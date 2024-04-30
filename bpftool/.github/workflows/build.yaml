@@ -1,0 +1,96 @@
+name: build
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/build.yaml'
+      - 'docs/**'
+      - 'include/**'
+      - 'libbpf/**'
+      - 'src/**'
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.after }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    env:
+      FEATURES: .llvm and .skeletons
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          submodules: true
+
+      - name: Use clang-12 and not clang-11 for older Ubuntu
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get remove -y clang-11 llvm-11
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 50
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+              libbfd-dev libcap-dev libelf-dev libiberty-dev python3-docutils
+          # clang/LLVM are already installed, but we're missing some aliases.
+          CLANG_VERSION="$(echo '__clang_major__' | clang -E - | tail -n 1)"
+          sudo update-alternatives \
+              --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-"${CLANG_VERSION}" 50 \
+              --slave /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-"${CLANG_VERSION}" \
+              --slave /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-"${CLANG_VERSION}"
+          echo "CLANG_VERSION=${CLANG_VERSION}" >> "${GITHUB_ENV}"
+
+      - name: Build bpftool (default LLVM disassembler)
+        run: |
+          make -j -C src V=1
+          ./src/bpftool 2>&1 | grep -q Usage
+          ./src/bpftool -p version | \
+              tee /dev/stderr | \
+              jq --exit-status ".features | ${FEATURES}"
+
+      - name: Build bpftool, with clang
+        run: |
+          make -C src clean
+          LLVM=1 make -j -C src V=1
+          ./src/bpftool 2>&1 | grep -q Usage
+          ./src/bpftool -p version | \
+              tee /dev/stderr | \
+              jq --exit-status ".features | ${FEATURES}"
+
+      - name: Build bpftool, with fallback to libbfd disassembler
+        run: |
+          sudo apt-get remove -y llvm-"${CLANG_VERSION}"-dev
+          make -C src clean
+          make -j -C src V=1
+          ./src/bpftool 2>&1 | grep -q Usage
+          ./src/bpftool -p version | \
+              tee /dev/stderr | \
+              jq --exit-status ".features | .libbfd and (.llvm | not)"
+
+      - name: Build bpftool, with libbfd, static build
+        run: |
+          make -C src clean
+          EXTRA_CFLAGS=--static make -j -C src V=1
+          ./src/bpftool 2>&1 | grep -q Usage
+          ./src/bpftool -p version | \
+              tee /dev/stderr | \
+              jq --exit-status ".features | .libbfd and (.llvm | not)"
+          ldd ./src/bpftool 2>&1 | \
+              tee /dev/stderr | \
+              grep -q 'not a dynamic executable'
+
+      - name: Build bpftool's documentation
+        run: |
+          make -j -C docs
+          grep -q '.TH "\?BPFTOOL"\? 8' ./docs/bpftool.8

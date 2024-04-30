@@ -1,0 +1,86 @@
+name: lint-commits
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checkCommits:
+    name: check commits
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          fetch-depth: 0
+
+      - name: Get list of commits
+        run: |
+          read PR_BASE PR_TIP < <(curl -L \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            ${{ github.event.pull_request.url }} | \
+            tee /dev/stderr | \
+            jq -r '"\(.base.sha) \(.head.sha)"' | \
+            tee /dev/stderr)
+            echo "PR_TIP=${PR_TIP}" >> "${GITHUB_ENV}"
+            echo "PR_BASE=${PR_BASE}" >> "${GITHUB_ENV}"
+
+      - name: Check commit prefixes
+        run: |
+          if [[ -z "${PR_TIP}" || -z "${PR_BASE}" ]]; then
+              echo "::error title=invalid base and head:: Failed to retrieve base and head for Pull Request"
+              # Fail workflow
+              false
+          fi
+          START_MARKER='sync: Update libbpf submodule'
+          END_MARKER='sync: Pull latest bpftool changes from kernel'
+          declare -a PREFIXES=(
+              "ci"
+              "mirror"
+          )
+
+          misformed=0
+          syncing=0
+          while read commit ; do
+              valid=1
+              sha="${commit%% *}"
+              object="${commit#* }"
+              case "${object}" in
+                  "${START_MARKER}")
+                      syncing=1
+                      ;;
+                  "${END_MARKER}")
+                      syncing=0
+                      ;;
+                  *)
+                      if [[ "${syncing}" == 0 ]]; then
+                          valid=0
+                          for prefix in "${PREFIXES[@]}"; do
+                              if [[ "${object}" =~ ^"${prefix}: " ]]; then
+                                  valid=1
+                                  break
+                              fi
+                          done
+                      fi
+                      ;;
+              esac
+              if [[ "${valid}" = 1 ]]; then
+                  echo "::notice title=valid prefix::${sha} (\"${object}\") has a valid prefix"
+              else
+                  echo "::error title=invalid prefix::${sha} (\"${object}\") does not have a valid prefix"
+                  misformed=$((misformed+1))
+              fi
+          done < <(git log --format='%h %s' --reverse ${{ env.PR_BASE }}..${{ env.PR_TIP }})
+
+          echo "::notice ::Found ${misformed} invalid commit object(s)"
+          if [[ "${misformed}" != 0 ]]; then
+              echo "Please ensure all commits not part of kernel sync are prefixed with one of:"
+              echo "    ${PREFIXES[@]/%/:}"
+              # Fail workflow
+              false
+          fi

@@ -1,0 +1,60 @@
+name: static LLVM build
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/static-build.yaml'
+      - 'include/**'
+      - 'libbpf/**'
+      - 'src/**'
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.after }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      LLVM_URL_PREFIX: https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.0
+      LLVM_PATH: clang+llvm-15.0.0-x86_64-linux-gnu-rhel-8.4
+
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libelf-dev
+
+      - name: Download and extract compiled LLVM release
+        run: |
+          curl -L -O "${{ env.LLVM_URL_PREFIX }}/${{ env.LLVM_PATH }}.tar.xz"
+          tar -xvf "${{ env.LLVM_PATH }}.tar.xz"
+
+      - name: Checkout bpftool
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          submodules: recursive
+          # Create a new directory to avoid wiping out LLVM on bpftool checkout
+          path: 'bpftool'
+
+      - name: Build bpftool (static build, default LLVM disassembler)
+        working-directory: 'bpftool'
+        run: |
+          EXTRA_CFLAGS=--static \
+              LLVM_CONFIG="${GITHUB_WORKSPACE}/${LLVM_PATH}/bin/llvm-config" \
+              LLVM_STRIP="${GITHUB_WORKSPACE}/${LLVM_PATH}/bin/llvm-strip" \
+              make -j -C src V=1
+
+      - name: Test bpftool binary
+        working-directory: 'bpftool'
+        run: |
+          ./src/bpftool 2>&1 | grep -q Usage
+          ./src/bpftool -p version | \
+              tee /dev/stderr | \
+              jq --exit-status ".features | .llvm"
+          ldd ./src/bpftool 2>&1 | \
+              tee /dev/stderr | \
+              grep -q 'not a dynamic executable'

@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+option go_package = "event";
+
+package event;
+
+service EventService {
+    rpc ReportDataEvent
+}
+
+message DataEvent {
+    
+}

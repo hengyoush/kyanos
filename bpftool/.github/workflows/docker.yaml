@@ -1,0 +1,44 @@
+name: docker
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/docker.yaml'
+      - 'Dockerfile'
+      - 'include/**'
+      - 'libbpf/**'
+      - 'src/**'
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.after }}
+  cancel-in-progress: true
+
+jobs:
+  dockerimage:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          submodules: recursive
+
+      - name: Build bpftool container image
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671 # v4.0.0
+        with:
+          push: false
+          tags: bpftool:latest
+
+      - name: Test bpftool container image
+        run: |
+          docker run --rm --privileged --pid=host bpftool version
+          docker run --rm --privileged --pid=host bpftool prog
+          docker run --rm --privileged --pid=host bpftool map
+
+      - name: Lint Docker image
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        with:
+          dockerfile: Dockerfile

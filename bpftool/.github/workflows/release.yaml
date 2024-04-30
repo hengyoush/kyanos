@@ -1,0 +1,147 @@
+name: build and release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.after }}
+  cancel-in-progress: true
+
+env:
+  # https://github.com/llvm/llvm-project/releases/tag/llvmorg-15.0.0
+  LLVM_URL_PREFIX: https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.0
+  LLVM_arm64: clang+llvm-15.0.0-aarch64-linux-gnu
+  LLVM_amd64: clang+llvm-15.0.0-x86_64-linux-gnu-rhel-8.4
+
+jobs:
+  build:
+    name: Build static bpftool binary
+    runs-on: ubuntu-22.04
+    env:
+      TARGETARCH: ${{ matrix.arch }}
+      FILE_STRING_ARCH_amd64: x86-64
+      FILE_STRING_ARCH_arm64: aarch64
+    strategy:
+      matrix:
+        arch: [arm64, amd64]
+
+    steps:
+      # amd64 needs the dependencies to build bpftool
+      - name: Install dependencies (amd64)
+        if: matrix.arch == 'amd64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libelf-dev libcap-dev
+
+      - name: Download and extract compiled LLVM release
+        env:
+          LLVM: ${{ env[format('LLVM_{0}', matrix.arch)] }}
+        run: |
+          curl -L -O "${{ env.LLVM_URL_PREFIX}}/${{ env.LLVM }}.tar.xz"
+          tar -xvf "${{ env.LLVM }}.tar.xz"
+
+      - name: Checkout bpftool code
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          submodules: recursive
+          # Create a new directory to avoid wiping out LLVM on bpftool checkout
+          path: 'bpftool'
+
+      - name: Build static bpftool natively for amd64
+        if: matrix.arch == 'amd64'
+        working-directory: 'bpftool'
+        env:
+          LLVM_PATH: ${{ env[format('LLVM_{0}', matrix.arch)] }}
+        run: |
+          EXTRA_CFLAGS=--static \
+              LLVM_CONFIG="${GITHUB_WORKSPACE}/${{ env.LLVM_PATH }}/bin/llvm-config" \
+              LLVM_STRIP="${GITHUB_WORKSPACE}/${{ env.LLVM_PATH }}/bin/llvm-strip" \
+              HOSTAR="${GITHUB_WORKSPACE}/${{ env.LLVM_PATH }}/bin/llvm-ar" \
+              make -j -C src V=1
+          strip src/bpftool
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@e81a89b1732b9c48d79cd809d8d81d79c4647a18 # v2.1.0
+        if: matrix.arch == 'arm64'
+        with:
+          platforms: arm64
+
+      # The emulated build leverages Docker and Ubuntu 22.04 container image
+      # distribution to have all the needed arm64 packages.
+      - name: Build static bpftool for arm64 with emulation
+        if: matrix.arch == 'arm64'
+        env:
+          LLVM_PATH: ${{ env[format('LLVM_{0}', matrix.arch)] }}
+        run:  |
+          docker run --platform linux/arm64 --rm -v $(pwd):/build ubuntu:22.04 \
+          bash -c "apt-get update && \
+                   apt-get install -y make pkg-config gcc \
+                       libelf-dev libcap-dev libstdc++-11-dev zlib1g-dev && \
+                   cd /build/bpftool && \
+                   EXTRA_CFLAGS=--static \
+                       LLVM_CONFIG='/build/${{ env.LLVM_PATH }}/bin/llvm-config' \
+                       LLVM_STRIP='/build/${{ env.LLVM_PATH }}/bin/llvm-strip' \
+                       CLANG='/build/${{ env.LLVM_PATH }}/bin/clang' \
+                       make -j -C src V=1 && \
+                   strip src/bpftool"
+
+      - name: Test bpftool binary
+        working-directory: 'bpftool/src'
+        env:
+          ARCH: ${{ env[format('FILE_STRING_ARCH_{0}', matrix.arch)] }}
+        run: |
+          file ./bpftool | \
+              tee /dev/stderr | \
+              grep -q "${{ env.ARCH }}"
+          ./bpftool 2>&1 | grep -q Usage
+          ./bpftool -p version | \
+              tee /dev/stderr | \
+              jq --exit-status ".features | .llvm and .skeletons"
+          ldd ./bpftool 2>&1 | \
+              tee /dev/stderr | \
+              grep -q 'not a dynamic executable'
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+        with:
+          name: ${{ format('bpftool_{0}', matrix.arch) }}
+          path: bpftool/src/bpftool
+
+  draft-release:
+    name: Create a draft release
+    runs-on: ubuntu-22.04
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts from build
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
+
+      - name: Rename binaries and compress
+        run: |
+          archive_amd64="bpftool-${{ github.ref_name }}-amd64.tar.gz"
+          archive_arm64="bpftool-${{ github.ref_name }}-arm64.tar.gz"
+          tar -C bpftool_amd64 -I 'gzip -9' -cvf "${archive_amd64}" bpftool
+          tar -C bpftool_arm64 -I 'gzip -9' -cvf "${archive_arm64}" bpftool
+          sha256sum "${archive_amd64}" > "${archive_amd64}.sha256sum"
+          sha256sum "${archive_arm64}" > "${archive_arm64}.sha256sum"
+
+      - name: Checkout bpftool and libbpf code
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          submodules: recursive
+          path: 'bpftool'
+
+      - name: Package source code including submodules
+        uses: qmonnet/git-archive-all-action@791fb850881cf58b1d1fcc9b06c01940080bba0a # v1.0.1
+        with:
+          output-files: bpftool-libbpf-${{ github.ref_name }}-sources.tar.gz
+          base-repo: bpftool
+
+      - name: Create draft release and add artifacts
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v0.1.15
+        with:
+          draft: true
+          files: bpftool*

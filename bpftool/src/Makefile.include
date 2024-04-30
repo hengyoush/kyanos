@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+
+ifneq ($(OUTPUT),)
+$(if $(shell [ -d "$(OUTPUT)" -a -x "$(OUTPUT)" ] && echo 1),, \
+  $(error output directory "$(OUTPUT)" does not exist))
+endif
+
+LLVM_VERSION ?=
+CLANG        ?= clang$(LLVM_VERSION)
+LLVM_CONFIG  ?= llvm-config$(LLVM_VERSION)
+LLVM_STRIP   ?= llvm-strip$(LLVM_VERSION)
+
+ifneq ($(LLVM),)
+  $(if $(findstring default,$(origin AR)),$(eval AR := llvm-ar$(LLVM_VERSION)))
+  $(if $(findstring default,$(origin CC)),$(eval CC := clang$(LLVM_VERSION)))
+  $(if $(findstring default,$(origin LD)),$(eval LD := ld.lld$(LLVM_VERSION)))
+  HOSTAR ?= llvm-ar
+  HOSTCC ?= clang
+  HOSTLD ?= ld.lld
+else
+  $(if $(findstring default,$(origin AR)),$(eval AR = $(CROSS_COMPILE)$(AR)))
+  $(if $(findstring default,$(origin CC)),$(eval CC = $(CROSS_COMPILE)$(CC)))
+  $(if $(findstring default,$(origin LD)),$(eval LD = $(CROSS_COMPILE)$(LD)))
+  HOSTAR ?= ar
+  HOSTCC ?= gcc
+  HOSTLD ?= ld
+endif
+
+EXTRA_WARNINGS := \
+	-Wbad-function-cast \
+	-Wdeclaration-after-statement \
+	-Wformat-security \
+	-Wformat-y2k \
+	-Winit-self \
+	-Wmissing-declarations \
+	-Wmissing-prototypes \
+	-Wold-style-definition \
+	-Wpacked \
+	-Wredundant-decls \
+	-Wshadow \
+	-Wstrict-prototypes \
+	-Wswitch-default \
+	-Wundef \
+	-Wwrite-strings \
+
+ifeq ($(findstring s,$(filter-out --%,$(MAKEFLAGS))),)
+  ifneq ($(V),1)
+
+    define def_quiet_msg
+      $(eval QUIET_$(1) = @printf '  %-9s%s\n' $(1) $$@;)
+    endef
+    $(foreach action,CC CLANG LINK MKDIR GEN,$(call def_quiet_msg,$(action)))
+
+    define def_quiet_msg_subdir
+      $(eval QUIET_$(1) = @printf '  %-9s%s\n' $(1) $$1;)
+    endef
+    $(foreach action,CLEAN INSTALL UNINST,$(call def_quiet_msg_subdir,$(action)))
+
+    define descend
+      @printf '  DESCEND  %s\n' $(1); mkdir -p $(OUTPUT)$(1) && \
+        $(MAKE) --no-print-directory -C $(1) $(2)
+    endef
+
+  endif
+endif
