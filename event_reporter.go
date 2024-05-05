@@ -38,6 +38,7 @@ type DataEvent struct {
 var httpClient *http.Client = &http.Client{}
 var connEventEndpoint string = "http://localhost:18800/event-collector/conn-event"
 var dataEventEndpoint string = "http://localhost:18800/event-collector/data-event"
+var queit bool = true
 
 type DirectEnum uint32
 
@@ -95,6 +96,16 @@ func StepAsString(s Step) string {
 	default:
 		return fmt.Sprintf("Unknown step: %d", s)
 	}
+}
+
+func ReportDataEvents(event []*pktlatencyKernEvt, conn *Connection4) error {
+	for _, e := range event {
+		err := ReportDataEvent(e, conn)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func ReportDataEvent(event *pktlatencyKernEvt, conn *Connection4) error {

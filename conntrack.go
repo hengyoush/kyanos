@@ -5,9 +5,10 @@ type Connection4 struct {
 	remoteIp   uint32
 	localPort  uint16
 	remotePort uint16
-	protocol   uint32
+	protocol   pktlatencyTrafficProtocolT
 	role       pktlatencyEndpointRoleT
 	tgidFd     uint64
+	TempEvents []*pktlatencyKernEvt
 }
 
 type ConnManager struct {
@@ -29,4 +30,8 @@ func (c *ConnManager) RemoveConnection4(TgidFd uint64) {
 
 func (c *ConnManager) findConnection4(TgidFd uint64) *Connection4 {
 	return c.connMap[TgidFd]
+}
+
+func (c *Connection4) AddEvent(e *pktlatencyKernEvt) {
+	c.TempEvents = append(c.TempEvents, e)
 }

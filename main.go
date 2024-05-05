@@ -49,7 +49,7 @@ func main() {
 		}
 		if l, ok := e.Value.(link.Link); ok {
 			defer func() {
-				(l).Close()
+				l.Close()
 			}()
 		}
 	}
@@ -157,6 +157,19 @@ func handleConnEvt(record []byte, connManager *ConnManager) error {
 			time.Sleep(1 * time.Second)
 			connManager.RemoveConnection4(TgidFd)
 		}()
+	} else if event.ConnType == pktlatencyConnTypeTKProtocolInfer {
+		// 协议推断
+		conn := connManager.findConnection4(TgidFd)
+		if conn != nil {
+			conn.protocol = event.ConnInfo.Protocol
+		} else {
+			return nil
+		}
+		if conn.protocol != pktlatencyTrafficProtocolTKProtocolUnknown {
+			ReportDataEvents(conn.TempEvents, conn)
+		}
+		// 清空, 这里可能有race
+		conn.TempEvents = conn.TempEvents[0:0]
 	}
 	direct := "=>"
 	if event.ConnInfo.Role != pktlatencyEndpointRoleTKRoleClient {
@@ -165,11 +178,13 @@ func handleConnEvt(record []byte, connManager *ConnManager) error {
 	eventType := "connect"
 	if event.ConnType == pktlatencyConnTypeTKClose {
 		eventType = "close"
+	} else if event.ConnType == pktlatencyConnTypeTKProtocolInfer {
+		eventType = "infer"
 	}
 	event.Ts += LaunchEpochTime
-	log.Printf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, eventType)
+	log.Printf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, eventType, conn.protocol)
 	go func() {
-		ReportConnEvent(&event)
+		// ReportConnEvent(&event)
 	}()
 	return nil
 }
@@ -192,10 +207,14 @@ func handleKernEvt(record []byte, connManager *ConnManager) error {
 	} else {
 		log.Println("failed to retrieve conn from connManager")
 	}
-	if event.Len > 0 && conn != nil {
+	if event.Len > 0 && conn != nil && conn.protocol != pktlatencyTrafficProtocolTKProtocolUnknown {
 		go func() {
 			if conn != nil {
-				ReportDataEvent(&event, conn)
+				if conn.protocol == pktlatencyTrafficProtocolTKProtocolUnset {
+					conn.AddEvent(&event)
+				} else if conn.protocol != pktlatencyTrafficProtocolTKProtocolUnknown {
+					// ReportDataEvent(&event, conn)
+				}
 			}
 		}()
 	}

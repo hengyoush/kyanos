@@ -44,7 +44,7 @@ type pktlatencyConnEvtT struct {
 			}
 			_ [12]byte
 		}
-		Protocol uint32
+		Protocol pktlatencyTrafficProtocolT
 		Role     pktlatencyEndpointRoleT
 	}
 	ConnType pktlatencyConnTypeT
@@ -55,8 +55,9 @@ type pktlatencyConnEvtT struct {
 type pktlatencyConnTypeT uint32
 
 const (
-	pktlatencyConnTypeTKConnect pktlatencyConnTypeT = 0
-	pktlatencyConnTypeTKClose   pktlatencyConnTypeT = 1
+	pktlatencyConnTypeTKConnect       pktlatencyConnTypeT = 0
+	pktlatencyConnTypeTKClose         pktlatencyConnTypeT = 1
+	pktlatencyConnTypeTKProtocolInfer pktlatencyConnTypeT = 2
 )
 
 type pktlatencyEndpointRoleT uint32
@@ -87,6 +88,26 @@ type pktlatencyTrafficDirectionT uint32
 const (
 	pktlatencyTrafficDirectionTKEgress  pktlatencyTrafficDirectionT = 0
 	pktlatencyTrafficDirectionTKIngress pktlatencyTrafficDirectionT = 1
+)
+
+type pktlatencyTrafficProtocolT uint32
+
+const (
+	pktlatencyTrafficProtocolTKProtocolUnset   pktlatencyTrafficProtocolT = 0
+	pktlatencyTrafficProtocolTKProtocolUnknown pktlatencyTrafficProtocolT = 1
+	pktlatencyTrafficProtocolTKProtocolHTTP    pktlatencyTrafficProtocolT = 2
+	pktlatencyTrafficProtocolTKProtocolHTTP2   pktlatencyTrafficProtocolT = 3
+	pktlatencyTrafficProtocolTKProtocolMySQL   pktlatencyTrafficProtocolT = 4
+	pktlatencyTrafficProtocolTKProtocolCQL     pktlatencyTrafficProtocolT = 5
+	pktlatencyTrafficProtocolTKProtocolPGSQL   pktlatencyTrafficProtocolT = 6
+	pktlatencyTrafficProtocolTKProtocolDNS     pktlatencyTrafficProtocolT = 7
+	pktlatencyTrafficProtocolTKProtocolRedis   pktlatencyTrafficProtocolT = 8
+	pktlatencyTrafficProtocolTKProtocolNATS    pktlatencyTrafficProtocolT = 9
+	pktlatencyTrafficProtocolTKProtocolMongo   pktlatencyTrafficProtocolT = 10
+	pktlatencyTrafficProtocolTKProtocolKafka   pktlatencyTrafficProtocolT = 11
+	pktlatencyTrafficProtocolTKProtocolMux     pktlatencyTrafficProtocolT = 12
+	pktlatencyTrafficProtocolTKProtocolAMQP    pktlatencyTrafficProtocolT = 13
+	pktlatencyTrafficProtocolTKNumProtocols    pktlatencyTrafficProtocolT = 14
 )
 
 // loadPktlatency returns the embedded CollectionSpec for pktlatency.
