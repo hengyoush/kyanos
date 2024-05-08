@@ -1,5 +1,0 @@
-decap_sanity  # weird failure with decap_sanity_ns netns already existing, TBD
-empty_skb # waiting the fix in bpf tree to make it to bpf-next
-bpf_nf/tc-bpf-ct # test consistently failing on x86: https://github.com/libbpf/libbpf/pull/698#issuecomment-1590341200
-bpf_nf/xdp-ct   # test consistently failing on x86: https://github.com/libbpf/libbpf/pull/698#issuecomment-1590341200
-kprobe_multi_bench_attach # suspected to cause crashes in CI

@@ -8,6 +8,7 @@
 *.so
 *.dylib
 *.o
+agent/agent_x86_bpfel.o
 
 # Test binary, built with `go test -c`
 *.test
