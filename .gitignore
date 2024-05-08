@@ -24,3 +24,5 @@ go.work
 .output/
 
 eapm-ebpf
+bpftool/
+libbpf/
