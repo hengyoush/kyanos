@@ -23,6 +23,6 @@ go.work
 .vscode/
 .output/
 
-eapm-ebpf
+./eapm-ebpf
 bpftool/
 libbpf/

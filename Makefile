@@ -7,8 +7,7 @@ BPFTOOL_OUTPUT ?= $(abspath $(OUTPUT)/bpftool)
 BPFTOOL ?= $(BPFTOOL_OUTPUT)/bootstrap/bpftool
 LIBBPF_OBJ := $(abspath $(OUTPUT)/libbpf.a)
 VMLINUX := ./vmlinux/$(ARCH)/vmlinux.h
-INCLUDES := -I$(OUTPUT) -I./libbpf/include/uapi -I$(dir $(VMLINUX)) -I/usr/local/include/glib-2.0 \
-		-I/usr/local/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/local/include -I/usr/include/mysql/
+INCLUDES := -I$(OUTPUT) -I./libbpf/include/uapi -I$(dir $(VMLINUX))
 ARCH ?= $(shell uname -m | sed 's/x86_64/x86/' \
 			 | sed 's/arm.*/arm/' \
 			 | sed 's/aarch64/arm64/' \
@@ -19,9 +18,9 @@ ARCH ?= $(shell uname -m | sed 's/x86_64/x86/' \
 
 CLANG_BPF_SYS_INCLUDES ?= $(shell $(CLANG) -v -E - </dev/null 2>&1 \
 	| sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }')
-APPS = pktlatency
+APPS = eapm-ebpf
 CFLAGS := -O2 -Wall 
-ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)  -L/usr/local/lib/x86_64-linux-gnu -lglib-2.0 -lmysqlclient
+ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 ifeq ($(V),1)
 	Q =
@@ -44,7 +43,7 @@ all: $(APPS)
 
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(APPS) pktlatency
+	$(Q)rm -rf $(OUTPUT) $(APPS) eapm-ebpf
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)
@@ -63,40 +62,9 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 	$(call msg,BPFTOOL,$@)
 	$(Q)$(MAKE) ARCH= CROSS_COMPILE= OUTPUT=$(BPFTOOL_OUTPUT)/ -C $(BPFTOOL_SRC) bootstrap
 
-# Build BPF code
-$(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(wildcard *.h) $(VMLINUX) | $(OUTPUT) $(BPFTOOL)
-	$(call msg,BPF,$@)
-	$(Q)$(CLANG) -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH)	      \
-		     $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES)		      \
-		     -c $(filter %.c,$^) -o $(patsubst %.bpf.o,%.tmp.bpf.o,$@)
-	$(Q)$(BPFTOOL) gen object $@ $(patsubst %.bpf.o,%.tmp.bpf.o,$@)
-
-
-# Generate BPF skeletons
-$(OUTPUT)/%.skel.h: $(OUTPUT)/%.bpf.o | $(OUTPUT) $(BPFTOOL)
-	$(call msg,GEN-SKEL,$@)
-	$(Q)$(BPFTOOL) gen skeleton $< > $@
-
-# 编译conn_track
-$(OUTPUT)/conn_track.o: conn_track.c $(wildcard *.h) | $(OUTPUT)
-	$(call msg,CC,$@)
-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
-
-# 编译ringbuffer
-$(OUTPUT)/ring_buffer.o: ring_buffer.c $(wildcard *.h) | $(OUTPUT)
-	$(call msg,CC,$@)
-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
-
-# pktlatency.o 依赖每个skel头文件
-$(OUTPUT)/pktlatency.o: $(patsubst %,$(OUTPUT)/%.skel.h,$(APPS)) $(patsubst %,$(OUTPUT)/%.o,$(PARSERS))
-$(OUTPUT)/pktlatency.o: pktlatency.c $(wildcard *.h) | $(OUTPUT)
-	$(call msg,CC,$@)
-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^)  -o $@
-
-pktlatency: $(OUTPUT)/pktlatency.o $(LIBBPF_OBJ) $(OUTPUT)/ring_buffer.o $(OUTPUT)/conn_track.o | $(OUTPUT)
+eapm-ebpf: $(LIBBPF_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
-	$(Q)$(CC) $(CFLAGS) $^ $(ALL_LDFLAGS) -lelf -lz -o $@
-
+	./build.sh
 # delete failed targets
 .DELETE_ON_ERROR:
 

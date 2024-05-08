@@ -292,6 +292,7 @@ static __always_inline struct protocol_message_t infer_protocol(const char *buf,
     protocol_message.protocol = kProtocolRedis;
   }
   conn_info->protocol = protocol_message.protocol;
+  return protocol_message;
 }
 
 #endif		
