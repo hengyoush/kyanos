@@ -21,6 +21,8 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 #define _U(src, a, ...)		BPF_PROBE_READ_USER(src, a, ##__VA_ARGS__)
 #define IP_H_LEN	(sizeof(struct iphdr))
 
+volatile const uint32_t agent_pid;
+
 #define MY_BPF_HASH(name, key_type, value_type) \
 struct {													\
 	__uint(type, BPF_MAP_TYPE_HASH); \
@@ -1034,6 +1036,10 @@ static __always_inline void process_syscall_connect(struct pt_regs* ctx, struct 
 	if (args->fd < 0) {
 		return;
 	}
+
+	if (tgid == agent_pid) {
+		return;
+	}
 	submit_new_conn(ctx, tgid, args->fd, args->addr, NULL, kRoleClient );
 }
 static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct accept_args *args, uint64_t id) {
@@ -1041,6 +1047,9 @@ static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct a
 	int  ret_fd = PT_REGS_RC_CORE(ctx);
 	if (ret_fd < 0) {
 		// bpf_printk("process_syscall_accept, ret_fd: %d, socket:%d", -ret_fd,args->sock_alloc_socket);
+		return;
+	}
+	if (tgid == agent_pid) {
 		return;
 	}
 	// bpf_printk("process_syscall_accept, ret_fd: %d, socket:%d", ret_fd,args->sock_alloc_socket);
