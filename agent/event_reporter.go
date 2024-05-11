@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"eapm-ebpf/common"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -101,7 +100,8 @@ func StepAsString(s Step) string {
 	case SyscallIn:
 		return "SYSCALL_IN"
 	default:
-		return fmt.Sprintf("Unknown step: %d", s)
+		log.Errorf("Unknown step: %d\n", s)
+		return ""
 	}
 }
 
@@ -168,11 +168,11 @@ func ReportDataEvent(event *agentKernEvt, conn *Connection4) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(jsonData))
+	log.Debugf(string(jsonData))
 	// 构造 HTTP 请求
 	req, err := http.NewRequest("POST", dataEventEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Println("Failed to create request:", err)
+		log.Warningln("Failed to create request:", err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -181,15 +181,13 @@ func ReportDataEvent(event *agentKernEvt, conn *Connection4) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Failed to send request:", err)
+		log.Warningln("Failed to send request:", err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	// 打印响应状态码
-	if viper.GetBool(common.VerboseVarName) {
-		fmt.Println("Response Status:", resp.Status)
-	}
+	log.Debugln("Response Status:", resp.Status)
 
 	return nil
 }
@@ -230,11 +228,11 @@ func ReportConnEvent(event *agentConnEvtT) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(jsonData))
+	log.Debugf(string(jsonData))
 	// 构造 HTTP 请求
 	req, err := http.NewRequest("POST", connEventEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
-		fmt.Println("Failed to create request:", err)
+		log.Errorln("Failed to create request:", err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -243,16 +241,16 @@ func ReportConnEvent(event *agentConnEvtT) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println("Failed to send request:", err)
+		log.Errorln("Failed to send request:", err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	// 打印响应状态码
 	if viper.GetBool(common.VerboseVarName) {
-		fmt.Println("Response Status:", resp.Status)
+		log.Debugln("Response Status:", resp.Status)
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		fmt.Println("Body: ", string(bodyBytes))
+		log.Debugln("Body: ", string(bodyBytes))
 	}
 
 	return nil

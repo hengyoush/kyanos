@@ -6,7 +6,6 @@ import (
 	"eapm-ebpf/common"
 	"encoding/binary"
 	"errors"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -17,10 +16,13 @@ import (
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/jefurry/logrus"
 	"github.com/spf13/viper"
 )
 
 var LaunchEpochTime uint64
+
+var log *logrus.Logger = common.Log
 
 func SetupAgent() {
 	InitReporter()
@@ -38,8 +40,22 @@ func SetupAgent() {
 
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs agentObjects
-	if err := loadAgentObjects(&objs, nil); err != nil {
-		log.Println("loadAgentObjects:", err)
+
+	spec, err := loadAgent()
+	if err != nil {
+		log.Fatal("load Agent error:", err)
+	}
+	err = spec.RewriteConstants(map[string]interface{}{
+		"agent_pid": uint32(os.Getpid()),
+	})
+	if err != nil {
+		log.Fatal("rewrite constants error:", err)
+	}
+
+	err = spec.LoadAndAssign(&objs, nil)
+
+	if err != nil {
+		log.Errorln("loadAgentObjects:", err)
 		return
 	}
 
@@ -60,14 +76,14 @@ func SetupAgent() {
 	// kernel >= 5.8
 	dataReader, err := ringbuf.NewReader(objs.agentMaps.Rb)
 	if err != nil {
-		log.Println("new dataReader ringbuffer err:", err)
+		log.Error("new dataReader ringbuffer err:", err)
 		return
 	}
 	defer dataReader.Close()
 
 	connEvtReader, err := ringbuf.NewReader(objs.agentMaps.ConnEvtRb)
 	if err != nil {
-		log.Println("new connEvtReader ringbuffer err:", err)
+		log.Error("new connEvtReader ringbuffer err:", err)
 		return
 	}
 	defer connEvtReader.Close()
@@ -87,7 +103,7 @@ func SetupAgent() {
 		stop = true
 	}()
 
-	log.Println("Waiting for events..")
+	log.Info("Waiting for events..")
 
 	// https://github.com/cilium/ebpf/blob/main/examples/ringbuffer/ringbuffer.c
 	go func() {
@@ -95,14 +111,14 @@ func SetupAgent() {
 			record, err := dataReader.Read()
 			if err != nil {
 				if errors.Is(err, ringbuf.ErrClosed) {
-					log.Println("[dataReader] Received signal, exiting..")
+					log.Infoln("[dataReader] Received signal, exiting..")
 					return
 				}
-				log.Printf("[dataReader] reading from reader: %s", err)
+				log.Infof("[dataReader] reading from reader: %s\n", err)
 				continue
 			}
 			if err := handleKernEvt(record.RawSample, connManager); err != nil {
-				log.Printf("[dataReader] handleKernEvt err: %s", err)
+				log.Infof("[dataReader] handleKernEvt err: %s\n", err)
 				continue
 			}
 
@@ -114,14 +130,14 @@ func SetupAgent() {
 			record, err := connEvtReader.Read()
 			if err != nil {
 				if errors.Is(err, ringbuf.ErrClosed) {
-					log.Println("[connEvtReader] Received signal, exiting..")
+					log.Infoln("[connEvtReader] Received signal, exiting..")
 					return
 				}
-				log.Printf("[connEvtReader] reading from reader: %s", err)
+				log.Infof("[connEvtReader] reading from reader: %s\n", err)
 				continue
 			}
 			if err := handleConnEvt(record.RawSample, connManager); err != nil {
-				log.Printf("[connEvtReader] handleKernEvt err: %s", err)
+				log.Infof("[connEvtReader] handleKernEvt err: %s\n", err)
 				continue
 			}
 		}
@@ -133,6 +149,7 @@ func SetupAgent() {
 	log.Println("Stopped")
 	return
 }
+
 func handleConnEvt(record []byte, connManager *ConnManager) error {
 	var event agentConnEvtT
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event)
@@ -183,7 +200,7 @@ func handleConnEvt(record []byte, connManager *ConnManager) error {
 	}
 	event.Ts += LaunchEpochTime
 	if viper.GetBool(common.ConsoleOutputVarName) {
-		log.Printf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, eventType, conn.protocol)
+		log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, eventType, conn.protocol)
 	}
 
 	go func() {
@@ -206,11 +223,11 @@ func handleKernEvt(record []byte, connManager *ConnManager) error {
 			direct = "<="
 		}
 		if viper.GetBool(common.ConsoleOutputVarName) {
-			log.Printf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, int8ToStr(event.FuncName[:]), StepAsString(Step(event.Step)), intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, event.Seq, event.Len)
+			log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, int8ToStr(event.FuncName[:]), StepAsString(Step(event.Step)), intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, event.Seq, event.Len)
 		}
 
 	} else {
-		log.Println("failed to retrieve conn from connManager")
+		log.Infoln("failed to retrieve conn from connManager")
 	}
 	if event.Len > 0 && conn != nil && conn.protocol != agentTrafficProtocolTKProtocolUnknown {
 		go func() {
