@@ -43,7 +43,7 @@ all: $(APPS)
 
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(APPS) eapm-ebpf
+	$(Q)rm -rf $(OUTPUT) $(APPS) eapm-ebpf eapm-ebpf.log
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)
@@ -62,7 +62,9 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 	$(call msg,BPFTOOL,$@)
 	$(Q)$(MAKE) ARCH= CROSS_COMPILE= OUTPUT=$(BPFTOOL_OUTPUT)/ -C $(BPFTOOL_SRC) bootstrap
 
-eapm-ebpf: $(LIBBPF_OBJ) | $(OUTPUT)
+GO_FILES := $(shell find $(SRC_DIR) -type f -name '*.go' | sort)  
+
+eapm-ebpf: $(LIBBPF_OBJ) $(GO_FILES) pktlatency.bpf.c | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	./build.sh
 # delete failed targets
