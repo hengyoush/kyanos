@@ -40,7 +40,21 @@ func SetupAgent() {
 
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs agentObjects
-	if err := loadAgentObjects(&objs, nil); err != nil {
+
+	spec, err := loadAgent()
+	if err != nil {
+		log.Fatal("load Agent error:", err)
+	}
+	err = spec.RewriteConstants(map[string]interface{}{
+		"agent_pid": uint32(os.Getpid()),
+	})
+	if err != nil {
+		log.Fatal("rewrite constants error:", err)
+	}
+
+	err = spec.LoadAndAssign(&objs, nil)
+
+	if err != nil {
 		log.Errorln("loadAgentObjects:", err)
 		return
 	}
@@ -135,6 +149,7 @@ func SetupAgent() {
 	log.Println("Stopped")
 	return
 }
+
 func handleConnEvt(record []byte, connManager *ConnManager) error {
 	var event agentConnEvtT
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event)
