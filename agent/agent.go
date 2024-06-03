@@ -183,29 +183,40 @@ func handleConnEvt(record []byte, connManager *ConnManager) error {
 			return nil
 		}
 		if conn.protocol != agentTrafficProtocolTKProtocolUnknown {
-			ReportDataEvents(conn.TempEvents, conn)
+			ReportDataEvents(conn.TempKernEvents, conn)
+			ReportConnEvents(conn.TempConnEvents)
 		}
 		// 清空, 这里可能有race
-		conn.TempEvents = conn.TempEvents[0:0]
+		conn.TempKernEvents = conn.TempKernEvents[0:0]
+		conn.TempConnEvents = conn.TempConnEvents[0:0]
 	}
 	direct := "=>"
 	if event.ConnInfo.Role != agentEndpointRoleTKRoleClient {
 		direct = "<="
 	}
 	eventType := "connect"
+	event.Ts += LaunchEpochTime
+	reportEvt := false
 	if event.ConnType == agentConnTypeTKClose {
 		eventType = "close"
+		// 连接关闭时,如果协议已经推断出来那么上报事件
+		if conn.ProtocolInferred() {
+			reportEvt = true
+		}
 	} else if event.ConnType == agentConnTypeTKProtocolInfer {
 		eventType = "infer"
+		// 连接推断事件可以不上报
+	} else if event.ConnType == agentConnTypeTKConnect {
+		conn.AddConnEvent(&event)
 	}
-	event.Ts += LaunchEpochTime
 	if viper.GetBool(common.ConsoleOutputVarName) {
 		log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, eventType, conn.protocol)
 	}
-
-	go func() {
-		ReportConnEvent(&event)
-	}()
+	if reportEvt {
+		go func() {
+			ReportConnEvent(&event)
+		}()
+	}
 	return nil
 }
 func handleKernEvt(record []byte, connManager *ConnManager) error {
@@ -233,7 +244,7 @@ func handleKernEvt(record []byte, connManager *ConnManager) error {
 		go func() {
 			if conn != nil {
 				if conn.protocol == agentTrafficProtocolTKProtocolUnset {
-					conn.AddEvent(&event)
+					conn.AddKernEvent(&event)
 				} else if conn.protocol != agentTrafficProtocolTKProtocolUnknown {
 					ReportDataEvent(&event, conn)
 				}

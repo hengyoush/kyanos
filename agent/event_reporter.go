@@ -104,7 +104,15 @@ func StepAsString(s Step) string {
 		return ""
 	}
 }
-
+func ReportConnEvents(event []*agentConnEvtT) error {
+	for _, e := range event {
+		err := ReportConnEvent(e)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 func ReportDataEvents(event []*agentKernEvt, conn *Connection4) error {
 	for _, e := range event {
 		err := ReportDataEvent(e, conn)

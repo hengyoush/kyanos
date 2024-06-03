@@ -1,37 +1,54 @@
 package agent
 
+import "sync"
+
 type Connection4 struct {
-	localIp    uint32
-	remoteIp   uint32
-	localPort  uint16
-	remotePort uint16
-	protocol   agentTrafficProtocolT
-	role       agentEndpointRoleT
-	tgidFd     uint64
-	TempEvents []*agentKernEvt
+	localIp        uint32
+	remoteIp       uint32
+	localPort      uint16
+	remotePort     uint16
+	protocol       agentTrafficProtocolT
+	role           agentEndpointRoleT
+	tgidFd         uint64
+	TempKernEvents []*agentKernEvt
+	TempConnEvents []*agentConnEvtT
 }
 
 type ConnManager struct {
-	connMap map[uint64]*Connection4
+	connMap *sync.Map
 }
 
 func InitConnManager() *ConnManager {
-	return &ConnManager{connMap: make(map[uint64]*Connection4)}
+	return &ConnManager{connMap: new(sync.Map)}
 }
 
 func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
-	c.connMap[TgidFd] = conn
+	c.connMap.Store(TgidFd, conn)
 	return nil
 }
 
 func (c *ConnManager) RemoveConnection4(TgidFd uint64) {
-	delete(c.connMap, TgidFd)
+	c.connMap.Delete(TgidFd)
 }
 
 func (c *ConnManager) findConnection4(TgidFd uint64) *Connection4 {
-	return c.connMap[TgidFd]
+	v, _ := c.connMap.Load(TgidFd)
+	if v != nil {
+		return v.(*Connection4)
+	} else {
+		return nil
+	}
+
 }
 
-func (c *Connection4) AddEvent(e *agentKernEvt) {
-	c.TempEvents = append(c.TempEvents, e)
+func (c *Connection4) AddKernEvent(e *agentKernEvt) {
+	c.TempKernEvents = append(c.TempKernEvents, e)
+}
+
+func (c *Connection4) AddConnEvent(e *agentConnEvtT) {
+	c.TempConnEvents = append(c.TempConnEvents, e)
+}
+
+func (c *Connection4) ProtocolInferred() bool {
+	return (c.protocol != agentTrafficProtocolTKProtocolUnknown) && (c.protocol != agentTrafficProtocolTKProtocolUnset)
 }
