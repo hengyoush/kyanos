@@ -3,6 +3,10 @@ package agent
 import (
 	"bytes"
 	"container/list"
+	"eapm-ebpf/agent/conn"
+	"eapm-ebpf/agent/protocol"
+	"eapm-ebpf/agent/stat"
+	"eapm-ebpf/bpf"
 	"eapm-ebpf/common"
 	"encoding/binary"
 	"errors"
@@ -11,6 +15,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -20,16 +25,18 @@ import (
 	"github.com/spf13/viper"
 )
 
-var LaunchEpochTime uint64
-
 var log *logrus.Logger = common.Log
 
 func SetupAgent() {
 	InitReporter()
 
-	LaunchEpochTime = GetMachineStartTimeNano()
+	common.LaunchEpochTime = GetMachineStartTimeNano()
 	stopper := make(chan os.Signal, 1)
-	connManager := InitConnManager()
+	connManager := conn.InitConnManager()
+	statRecorder := stat.InitStatRecorder()
+	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
+		return statRecorder.ReceiveRecord(r, c)
+	}
 
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
 
@@ -39,9 +46,9 @@ func SetupAgent() {
 	}
 
 	// Load the compiled eBPF ELF and load it into the kernel.
-	var objs agentObjects
+	var objs bpf.AgentObjects
 
-	spec, err := loadAgent()
+	spec, err := bpf.LoadAgent()
 	if err != nil {
 		log.Fatal("load Agent error:", err)
 	}
@@ -55,7 +62,14 @@ func SetupAgent() {
 	err = spec.LoadAndAssign(&objs, nil)
 
 	if err != nil {
-		log.Errorln("loadAgentObjects:", err)
+		err = errors.Unwrap(errors.Unwrap(err))
+		inner_err, ok := err.(*ebpf.VerifierError)
+		if ok {
+			inner_err.Truncated = false
+			log.Errorf("loadAgentObjects: %+v", inner_err)
+		} else {
+			log.Errorf("loadAgentObjects: %+v", err)
+		}
 		return
 	}
 
@@ -74,14 +88,21 @@ func SetupAgent() {
 		}
 	}
 	// kernel >= 5.8
-	dataReader, err := ringbuf.NewReader(objs.agentMaps.Rb)
+	syscallDataReader, err := ringbuf.NewReader(objs.AgentMaps.SyscallRb)
+	if err != nil {
+		log.Error("new syscall data reader ringbuffer err:", err)
+		return
+	}
+	defer syscallDataReader.Close()
+
+	dataReader, err := ringbuf.NewReader(objs.AgentMaps.Rb)
 	if err != nil {
 		log.Error("new dataReader ringbuffer err:", err)
 		return
 	}
 	defer dataReader.Close()
 
-	connEvtReader, err := ringbuf.NewReader(objs.agentMaps.ConnEvtRb)
+	connEvtReader, err := ringbuf.NewReader(objs.AgentMaps.ConnEvtRb)
 	if err != nil {
 		log.Error("new connEvtReader ringbuffer err:", err)
 		return
@@ -99,6 +120,9 @@ func SetupAgent() {
 		}
 		if err := connEvtReader.Close(); err != nil {
 			log.Fatalf("closing connEvtReader error: %s", err)
+		}
+		if err := syscallDataReader.Close(); err != nil {
+			log.Fatalf("closing syscallDataReader error: %s", err)
 		}
 		stop = true
 	}()
@@ -127,6 +151,24 @@ func SetupAgent() {
 
 	go func() {
 		for {
+			record, err := syscallDataReader.Read()
+			if err != nil {
+				if errors.Is(err, ringbuf.ErrClosed) {
+					log.Infoln("[syscallDataReader] Received signal, exiting..")
+					return
+				}
+				log.Infof("[syscallDataReader] reading from reader: %s\n", err)
+				continue
+			}
+			if err := handleSyscallEvt(record.RawSample, connManager); err != nil {
+				log.Infof("[syscallDataReader] handleSyscallEvt err: %s\n", err)
+				continue
+			}
+		}
+	}()
+
+	go func() {
+		for {
 			record, err := connEvtReader.Read()
 			if err != nil {
 				if errors.Is(err, ringbuf.ErrClosed) {
@@ -150,180 +192,240 @@ func SetupAgent() {
 	return
 }
 
-func handleConnEvt(record []byte, connManager *ConnManager) error {
-	var event agentConnEvtT
+func handleConnEvt(record []byte, connManager *conn.ConnManager) error {
+	var event bpf.AgentConnEvtT
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event)
 	if err != nil {
 		return err
 	}
 	TgidFd := uint64(event.ConnInfo.ConnId.Upid.Pid)<<32 | uint64(event.ConnInfo.ConnId.Fd)
-	conn := Connection4{
-		localIp:    event.ConnInfo.Laddr.In4.SinAddr.S_addr,
-		remoteIp:   event.ConnInfo.Raddr.In4.SinAddr.S_addr,
-		localPort:  event.ConnInfo.Laddr.In4.SinPort,
-		remotePort: event.ConnInfo.Raddr.In4.SinPort,
-		protocol:   event.ConnInfo.Protocol,
-		role:       event.ConnInfo.Role,
-		tgidFd:     uint64(event.ConnInfo.ConnId.Upid.Pid)<<32 | uint64(event.ConnInfo.ConnId.Fd),
+	conn := conn.Connection4{
+		LocalIp:    event.ConnInfo.Laddr.In4.SinAddr.S_addr,
+		RemoteIp:   event.ConnInfo.Raddr.In4.SinAddr.S_addr,
+		LocalPort:  event.ConnInfo.Laddr.In4.SinPort,
+		RemotePort: event.ConnInfo.Raddr.In4.SinPort,
+		Protocol:   event.ConnInfo.Protocol,
+		Role:       event.ConnInfo.Role,
+		TgidFd:     TgidFd,
 	}
+	// remove this TODO
+	// if conn.remotePort == 80 || conn.remotePort == 0 {
+	// 	return nil
+	// }
 
-	if event.ConnType == agentConnTypeTKConnect {
+	if event.ConnType == bpf.AgentConnTypeTKConnect {
 		connManager.AddConnection4(TgidFd, &conn)
-	} else if event.ConnType == agentConnTypeTKClose {
+	} else if event.ConnType == bpf.AgentConnTypeTKClose {
 		go func() {
 			time.Sleep(1 * time.Second)
+			conn := connManager.FindConnection4(TgidFd)
+			if conn != nil {
+				conn.OnClose()
+			}
 			connManager.RemoveConnection4(TgidFd)
 		}()
-	} else if event.ConnType == agentConnTypeTKProtocolInfer {
+	} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
 		// 协议推断
-		conn := connManager.findConnection4(TgidFd)
+		conn := connManager.FindConnection4(TgidFd)
 		if conn != nil {
-			conn.protocol = event.ConnInfo.Protocol
+			conn.Protocol = event.ConnInfo.Protocol
 		} else {
 			return nil
 		}
-		if conn.protocol != agentTrafficProtocolTKProtocolUnknown {
-			ReportDataEvents(conn.TempKernEvents, conn)
-			ReportConnEvents(conn.TempConnEvents)
+		if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
+			// ReportDataEvents(conn.TempKernEvents, conn)
+			// ReportConnEvents(conn.TempConnEvents)
+			for _, sysEvent := range conn.TempSyscallEvents {
+				conn.OnSyscallEvent(sysEvent.Buf, &sysEvent.SyscallEvent)
+			}
 		}
 		// 清空, 这里可能有race
 		conn.TempKernEvents = conn.TempKernEvents[0:0]
 		conn.TempConnEvents = conn.TempConnEvents[0:0]
 	}
 	direct := "=>"
-	if event.ConnInfo.Role != agentEndpointRoleTKRoleClient {
+	if event.ConnInfo.Role != bpf.AgentEndpointRoleTKRoleClient {
 		direct = "<="
 	}
 	eventType := "connect"
-	event.Ts += LaunchEpochTime
+	event.Ts += common.LaunchEpochTime
 	reportEvt := false
-	if event.ConnType == agentConnTypeTKClose {
+	if event.ConnType == bpf.AgentConnTypeTKClose {
 		eventType = "close"
-		// 连接关闭时,如果协议已经推断出来那么上报事件
+		// 连接关闭时,如果协议已经推断出来那么上报事件 TODO还要删除conn
 		if conn.ProtocolInferred() {
 			reportEvt = true
 		}
-	} else if event.ConnType == agentConnTypeTKProtocolInfer {
+	} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
 		eventType = "infer"
 		// 连接推断事件可以不上报
-	} else if event.ConnType == agentConnTypeTKConnect {
+	} else if event.ConnType == bpf.AgentConnTypeTKConnect {
 		conn.AddConnEvent(&event)
 	}
-	if viper.GetBool(common.ConsoleOutputVarName) {
-		log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, eventType, conn.protocol)
+	if event.ConnType == bpf.AgentConnTypeTKProtocolInfer && conn.ProtocolInferred() {
+		log.Infof("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
+	} else {
+		log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
 	}
 	if reportEvt {
 		go func() {
-			ReportConnEvent(&event)
+			// ReportConnEvent(&event)
 		}()
 	}
 	return nil
 }
-func handleKernEvt(record []byte, connManager *ConnManager) error {
-	var event agentKernEvt
+func handleSyscallEvt(record []byte, connManager *conn.ConnManager) error {
+	// 首先看这个连接上有没有堆积的请求，如果有继续堆积
+	// 如果没有作为新的请求
+	var event bpf.SyscallEventData
+	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event.SyscallEvent)
+	if err != nil {
+		return err
+	}
+	msgSize := event.SyscallEvent.BufSize
+	buf := make([]byte, msgSize)
+	headerSize := uint(unsafe.Sizeof(event.SyscallEvent)) - 4
+	err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
+	event.Buf = buf
+
+	tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
+	conn := connManager.FindConnection4(tgidFd)
+	// direct := "=>"
+	// if event.Ke.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
+	// 	direct = "<="
+	// }
+	if conn != nil && conn.ProtocolInferred() {
+		// log.Infof("[syscall][tgidfd=%d][protocol=%d] %s:%d %s %s:%d | %s", tgidFd, conn.Protocol, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(buf))
+		conn.OnSyscallEvent(buf, &event.SyscallEvent)
+	} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
+		conn.AddSyscallEvent(&event)
+		// log.Infof("[syscall][protocol unset][tgidfd=%d][protocol=%d] %s:%d %s %s:%d | %s", tgidFd, conn.Protocol, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(buf))
+	}
+	return nil
+}
+func handleKernEvt(record []byte, connManager *conn.ConnManager) error {
+	var event bpf.AgentKernEvt
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event)
 	if err != nil {
 		return err
 	}
 	tgidFd := event.ConnIdS.TgidFd
-	conn := connManager.findConnection4(tgidFd)
-	event.Ts += LaunchEpochTime
+	conn := connManager.FindConnection4(tgidFd)
+	event.Ts += common.LaunchEpochTime
 	if conn != nil {
 		direct := "=>"
-		if event.ConnIdS.Direct == agentTrafficDirectionTKIngress {
+		if event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
 			direct = "<="
 		}
 		if viper.GetBool(common.ConsoleOutputVarName) {
-			log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, int8ToStr(event.FuncName[:]), StepAsString(Step(event.Step)), intToIP(conn.localIp), conn.localPort, direct, intToIP(conn.remoteIp), conn.remotePort, event.Seq, event.Len)
+			log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), StepAsString(Step(event.Step)), common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 		}
 
 	} else {
-		log.Infoln("failed to retrieve conn from connManager")
+		// log.Infoln("failed to retrieve conn from connManager")
+		return nil
 	}
-	if event.Len > 0 && conn != nil && conn.protocol != agentTrafficProtocolTKProtocolUnknown {
-		go func() {
-			if conn != nil {
-				if conn.protocol == agentTrafficProtocolTKProtocolUnset {
-					conn.AddKernEvent(&event)
-				} else if conn.protocol != agentTrafficProtocolTKProtocolUnknown {
-					ReportDataEvent(&event, conn)
-				}
+	if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
+		isReq := isReq(conn, &event)
+		if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
+			// TODO 推断出协议之前的事件需要处理，这里暂时略过
+			// conn.AddKernEvent(&event)
+		} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
+			var msg *protocol.BaseProtocolMessage
+			if isReq {
+				msg = conn.CurReq
+			} else {
+				msg = conn.CurResp
 			}
-		}()
+			if msg != nil {
+				// timeline := (*msg).Timeline()
+				// timeline[uint8(event.Step)] = event.Ts
+			}
+		}
 	}
 	return nil
 }
 
-func attachBpfProgs(objs agentObjects) *list.List {
+func isReq(conn *conn.Connection4, event *bpf.AgentKernEvt) bool {
+	var isReq bool
+	if conn.Role == bpf.AgentEndpointRoleTKRoleClient {
+		isReq = event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKEgress
+	} else {
+		isReq = event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress
+	}
+	return isReq
+}
+
+func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	linkList := list.New()
 
-	l := kprobe("__sys_accept4", objs.agentPrograms.Accept4Entry)
+	l := kprobe("__sys_accept4", objs.AgentPrograms.Accept4Entry)
 	linkList.PushBack(l)
-	l = kretprobe("__sys_accept4", objs.agentPrograms.SysAccept4Ret)
-	linkList.PushBack(l)
-
-	l = kretprobe("sock_alloc", objs.agentPrograms.SockAllocRet)
+	l = kretprobe("__sys_accept4", objs.AgentPrograms.SysAccept4Ret)
 	linkList.PushBack(l)
 
-	l = kretprobe("__sys_connect", objs.agentPrograms.SysConnectRet)
-	linkList.PushBack(l)
-	l = kprobe("__sys_connect", objs.agentPrograms.ConnectEntry)
+	l = kretprobe("sock_alloc", objs.AgentPrograms.SockAllocRet)
 	linkList.PushBack(l)
 
-	l = kprobe("__x64_sys_close", objs.agentPrograms.CloseEntry)
+	l = kretprobe("__sys_connect", objs.AgentPrograms.SysConnectRet)
 	linkList.PushBack(l)
-	l = kretprobe("__x64_sys_close", objs.agentPrograms.SysCloseRet)
-	linkList.PushBack(l)
-
-	l = kprobe("__x64_sys_write", objs.agentPrograms.WriteEnter)
-	linkList.PushBack(l)
-	l = kretprobe("__x64_sys_write", objs.agentPrograms.WriteReturn)
+	l = kprobe("__sys_connect", objs.AgentPrograms.ConnectEntry)
 	linkList.PushBack(l)
 
-	l = kprobe("__sys_sendto", objs.agentPrograms.SendtoEnter)
+	l = kprobe("__x64_sys_close", objs.AgentPrograms.CloseEntry)
 	linkList.PushBack(l)
-	l = kretprobe("__sys_sendto", objs.agentPrograms.SendtoReturn)
-	linkList.PushBack(l)
-
-	l = kprobe("__x64_sys_read", objs.agentPrograms.ReadEnter)
-	linkList.PushBack(l)
-	l = kretprobe("__x64_sys_read", objs.agentPrograms.ReadReturn)
+	l = kretprobe("__x64_sys_close", objs.AgentPrograms.SysCloseRet)
 	linkList.PushBack(l)
 
-	l = kprobe("__sys_recvfrom", objs.agentPrograms.RecvfromEnter)
+	l = kprobe("__x64_sys_write", objs.AgentPrograms.WriteEnter)
 	linkList.PushBack(l)
-	l = kretprobe("__sys_recvfrom", objs.agentPrograms.RecvfromReturn)
+	l = kretprobe("__x64_sys_write", objs.AgentPrograms.WriteReturn)
 	linkList.PushBack(l)
 
-	l = kprobe("security_socket_recvmsg", objs.agentPrograms.SecuritySocketRecvmsgEnter)
+	l = kprobe("__sys_sendto", objs.AgentPrograms.SendtoEnter)
 	linkList.PushBack(l)
-	l = kprobe("security_socket_sendmsg", objs.agentPrograms.SecuritySocketSendmsgEnter)
+	l = kretprobe("__sys_sendto", objs.AgentPrograms.SendtoReturn)
+	linkList.PushBack(l)
+
+	l = kprobe("__x64_sys_read", objs.AgentPrograms.ReadEnter)
+	linkList.PushBack(l)
+	l = kretprobe("__x64_sys_read", objs.AgentPrograms.ReadReturn)
+	linkList.PushBack(l)
+
+	l = kprobe("__sys_recvfrom", objs.AgentPrograms.RecvfromEnter)
+	linkList.PushBack(l)
+	l = kretprobe("__sys_recvfrom", objs.AgentPrograms.RecvfromReturn)
+	linkList.PushBack(l)
+
+	l = kprobe("security_socket_recvmsg", objs.AgentPrograms.SecuritySocketRecvmsgEnter)
+	linkList.PushBack(l)
+	l = kprobe("security_socket_sendmsg", objs.AgentPrograms.SecuritySocketSendmsgEnter)
 	linkList.PushBack(l)
 
 	l, err := link.AttachRawTracepoint(link.RawTracepointOptions{
 		Name:    "tcp_destroy_sock",
-		Program: objs.agentPrograms.TcpDestroySock,
+		Program: objs.AgentPrograms.TcpDestroySock,
 	})
 	if err != nil {
 		log.Fatal("tcp_destroy_sock failed: ", err)
 	}
 	linkList.PushBack(l)
 
-	l = kprobe("ip_queue_xmit", objs.agentPrograms.IpQueueXmit)
+	l = kprobe("ip_queue_xmit", objs.AgentPrograms.IpQueueXmit)
 	linkList.PushBack(l)
-	l = kprobe("dev_queue_xmit", objs.agentPrograms.DevQueueXmit)
+	l = kprobe("dev_queue_xmit", objs.AgentPrograms.DevQueueXmit)
 	linkList.PushBack(l)
-	l = kprobe("dev_hard_start_xmit", objs.agentPrograms.DevHardStartXmit)
+	l = kprobe("dev_hard_start_xmit", objs.AgentPrograms.DevHardStartXmit)
 	linkList.PushBack(l)
 
-	if l, err = kprobe2("ip_rcv_core", objs.agentPrograms.IpRcvCore); err != nil {
-		l = kprobe("ip_rcv_core.isra.0", objs.agentPrograms.IpRcvCore)
+	if l, err = kprobe2("ip_rcv_core", objs.AgentPrograms.IpRcvCore); err != nil {
+		l = kprobe("ip_rcv_core.isra.0", objs.AgentPrograms.IpRcvCore)
 	}
 	linkList.PushBack(l)
 
-	l = kprobe("tcp_v4_do_rcv", objs.agentPrograms.TcpV4DoRcv)
+	l = kprobe("tcp_v4_do_rcv", objs.AgentPrograms.TcpV4DoRcv)
 	linkList.PushBack(l)
-	l = kprobe("__skb_datagram_iter", objs.agentPrograms.SkbCopyDatagramIter)
+	l = kprobe("__skb_datagram_iter", objs.AgentPrograms.SkbCopyDatagramIter)
 	linkList.PushBack(l)
 
 	ifname := "eth0" // TODO
@@ -333,7 +435,7 @@ func attachBpfProgs(objs agentObjects) *list.List {
 	}
 
 	l, err = link.AttachXDP(link.XDPOptions{
-		Program:   objs.agentPrograms.XdpProxy,
+		Program:   objs.AgentPrograms.XdpProxy,
 		Interface: iface.Index,
 		Flags:     link.XDPDriverMode,
 	})

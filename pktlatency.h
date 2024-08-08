@@ -155,6 +155,12 @@ struct kern_evt {
 	int is_sample;
   enum step_t step;
 };
+#define MAX_MSG_SIZE 30720
+struct kern_evt_data {
+  struct kern_evt ke;
+  uint32_t buf_size;
+  char msg[MAX_MSG_SIZE];
+};
 
 
 // struct data_evt {

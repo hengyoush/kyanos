@@ -1,4 +1,4 @@
-package agent
+package common
 
 import (
 	"encoding/binary"
@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-func intToIP(ipInt uint32) string {
+func IntToIP(ipInt uint32) string {
 	// 将32位整数转换为4字节的切片
 	ipBytes := make([]byte, 4)
 	binary.LittleEndian.PutUint32(ipBytes, ipInt)
@@ -18,7 +18,7 @@ func intToIP(ipInt uint32) string {
 	return ip.String()
 }
 
-func int8ToStr(arr []int8) string {
+func Int8ToStr(arr []int8) string {
 	str := ""
 	for _, v := range arr {
 		if v >= 0 && v <= 127 { // 确保int8值在有效的ASCII范围内
@@ -29,4 +29,12 @@ func int8ToStr(arr []int8) string {
 		}
 	}
 	return str
+}
+
+func B2S(bs []int8) string {
+	ba := make([]byte, 0, len(bs))
+	for _, b := range bs {
+		ba = append(ba, byte(b))
+	}
+	return string(ba)
 }

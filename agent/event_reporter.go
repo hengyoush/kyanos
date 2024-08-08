@@ -2,6 +2,8 @@ package agent
 
 import (
 	"bytes"
+	"eapm-ebpf/agent/conn"
+	"eapm-ebpf/bpf"
 	"eapm-ebpf/common"
 	"encoding/json"
 	"io"
@@ -17,6 +19,7 @@ type Conn struct {
 	DstPort  uint16 `json:"dstPort"`
 	Protocol uint32 `json:"protocol"`
 	TgidFd   uint64 `json:"tgidFd"`
+	Role     uint8  `json:"role"`
 }
 
 type ConnEvent struct {
@@ -104,7 +107,7 @@ func StepAsString(s Step) string {
 		return ""
 	}
 }
-func ReportConnEvents(event []*agentConnEvtT) error {
+func ReportConnEvents(event []*bpf.AgentConnEvtT) error {
 	for _, e := range event {
 		err := ReportConnEvent(e)
 		if err != nil {
@@ -113,7 +116,7 @@ func ReportConnEvents(event []*agentConnEvtT) error {
 	}
 	return nil
 }
-func ReportDataEvents(event []*agentKernEvt, conn *Connection4) error {
+func ReportDataEvents(event []*bpf.AgentKernEvt, conn *conn.Connection4) error {
 	for _, e := range event {
 		err := ReportDataEvent(e, conn)
 		if err != nil {
@@ -123,24 +126,24 @@ func ReportDataEvents(event []*agentKernEvt, conn *Connection4) error {
 	return nil
 }
 
-func ReportDataEvent(event *agentKernEvt, conn *Connection4) error {
+func ReportDataEvent(event *bpf.AgentKernEvt, conn *conn.Connection4) error {
 	if viper.GetBool(common.LocalModeVarName) {
 		return nil
 	}
 	var dataEvent DataEvent
 	var direct uint32
-	if conn.role == agentEndpointRoleTKRoleClient {
-		if uint32(event.ConnIdS.Direct) == uint32(agentTrafficDirectionTKIngress) {
+	if conn.Role == bpf.AgentEndpointRoleTKRoleClient {
+		if uint32(event.ConnIdS.Direct) == uint32(bpf.AgentTrafficDirectionTKIngress) {
 			direct = uint32(toSrc)
 		} else {
 			direct = uint32(toDst)
 		}
 		dataEvent = DataEvent{
 			Conn: Conn{
-				SrcIP:    conn.localIp,
-				SrcPort:  conn.localPort,
-				DstIP:    conn.remoteIp,
-				DstPort:  conn.remotePort,
+				SrcIP:    conn.LocalIp,
+				SrcPort:  conn.LocalPort,
+				DstIP:    conn.RemoteIp,
+				DstPort:  conn.RemotePort,
 				Protocol: 0,
 				TgidFd:   event.ConnIdS.TgidFd,
 			},
@@ -151,17 +154,17 @@ func ReportDataEvent(event *agentKernEvt, conn *Connection4) error {
 			Source:    event.Step,
 		}
 	} else {
-		if uint32(event.ConnIdS.Direct) == uint32(agentTrafficDirectionTKIngress) {
+		if uint32(event.ConnIdS.Direct) == uint32(bpf.AgentTrafficDirectionTKIngress) {
 			direct = uint32(toDst)
 		} else {
 			direct = uint32(toSrc)
 		}
 		dataEvent = DataEvent{
 			Conn: Conn{
-				DstIP:    conn.localIp,
-				DstPort:  conn.localPort,
-				SrcIP:    conn.remoteIp,
-				SrcPort:  conn.remotePort,
+				DstIP:    conn.LocalIp,
+				DstPort:  conn.LocalPort,
+				SrcIP:    conn.RemoteIp,
+				SrcPort:  conn.RemotePort,
 				Protocol: 0,
 				TgidFd:   event.ConnIdS.TgidFd,
 			},
@@ -200,12 +203,12 @@ func ReportDataEvent(event *agentKernEvt, conn *Connection4) error {
 	return nil
 }
 
-func ReportConnEvent(event *agentConnEvtT) error {
+func ReportConnEvent(event *bpf.AgentConnEvtT) error {
 	if viper.GetBool(common.LocalModeVarName) {
 		return nil
 	}
 	var connEvent ConnEvent
-	if event.ConnInfo.Role == agentEndpointRoleTKRoleClient {
+	if event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleClient {
 		connEvent = ConnEvent{
 			Conn: Conn{
 				SrcIP:    event.ConnInfo.Laddr.In4.SinAddr.S_addr,
@@ -214,6 +217,7 @@ func ReportConnEvent(event *agentConnEvtT) error {
 				DstPort:  event.ConnInfo.Raddr.In4.SinPort,
 				Protocol: 0,
 				TgidFd:   uint64(event.ConnInfo.ConnId.Upid.Pid)<<32 | uint64(event.ConnInfo.ConnId.Fd),
+				Role:     uint8(event.ConnInfo.Role),
 			},
 			Timestamp: event.Ts,
 			Type:      int(event.ConnType),
@@ -227,6 +231,7 @@ func ReportConnEvent(event *agentConnEvtT) error {
 				DstPort:  event.ConnInfo.Laddr.In4.SinPort,
 				Protocol: 0,
 				TgidFd:   uint64(event.ConnInfo.ConnId.Upid.Pid)<<32 | uint64(event.ConnInfo.ConnId.Fd),
+				Role:     uint8(event.ConnInfo.Role),
 			},
 			Timestamp: event.Ts,
 			Type:      int(event.ConnType),

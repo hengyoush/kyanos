@@ -32,6 +32,15 @@ struct {													\
 	__uint(map_flags, 0); \
 } name SEC(".maps");
 
+#define MY_BPF_ARRAY_PERCPU(name, value_type) \
+struct {													\
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY); \
+	__uint(key_size, sizeof(__u32)); \
+	__uint(value_size, sizeof(value_type)); \
+	__uint(max_entries, 1); \
+	__uint(map_flags, 0); \
+} name SEC(".maps");
+
 #define _(src)							\
 ({								\
 	typeof(src) tmp;					\
@@ -41,10 +50,12 @@ struct {													\
 
 const struct kern_evt *kern_evt_unused __attribute__((unused));
 const struct conn_evt_t *conn_evt_t_unused __attribute__((unused));
+const struct kern_evt_data *kern_evt_data_unused __attribute__((unused));
 const enum conn_type_t *conn_type_t_unused __attribute__((unused));
 const enum endpoint_role_t *endpoint_role_unused  __attribute__((unused));
 const enum traffic_direction_t *traffic_direction_t_unused __attribute__((unused));
 const enum traffic_protocol_t *traffic_protocol_t_unused __attribute__((unused));
+const enum step_t *step_t_unused __attribute__((unused));
 
 static __always_inline bool skb_l2_check(u16 header)
 {
@@ -100,11 +111,16 @@ struct {
 } sock_key_conn_id_map SEC(".maps");
 
 MY_BPF_HASH(conn_info_map, uint64_t, struct conn_info_t);
+MY_BPF_ARRAY_PERCPU(syscall_data_map, struct kern_evt_data)
 
 struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, 1<<24);
 } rb SEC(".maps");
+struct {
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 1<<24);
+} syscall_rb SEC(".maps");
 struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, 1 << 24);
@@ -212,18 +228,70 @@ static __always_inline void  report_kern_evt(u32 seq, struct sock_key* key,struc
 	bpf_ringbuf_submit(evt, 0);
 	// evt->inode = get_netns(skb);
 }
-static void __always_inline report_syscall_evt(uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step) {
-	struct kern_evt* evt = bpf_ringbuf_reserve(&rb, sizeof(struct kern_evt), 0); 
+static void __always_inline report_syscall_evt(uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args) {
+	uint32_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
+	if (_len == 0) {
+		return;
+	}
+	int zero = 0;
+	struct kern_evt_data* evt = bpf_map_lookup_elem(&syscall_data_map, &zero);
+	// struct kern_evt_data* evt = bpf_ringbuf_reserve(&syscall_rb, sizeof(struct kern_evt) + sizeof(uint32_t) + _len, 0); 
 	if(!evt || !conn_id_s) {
 		return;
 	}
-	evt->conn_id_s = *conn_id_s;
-	evt->seq = seq;
-	evt->len = len;
-	evt->step = step;
-	evt->ts = bpf_ktime_get_ns();
+	evt->ke.conn_id_s = *conn_id_s;
+	evt->ke.seq = seq;
+	evt->ke.len = len;
+	evt->ke.step = step;
+	evt->ke.ts = bpf_ktime_get_ns();
 	char *func_name = "syscall";
-	my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
+	my_strcpy(evt->ke.func_name, func_name, FUNC_NAME_LIMIT);
+	evt->buf_size = _len;
+
+	size_t len_minus_1 = _len - 1;
+	asm volatile("" : "+r"(len_minus_1) :);
+	_len = len_minus_1 + 1;
+	size_t amount_copied = 0;
+	if (len_minus_1 < MAX_MSG_SIZE) {
+		bpf_probe_read(evt->msg, _len, args->buf);
+		amount_copied = _len;
+	} else if (len_minus_1 < 0x7fffffff) {
+		bpf_probe_read(evt->msg, MAX_MSG_SIZE, args->buf);
+		amount_copied = MAX_MSG_SIZE;
+	}
+	evt->buf_size = amount_copied;
+	bpf_ringbuf_output(&syscall_rb, evt, sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied, 0);
+}
+static void __always_inline report_syscall_evt2(uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args) {
+	struct kern_evt_data* evt = bpf_ringbuf_reserve(&syscall_rb, sizeof(struct kern_evt_data), 0); 
+	if(!evt || !conn_id_s) {
+		return;
+	}
+	evt->ke.conn_id_s = *conn_id_s;
+	evt->ke.seq = seq;
+	evt->ke.len = len;
+	evt->ke.step = step;
+	evt->ke.ts = bpf_ktime_get_ns();
+	char *func_name = "syscall";
+	my_strcpy(evt->ke.func_name, func_name, FUNC_NAME_LIMIT);
+	uint32_t _len = len < sizeof(evt->msg) ? len : sizeof(evt->msg);
+	evt->buf_size = _len;
+	if (_len == 0) {
+		
+	} else {
+		size_t len_minus_1 = _len - 1;
+		asm volatile("" : "+r"(len_minus_1) :);
+		_len = len_minus_1 + 1;
+		size_t amount_copied = 0;
+		if (len_minus_1 < MAX_MSG_SIZE) {
+			bpf_probe_read(evt->msg, _len, args->buf);
+			amount_copied = _len;
+		} else if (len_minus_1 < 0x7fffffff) {
+			bpf_probe_read(evt->msg, MAX_MSG_SIZE, args->buf);
+			amount_copied = MAX_MSG_SIZE;
+		}
+	}
+	
 	bpf_ringbuf_submit(evt, 0);
 }
 
@@ -1084,7 +1152,7 @@ static __always_inline void process_syscall_data(struct pt_regs* ctx, struct dat
 	conn_id_s.tgid_fd = tgid_fd;
 	conn_id_s.direct = direct;
 	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
-	report_syscall_evt(seq, &conn_id_s, bytes_count, step);
+	report_syscall_evt(seq, &conn_id_s, bytes_count, step, args);
 	
 	if (direct == kEgress) {
 		conn_info->write_bytes += bytes_count;
