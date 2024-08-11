@@ -24,7 +24,8 @@ enum step_t {
   IP_IN,
   TCP_IN,
   USER_COPY,
-  SYSCALL_IN
+  SYSCALL_IN,
+  end
 };
 
 enum traffic_protocol_t {
@@ -203,6 +204,7 @@ struct data_args {
   // For sendmmsg()
   unsigned int* msg_len;
   size_t* ssl_ex_len;
+  uint64_t ts;
 };
 struct close_args {
   uint32_t fd;

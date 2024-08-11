@@ -106,6 +106,7 @@ const (
 	AgentStepTTCP_IN      AgentStepT = 10
 	AgentStepTUSER_COPY   AgentStepT = 11
 	AgentStepTSYSCALL_IN  AgentStepT = 12
+	AgentStepTEnd         AgentStepT = 13
 )
 
 type AgentTrafficDirectionT uint32

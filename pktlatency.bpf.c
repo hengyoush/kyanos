@@ -243,7 +243,11 @@ static void __always_inline report_syscall_evt(uint64_t seq, struct conn_id_s_t 
 	evt->ke.seq = seq;
 	evt->ke.len = len;
 	evt->ke.step = step;
-	evt->ke.ts = bpf_ktime_get_ns();
+	if (args->ts != 0) {
+		evt->ke.ts = args->ts;
+	} else {
+		evt->ke.ts = bpf_ktime_get_ns();
+	}
 	char *func_name = "syscall";
 	my_strcpy(evt->ke.func_name, func_name, FUNC_NAME_LIMIT);
 	evt->buf_size = _len;
@@ -523,9 +527,10 @@ int xdp_proxy(struct xdp_md *ctx){
 	key.sport = bpf_ntohs(th->source);
 	key.dport = bpf_ntohs(th->dest);
 	key.family = 0;
+	// bpf_printk("xdp, not found!, sport:%d, dport:%d, family:%d", key.sport, key.dport,key.family);
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
-	if (found == NULL || !should_trace_sock_key(&key)) {
-		// bpf_printk("xdp key.dport != target_port, %u,%u", key.dport, key.sport);
+	if (found == NULL && !should_trace_sock_key(&key)) {
+		bpf_printk("xdp key.dport != target_port, %u,%u,should_trace_sock_key:%d", key.dport, key.sport,should_trace_sock_key(&key));
 		return XDP_PASS;
 	}
 	u32 inital_seq;
@@ -537,7 +542,7 @@ int xdp_proxy(struct xdp_md *ctx){
 		// bpf_printk("xdp, not found!, sport:%d, dport:%d, family:%d", key.sport, key.dport,key.family);
 	} else {
 		bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
-		bpf_printk("xdp found!, seq: %u", inital_seq);
+		// bpf_printk("xdp found!, seq: %u", inital_seq);
 	}
 	u32 len = data_end - data - (sizeof(struct ethhdr) + sizeof(struct iphdr));
 	// bpf_printk("xdp, skb: %x", data);
@@ -872,7 +877,7 @@ int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
 	parse_sock_key(skb, &key);
 	// 如果map里有才进行后面的步骤
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
-	if (found == NULL || !should_trace_sock_key(&key)) {
+	if (found == NULL && !should_trace_sock_key(&key)) {
 		// bpf_printk("kp, lip: %d, dip:%d", key.sip, key.dip);
 		// bpf_printk("ip_queue_xmit, lport: %d, dport:%d", key.sport, key.dport);
 		return 0;
@@ -1238,6 +1243,7 @@ int BPF_KRETPROBE(recvfrom_return) {
 
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL) {
+		args->ts = bpf_ktime_get_ns();
 		process_syscall_data((struct pt_regs*)ctx, args, id, kIngress, bytes_count);
 	}
 
@@ -1264,6 +1270,7 @@ int BPF_KRETPROBE(read_return) {
 
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
+		args->ts = bpf_ktime_get_ns();
 		process_syscall_data((struct pt_regs*)ctx, args, id, kIngress, bytes_count);
 	}
 
@@ -1281,6 +1288,7 @@ int BPF_KPROBE(sendto_enter, unsigned int sockfd, char* buf) {
 	args.fd = sockfd;
 	args.buf = buf;
 	args.source_fn = kSyscallSendTo;
+	args.ts = bpf_ktime_get_ns();
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
@@ -1307,6 +1315,7 @@ int BPF_KPROBE(write_enter, unsigned int fd, char* buf, size_t count) {
 	args.fd = fd;
 	args.buf = buf;
 	args.source_fn = kSyscallWrite;
+	args.ts = bpf_ktime_get_ns();
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
 	return 0;
 }

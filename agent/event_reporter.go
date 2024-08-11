@@ -56,57 +56,6 @@ const (
 	toSrc DirectEnum = 1
 )
 
-type Step uint32
-
-const (
-	Start Step = iota
-	SyscallOut
-	TcpOut
-	IpOut
-	QdiscOut
-	DevOut
-	NicOut
-	NicIn
-	DevIn
-	IpIn
-	TcpIn
-	UserCopy
-	SyscallIn
-)
-
-func StepAsString(s Step) string {
-	switch s {
-	case Start:
-		return "start"
-	case SyscallOut:
-		return "SYSCALL_OUT"
-	case TcpOut:
-		return "TCP_OUT"
-	case IpOut:
-		return "IP_OUT"
-	case QdiscOut:
-		return "QDISC_OUT"
-	case DevOut:
-		return "DEV_OUT"
-	case NicOut:
-		return "NIC_OUT"
-	case NicIn:
-		return "NIC_IN"
-	case DevIn:
-		return "DEV_IN"
-	case IpIn:
-		return "IP_IN"
-	case TcpIn:
-		return "TCP_IN"
-	case UserCopy:
-		return "USER_COPY"
-	case SyscallIn:
-		return "SYSCALL_IN"
-	default:
-		log.Errorf("Unknown step: %d\n", s)
-		return ""
-	}
-}
 func ReportConnEvents(event []*bpf.AgentConnEvtT) error {
 	for _, e := range event {
 		err := ReportConnEvent(e)
@@ -151,7 +100,7 @@ func ReportDataEvent(event *bpf.AgentKernEvt, conn *conn.Connection4) error {
 			Len:       event.Len,
 			Direct:    direct,
 			Timestamp: event.Ts,
-			Source:    event.Step,
+			Source:    uint32(event.Step),
 		}
 	} else {
 		if uint32(event.ConnIdS.Direct) == uint32(bpf.AgentTrafficDirectionTKIngress) {
@@ -172,7 +121,7 @@ func ReportDataEvent(event *bpf.AgentKernEvt, conn *conn.Connection4) error {
 			Len:       event.Len,
 			Direct:    direct,
 			Timestamp: event.Ts,
-			Source:    event.Step,
+			Source:    uint32(event.Step),
 		}
 	}
 	jsonData, err := json.Marshal(dataEvent)

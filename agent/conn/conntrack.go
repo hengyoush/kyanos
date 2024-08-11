@@ -21,11 +21,19 @@ type Connection4 struct {
 	TempKernEvents    []*bpf.AgentKernEvt
 	TempConnEvents    []*bpf.AgentConnEvtT
 	TempSyscallEvents []*bpf.SyscallEventData
+	Status            ConnStatus
 	// ReqBuf         []byte // =>
 	// RespBuf        []byte // <=
 	CurReq  *protocol.BaseProtocolMessage
 	CurResp *protocol.BaseProtocolMessage
 }
+
+type ConnStatus uint8
+
+const (
+	Connected ConnStatus = 0
+	Closed    ConnStatus = 1
+)
 
 type ConnManager struct {
 	connMap *sync.Map
@@ -79,6 +87,7 @@ func (c *Connection4) OnClose() {
 		}
 		RecordFunc(record, c)
 	}
+	c.Status = Closed
 }
 
 func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
@@ -89,7 +98,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 	isReq := isReq(c, &event.Ke)
 	if isReq {
 		// 首先要尝试匹配之前的req和resp
-		if c.CurResp != nil {
+		if c.CurResp.HasData() && c.CurReq.HasData() {
 			// 匹配 输出record
 			record := protocol.Record{
 				Request:  c.CurReq,
@@ -98,13 +107,17 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 			}
 			RecordFunc(record, c)
 			// 然后再更新状态
-			c.CurReq = nil
-			c.CurResp = nil
+			c.CurReq = protocol.InitProtocolMessage(true, c.IsServerSide())
+			c.CurResp = protocol.InitProtocolMessage(false, c.IsServerSide())
 		}
-		if c.CurReq != nil {
+		if c.CurReq.HasData() {
 			c.CurReq.AppendData(data)
 		} else {
-			c.CurReq = parser.Parse(event, data)
+			tempReq := c.CurReq
+			c.CurReq = parser.Parse(event, data, isReq, c.IsServerSide())
+			if tempReq.HasEvent() {
+				c.CurReq.CopyTimeDetailFrom(tempReq)
+			}
 			if c.IsServerSide() {
 				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, c.CurReq.Timestamp)
 			} else {
@@ -113,10 +126,14 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 
 		}
 	} else {
-		if c.CurResp != nil {
+		if c.CurResp.HasData() {
 			c.CurResp.AppendData(data)
 		} else {
-			c.CurResp = parser.Parse(event, data)
+			tempResp := c.CurResp
+			c.CurResp = parser.Parse(event, data, isReq, c.IsServerSide())
+			if tempResp.HasEvent() {
+				c.CurResp.CopyTimeDetailFrom(tempResp)
+			}
 			if c.IsServerSide() {
 				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, c.CurResp.Timestamp)
 			} else {
@@ -124,6 +141,18 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 			}
 		}
 	}
+}
+
+func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
+	isReq := isReq(c, event)
+	if isReq && c.CurReq != nil {
+		c.CurReq.AddTimeDetail(event.Step, event.Ts)
+	} else if !isReq && c.CurResp != nil {
+		c.CurResp.AddTimeDetail(event.Step, event.Ts)
+	} else {
+		return false
+	}
+	return true
 }
 
 func isReq(conn *Connection4, event *bpf.AgentKernEvt) bool {

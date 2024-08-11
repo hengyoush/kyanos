@@ -65,7 +65,7 @@ func init() {
 	rootCmd.Flags().StringVar(&LogDir, "log-dir", "", "log file dir")
 	rootCmd.Flags().BoolVar(&LocalMode, "local-mode", false, "set true then do not export data to collector")
 	rootCmd.Flags().BoolVarP(&ConsoleOutput, "console-output", "c", true, "print trace data to console")
-	rootCmd.Flags().BoolVarP(&Verbose, "verbose", "v", true, "print verbose log")
+	rootCmd.Flags().BoolVarP(&Verbose, "verbose", "v", false, "print verbose log")
 	rootCmd.Flags().BoolVarP(&Daemon, "daemon", "d", false, "run in background")
 	viper.BindPFlags(rootCmd.Flags())
 }

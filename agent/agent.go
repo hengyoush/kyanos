@@ -22,10 +22,10 @@ import (
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/jefurry/logrus"
-	"github.com/spf13/viper"
 )
 
 var log *logrus.Logger = common.Log
+var processorsNum int = 4
 
 func SetupAgent() {
 	InitReporter()
@@ -34,6 +34,7 @@ func SetupAgent() {
 	stopper := make(chan os.Signal, 1)
 	connManager := conn.InitConnManager()
 	statRecorder := stat.InitStatRecorder()
+	pm := conn.InitProcessorManager(processorsNum, connManager)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c)
 	}
@@ -124,6 +125,7 @@ func SetupAgent() {
 		if err := syscallDataReader.Close(); err != nil {
 			log.Fatalf("closing syscallDataReader error: %s", err)
 		}
+		pm.StopAll()
 		stop = true
 	}()
 
@@ -141,7 +143,8 @@ func SetupAgent() {
 				log.Infof("[dataReader] reading from reader: %s\n", err)
 				continue
 			}
-			if err := handleKernEvt(record.RawSample, connManager); err != nil {
+
+			if err := handleKernEvt(record.RawSample, pm); err != nil {
 				log.Infof("[dataReader] handleKernEvt err: %s\n", err)
 				continue
 			}
@@ -160,7 +163,7 @@ func SetupAgent() {
 				log.Infof("[syscallDataReader] reading from reader: %s\n", err)
 				continue
 			}
-			if err := handleSyscallEvt(record.RawSample, connManager); err != nil {
+			if err := handleSyscallEvt(record.RawSample, pm); err != nil {
 				log.Infof("[syscallDataReader] handleSyscallEvt err: %s\n", err)
 				continue
 			}
@@ -207,6 +210,9 @@ func handleConnEvt(record []byte, connManager *conn.ConnManager) error {
 		Protocol:   event.ConnInfo.Protocol,
 		Role:       event.ConnInfo.Role,
 		TgidFd:     TgidFd,
+		Status:     conn.Connected,
+		CurReq:     protocol.InitProtocolMessage(true, event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleServer),
+		CurResp:    protocol.InitProtocolMessage(false, event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleServer),
 	}
 	// remove this TODO
 	// if conn.remotePort == 80 || conn.remotePort == 0 {
@@ -274,10 +280,10 @@ func handleConnEvt(record []byte, connManager *conn.ConnManager) error {
 	}
 	return nil
 }
-func handleSyscallEvt(record []byte, connManager *conn.ConnManager) error {
+func handleSyscallEvt(record []byte, pm *conn.ProcessorManager) error {
 	// 首先看这个连接上有没有堆积的请求，如果有继续堆积
 	// 如果没有作为新的请求
-	var event bpf.SyscallEventData
+	event := new(bpf.SyscallEventData)
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event.SyscallEvent)
 	if err != nil {
 		return err
@@ -289,60 +295,19 @@ func handleSyscallEvt(record []byte, connManager *conn.ConnManager) error {
 	event.Buf = buf
 
 	tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
-	conn := connManager.FindConnection4(tgidFd)
-	// direct := "=>"
-	// if event.Ke.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
-	// 	direct = "<="
-	// }
-	if conn != nil && conn.ProtocolInferred() {
-		// log.Infof("[syscall][tgidfd=%d][protocol=%d] %s:%d %s %s:%d | %s", tgidFd, conn.Protocol, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(buf))
-		conn.OnSyscallEvent(buf, &event.SyscallEvent)
-	} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
-		conn.AddSyscallEvent(&event)
-		// log.Infof("[syscall][protocol unset][tgidfd=%d][protocol=%d] %s:%d %s %s:%d | %s", tgidFd, conn.Protocol, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(buf))
-	}
+	p := pm.GetProcessor(int(tgidFd) % processorsNum)
+	p.AddSyscallEvent(event)
 	return nil
 }
-func handleKernEvt(record []byte, connManager *conn.ConnManager) error {
+func handleKernEvt(record []byte, pm *conn.ProcessorManager) error {
 	var event bpf.AgentKernEvt
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event)
 	if err != nil {
 		return err
 	}
 	tgidFd := event.ConnIdS.TgidFd
-	conn := connManager.FindConnection4(tgidFd)
-	event.Ts += common.LaunchEpochTime
-	if conn != nil {
-		direct := "=>"
-		if event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
-			direct = "<="
-		}
-		if viper.GetBool(common.ConsoleOutputVarName) {
-			log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), StepAsString(Step(event.Step)), common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
-		}
-
-	} else {
-		// log.Infoln("failed to retrieve conn from connManager")
-		return nil
-	}
-	if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
-		isReq := isReq(conn, &event)
-		if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
-			// TODO 推断出协议之前的事件需要处理，这里暂时略过
-			// conn.AddKernEvent(&event)
-		} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
-			var msg *protocol.BaseProtocolMessage
-			if isReq {
-				msg = conn.CurReq
-			} else {
-				msg = conn.CurResp
-			}
-			if msg != nil {
-				// timeline := (*msg).Timeline()
-				// timeline[uint8(event.Step)] = event.Ts
-			}
-		}
-	}
+	p := pm.GetProcessor(int(tgidFd) % processorsNum)
+	p.AddKernEvent(&event)
 	return nil
 }
 
