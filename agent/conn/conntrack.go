@@ -9,6 +9,7 @@ import (
 )
 
 var RecordFunc func(protocol.Record, *Connection4) error
+var OnCloseRecordFunc func(*Connection4) error
 
 type Connection4 struct {
 	LocalIp           uint32
@@ -22,10 +23,8 @@ type Connection4 struct {
 	TempConnEvents    []*bpf.AgentConnEvtT
 	TempSyscallEvents []*bpf.SyscallEventData
 	Status            ConnStatus
-	// ReqBuf         []byte // =>
-	// RespBuf        []byte // <=
-	CurReq  *protocol.BaseProtocolMessage
-	CurResp *protocol.BaseProtocolMessage
+	CurReq            *protocol.BaseProtocolMessage
+	CurResp           *protocol.BaseProtocolMessage
 }
 
 type ConnStatus uint8
@@ -79,14 +78,20 @@ func (c *Connection4) ProtocolInferred() bool {
 }
 
 func (c *Connection4) OnClose() {
-	if c.CurReq != nil && c.CurResp != nil {
+	if c.CurResp.HasData() || c.CurReq.HasData() {
 		record := protocol.Record{
 			Request:  c.CurReq,
 			Response: c.CurResp,
-			Duration: c.CurResp.Timestamp - c.CurReq.Timestamp,
+		}
+		if !c.CurResp.HasData() || !c.CurReq.HasData() {
+			// 缺少请求或者响应,连接就关闭了
+			record.Duration = 0
+		} else {
+			record.Duration = c.CurResp.Timestamp - c.CurReq.Timestamp
 		}
 		RecordFunc(record, c)
 	}
+	OnCloseRecordFunc(c)
 	c.Status = Closed
 }
 
@@ -115,6 +120,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 		} else {
 			tempReq := c.CurReq
 			c.CurReq = parser.Parse(event, data, isReq, c.IsServerSide())
+			c.CurResp = protocol.InitProtocolMessage(false, c.IsServerSide())
 			if tempReq.HasEvent() {
 				c.CurReq.CopyTimeDetailFrom(tempReq)
 			}

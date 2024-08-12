@@ -38,6 +38,10 @@ func SetupAgent() {
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c)
 	}
+	conn.OnCloseRecordFunc = func(c *conn.Connection4) error {
+		statRecorder.RemoveRecord(c.TgidFd)
+		return nil
+	}
 
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
 

@@ -31,6 +31,9 @@ type BaseProtocolMessage struct {
 	timedetails1 map[uint8]uint64
 	formatString string
 	buf          []byte
+	syscallCnt   uint
+	duration     uint // 读/写总用时
+	totalBytes   uint // 读/写总字节数
 }
 
 func InitProtocolMessage(isReq bool, isServerSide bool) *BaseProtocolMessage {
@@ -73,7 +76,7 @@ func (s *BaseProtocolMessage) ExportTimeDetails() string {
 			if start != 0 && end != 0 {
 				if lastStep != bpf.AgentStepTEnd {
 					lastDuration := end - s.timedetails0[uint8(lastStep)]
-					result += fmt.Sprintf("[%s => %s] dur=%d(ns), cur=%d(ns)\n", common.StepCNNames[lastStep], common.StepCNNames[i], lastDuration, end-start)
+					result += fmt.Sprintf("[%s => %s] dur=%dns(%d-%d), cur=%d(ns)\n", common.StepCNNames[lastStep], common.StepCNNames[i], lastDuration, end, s.timedetails0[uint8(lastStep)], end-start)
 				} else {
 					result += fmt.Sprintf("[%s]dur= %d(ns)\n", common.StepCNNames[i], end-start)
 				}

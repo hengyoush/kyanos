@@ -108,7 +108,7 @@ func (p *Processor) run() {
 			}
 			if conn != nil {
 				if viper.GetBool(common.ConsoleOutputVarName) {
-					log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
+					log.Debugf("[data][tgid_fd=%d][func=%s][ts=%d][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), event.Ts, common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 				}
 
 			} else {
@@ -127,7 +127,7 @@ func (p *Processor) run() {
 						log.Infof("[skip] skip due to cur req/resp is nil ?(maybe bug)")
 					}
 				}
-			} else if event.Len > 0 {
+			} else if event.Len > 0 && conn != nil {
 				log.Infof("[skip] skip due to protocol is unknwon")
 				log.Infof("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 			}

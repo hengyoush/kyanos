@@ -49,3 +49,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, conn *conn.Connection4) 
 
 	return nil
 }
+
+func (s *StatRecorder) RemoveRecord(tgidFd uint64) {
+	delete(s.recordMap, tgidFd)
+}
