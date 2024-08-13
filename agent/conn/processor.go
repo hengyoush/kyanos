@@ -87,6 +87,7 @@ func (p *Processor) run() {
 		case event := <-p.syscallEvents:
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4(tgidFd)
+			event.SyscallEvent.Ke.Ts += common.LaunchEpochTime
 			// direct := "=>"
 			// if event.Ke.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
 			// 	direct = "<="

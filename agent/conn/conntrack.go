@@ -87,7 +87,7 @@ func (c *Connection4) OnClose() {
 			// 缺少请求或者响应,连接就关闭了
 			record.Duration = 0
 		} else {
-			record.Duration = c.CurResp.Timestamp - c.CurReq.Timestamp
+			record.Duration = c.CurResp.EndTs - c.CurReq.StartTs
 		}
 		RecordFunc(record, c)
 	}
@@ -108,7 +108,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 			record := protocol.Record{
 				Request:  c.CurReq,
 				Response: c.CurResp,
-				Duration: c.CurResp.Timestamp - c.CurReq.Timestamp,
+				Duration: c.CurResp.EndTs - c.CurReq.StartTs,
 			}
 			RecordFunc(record, c)
 			// 然后再更新状态
@@ -125,12 +125,13 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 				c.CurReq.CopyTimeDetailFrom(tempReq)
 			}
 			if c.IsServerSide() {
-				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, c.CurReq.Timestamp)
+				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, event.Ke.Ts)
 			} else {
-				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, c.CurReq.Timestamp)
+				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, event.Ke.Ts)
 			}
-
 		}
+		c.CurReq.IncrSyscallCount()
+		c.CurReq.IncrTotalBytesBy(uint(event.Ke.Len))
 	} else {
 		if c.CurResp.HasData() {
 			c.CurResp.AppendData(data)
@@ -141,11 +142,13 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 				c.CurResp.CopyTimeDetailFrom(tempResp)
 			}
 			if c.IsServerSide() {
-				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, c.CurResp.Timestamp)
+				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, event.Ke.Ts)
 			} else {
-				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, c.CurResp.Timestamp)
+				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, event.Ke.Ts)
 			}
 		}
+		c.CurResp.IncrSyscallCount()
+		c.CurResp.IncrTotalBytesBy(uint(event.Ke.Len))
 	}
 }
 

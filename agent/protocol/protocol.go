@@ -25,7 +25,8 @@ type BaseProtocolMessage struct {
 	Parser       ProtocolParser
 	IsReq        bool
 	IsServerSide bool
-	Timestamp    uint64
+	StartTs      uint64
+	EndTs        uint64
 	isTruncated  bool
 	timedetails0 map[uint8]uint64
 	timedetails1 map[uint8]uint64
@@ -47,9 +48,9 @@ func InitProtocolMessage(isReq bool, isServerSide bool) *BaseProtocolMessage {
 	return msg
 }
 
-func (s *BaseProtocolMessage) Ts() uint64 {
-	return s.Timestamp
-}
+// func (s *BaseProtocolMessage) StartTs() uint64 {
+// 	return s.startTs
+// }
 
 func (s *BaseProtocolMessage) IsTruncated() bool {
 	return s.isTruncated
@@ -82,6 +83,12 @@ func (s *BaseProtocolMessage) ExportTimeDetails() string {
 				}
 				lastStep = i
 			}
+		}
+
+		if s.IsReq {
+			result += fmt.Sprintf("total bytes: %d, duration: %dns, syscall count: %d\n", s.totalBytes, s.EndTs-s.StartTs, s.syscallCnt)
+		} else {
+			result += fmt.Sprintf("total bytes: %d, duration: %dns, syscall count: %d\n", s.totalBytes, s.EndTs-s.StartTs, s.syscallCnt)
 		}
 	} else {
 		// req: NICIN => SyscallIn
@@ -126,6 +133,7 @@ func (s *BaseProtocolMessage) AppendData(data []byte) {
 }
 
 func (s *BaseProtocolMessage) AddTimeDetail(step bpf.AgentStepT, ns uint64) {
+	// ns += common.LaunchEpochTime
 	start, ok := s.timedetails0[uint8(step)]
 	if !ok || start > ns {
 		s.timedetails0[uint8(step)] = ns
@@ -133,6 +141,12 @@ func (s *BaseProtocolMessage) AddTimeDetail(step bpf.AgentStepT, ns uint64) {
 	end, ok := s.timedetails1[uint8(step)]
 	if !ok || end < ns {
 		s.timedetails1[uint8(step)] = ns
+	}
+	if s.StartTs > ns {
+		s.StartTs = ns
+	}
+	if s.EndTs < ns {
+		s.EndTs = ns
 	}
 }
 
@@ -147,6 +161,14 @@ func (s *BaseProtocolMessage) HasEvent() bool {
 func (s *BaseProtocolMessage) CopyTimeDetailFrom(t *BaseProtocolMessage) {
 	s.timedetails0 = t.timedetails0
 	s.timedetails1 = t.timedetails1
+}
+
+func (s *BaseProtocolMessage) IncrSyscallCount() {
+	s.syscallCnt++
+}
+
+func (s *BaseProtocolMessage) IncrTotalBytesBy(bytes uint) {
+	s.totalBytes += bytes
 }
 
 type Record struct {

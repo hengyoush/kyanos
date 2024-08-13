@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"eapm-ebpf/bpf"
-	"eapm-ebpf/common"
 )
 
 type StringParser struct {
@@ -10,7 +9,8 @@ type StringParser struct {
 
 func (h *StringParser) Parse(evt *bpf.SyscallEvent, buf []byte, isReq bool, isServerSide bool) *BaseProtocolMessage {
 	msg := new(BaseProtocolMessage)
-	msg.Timestamp = evt.Ke.Ts + common.LaunchEpochTime
+	msg.StartTs = evt.Ke.Ts
+	msg.EndTs = evt.Ke.Ts
 	msg.isTruncated = evt.BufSize != uint32(len(buf))
 	msg.buf = append(msg.buf, buf...)
 	msg.Parser = h
