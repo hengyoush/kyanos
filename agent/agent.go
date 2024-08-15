@@ -224,6 +224,7 @@ func handleConnEvt(record []byte, connManager *conn.ConnManager) error {
 	// }
 
 	if event.ConnType == bpf.AgentConnTypeTKConnect {
+		conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
 		connManager.AddConnection4(TgidFd, &conn)
 	} else if event.ConnType == bpf.AgentConnTypeTKClose {
 		go func() {

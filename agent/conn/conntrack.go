@@ -11,6 +11,13 @@ import (
 var RecordFunc func(protocol.Record, *Connection4) error
 var OnCloseRecordFunc func(*Connection4) error
 
+type TCPHandshakeStatus struct {
+	ConnectStartTs      uint64 // connect syscall 开始的时间
+	ServerSynReceived   bool
+	ServerSynReceivedTs uint64
+	ClientAckSent       bool
+	ClientAckSentTs     uint64
+}
 type Connection4 struct {
 	LocalIp           uint32
 	RemoteIp          uint32
@@ -25,6 +32,7 @@ type Connection4 struct {
 	Status            ConnStatus
 	CurReq            *protocol.BaseProtocolMessage
 	CurResp           *protocol.BaseProtocolMessage
+	TCPHandshakeStatus
 }
 
 type ConnStatus uint8
@@ -154,13 +162,32 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 
 func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 	isReq := isReq(c, event)
-	if isReq && c.CurReq != nil {
-		c.CurReq.AddTimeDetail(event.Step, event.Ts)
-	} else if !isReq && c.CurResp != nil {
-		c.CurResp.AddTimeDetail(event.Step, event.Ts)
+	if event.Len > 0 {
+		if isReq && c.CurReq != nil {
+			c.CurReq.AddTimeDetail(event.Step, event.Ts)
+		} else if !isReq && c.CurResp != nil {
+			c.CurResp.AddTimeDetail(event.Step, event.Ts)
+		} else {
+			return false
+		}
 	} else {
-		return false
+		if (event.Flags&uint8(common.TCP_FLAGS_SYN) != 0) && !isReq && event.Step == bpf.AgentStepTIP_IN {
+			// 接收到Server给的Syn包
+			if c.ServerSynReceived {
+				log.Debugf("[kern][handshake]%s already received server sync, but now received again!\n", c.ToString())
+			} else {
+				c.ServerSynReceived = true
+				c.ServerSynReceivedTs = event.Ts
+				log.Debugf("[kern][handshake]%s received server sync\n", c.ToString())
+			}
+		}
+		if (event.Flags&uint8(common.TCP_FLAGS_ACK) != 0) && isReq && c.ServerSynReceived && !c.ClientAckSent && event.Step == bpf.AgentStepTIP_OUT {
+			c.ClientAckSent = true
+			c.ClientAckSentTs = event.Ts
+			log.Warnf("[kern][handshake]%s sent ack, complete handshake, use time: %d(%d-%d)\n", c.ToString(), c.ClientAckSentTs-c.ConnectStartTs, c.ClientAckSentTs, c.ConnectStartTs)
+		}
 	}
+
 	return true
 }
 

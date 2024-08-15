@@ -38,3 +38,36 @@ func B2S(bs []int8) string {
 	}
 	return string(ba)
 }
+
+func DisplayTcpFlags(flags uint8) string {
+	return ConvertTcpFlagAck(flags) + ConvertTcpFlagPsh(flags) +
+		ConvertTcpFlagRst(flags) + ConvertTcpFlagSyn(flags)
+}
+
+func ConvertTcpFlagAck(flags uint8) string {
+	if (flags & uint8(TCP_FLAGS_ACK)) != 0 {
+		return "A"
+	}
+	return ""
+}
+
+func ConvertTcpFlagPsh(flags uint8) string {
+	if (flags & uint8(TCP_FLAGS_PSH)) != 0 {
+		return "P"
+	}
+	return ""
+}
+
+func ConvertTcpFlagRst(flags uint8) string {
+	if (flags & uint8(TCP_FLAGS_RST)) != 0 {
+		return "R"
+	}
+	return ""
+}
+
+func ConvertTcpFlagSyn(flags uint8) string {
+	if (flags & uint8(TCP_FLAGS_SYN)) != 0 {
+		return "S"
+	}
+	return ""
+}

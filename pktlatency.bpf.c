@@ -223,6 +223,7 @@ static __always_inline void  report_kern_evt(u32 seq, struct sock_key* key,struc
 	evt->is_sample = has_divisible_number(bl_bdr, br_bdr, bytes_interval);
 	evt->ts = bpf_ktime_get_ns();
 	evt->step = step;
+	evt->flags = _(((u8 *)tcp)[13]);
 	my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
 
 	bpf_ringbuf_submit(evt, 0);
@@ -300,14 +301,18 @@ static void __always_inline report_syscall_evt2(uint64_t seq, struct conn_id_s_t
 }
 
 
-static void __always_inline report_conn_evt(struct conn_info_t *conn_info, enum conn_type_t type) {
+static void __always_inline report_conn_evt(struct conn_info_t *conn_info, enum conn_type_t type, uint64_t ts) {
 	struct conn_evt_t* evt = bpf_ringbuf_reserve(&conn_evt_rb, sizeof(struct conn_evt_t), 0); 	
 	if (!evt) {
 		return;
 	}
 	evt->conn_info = *conn_info;
 	evt->conn_type = type;
-	evt->ts = bpf_ktime_get_ns();
+	if (ts != 0) {
+		evt->ts = ts;
+	} else {
+		evt->ts = bpf_ktime_get_ns();
+	}
 	bpf_ringbuf_submit(evt, 0);
 }
 
@@ -916,7 +921,7 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 		tgid_fd = conn_id_s->tgid_fd;
 		struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 		if (conn_info != NULL) {
-			report_conn_evt(conn_info, kClose);
+			report_conn_evt(conn_info, kClose, 0);
 		}
 		bpf_map_delete_elem(&conn_info_map, &tgid_fd);
 		bpf_map_delete_elem(&sock_key_conn_id_map, &key);
@@ -1007,9 +1012,9 @@ static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 	return NULL;
 }
 
-static __inline void submit_new_conn(struct pt_regs* ctx, uint32_t tgid, int32_t fd,
+static __always_inline void submit_new_conn(struct pt_regs* ctx, uint32_t tgid, int32_t fd,
 const struct sockaddr* addr, const struct socket* socket,
-enum endpoint_role_t role) {
+enum endpoint_role_t role, uint64_t start_ts) {
 	struct conn_info_t conn_info = {};
 	uint64_t tgid_fd = gen_tgid_fd(tgid, fd);
 	init_conn_info(tgid, fd, &conn_info);
@@ -1051,7 +1056,7 @@ enum endpoint_role_t role) {
 		conn_id_s_rev.direct = role == kRoleClient ? kIngress : kEgress;
 		conn_id_s_rev.tgid_fd = tgid_fd;
 		bpf_map_update_elem(&sock_key_conn_id_map, &rev, &conn_id_s_rev, BPF_NOEXIST);
-		report_conn_evt(&conn_info, kConnect);
+		report_conn_evt(&conn_info, kConnect, start_ts);
 	}
 
 	// struct sock_key key;
@@ -1085,7 +1090,7 @@ static __always_inline void process_syscall_close(struct pt_regs* ctx, struct cl
 	}
 	bpf_printk("close syscall tgid_fd:%u", tgid_fd);
 	
-	report_conn_evt(conn_info, kClose);
+	report_conn_evt(conn_info, kClose, 0);
 
 	bpf_map_delete_elem(&conn_info_map, &tgid_fd);
 	
@@ -1113,7 +1118,7 @@ static __always_inline void process_syscall_connect(struct pt_regs* ctx, struct 
 	if (tgid == agent_pid) {
 		return;
 	}
-	submit_new_conn(ctx, tgid, args->fd, args->addr, NULL, kRoleClient );
+	submit_new_conn(ctx, tgid, args->fd, args->addr, NULL, kRoleClient , args->start_ts);
 }
 static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct accept_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
@@ -1126,7 +1131,7 @@ static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct a
 		return;
 	}
 	// bpf_printk("process_syscall_accept, ret_fd: %d, socket:%d", ret_fd,args->sock_alloc_socket);
-	submit_new_conn(ctx, tgid, ret_fd, args->addr, args->sock_alloc_socket, kRoleServer );
+	submit_new_conn(ctx, tgid, ret_fd, args->addr, args->sock_alloc_socket, kRoleServer , 0);
 }
 
 static __always_inline void process_syscall_data(struct pt_regs* ctx, struct data_args *args, uint64_t id, enum traffic_direction_t direct,
@@ -1141,7 +1146,7 @@ static __always_inline void process_syscall_data(struct pt_regs* ctx, struct dat
 		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
 		// conn_info->protocol = protocol_message.protocol;
 		bpf_printk("[protocol infer]: %d", conn_info->protocol);
-		report_conn_evt(conn_info, kProtocolInfer);
+		report_conn_evt(conn_info, kProtocolInfer, 0);
 		if (conn_info->raddr.in4.sin_port == 6379 && bytes_count > 16) {
 			char buf[1] = {};
 			bpf_probe_read_user(buf, 1, args->buf);
@@ -1366,6 +1371,7 @@ int BPF_KPROBE(connect_entry, int sockfd, const struct sockaddr* addr) {
 	struct connect_args args = {0};
 	args.fd = sockfd;
 	args.addr = addr;
+	args.start_ts = bpf_ktime_get_ns();
 	bpf_map_update_elem(&connect_args_map, &id, &args, BPF_ANY);
 	return 0;
 }

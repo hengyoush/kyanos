@@ -152,6 +152,7 @@ struct kern_evt {
 	uint64_t ts;
 	uint64_t seq;
 	uint32_t len;
+  uint8_t flags;
   struct conn_id_s_t conn_id_s;
 	int is_sample;
   enum step_t step;
@@ -213,6 +214,7 @@ struct close_args {
 struct connect_args {
   const struct sockaddr* addr;
   int32_t fd;
+  uint64_t start_ts;
 };
 
 struct accept_args {

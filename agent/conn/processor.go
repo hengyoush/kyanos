@@ -109,11 +109,20 @@ func (p *Processor) run() {
 			}
 			if conn != nil {
 				if viper.GetBool(common.ConsoleOutputVarName) {
-					log.Debugf("[data][tgid_fd=%d][func=%s][ts=%d][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), event.Ts, common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
+					log.Debugf("[data][tgid_fd=%d][func=%s][ts=%d][%s] %s:%d %s %s:%d | %d:%d flags:%s\n",
+						tgidFd, common.Int8ToStr(event.FuncName[:]), event.Ts,
+						common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp),
+						conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len,
+						common.DisplayTcpFlags(event.Flags))
 				}
 
 			} else {
-				// log.Infoln("failed to retrieve conn from connManager")
+				if viper.GetBool(common.ConsoleOutputVarName) {
+					log.Debugf("[data no conn][tgid_fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n",
+						tgidFd, common.Int8ToStr(event.FuncName[:]), event.Ts,
+						common.StepCNNames[event.Step], event.Seq, event.Len,
+						common.DisplayTcpFlags(event.Flags))
+				}
 			}
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
@@ -131,6 +140,8 @@ func (p *Processor) run() {
 			} else if event.Len > 0 && conn != nil {
 				log.Infof("[skip] skip due to protocol is unknwon")
 				log.Infof("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
+			} else if event.Len == 0 && conn != nil {
+				conn.OnKernEvent(event)
 			}
 		}
 	}

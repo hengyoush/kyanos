@@ -73,7 +73,8 @@ type AgentKernEvt struct {
 	Ts       uint64
 	Seq      uint64
 	Len      uint32
-	_        [4]byte
+	Flags    uint8
+	_        [3]byte
 	ConnIdS  struct {
 		TgidFd uint64
 		Direct AgentTrafficDirectionT
