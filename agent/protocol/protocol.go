@@ -92,14 +92,20 @@ func (s *BaseProtocolMessage) ExportTimeDetails() string {
 		}
 	} else {
 		// req: NICIN => SyscallIn
-		// resp: SyscallOut => NICOUT
 		for i := bpf.AgentStepTNIC_IN; i < bpf.AgentStepTEnd; i++ {
 			start := s.timedetails0[uint8(i)]
 			end := s.timedetails1[uint8(i)]
 			if start != 0 && end != 0 {
-				result += fmt.Sprintf("[%s]dur= %d(ns)\n", common.StepCNNames[i], end-start)
+				if lastStep != bpf.AgentStepTEnd {
+					lastDuration := end - s.timedetails0[uint8(lastStep)]
+					result += fmt.Sprintf("[%s => %s] dur=%dns(%d-%d), cur=%d(ns)\n", common.StepCNNames[lastStep], common.StepCNNames[i], lastDuration, end, s.timedetails0[uint8(lastStep)], end-start)
+				} else {
+					result += fmt.Sprintf("[%s]dur= %d(ns)\n", common.StepCNNames[i], end-start)
+				}
+				lastStep = i
 			}
 		}
+		// resp: SyscallOut => NICOUT
 		for i := bpf.AgentStepTStart + 1; i <= bpf.AgentStepTNIC_OUT; i++ {
 			start := s.timedetails0[uint8(i)]
 			end := s.timedetails1[uint8(i)]
@@ -107,6 +113,7 @@ func (s *BaseProtocolMessage) ExportTimeDetails() string {
 				result += fmt.Sprintf("[%s]dur= %d(ns)\n", common.StepCNNames[i], end-start)
 			}
 		}
+		result += fmt.Sprintf("total bytes: %d, duration: %dns, syscall count: %d\n", s.totalBytes, s.EndTs-s.StartTs, s.syscallCnt)
 	}
 
 	return result

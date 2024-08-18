@@ -64,7 +64,7 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 
 GO_FILES := $(shell find $(SRC_DIR) -type f -name '*.go' | sort)  
 
-eapm-ebpf: $(LIBBPF_OBJ) $(GO_FILES) pktlatency.bpf.c | $(OUTPUT)
+eapm-ebpf: $(LIBBPF_OBJ) $(GO_FILES) pktlatency.bpf.c pktlatency.h | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	./build.sh
 # delete failed targets
