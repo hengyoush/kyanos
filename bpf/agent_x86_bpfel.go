@@ -194,6 +194,8 @@ type AgentProgramSpecs struct {
 	ProcessMultibulkBufferReturn *ebpf.ProgramSpec `ebpf:"processMultibulkBufferReturn"`
 	ReadEnter                    *ebpf.ProgramSpec `ebpf:"read_enter"`
 	ReadReturn                   *ebpf.ProgramSpec `ebpf:"read_return"`
+	ReadvEnter                   *ebpf.ProgramSpec `ebpf:"readv_enter"`
+	ReadvReturn                  *ebpf.ProgramSpec `ebpf:"readv_return"`
 	RecvfromEnter                *ebpf.ProgramSpec `ebpf:"recvfrom_enter"`
 	RecvfromReturn               *ebpf.ProgramSpec `ebpf:"recvfrom_return"`
 	SecuritySocketRecvmsgEnter   *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
@@ -212,6 +214,8 @@ type AgentProgramSpecs struct {
 	TcpV4Rcv                     *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
 	WriteEnter                   *ebpf.ProgramSpec `ebpf:"write_enter"`
 	WriteReturn                  *ebpf.ProgramSpec `ebpf:"write_return"`
+	WritevEnter                  *ebpf.ProgramSpec `ebpf:"writev_enter"`
+	WritevReturn                 *ebpf.ProgramSpec `ebpf:"writev_return"`
 	XdpProxy                     *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
 }
 
@@ -324,6 +328,8 @@ type AgentPrograms struct {
 	ProcessMultibulkBufferReturn *ebpf.Program `ebpf:"processMultibulkBufferReturn"`
 	ReadEnter                    *ebpf.Program `ebpf:"read_enter"`
 	ReadReturn                   *ebpf.Program `ebpf:"read_return"`
+	ReadvEnter                   *ebpf.Program `ebpf:"readv_enter"`
+	ReadvReturn                  *ebpf.Program `ebpf:"readv_return"`
 	RecvfromEnter                *ebpf.Program `ebpf:"recvfrom_enter"`
 	RecvfromReturn               *ebpf.Program `ebpf:"recvfrom_return"`
 	SecuritySocketRecvmsgEnter   *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
@@ -342,6 +348,8 @@ type AgentPrograms struct {
 	TcpV4Rcv                     *ebpf.Program `ebpf:"tcp_v4_rcv"`
 	WriteEnter                   *ebpf.Program `ebpf:"write_enter"`
 	WriteReturn                  *ebpf.Program `ebpf:"write_return"`
+	WritevEnter                  *ebpf.Program `ebpf:"writev_enter"`
+	WritevReturn                 *ebpf.Program `ebpf:"writev_return"`
 	XdpProxy                     *ebpf.Program `ebpf:"xdp_proxy"`
 }
 
@@ -363,6 +371,8 @@ func (p *AgentPrograms) Close() error {
 		p.ProcessMultibulkBufferReturn,
 		p.ReadEnter,
 		p.ReadReturn,
+		p.ReadvEnter,
+		p.ReadvReturn,
 		p.RecvfromEnter,
 		p.RecvfromReturn,
 		p.SecuritySocketRecvmsgEnter,
@@ -381,6 +391,8 @@ func (p *AgentPrograms) Close() error {
 		p.TcpV4Rcv,
 		p.WriteEnter,
 		p.WriteReturn,
+		p.WritevEnter,
+		p.WritevReturn,
 		p.XdpProxy,
 	)
 }

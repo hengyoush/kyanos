@@ -275,7 +275,7 @@ static __always_inline int is_redis_protocol(const char *old_buf, size_t count) 
 }
 
 static __always_inline int is_http_protocol(const char *old_buf, size_t count) {
-  if (count < 16) {
+  if (count < 5) {
     return 0;
   }
   char buf[4] = {};
