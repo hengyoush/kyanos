@@ -258,14 +258,24 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	l = kprobe("__sys_connect", objs.AgentPrograms.ConnectEntry)
 	linkList.PushBack(l)
 
-	l = kprobe("__x64_sys_close", objs.AgentPrograms.CloseEntry)
+	l = kprobe("sys_close", objs.AgentPrograms.CloseEntry)
 	linkList.PushBack(l)
-	l = kretprobe("__x64_sys_close", objs.AgentPrograms.SysCloseRet)
+	l = kretprobe("sys_close", objs.AgentPrograms.SysCloseRet)
 	linkList.PushBack(l)
 
-	l = kprobe("__x64_sys_write", objs.AgentPrograms.WriteEnter)
+	l = kprobe("sys_write", objs.AgentPrograms.WriteEnter)
 	linkList.PushBack(l)
-	l = kretprobe("__x64_sys_write", objs.AgentPrograms.WriteReturn)
+	l = tracepoint("syscalls", "sys_exit_write", objs.AgentPrograms.TracepointSyscallsSysExitWrite)
+	linkList.PushBack(l)
+
+	l = kprobe("sys_sendmsg", objs.AgentPrograms.SendmsgEnter)
+	linkList.PushBack(l)
+	l = tracepoint("syscalls", "sys_exit_recvmsg", objs.AgentPrograms.TracepointSyscallsSysExitSendmsg)
+	linkList.PushBack(l)
+
+	l = kprobe("sys_recvmsg", objs.AgentPrograms.RecvmsgEnter)
+	linkList.PushBack(l)
+	l = tracepoint("syscalls", "sys_exit_recvmsg", objs.AgentPrograms.TracepointSyscallsSysExitRecvmsg)
 	linkList.PushBack(l)
 
 	l = kprobe("do_writev", objs.AgentPrograms.WritevEnter)
@@ -278,9 +288,9 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	l = kretprobe("__sys_sendto", objs.AgentPrograms.SendtoReturn)
 	linkList.PushBack(l)
 
-	l = kprobe("__x64_sys_read", objs.AgentPrograms.ReadEnter)
+	l = kprobe("sys_read", objs.AgentPrograms.ReadEnter)
 	linkList.PushBack(l)
-	l = kretprobe("__x64_sys_read", objs.AgentPrograms.ReadReturn)
+	l = tracepoint("syscalls", "sys_exit_read", objs.AgentPrograms.TracepointSyscallsSysExitRead)
 	linkList.PushBack(l)
 
 	l = kprobe("do_readv", objs.AgentPrograms.ReadvEnter)
@@ -340,6 +350,15 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	}
 	linkList.PushBack(l)
 	return linkList
+}
+
+func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
+	if link, err := link.Tracepoint(group, name, prog, nil); err != nil {
+		log.Fatalf("tp failed: %s, %s", group+":"+name, err)
+		return nil
+	} else {
+		return link
+	}
 }
 
 func kprobe(func_name string, prog *ebpf.Program) link.Link {

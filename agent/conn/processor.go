@@ -180,11 +180,11 @@ func (p *Processor) run() {
 				direct = "<="
 			}
 			if conn != nil && conn.ProtocolInferred() {
-				log.Infof("[syscall][tgid=%d fd=%d][protocol=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
+				log.Infof("[syscall][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
 				conn.OnSyscallEvent(event.Buf, &event.SyscallEvent)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
-				log.Infof("[syscall][protocol unset][tgidfd=%d][protocol=%d] %s:%d %s %s:%d | %s", tgidFd, conn.Protocol, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
+				log.Infof("[syscall][protocol unset][tgidfd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd, conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
@@ -196,7 +196,7 @@ func (p *Processor) run() {
 			}
 			if conn != nil {
 				if viper.GetBool(common.ConsoleOutputVarName) {
-					log.Debugf("[data][tgid=%d fd=%d][func=%s][ts=%d][%s] %s:%d %s %s:%d | %d:%d flags:%s\n",
+					log.Debugf("[data][tgid=%d fd=%d][func=%s][ts=%d][%s] *%s:%d %s %s:%d | %d:%d flags:%s\n",
 						tgidFd>>32, uint32(event.ConnIdS.TgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts,
 						common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp),
 						conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len,

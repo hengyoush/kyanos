@@ -214,5 +214,5 @@ func (c *Connection4) ToString() string {
 	if c.Role != bpf.AgentEndpointRoleTKRoleClient {
 		direct = "<="
 	}
-	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d] %s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, common.IntToIP(c.LocalIp), c.LocalPort, direct, common.IntToIP(c.RemoteIp), c.RemotePort)
+	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d] *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, common.IntToIP(c.LocalIp), c.LocalPort, direct, common.IntToIP(c.RemoteIp), c.RemotePort)
 }

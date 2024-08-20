@@ -96,7 +96,7 @@ func TestReadv(t *testing.T) {
 		fmt.Fprintf(os.Stderr, "Writev出错, err: %v\n", err)
 		return
 	} else {
-		fmt.Fprintf(os.Stderr, "Writev完成, n: %d, fd: %v\n", n, fd)
+		fmt.Fprintf(os.Stderr, "Writev完成, n: %d, fd: %v, local port:%s\n", n, fd, tcpConn.LocalAddr().String())
 	}
 
 	// time.Sleep(time.Second * 1)
