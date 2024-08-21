@@ -60,6 +60,14 @@ const (
 	AgentConnTypeTKProtocolInfer AgentConnTypeT = 2
 )
 
+type AgentControlValueIndexT uint32
+
+const (
+	AgentControlValueIndexTKTargetTGIDIndex   AgentControlValueIndexT = 0
+	AgentControlValueIndexTKStirlingTGIDIndex AgentControlValueIndexT = 1
+	AgentControlValueIndexTKNumControlValues  AgentControlValueIndexT = 2
+)
+
 type AgentEndpointRoleT uint32
 
 const (
@@ -178,49 +186,50 @@ type AgentSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type AgentProgramSpecs struct {
-	AddReplyToBufferOrList           *ebpf.ProgramSpec `ebpf:"_addReplyToBufferOrList"`
-	AddReplyToBufferOrListReturn     *ebpf.ProgramSpec `ebpf:"_addReplyToBufferOrListReturn"`
-	WriteToClient                    *ebpf.ProgramSpec `ebpf:"_writeToClient"`
-	WriteToClientReturn              *ebpf.ProgramSpec `ebpf:"_writeToClientReturn"`
-	Accept4Entry                     *ebpf.ProgramSpec `ebpf:"accept4_entry"`
-	CloseEntry                       *ebpf.ProgramSpec `ebpf:"close_entry"`
-	ConnSocketRead                   *ebpf.ProgramSpec `ebpf:"connSocketRead"`
-	ConnectEntry                     *ebpf.ProgramSpec `ebpf:"connect_entry"`
-	DevHardStartXmit                 *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
-	DevQueueXmit                     *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
-	IpQueueXmit                      *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
-	IpRcvCore                        *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
-	ProcessMultibulkBuffer           *ebpf.ProgramSpec `ebpf:"processMultibulkBuffer"`
-	ProcessMultibulkBufferReturn     *ebpf.ProgramSpec `ebpf:"processMultibulkBufferReturn"`
-	ReadEnter                        *ebpf.ProgramSpec `ebpf:"read_enter"`
-	ReadvEnter                       *ebpf.ProgramSpec `ebpf:"readv_enter"`
-	ReadvReturn                      *ebpf.ProgramSpec `ebpf:"readv_return"`
-	RecvfromEnter                    *ebpf.ProgramSpec `ebpf:"recvfrom_enter"`
-	RecvfromReturn                   *ebpf.ProgramSpec `ebpf:"recvfrom_return"`
-	RecvmsgEnter                     *ebpf.ProgramSpec `ebpf:"recvmsg_enter"`
-	SecuritySocketRecvmsgEnter       *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
-	SecuritySocketSendmsgEnter       *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
-	SendmsgEnter                     *ebpf.ProgramSpec `ebpf:"sendmsg_enter"`
-	SendtoEnter                      *ebpf.ProgramSpec `ebpf:"sendto_enter"`
-	SendtoReturn                     *ebpf.ProgramSpec `ebpf:"sendto_return"`
-	SkbCopyDatagramIter              *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
-	SockAllocRet                     *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
-	SysAccept4Ret                    *ebpf.ProgramSpec `ebpf:"sys_accept4_ret"`
-	SysCloseRet                      *ebpf.ProgramSpec `ebpf:"sys_close_ret"`
-	SysConnectRet                    *ebpf.ProgramSpec `ebpf:"sys_connect_ret"`
-	TcpDestroySock                   *ebpf.ProgramSpec `ebpf:"tcp_destroy_sock"`
-	TcpQueueRcv                      *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
-	TcpRcvEstablished                *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
-	TcpV4DoRcv                       *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
-	TcpV4Rcv                         *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
-	TracepointSyscallsSysExitRead    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_read"`
-	TracepointSyscallsSysExitRecvmsg *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
-	TracepointSyscallsSysExitSendmsg *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
-	TracepointSyscallsSysExitWrite   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_write"`
-	WriteEnter                       *ebpf.ProgramSpec `ebpf:"write_enter"`
-	WritevEnter                      *ebpf.ProgramSpec `ebpf:"writev_enter"`
-	WritevReturn                     *ebpf.ProgramSpec `ebpf:"writev_return"`
-	XdpProxy                         *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
+	AddReplyToBufferOrList            *ebpf.ProgramSpec `ebpf:"_addReplyToBufferOrList"`
+	AddReplyToBufferOrListReturn      *ebpf.ProgramSpec `ebpf:"_addReplyToBufferOrListReturn"`
+	WriteToClient                     *ebpf.ProgramSpec `ebpf:"_writeToClient"`
+	WriteToClientReturn               *ebpf.ProgramSpec `ebpf:"_writeToClientReturn"`
+	Accept4Entry                      *ebpf.ProgramSpec `ebpf:"accept4_entry"`
+	CloseEntry                        *ebpf.ProgramSpec `ebpf:"close_entry"`
+	ConnSocketRead                    *ebpf.ProgramSpec `ebpf:"connSocketRead"`
+	ConnectEntry                      *ebpf.ProgramSpec `ebpf:"connect_entry"`
+	DevHardStartXmit                  *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
+	DevQueueXmit                      *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
+	IpQueueXmit                       *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
+	IpRcvCore                         *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
+	ProcessMultibulkBuffer            *ebpf.ProgramSpec `ebpf:"processMultibulkBuffer"`
+	ProcessMultibulkBufferReturn      *ebpf.ProgramSpec `ebpf:"processMultibulkBufferReturn"`
+	ReadEnter                         *ebpf.ProgramSpec `ebpf:"read_enter"`
+	ReadvEnter                        *ebpf.ProgramSpec `ebpf:"readv_enter"`
+	ReadvReturn                       *ebpf.ProgramSpec `ebpf:"readv_return"`
+	RecvfromEnter                     *ebpf.ProgramSpec `ebpf:"recvfrom_enter"`
+	RecvfromReturn                    *ebpf.ProgramSpec `ebpf:"recvfrom_return"`
+	RecvmsgEnter                      *ebpf.ProgramSpec `ebpf:"recvmsg_enter"`
+	SecuritySocketRecvmsgEnter        *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
+	SecuritySocketSendmsgEnter        *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
+	SendmsgEnter                      *ebpf.ProgramSpec `ebpf:"sendmsg_enter"`
+	SkbCopyDatagramIter               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
+	SockAllocRet                      *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
+	SysAccept4Ret                     *ebpf.ProgramSpec `ebpf:"sys_accept4_ret"`
+	TcpDestroySock                    *ebpf.ProgramSpec `ebpf:"tcp_destroy_sock"`
+	TcpQueueRcv                       *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
+	TcpRcvEstablished                 *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
+	TcpV4DoRcv                        *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
+	TcpV4Rcv                          *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
+	TracepointSyscallsSysEnterSendto  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
+	TracepointSyscallsSysExitClose    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_close"`
+	TracepointSyscallsSysExitConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_connect"`
+	TracepointSyscallsSysExitRead     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_read"`
+	TracepointSyscallsSysExitRecvfrom *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvfrom"`
+	TracepointSyscallsSysExitRecvmsg  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
+	TracepointSyscallsSysExitSendmsg  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
+	TracepointSyscallsSysExitSendto   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
+	TracepointSyscallsSysExitWrite    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_write"`
+	WriteEnter                        *ebpf.ProgramSpec `ebpf:"write_enter"`
+	WritevEnter                       *ebpf.ProgramSpec `ebpf:"writev_enter"`
+	WritevReturn                      *ebpf.ProgramSpec `ebpf:"writev_return"`
+	XdpProxy                          *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
 }
 
 // AgentMapSpecs contains maps before they are loaded into the kernel.
@@ -234,6 +243,7 @@ type AgentMapSpecs struct {
 	ConnEvtRb                           *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap                         *ebpf.MapSpec `ebpf:"conn_info_map"`
 	ConnectArgsMap                      *ebpf.MapSpec `ebpf:"connect_args_map"`
+	ControlValues                       *ebpf.MapSpec `ebpf:"control_values"`
 	CurRedisReq                         *ebpf.MapSpec `ebpf:"cur_redis_req"`
 	ProcessMultibulkBufferReturnArgsMap *ebpf.MapSpec `ebpf:"processMultibulkBufferReturn_args_map"`
 	Rb                                  *ebpf.MapSpec `ebpf:"rb"`
@@ -274,6 +284,7 @@ type AgentMaps struct {
 	ConnEvtRb                           *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap                         *ebpf.Map `ebpf:"conn_info_map"`
 	ConnectArgsMap                      *ebpf.Map `ebpf:"connect_args_map"`
+	ControlValues                       *ebpf.Map `ebpf:"control_values"`
 	CurRedisReq                         *ebpf.Map `ebpf:"cur_redis_req"`
 	ProcessMultibulkBufferReturnArgsMap *ebpf.Map `ebpf:"processMultibulkBufferReturn_args_map"`
 	Rb                                  *ebpf.Map `ebpf:"rb"`
@@ -297,6 +308,7 @@ func (m *AgentMaps) Close() error {
 		m.ConnEvtRb,
 		m.ConnInfoMap,
 		m.ConnectArgsMap,
+		m.ControlValues,
 		m.CurRedisReq,
 		m.ProcessMultibulkBufferReturnArgsMap,
 		m.Rb,
@@ -316,49 +328,50 @@ func (m *AgentMaps) Close() error {
 //
 // It can be passed to LoadAgentObjects or ebpf.CollectionSpec.LoadAndAssign.
 type AgentPrograms struct {
-	AddReplyToBufferOrList           *ebpf.Program `ebpf:"_addReplyToBufferOrList"`
-	AddReplyToBufferOrListReturn     *ebpf.Program `ebpf:"_addReplyToBufferOrListReturn"`
-	WriteToClient                    *ebpf.Program `ebpf:"_writeToClient"`
-	WriteToClientReturn              *ebpf.Program `ebpf:"_writeToClientReturn"`
-	Accept4Entry                     *ebpf.Program `ebpf:"accept4_entry"`
-	CloseEntry                       *ebpf.Program `ebpf:"close_entry"`
-	ConnSocketRead                   *ebpf.Program `ebpf:"connSocketRead"`
-	ConnectEntry                     *ebpf.Program `ebpf:"connect_entry"`
-	DevHardStartXmit                 *ebpf.Program `ebpf:"dev_hard_start_xmit"`
-	DevQueueXmit                     *ebpf.Program `ebpf:"dev_queue_xmit"`
-	IpQueueXmit                      *ebpf.Program `ebpf:"ip_queue_xmit"`
-	IpRcvCore                        *ebpf.Program `ebpf:"ip_rcv_core"`
-	ProcessMultibulkBuffer           *ebpf.Program `ebpf:"processMultibulkBuffer"`
-	ProcessMultibulkBufferReturn     *ebpf.Program `ebpf:"processMultibulkBufferReturn"`
-	ReadEnter                        *ebpf.Program `ebpf:"read_enter"`
-	ReadvEnter                       *ebpf.Program `ebpf:"readv_enter"`
-	ReadvReturn                      *ebpf.Program `ebpf:"readv_return"`
-	RecvfromEnter                    *ebpf.Program `ebpf:"recvfrom_enter"`
-	RecvfromReturn                   *ebpf.Program `ebpf:"recvfrom_return"`
-	RecvmsgEnter                     *ebpf.Program `ebpf:"recvmsg_enter"`
-	SecuritySocketRecvmsgEnter       *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
-	SecuritySocketSendmsgEnter       *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
-	SendmsgEnter                     *ebpf.Program `ebpf:"sendmsg_enter"`
-	SendtoEnter                      *ebpf.Program `ebpf:"sendto_enter"`
-	SendtoReturn                     *ebpf.Program `ebpf:"sendto_return"`
-	SkbCopyDatagramIter              *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
-	SockAllocRet                     *ebpf.Program `ebpf:"sock_alloc_ret"`
-	SysAccept4Ret                    *ebpf.Program `ebpf:"sys_accept4_ret"`
-	SysCloseRet                      *ebpf.Program `ebpf:"sys_close_ret"`
-	SysConnectRet                    *ebpf.Program `ebpf:"sys_connect_ret"`
-	TcpDestroySock                   *ebpf.Program `ebpf:"tcp_destroy_sock"`
-	TcpQueueRcv                      *ebpf.Program `ebpf:"tcp_queue_rcv"`
-	TcpRcvEstablished                *ebpf.Program `ebpf:"tcp_rcv_established"`
-	TcpV4DoRcv                       *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
-	TcpV4Rcv                         *ebpf.Program `ebpf:"tcp_v4_rcv"`
-	TracepointSyscallsSysExitRead    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_read"`
-	TracepointSyscallsSysExitRecvmsg *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
-	TracepointSyscallsSysExitSendmsg *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
-	TracepointSyscallsSysExitWrite   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_write"`
-	WriteEnter                       *ebpf.Program `ebpf:"write_enter"`
-	WritevEnter                      *ebpf.Program `ebpf:"writev_enter"`
-	WritevReturn                     *ebpf.Program `ebpf:"writev_return"`
-	XdpProxy                         *ebpf.Program `ebpf:"xdp_proxy"`
+	AddReplyToBufferOrList            *ebpf.Program `ebpf:"_addReplyToBufferOrList"`
+	AddReplyToBufferOrListReturn      *ebpf.Program `ebpf:"_addReplyToBufferOrListReturn"`
+	WriteToClient                     *ebpf.Program `ebpf:"_writeToClient"`
+	WriteToClientReturn               *ebpf.Program `ebpf:"_writeToClientReturn"`
+	Accept4Entry                      *ebpf.Program `ebpf:"accept4_entry"`
+	CloseEntry                        *ebpf.Program `ebpf:"close_entry"`
+	ConnSocketRead                    *ebpf.Program `ebpf:"connSocketRead"`
+	ConnectEntry                      *ebpf.Program `ebpf:"connect_entry"`
+	DevHardStartXmit                  *ebpf.Program `ebpf:"dev_hard_start_xmit"`
+	DevQueueXmit                      *ebpf.Program `ebpf:"dev_queue_xmit"`
+	IpQueueXmit                       *ebpf.Program `ebpf:"ip_queue_xmit"`
+	IpRcvCore                         *ebpf.Program `ebpf:"ip_rcv_core"`
+	ProcessMultibulkBuffer            *ebpf.Program `ebpf:"processMultibulkBuffer"`
+	ProcessMultibulkBufferReturn      *ebpf.Program `ebpf:"processMultibulkBufferReturn"`
+	ReadEnter                         *ebpf.Program `ebpf:"read_enter"`
+	ReadvEnter                        *ebpf.Program `ebpf:"readv_enter"`
+	ReadvReturn                       *ebpf.Program `ebpf:"readv_return"`
+	RecvfromEnter                     *ebpf.Program `ebpf:"recvfrom_enter"`
+	RecvfromReturn                    *ebpf.Program `ebpf:"recvfrom_return"`
+	RecvmsgEnter                      *ebpf.Program `ebpf:"recvmsg_enter"`
+	SecuritySocketRecvmsgEnter        *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
+	SecuritySocketSendmsgEnter        *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
+	SendmsgEnter                      *ebpf.Program `ebpf:"sendmsg_enter"`
+	SkbCopyDatagramIter               *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
+	SockAllocRet                      *ebpf.Program `ebpf:"sock_alloc_ret"`
+	SysAccept4Ret                     *ebpf.Program `ebpf:"sys_accept4_ret"`
+	TcpDestroySock                    *ebpf.Program `ebpf:"tcp_destroy_sock"`
+	TcpQueueRcv                       *ebpf.Program `ebpf:"tcp_queue_rcv"`
+	TcpRcvEstablished                 *ebpf.Program `ebpf:"tcp_rcv_established"`
+	TcpV4DoRcv                        *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
+	TcpV4Rcv                          *ebpf.Program `ebpf:"tcp_v4_rcv"`
+	TracepointSyscallsSysEnterSendto  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
+	TracepointSyscallsSysExitClose    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_close"`
+	TracepointSyscallsSysExitConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_connect"`
+	TracepointSyscallsSysExitRead     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_read"`
+	TracepointSyscallsSysExitRecvfrom *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvfrom"`
+	TracepointSyscallsSysExitRecvmsg  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
+	TracepointSyscallsSysExitSendmsg  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
+	TracepointSyscallsSysExitSendto   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
+	TracepointSyscallsSysExitWrite    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_write"`
+	WriteEnter                        *ebpf.Program `ebpf:"write_enter"`
+	WritevEnter                       *ebpf.Program `ebpf:"writev_enter"`
+	WritevReturn                      *ebpf.Program `ebpf:"writev_return"`
+	XdpProxy                          *ebpf.Program `ebpf:"xdp_proxy"`
 }
 
 func (p *AgentPrograms) Close() error {
@@ -386,21 +399,22 @@ func (p *AgentPrograms) Close() error {
 		p.SecuritySocketRecvmsgEnter,
 		p.SecuritySocketSendmsgEnter,
 		p.SendmsgEnter,
-		p.SendtoEnter,
-		p.SendtoReturn,
 		p.SkbCopyDatagramIter,
 		p.SockAllocRet,
 		p.SysAccept4Ret,
-		p.SysCloseRet,
-		p.SysConnectRet,
 		p.TcpDestroySock,
 		p.TcpQueueRcv,
 		p.TcpRcvEstablished,
 		p.TcpV4DoRcv,
 		p.TcpV4Rcv,
+		p.TracepointSyscallsSysEnterSendto,
+		p.TracepointSyscallsSysExitClose,
+		p.TracepointSyscallsSysExitConnect,
 		p.TracepointSyscallsSysExitRead,
+		p.TracepointSyscallsSysExitRecvfrom,
 		p.TracepointSyscallsSysExitRecvmsg,
 		p.TracepointSyscallsSysExitSendmsg,
+		p.TracepointSyscallsSysExitSendto,
 		p.TracepointSyscallsSysExitWrite,
 		p.WriteEnter,
 		p.WritevEnter,

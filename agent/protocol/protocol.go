@@ -105,12 +105,19 @@ func (s *BaseProtocolMessage) ExportTimeDetails() string {
 				lastStep = i
 			}
 		}
+		lastStep = bpf.AgentStepTEnd
 		// resp: SyscallOut => NICOUT
 		for i := bpf.AgentStepTStart + 1; i <= bpf.AgentStepTNIC_OUT; i++ {
 			start := s.timedetails0[uint8(i)]
 			end := s.timedetails1[uint8(i)]
 			if start != 0 && end != 0 {
-				result += fmt.Sprintf("[%s]dur= %d(ns)\n", common.StepCNNames[i], end-start)
+				if lastStep != bpf.AgentStepTEnd {
+					lastDuration := end - s.timedetails0[uint8(lastStep)]
+					result += fmt.Sprintf("[%s => %s] dur=%dns(%d-%d), cur=%d(ns)\n", common.StepCNNames[lastStep], common.StepCNNames[i], lastDuration, end, s.timedetails0[uint8(lastStep)], end-start)
+				} else {
+					result += fmt.Sprintf("[%s]dur= %d(ns)\n", common.StepCNNames[i], end-start)
+				}
+				lastStep = i
 			}
 		}
 		result += fmt.Sprintf("total bytes: %d, duration: %dns, syscall count: %d\n", s.totalBytes, s.EndTs-s.StartTs, s.syscallCnt)
@@ -120,17 +127,31 @@ func (s *BaseProtocolMessage) ExportTimeDetails() string {
 }
 
 func (req *BaseProtocolMessage) ExportReqRespTimeDetails(resp *BaseProtocolMessage) string {
-	start, ok := req.timedetails1[uint8(bpf.AgentStepTDEV_OUT)]
-	if !ok {
-		log.Debugln("[no info] no dev out time detail")
-		return ""
+	if req.IsServerSide {
+		start, ok := req.timedetails1[uint8(bpf.AgentStepTSYSCALL_IN)]
+		if !ok {
+			log.Debugln("[no info] no syscall in time detail")
+			return ""
+		}
+		end, ok := resp.timedetails0[uint8(bpf.AgentStepTSYSCALL_OUT)]
+		if !ok {
+			log.Debugln("[no info] no syscall out time detail")
+			return ""
+		}
+		return fmt.Sprintf("[服务耗时]dur=%d(ns)\n", end-start)
+	} else {
+		start, ok := req.timedetails1[uint8(bpf.AgentStepTDEV_OUT)]
+		if !ok {
+			log.Debugln("[no info] no dev out time detail")
+			return ""
+		}
+		end, ok := resp.timedetails0[uint8(bpf.AgentStepTNIC_IN)]
+		if !ok {
+			log.Debugln("[no info] no nic in time detail")
+			return ""
+		}
+		return fmt.Sprintf("[网络耗时]dur=%d(ns)\n", end-start)
 	}
-	end, ok := resp.timedetails0[uint8(bpf.AgentStepTNIC_IN)]
-	if !ok {
-		log.Debugln("[no info] no nic in time detail")
-		return ""
-	}
-	return fmt.Sprintf("[网络耗时]dur=%d(ns)\n", end-start)
 }
 
 func (s *BaseProtocolMessage) AppendData(data []byte) {

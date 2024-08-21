@@ -107,9 +107,9 @@ func (p *Processor) run() {
 				CurResp:    protocol.InitProtocolMessage(false, event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleServer),
 			}
 			// remove this TODO
-			if conn.LocalPort != 16660 {
-				continue
-			}
+			// if conn.LocalPort != 16660 {
+			// 	continue
+			// }
 
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
 				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
@@ -216,7 +216,7 @@ func (p *Processor) run() {
 					// TODO 推断出协议之前的事件需要处理，这里暂时略过
 					// conn.AddKernEvent(&event)
 					conn.OnKernEvent(event)
-					// log.Infof("[skip] skip due to protocol unset")
+					log.Infof("[skip] skip due to protocol unset")
 					// log.Infof("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 					flag := conn.OnKernEvent(event)

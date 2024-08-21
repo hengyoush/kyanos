@@ -57,6 +57,7 @@ const enum conn_type_t *conn_type_t_unused __attribute__((unused));
 const enum endpoint_role_t *endpoint_role_unused  __attribute__((unused));
 const enum traffic_direction_t *traffic_direction_t_unused __attribute__((unused));
 const enum traffic_protocol_t *traffic_protocol_t_unused __attribute__((unused));
+const enum control_value_index_t *control_value_index_t_unused __attribute__((unused));
 const enum step_t *step_t_unused __attribute__((unused));
 
 static __always_inline bool skb_l2_check(u16 header)
@@ -172,6 +173,34 @@ static __always_inline int get_netns(struct sk_buff *skb)
 no_ns:
 	return 0;
 }
+
+MY_BPF_HASH(control_values, uint32_t, int64_t)
+
+enum target_tgid_match_result_t {
+  TARGET_TGID_UNSPECIFIED,
+  TARGET_TGID_ALL,
+  TARGET_TGID_MATCHED,
+  TARGET_TGID_UNMATCHED,
+};
+static __inline enum target_tgid_match_result_t match_trace_tgid(const uint32_t tgid) {
+  // TODO(yzhao): Use externally-defined macro to replace BPF_MAP. Since this function is called for
+  // all PIDs, this optimization is useful.
+  uint32_t idx = kTargetTGIDIndex;
+  int64_t* target_tgid = bpf_map_lookup_elem(&control_values, &idx);
+  if (target_tgid == NULL) {
+    return TARGET_TGID_UNSPECIFIED;
+  }
+  if (*target_tgid < 0) {
+    // Negative value means trace all.
+    return TARGET_TGID_ALL;
+  }
+  if (*target_tgid == tgid) {
+    return TARGET_TGID_MATCHED;
+  }
+  return TARGET_TGID_UNMATCHED;
+// return TARGET_TGID_UNSPECIFIED;
+}
+
 static __always_inline struct sock_key reverse_sock_key(struct sock_key* key) {
 	struct sock_key copy;
 	copy.dip = key->sip;
@@ -998,7 +1027,7 @@ static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 	return NULL;
 }
 
-static __always_inline void submit_new_conn(struct pt_regs* ctx, uint32_t tgid, int32_t fd,
+static __always_inline void submit_new_conn(uint32_t tgid, int32_t fd,
 const struct sockaddr* addr, const struct socket* socket,
 enum endpoint_role_t role, uint64_t start_ts) {
 	struct conn_info_t conn_info = {};
@@ -1096,9 +1125,8 @@ static __always_inline void process_syscall_close(struct pt_regs* ctx, struct cl
 	bpf_map_delete_elem(&sock_key_conn_id_map, &rev_key);
 }
 
-static __always_inline void process_syscall_connect(struct pt_regs* ctx, struct connect_args *args, uint64_t id) {
+static __always_inline void process_syscall_connect(int  ret_val, struct connect_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
-	int  ret_val = PT_REGS_RC_CORE(ctx);
 	if (ret_val < 0 && ret_val != -EINPROGRESS) {
     	return;
   	}
@@ -1109,8 +1137,11 @@ static __always_inline void process_syscall_connect(struct pt_regs* ctx, struct 
 	if (tgid == agent_pid) {
 		return;
 	}
+	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
+		return;
+	}
 	bpf_printk("process_syscall_connect, tgid:%lu, fd: %d", tgid, args->fd);
-	submit_new_conn(ctx, tgid, args->fd, args->addr, NULL, kRoleClient , args->start_ts);
+	submit_new_conn(tgid, args->fd, args->addr, NULL, kRoleClient , args->start_ts);
 }
 static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct accept_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
@@ -1122,8 +1153,12 @@ static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct a
 	if (tgid == agent_pid) {
 		return;
 	}
+
+	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
+		return;
+	}
 	bpf_printk("process_syscall_accept, tgid:%lu, ret_fd: %d, socket:%d", tgid,ret_fd,args->sock_alloc_socket);
-	submit_new_conn(ctx, tgid, ret_fd, args->addr, args->sock_alloc_socket, kRoleServer , 0);
+	submit_new_conn(tgid, ret_fd, args->addr, args->sock_alloc_socket, kRoleServer , 0);
 }
 
 static __always_inline void process_syscall_data_vecs(struct pt_regs* ctx, struct data_args *args, uint64_t id, enum traffic_direction_t direct,
@@ -1198,12 +1233,12 @@ static __always_inline void process_syscall_data(struct pt_regs* ctx, struct dat
 	uint64_t tgid_fd = gen_tgid_fd(tgid, args->fd);
 	struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 	if (!conn_info) {
-		// if (tgid == 1573997) {
-		// 	bpf_printk("conn_info == null, tgid:%lu,fd:%d,func:%d", tgid,args->fd,args->source_fn);
-		// }
+		if (tgid == 2509849) {
+			bpf_printk("conn_info == null, tgid:%lu,fd:%d,func:%d", tgid,args->fd,args->source_fn);
+		}
 		return;
 	} else {
-		// if (tgid == 1573997) {
+		// if (tgid == 2509849) {
 		// 	bpf_printk("conn_info != null, tgid:%lu,fd:%d,func:%d", tgid,args->fd,args->source_fn);
 		// }
 	}
@@ -1243,9 +1278,9 @@ static __always_inline void process_implicit_conn(struct pt_regs* ctx, uint64_t 
 										   enum endpoint_role_t role) {
   uint32_t tgid = id >> 32;
 
-//   if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
-//     return;
-//   }
+  if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
+    return;
+  }
 
   if (args->fd < 0) {
     return;
@@ -1258,7 +1293,7 @@ static __always_inline void process_implicit_conn(struct pt_regs* ctx, uint64_t 
     return;
   }
 
-  submit_new_conn(ctx, tgid, args->fd, args->addr, /*socket*/ NULL, role, source_fn);
+  submit_new_conn(tgid, args->fd, args->addr, /*socket*/ NULL, role, source_fn);
 }
 SEC("kprobe/security_socket_sendmsg")
 int BPF_KPROBE(security_socket_sendmsg_enter) {
@@ -1285,29 +1320,52 @@ int BPF_KPROBE(security_socket_recvmsg_enter) {
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 //                  struct sockaddr *src_addr, socklen_t *addrlen);
 SEC("kprobe/__sys_recvfrom")
-int BPF_KSYSCALL(recvfrom_enter,  uint32_t fd, char* buf) {
+int BPF_KPROBE(recvfrom_enter,  uint32_t fd, char* buf) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct data_args args = {0};
 	args.fd = fd;
 	args.buf = buf;
 	args.source_fn = kSyscallRecvFrom;
+	if (id >> 32 == 2509849) {
+		bpf_printk("recvfrom enter fd:%u,buf:%x", args.fd, args.buf);
+	}
 	bpf_map_update_elem(&read_args_map, &id, &args, BPF_ANY);
+	return 0;
+}
+SEC("tracepoint/syscalls/sys_exit_recvfrom")
+int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	ssize_t bytes_count = ctx->ret;
+
+	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
+	if (args != NULL) {
+		if (id >> 32 == 2509849) {
+			bpf_printk("recvfrom exit fd:%u,buf:%x", args->fd, args->buf);
+		}
+		args->ts = bpf_ktime_get_ns();
+		process_syscall_data((struct pt_regs*)ctx, args, id, kIngress, bytes_count);
+	} 
+
+	bpf_map_delete_elem(&read_args_map, &id);
 	return 0;
 }
 
 SEC("kretprobe/__sys_recvfrom")
 int BPF_KRETPROBE(recvfrom_return) {
-	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count = PT_REGS_RC_CORE((struct pt_regs*)ctx);
+	// uint64_t id = bpf_get_current_pid_tgid();
+	// ssize_t bytes_count = PT_REGS_RC_CORE((struct pt_regs*)ctx);
 
-	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
-	if (args != NULL) {
-		args->ts = bpf_ktime_get_ns();
-		process_syscall_data((struct pt_regs*)ctx, args, id, kIngress, bytes_count);
-	}
+	// struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
+	// if (args != NULL) {
+	// 	if (id >> 32 == 2509849) {
+	// 		bpf_printk("recvfrom fd:%u,buf:%x", args->fd, args->buf);
+	// 	}
+	// 	args->ts = bpf_ktime_get_ns();
+	// 	process_syscall_data((struct pt_regs*)ctx, args, id, kIngress, bytes_count);
+	// }
 
-	bpf_map_delete_elem(&read_args_map, &id);
+	// bpf_map_delete_elem(&read_args_map, &id);
 	return 0;
 }
 
@@ -1422,27 +1480,28 @@ int BPF_KRETPROBE(readv_return) {
 
 // ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
 //                const struct sockaddr *dest_addr, socklen_t addrlen);
-SEC("kprobe/__sys_sendto")
-int BPF_KSYSCALL(sendto_enter, unsigned int sockfd, char* buf) {
+SEC("tracepoint/syscalls/sys_enter_sendto")
+int tracepoint__syscalls__sys_enter_sendto(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct data_args args = {0};
-	args.fd = sockfd;
-	args.buf = buf;
+	args.fd = (int32_t) ctx->args[0];
+	args.buf = (char*) ctx->args[1];
 	args.source_fn = kSyscallSendTo;
 	args.ts = bpf_ktime_get_ns();
+	bpf_printk("tp fd:%u, buf:%x", args.fd, args.buf);
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
 
-SEC("kretprobe/__sys_sendto")
-int BPF_KRETPROBE(sendto_return) {
+SEC("tracepoint/syscalls/sys_exit_sendto")
+int tracepoint__syscalls__sys_exit_sendto(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count = PT_REGS_RC_CORE((struct pt_regs*)ctx);
+	ssize_t bytes_count = ctx->ret;
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL ) {
-		process_syscall_data(ctx, args, id, kEgress, bytes_count);
+		process_syscall_data((struct pt_regs*)ctx, args, id, kEgress, bytes_count);
 	}
 
 	bpf_map_delete_elem(&write_args_map, &id);
@@ -1520,29 +1579,6 @@ int tracepoint__syscalls__sys_exit_sendmsg(struct trace_event_raw_sys_exit *ctx)
 	bpf_map_delete_elem(&write_args_map, &id);
 	return 0;
 }
-/**
- * 
-int syscall__probe_ret_sendmsg(struct pt_regs* ctx) {
-  uint64_t id = bpf_get_current_pid_tgid();
-  ssize_t bytes_count = PT_REGS_RC(ctx);
-
-  // Unstash arguments, and process syscall.
-  const struct connect_args_t* connect_args = active_connect_args_map.lookup(&id);
-  if (connect_args != NULL && bytes_count > 0) {
-    process_implicit_conn(ctx, id, connect_args, kSyscallSendMsg);
-  }
-  active_connect_args_map.delete(&id);
-
-  // Unstash arguments, and process syscall.
-  struct data_args_t* write_args = active_write_args_map.lookup(&id);
-  if (write_args != NULL) {
-    process_syscall_data_vecs(ctx, id, kEgress, write_args, bytes_count);
-  }
-
-  active_write_args_map.delete(&id);
-  return 0;
-}
- */
 
 SEC("kprobe/do_writev")
 int BPF_KPROBE(writev_enter, unsigned int fd, const struct iovec* iov, int iovlen) {
@@ -1574,7 +1610,7 @@ int BPF_KRETPROBE(writev_return) {
 
 // int close(int fd);
 SEC("kprobe/sys_close")
-int BPF_KSYSCALL(close_entry, unsigned int sockfd) {
+int BPF_KPROBE(close_entry, unsigned int sockfd) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct close_args args = {0};
@@ -1583,8 +1619,8 @@ int BPF_KSYSCALL(close_entry, unsigned int sockfd) {
 	return 0;
 }
 
-SEC("kretprobe/__x64_sys_close")
-int BPF_KRETPROBE(sys_close_ret)
+SEC("tracepoint/syscalls/sys_exit_close")
+int tracepoint__syscalls__sys_exit_close(struct trace_event_raw_sys_exit *ctx)
 {
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct close_args *args = bpf_map_lookup_elem(&close_args_map, &id);
@@ -1598,7 +1634,7 @@ int BPF_KRETPROBE(sys_close_ret)
 
 //int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 SEC("kprobe/__sys_connect")
-int BPF_KSYSCALL(connect_entry, int sockfd, const struct sockaddr* addr) {
+int BPF_KPROBE(connect_entry, int sockfd, const struct sockaddr* addr) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct connect_args args = {0};
@@ -1609,20 +1645,20 @@ int BPF_KSYSCALL(connect_entry, int sockfd, const struct sockaddr* addr) {
 	return 0;
 }
 
-SEC("kretprobe/__sys_connect")
-int BPF_KRETPROBE(sys_connect_ret)
-{
+SEC("tracepoint/syscalls/sys_exit_connect")
+int tracepoint__syscalls__sys_exit_connect(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct connect_args *args = bpf_map_lookup_elem(&connect_args_map, &id);
 	if (args != NULL) {
-		process_syscall_connect(ctx, args, id);
-	}	
+		process_syscall_connect(ctx->ret, args, id);
+	} 
 	bpf_map_delete_elem(&connect_args_map, &id);
 	return 0;
 }
 
+
 SEC("ksyscall/accept4")
-int BPF_KSYSCALL(accept4_entry, int sockfd, struct sockaddr* addr) {
+int BPF_KPROBE(accept4_entry, int sockfd, struct sockaddr* addr) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct accept_args args = {0};
