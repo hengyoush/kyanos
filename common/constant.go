@@ -14,6 +14,7 @@ var ConsoleOutputVarName string = "console-output"
 var VerboseVarName string = "verbose"
 var DaemonVarName string = "daemon"
 var LogDirVarName string = "log-dir"
+var FilterPidVarName string = "filter-pid"
 var LaunchEpochTime uint64
 
 var TCP_FLAGS_ACK = 1 << 4

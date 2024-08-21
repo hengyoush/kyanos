@@ -59,6 +59,7 @@ var ConsoleOutput bool
 var Verbose bool
 var Daemon bool
 var LogDir string
+var FilterPid int64
 
 func init() {
 	rootCmd.Flags().StringVar(&CollectorAddr, "collector-addr", "localhost:18800", "backend collector address")
@@ -67,6 +68,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&ConsoleOutput, "console-output", "c", true, "print trace data to console")
 	rootCmd.Flags().BoolVarP(&Verbose, "verbose", "v", false, "print verbose log")
 	rootCmd.Flags().BoolVarP(&Daemon, "daemon", "d", false, "run in background")
+	rootCmd.Flags().Int64VarP(&FilterPid, "filter-pid", "p", -1, "the pid to filter")
 	viper.BindPFlags(rootCmd.Flags())
 }
 

@@ -81,6 +81,17 @@ enum source_function_t {
   kSSLWrite,
   kSSLRead,
 };
+
+enum control_value_index_t {
+  // This specify one pid to monitor. This is used during test to eliminate noise.
+  // TODO: We need a more robust mechanism for production use, which should be able to:
+  // * Specify multiple pids up to a certain limit, let's say 1024.
+  // * Support efficient lookup inside bpf to minimize overhead.
+  kTargetTGIDIndex = 0,
+  kStirlingTGIDIndex,
+  kNumControlValues,
+};
+
 enum message_type_t { kUnknown, kRequest, kResponse };
 
 struct protocol_message_t {

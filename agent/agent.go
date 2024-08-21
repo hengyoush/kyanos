@@ -22,6 +22,7 @@ import (
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
 	"github.com/jefurry/logrus"
+	"github.com/spf13/viper"
 )
 
 var log *logrus.Logger = common.Log
@@ -79,6 +80,10 @@ func SetupAgent() {
 	}
 
 	defer objs.Close()
+	if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
+		log.Infoln("filter for pid: ", targetPid)
+		objs.AgentMaps.ControlValues.Update(bpf.AgentControlValueIndexTKTargetTGIDIndex, targetPid, ebpf.UpdateAny)
+	}
 
 	links := attachBpfProgs(objs)
 
@@ -253,14 +258,16 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	l = kretprobe("sock_alloc", objs.AgentPrograms.SockAllocRet)
 	linkList.PushBack(l)
 
-	l = kretprobe("__sys_connect", objs.AgentPrograms.SysConnectRet)
-	linkList.PushBack(l)
+	// l = kretprobe("__sys_connect", objs.AgentPrograms.SysConnectRet)
+	// linkList.PushBack(l)
 	l = kprobe("__sys_connect", objs.AgentPrograms.ConnectEntry)
+	linkList.PushBack(l)
+	l = tracepoint("syscalls", "sys_exit_connect", objs.AgentPrograms.TracepointSyscallsSysExitConnect)
 	linkList.PushBack(l)
 
 	l = kprobe("sys_close", objs.AgentPrograms.CloseEntry)
 	linkList.PushBack(l)
-	l = kretprobe("sys_close", objs.AgentPrograms.SysCloseRet)
+	l = tracepoint("syscalls", "sys_exit_close", objs.AgentPrograms.TracepointSyscallsSysExitClose)
 	linkList.PushBack(l)
 
 	l = kprobe("sys_write", objs.AgentPrograms.WriteEnter)
@@ -270,7 +277,7 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 
 	l = kprobe("sys_sendmsg", objs.AgentPrograms.SendmsgEnter)
 	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_exit_recvmsg", objs.AgentPrograms.TracepointSyscallsSysExitSendmsg)
+	l = tracepoint("syscalls", "sys_exit_sendmsg", objs.AgentPrograms.TracepointSyscallsSysExitSendmsg)
 	linkList.PushBack(l)
 
 	l = kprobe("sys_recvmsg", objs.AgentPrograms.RecvmsgEnter)
@@ -283,10 +290,12 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	l = kretprobe("do_writev", objs.AgentPrograms.WritevReturn)
 	linkList.PushBack(l)
 
-	l = kprobe("__sys_sendto", objs.AgentPrograms.SendtoEnter)
+	l = tracepoint("syscalls", "sys_exit_sendto", objs.AgentPrograms.TracepointSyscallsSysExitSendto)
 	linkList.PushBack(l)
-	l = kretprobe("__sys_sendto", objs.AgentPrograms.SendtoReturn)
+	l = tracepoint("syscalls", "sys_enter_sendto", objs.AgentPrograms.TracepointSyscallsSysEnterSendto)
 	linkList.PushBack(l)
+	// l = kretprobe("__sys_sendto", objs.AgentPrograms.TracepointSyscallsSysExitSendto)
+	// linkList.PushBack(l)
 
 	l = kprobe("sys_read", objs.AgentPrograms.ReadEnter)
 	linkList.PushBack(l)
@@ -300,7 +309,7 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 
 	l = kprobe("__sys_recvfrom", objs.AgentPrograms.RecvfromEnter)
 	linkList.PushBack(l)
-	l = kretprobe("__sys_recvfrom", objs.AgentPrograms.RecvfromReturn)
+	l = tracepoint("syscalls", "sys_exit_recvfrom", objs.AgentPrograms.TracepointSyscallsSysExitRecvfrom)
 	linkList.PushBack(l)
 
 	l = kprobe("security_socket_recvmsg", objs.AgentPrograms.SecuritySocketRecvmsgEnter)
