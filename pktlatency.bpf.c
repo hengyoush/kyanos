@@ -316,10 +316,10 @@ static void __always_inline report_syscall_evt_vecs(uint64_t seq, struct conn_id
 }
 
 
-static void __always_inline report_conn_evt(struct conn_info_t *conn_info, enum conn_type_t type, uint64_t ts) {
+static bool __always_inline report_conn_evt(struct conn_info_t *conn_info, enum conn_type_t type, uint64_t ts) {
 	struct conn_evt_t* evt = bpf_ringbuf_reserve(&conn_evt_rb, sizeof(struct conn_evt_t), 0); 	
 	if (!evt) {
-		return;
+		return 0;
 	}
 	evt->conn_info = *conn_info;
 	evt->conn_type = type;
@@ -329,6 +329,7 @@ static void __always_inline report_conn_evt(struct conn_info_t *conn_info, enum 
 		evt->ts = bpf_ktime_get_ns();
 	}
 	bpf_ringbuf_submit(evt, 0);
+	return 1;
 }
 
 static void __always_inline debug_evt(struct kern_evt* evt, char* func_name) {
@@ -934,6 +935,7 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 	uint64_t tgid_fd;
 	if (conn_id_s != NULL) {
 		tgid_fd = conn_id_s->tgid_fd;
+		bpf_printk("tcp_destroy_sock found, tgid:%d", tgid_fd>>32);
 		struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 		if (conn_info != NULL) {
 			report_conn_evt(conn_info, kClose, 0);
@@ -942,7 +944,7 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 		bpf_map_delete_elem(&sock_key_conn_id_map, &key);
 		struct sock_key rev_key = reverse_sock_key(&key);
 		bpf_map_delete_elem(&sock_key_conn_id_map, &rev_key);
-	}
+	} 
 	if (!err) {
 		// bpf_printk("tcp_destroy_sock, sock destory, %d, %d", key.sport, key.dport);
 	}
@@ -1092,25 +1094,25 @@ enum endpoint_role_t role, uint64_t start_ts) {
 // 	} 
 // }
 
-static __always_inline void process_syscall_close(struct pt_regs* ctx, struct close_args *args, uint64_t id) {
+static __always_inline void process_syscall_close(int ret_val, struct close_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
-	int  ret_val = PT_REGS_RC_CORE(ctx);
 	if (args->fd < 0) {
-		bpf_printk("close syscall args->fd:%d", args->fd);
+		bpf_printk("close syscall args->fd:%d,tgid:%u", args->fd, tgid);
 		return;
 	}
 	if (ret_val < 0) {
-		// bpf_printk("close syscall ret_val:%u", ret_val);
+		bpf_printk("close syscall ret_val:%d,tgid:%u", ret_val, tgid);
 		return;
 	}
 	uint64_t tgid_fd = gen_tgid_fd(tgid, args->fd);
 	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 	if (conn_info == NULL) {
+		bpf_printk("close syscall no conn find,tgid:%u,fd:%d",  tgid, args->fd);
 		return;
 	}
-	bpf_printk("close syscall tgid_fd:%u", tgid_fd);
 	
-	report_conn_evt(conn_info, kClose, 0);
+	bool reported = report_conn_evt(conn_info, kClose, 0);
+	bpf_printk("reported  close syscall event tgid:%u , reported: %d", tgid, reported);
 
 	bpf_map_delete_elem(&conn_info_map, &tgid_fd);
 	
@@ -1327,9 +1329,6 @@ int BPF_KPROBE(recvfrom_enter,  uint32_t fd, char* buf) {
 	args.fd = fd;
 	args.buf = buf;
 	args.source_fn = kSyscallRecvFrom;
-	if (id >> 32 == 2509849) {
-		bpf_printk("recvfrom enter fd:%u,buf:%x", args.fd, args.buf);
-	}
 	bpf_map_update_elem(&read_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
@@ -1340,9 +1339,6 @@ int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx
 
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL) {
-		if (id >> 32 == 2509849) {
-			bpf_printk("recvfrom exit fd:%u,buf:%x", args->fd, args->buf);
-		}
 		args->ts = bpf_ktime_get_ns();
 		process_syscall_data((struct pt_regs*)ctx, args, id, kIngress, bytes_count);
 	} 
@@ -1489,7 +1485,6 @@ int tracepoint__syscalls__sys_enter_sendto(struct trace_event_raw_sys_enter *ctx
 	args.buf = (char*) ctx->args[1];
 	args.source_fn = kSyscallSendTo;
 	args.ts = bpf_ktime_get_ns();
-	bpf_printk("tp fd:%u, buf:%x", args.fd, args.buf);
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
@@ -1610,11 +1605,11 @@ int BPF_KRETPROBE(writev_return) {
 
 // int close(int fd);
 SEC("kprobe/sys_close")
-int BPF_KPROBE(close_entry, unsigned int sockfd) {
+int BPF_KSYSCALL(close_entry, unsigned int sockfd) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct close_args args = {0};
-	args.fd = PT_REGS_PARM1_CORE_SYSCALL(ctx);
+	args.fd = sockfd;
 	bpf_map_update_elem(&close_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
@@ -1625,7 +1620,7 @@ int tracepoint__syscalls__sys_exit_close(struct trace_event_raw_sys_exit *ctx)
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct close_args *args = bpf_map_lookup_elem(&close_args_map, &id);
 	if (args != NULL) {
-		process_syscall_close((struct pt_regs*)ctx, args, id);
+		process_syscall_close(ctx->ret, args, id);
 	}	
 	bpf_map_delete_elem(&close_args_map, &id);
 	return 0;

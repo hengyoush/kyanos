@@ -27,6 +27,26 @@ import (
 
 var log *logrus.Logger = common.Log
 var processorsNum int = 4
+var loadBpfProgram func(objs bpf.AgentObjects) *list.List = attachBpfProgs
+var customSyscallEventHook func(evt *bpf.SyscallEventData) = func(evt *bpf.SyscallEventData) {}
+var customConnEventHook func(evt *bpf.AgentConnEvtT) = func(evt *bpf.AgentConnEvtT) {}
+var initCompletedHook func() = func() {}
+
+func SetLoadBpfProgram(f func(objs bpf.AgentObjects) *list.List) {
+	loadBpfProgram = f
+}
+
+func SetCustomSyscallEventHook(f func(evt *bpf.SyscallEventData)) {
+	customSyscallEventHook = f
+}
+
+func SetCustomConnEventHook(f func(evt *bpf.AgentConnEvtT)) {
+	customConnEventHook = f
+}
+
+func SetInitCompletedHook(f func()) {
+	initCompletedHook = f
+}
 
 func SetupAgent() {
 	InitReporter()
@@ -58,12 +78,6 @@ func SetupAgent() {
 	if err != nil {
 		log.Fatal("load Agent error:", err)
 	}
-	err = spec.RewriteConstants(map[string]interface{}{
-		"agent_pid": uint32(os.Getpid()),
-	})
-	if err != nil {
-		log.Fatal("rewrite constants error:", err)
-	}
 
 	err = spec.LoadAndAssign(&objs, nil)
 
@@ -85,7 +99,7 @@ func SetupAgent() {
 		objs.AgentMaps.ControlValues.Update(bpf.AgentControlValueIndexTKTargetTGIDIndex, targetPid, ebpf.UpdateAny)
 	}
 
-	links := attachBpfProgs(objs)
+	links := loadBpfProgram(objs)
 
 	for e := links.Front(); e != nil; e = e.Next() {
 		if e.Value == nil {
@@ -197,6 +211,9 @@ func SetupAgent() {
 		}
 	}()
 
+	if initCompletedHook != nil {
+		initCompletedHook()
+	}
 	for !stop {
 		time.Sleep(time.Second * 1)
 	}
@@ -213,6 +230,9 @@ func handleConnEvt(record []byte, pm *conn.ProcessorManager) error {
 
 	tgidFd := uint64(event.ConnInfo.ConnId.Upid.Pid)<<32 | uint64(event.ConnInfo.ConnId.Fd)
 	p := pm.GetProcessor(int(tgidFd) % processorsNum)
+	if customConnEventHook != nil {
+		customConnEventHook(&event)
+	}
 	p.AddConnEvent(&event)
 	return nil
 }
@@ -232,6 +252,9 @@ func handleSyscallEvt(record []byte, pm *conn.ProcessorManager) error {
 
 	tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
 	p := pm.GetProcessor(int(tgidFd) % processorsNum)
+	if customSyscallEventHook != nil {
+		customSyscallEventHook(event)
+	}
 	p.AddSyscallEvent(event)
 	return nil
 }
@@ -250,83 +273,47 @@ func handleKernEvt(record []byte, pm *conn.ProcessorManager) error {
 func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	linkList := list.New()
 
-	l := kprobe("__sys_accept4", objs.AgentPrograms.Accept4Entry)
-	linkList.PushBack(l)
-	l = kretprobe("__sys_accept4", objs.AgentPrograms.SysAccept4Ret)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallAcceptEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallAcceptExit(objs))
 
-	l = kretprobe("sock_alloc", objs.AgentPrograms.SockAllocRet)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallSockAllocExit(objs))
 
-	// l = kretprobe("__sys_connect", objs.AgentPrograms.SysConnectRet)
-	// linkList.PushBack(l)
-	l = kprobe("__sys_connect", objs.AgentPrograms.ConnectEntry)
-	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_exit_connect", objs.AgentPrograms.TracepointSyscallsSysExitConnect)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallConnectEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallConnectExit(objs))
 
-	l = kprobe("sys_close", objs.AgentPrograms.CloseEntry)
-	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_exit_close", objs.AgentPrograms.TracepointSyscallsSysExitClose)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallCloseEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallCloseExit(objs))
 
-	l = kprobe("sys_write", objs.AgentPrograms.WriteEnter)
-	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_exit_write", objs.AgentPrograms.TracepointSyscallsSysExitWrite)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallWriteEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallWriteExit(objs))
 
-	l = kprobe("sys_sendmsg", objs.AgentPrograms.SendmsgEnter)
-	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_exit_sendmsg", objs.AgentPrograms.TracepointSyscallsSysExitSendmsg)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallSendMsgEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallSendMsgExit(objs))
 
-	l = kprobe("sys_recvmsg", objs.AgentPrograms.RecvmsgEnter)
-	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_exit_recvmsg", objs.AgentPrograms.TracepointSyscallsSysExitRecvmsg)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallRecvMsgEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallRecvMsgExit(objs))
 
-	l = kprobe("do_writev", objs.AgentPrograms.WritevEnter)
-	linkList.PushBack(l)
-	l = kretprobe("do_writev", objs.AgentPrograms.WritevReturn)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallWritevEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallWritevExit(objs))
 
-	l = tracepoint("syscalls", "sys_exit_sendto", objs.AgentPrograms.TracepointSyscallsSysExitSendto)
-	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_enter_sendto", objs.AgentPrograms.TracepointSyscallsSysEnterSendto)
-	linkList.PushBack(l)
-	// l = kretprobe("__sys_sendto", objs.AgentPrograms.TracepointSyscallsSysExitSendto)
-	// linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallSendtoEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallSendtoExit(objs))
 
-	l = kprobe("sys_read", objs.AgentPrograms.ReadEnter)
-	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_exit_read", objs.AgentPrograms.TracepointSyscallsSysExitRead)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallReadEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallReadExit(objs))
 
-	l = kprobe("do_readv", objs.AgentPrograms.ReadvEnter)
-	linkList.PushBack(l)
-	l = kretprobe("do_readv", objs.AgentPrograms.ReadvReturn)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallReadvEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallReadvExit(objs))
 
-	l = kprobe("__sys_recvfrom", objs.AgentPrograms.RecvfromEnter)
-	linkList.PushBack(l)
-	l = tracepoint("syscalls", "sys_exit_recvfrom", objs.AgentPrograms.TracepointSyscallsSysExitRecvfrom)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachSyscallRecvfromEntry(objs))
+	linkList.PushBack(bpf.AttachSyscallRecvfromExit(objs))
 
-	l = kprobe("security_socket_recvmsg", objs.AgentPrograms.SecuritySocketRecvmsgEnter)
-	linkList.PushBack(l)
-	l = kprobe("security_socket_sendmsg", objs.AgentPrograms.SecuritySocketSendmsgEnter)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry(objs))
+	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry(objs))
 
-	l, err := link.AttachRawTracepoint(link.RawTracepointOptions{
-		Name:    "tcp_destroy_sock",
-		Program: objs.AgentPrograms.TcpDestroySock,
-	})
-	if err != nil {
-		log.Fatal("tcp_destroy_sock failed: ", err)
-	}
-	linkList.PushBack(l)
-
-	l = kprobe("ip_queue_xmit", objs.AgentPrograms.IpQueueXmit)
+	linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(objs))
+	var err error
+	l := kprobe("ip_queue_xmit", objs.AgentPrograms.IpQueueXmit)
 	linkList.PushBack(l)
 	l = kprobe("dev_queue_xmit", objs.AgentPrograms.DevQueueXmit)
 	linkList.PushBack(l)
