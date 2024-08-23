@@ -12,9 +12,6 @@
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 
-
-#define AF_INET 2
-#define AF_INET6 10
 #define ETH_P_IP	0x0800
 #define ETH_HLEN	14		/* Total octets in header.	 */
 #define _C(src, a, ...)		BPF_CORE_READ(src, a, ##__VA_ARGS__)
@@ -351,8 +348,8 @@ static void __always_inline parse_sock_key_rcv_sk(struct sock* sk, struct sock_k
 	key->dip = _C(sk, __sk_common.skc_rcv_saddr);
 	key->dport =  _C(sk, __sk_common.skc_num);
 	key->sport = bpf_ntohs(_C(sk, __sk_common.skc_dport));
-	// key->family = _C(sk, __sk_common.skc_family);
-	key->family = 0;
+	key->family = _C(sk, __sk_common.skc_family);
+	// key->family = 0;
 }
 static void __always_inline parse_sock_key_rcv(struct sk_buff *skb, struct sock_key* key) {
 
@@ -369,8 +366,8 @@ static void __always_inline parse_sock_key_sk(struct sock* sk, struct sock_key* 
 	key->sip = _C(sk, __sk_common.skc_rcv_saddr);
 	key->sport =  _C(sk, __sk_common.skc_num);
 	key->dport = bpf_ntohs(_C(sk, __sk_common.skc_dport));
-	// key->family = _C(sk, __sk_common.skc_family);
-	key->family = 0;
+	key->family = _C(sk, __sk_common.skc_family);
+	// key->family = 0;
 }
 static void __always_inline parse_sock_key(struct sk_buff *skb, struct sock_key* key) {
 
@@ -389,7 +386,7 @@ static void __always_inline parse_sk_l3l4(struct sock_key *key, struct iphdr *ip
 	key->dip = daddr;
 	key->sport = sport;
 	key->dport = dport;
-	key->family = 0;
+	key->family = AF_INET;
 }
 
 static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
@@ -547,7 +544,7 @@ int xdp_proxy(struct xdp_md *ctx){
 	key.dip = iph->daddr;
 	key.sport = bpf_ntohs(th->source);
 	key.dport = bpf_ntohs(th->dest);
-	key.family = 0;
+	key.family = AF_INET;
 	// bpf_printk("xdp, not found!, sport:%d, dport:%d, family:%d", key.sport, key.dport,key.family);
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 	if (found == NULL && !should_trace_sock_key(&key)) {
@@ -1048,6 +1045,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		bpf_printk("raddr: null");
 	}
 	struct tcp_sock * tcp_sk = get_socket_from_fd(fd);
+	// s => d
 	struct sock_key key;
 	if (role == kRoleClient) {
 		parse_sock_key_sk((struct sock*)tcp_sk, &key);
@@ -1057,10 +1055,12 @@ enum endpoint_role_t role, uint64_t start_ts) {
 	
 	print_sock_key(&key);
 	if (socket == NULL) {
-		conn_info.laddr.in4.sin_addr.s_addr = key.sip;
-		conn_info.laddr.in4.sin_port = key.sport;
-		conn_info.raddr.in4.sin_addr.s_addr = key.dip;
-		conn_info.raddr.in4.sin_port = key.dport;
+		conn_info.laddr.in4.sin_addr.s_addr = role == kRoleClient ? key.sip : key.dip;
+		conn_info.laddr.in4.sin_port = role == kRoleClient ? key.sport : key.dport;
+		conn_info.raddr.in4.sin_addr.s_addr = role == kRoleClient ? key.dip : key.sip;
+		conn_info.raddr.in4.sin_port = role == kRoleClient ? key.dport : key.sport;
+		conn_info.laddr.in4.sin_family = key.family;
+		conn_info.raddr.in4.sin_family = key.family;
 	}
 	// bpf_printk("submit_new_conn laddr: port:%u", conn_info.laddr.in4.sin_port);
 	// bpf_printk("submit_new_conn raddr: port:%u", conn_info.raddr.in4.sin_port);
@@ -1074,6 +1074,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		conn_id_s.tgid_fd = tgid_fd;
 		bpf_map_update_elem(&sock_key_conn_id_map, &key, &conn_id_s, BPF_NOEXIST);
 		struct sock_key rev = reverse_sock_key(&key);
+		// d => s
 		struct conn_id_s_t conn_id_s_rev = {};
 		conn_id_s_rev.direct = role == kRoleClient ? kIngress : kEgress;
 		conn_id_s_rev.tgid_fd = tgid_fd;
@@ -1121,7 +1122,7 @@ static __always_inline void process_syscall_close(int ret_val, struct close_args
 	key.sport = conn_info->laddr.in4.sin_port;
 	key.dip = conn_info->raddr.in4.sin_addr.s_addr;
 	key.dport = conn_info->raddr.in4.sin_port;
-	key.family = 0;
+	key.family = conn_info->laddr.in4.sin_family;
 	bpf_map_delete_elem(&sock_key_conn_id_map, &key);
 	struct sock_key rev_key = reverse_sock_key(&key);
 	bpf_map_delete_elem(&sock_key_conn_id_map, &rev_key);

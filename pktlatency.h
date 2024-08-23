@@ -2,6 +2,8 @@
 #define __KPROBE_H__
 
 #define PX_AF_UNKNOWN 0xff
+#define AF_INET 2
+#define AF_INET6 10
 #define MAX_MSG_SIZE 30720
 #define EINPROGRESS 115
 

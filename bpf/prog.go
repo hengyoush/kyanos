@@ -40,7 +40,7 @@ func AttachSyscallAcceptEntry(objs AgentObjects) link.Link {
 }
 
 func AttachSyscallAcceptExit(objs AgentObjects) link.Link {
-	return kretprobe("__sys_accept4", objs.AgentPrograms.Accept4Entry)
+	return kretprobe("__sys_accept4", objs.AgentPrograms.SysAccept4Ret)
 }
 
 /* sock_alloc */

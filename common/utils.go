@@ -2,8 +2,13 @@ package common
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
+	"sort"
+	"strings"
+
+	"github.com/jefurry/logrus"
 )
 
 func IntToIP(ipInt uint32) string {
@@ -70,4 +75,43 @@ func ConvertTcpFlagSyn(flags uint8) string {
 		return "S"
 	}
 	return ""
+}
+
+func GetIPAddrByInterfaceName(filter string) (string, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return "", err
+	}
+	nameIPS := map[string]string{}
+	names := []string{}
+	for _, i := range interfaces {
+		name := i.Name
+		addrs, err := i.Addrs()
+		if err != nil {
+			panic(err)
+		}
+		// handle err
+		for _, addr := range addrs {
+			var (
+				ip net.IP
+			)
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if filter == "" || strings.Contains(name, filter) {
+				names = append(names, name)
+				nameIPS[name] = ip.String()
+			}
+		}
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return "", errors.New("can not find the client ip address ")
+	}
+	logrus.Infof("GetClientIP ips:%v", nameIPS)
+	return nameIPS[names[0]], nil
+
 }

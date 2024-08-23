@@ -17,6 +17,9 @@ var LogDirVarName string = "log-dir"
 var FilterPidVarName string = "filter-pid"
 var LaunchEpochTime uint64
 
+var AF_INET = 2
+var AF_INET6 = 10
+
 var TCP_FLAGS_ACK = 1 << 4
 var TCP_FLAGS_PSH = 1 << 3
 var TCP_FLAGS_RST = 1 << 2
