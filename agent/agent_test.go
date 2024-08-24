@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sys/unix"
 )
 
 type ConnEventAssertions struct {
@@ -285,6 +286,7 @@ func sendTestRequest(t *testing.T, options SendTestHttpRequestOptions) error {
 
 func TestConnectSyscall(t *testing.T) {
 	connEventList := make([]bpf.AgentConnEvtT, 0)
+	agentStopper := make(chan os.Signal, 1)
 	StartAgent(
 		[]bpf.AttachBpfProgFunction{
 			bpf.AttachSyscallConnectEntry,
@@ -292,7 +294,11 @@ func TestConnectSyscall(t *testing.T) {
 		},
 		&connEventList,
 		nil,
-		nil)
+		nil,
+		agentStopper)
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
 	fmt.Println("Start Send Http Request")
 	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true})
 
@@ -316,10 +322,11 @@ func TestConnectSyscall(t *testing.T) {
 		expectLocalPort:       -1,
 		expectConnEventType:   bpf.AgentConnTypeTKConnect,
 	})
+
 }
 
 func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction, connEventList *[]bpf.AgentConnEvtT,
-	syscallEventList *[]bpf.SyscallEventData, connManagerInitHook func(*conn.ConnManager)) {
+	syscallEventList *[]bpf.SyscallEventData, connManagerInitHook func(*conn.ConnManager), agentStopper chan os.Signal) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func(pid int) {
@@ -348,7 +355,9 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction, connEventList *[
 		}
 		cmd.FilterPid = int64(pid)
 
-		agent.SetupAgent()
+		agent.SetupAgent(agent.AgentOptions{
+			Stopper: agentStopper,
+		})
 	}(os.Getpid())
 
 	wg.Wait()
@@ -356,6 +365,7 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction, connEventList *[
 
 func TestCloseSyscall(t *testing.T) {
 	connEventList := make([]bpf.AgentConnEvtT, 0)
+	agentStopper := make(chan os.Signal, 1)
 	StartAgent(
 		[]bpf.AttachBpfProgFunction{
 			bpf.AttachSyscallConnectEntry,
@@ -364,7 +374,10 @@ func TestCloseSyscall(t *testing.T) {
 			bpf.AttachSyscallCloseExit},
 		&connEventList,
 		nil,
-		nil)
+		nil, agentStopper)
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
 	fmt.Println("Start Send Http Request")
 	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true})
 
@@ -393,6 +406,7 @@ func TestCloseSyscall(t *testing.T) {
 func TestAccept(t *testing.T) {
 	StartEchoTcpServerAndWait()
 	connEventList := make([]bpf.AgentConnEvtT, 0)
+	agentStopper := make(chan os.Signal, 1)
 
 	StartAgent(
 		[]bpf.AttachBpfProgFunction{
@@ -401,10 +415,20 @@ func TestAccept(t *testing.T) {
 		},
 		&connEventList,
 		nil,
-		nil)
+		nil, agentStopper)
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
 	// ip, _ := common.GetIPAddrByInterfaceName("eth0")
 	ip := "127.0.0.1"
-	WriteToEchoTcpServerAndReadResponse(ip+":"+fmt.Sprint(echoTcpServerPort), "hello\n", true)
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:            t,
+		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
+		message:      "hello\n",
+		readResponse: true,
+		writeSyscall: Write,
+		readSyscall:  Read,
+	})
 	time.Sleep(1 * time.Second)
 	if len(connEventList) == 0 {
 		t.Fatalf("no conn event!")
@@ -432,6 +456,7 @@ func TestRead(t *testing.T) {
 	StartEchoTcpServerAndWait()
 	connEventList := make([]bpf.AgentConnEvtT, 0)
 	syscallEventList := make([]bpf.SyscallEventData, 0)
+	agentStopper := make(chan os.Signal)
 	var connManager *conn.ConnManager = conn.InitConnManager()
 	StartAgent(
 		[]bpf.AttachBpfProgFunction{
@@ -445,11 +470,21 @@ func TestRead(t *testing.T) {
 		&syscallEventList,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
-		})
+		}, agentStopper)
 
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
 	ip := "127.0.0.1"
-	sendMsg := "GET hello\n"
-	WriteToEchoTcpServerAndReadResponse(ip+":"+fmt.Sprint(echoTcpServerPort), sendMsg, true)
+	sendMsg := "GET TestRead\n"
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:            t,
+		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
+		message:      sendMsg,
+		readResponse: true,
+		writeSyscall: Write,
+		readSyscall:  Read,
+	})
 	time.Sleep(500 * time.Millisecond)
 
 	assert.NotEmpty(t, syscallEventList)
@@ -474,11 +509,195 @@ func TestRead(t *testing.T) {
 	})
 }
 
+func TestRecvFrom(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallRecvfromEntry,
+			bpf.AttachSyscallRecvfromExit,
+			bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper)
+
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+	ip := "127.0.0.1"
+	sendMsg := "GET TestRecvFrom\n"
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:            t,
+		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
+		message:      sendMsg,
+		readResponse: true,
+		writeSyscall: Write,
+		readSyscall:  RecvFrom,
+	})
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, syscallEventList)
+	syscallEvents := findInterestedSyscallEvents(t, syscallEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       uint16(echoTcpServerPort),
+		connEventList:    connEventList,
+	})
+	syscallEvent := syscallEvents[0]
+	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
+	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
+		connIdDirect:          bpf.AgentTrafficDirectionTKIngress,
+		pid:                   uint64(os.Getpid()),
+		fd:                    uint32(conn.TgidFd),
+		funcName:              "syscall",
+		dataLen:               uint32(len(sendMsg)),
+		seq:                   1,
+		step:                  bpf.AgentStepTSYSCALL_IN,
+		tsAssertFunction:      func(u uint64) bool { return u > 0 },
+		bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMsg)) },
+		bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg },
+	})
+}
+
+func TestReadv(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	agentStopper := make(chan os.Signal, 1)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallReadvEntry,
+			bpf.AttachSyscallReadvExit,
+			bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper)
+
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+	ip := "127.0.0.1"
+	sendMsg := "GET TestReadv\n"
+	readBufSizeSlice := []int{len(sendMsg) / 2, len(sendMsg) - len(sendMsg)/2}
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:                t,
+		server:           ip + ":" + fmt.Sprint(echoTcpServerPort),
+		message:          sendMsg,
+		readResponse:     true,
+		writeSyscall:     Write,
+		readSyscall:      Readv,
+		readBufSizeSlice: readBufSizeSlice,
+	})
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, syscallEventList)
+	syscallEvents := findInterestedSyscallEvents(t, syscallEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       uint16(echoTcpServerPort),
+		connEventList:    connEventList,
+	})
+	assert.Equal(t, len(readBufSizeSlice), len(syscallEvents))
+	conn := connManager.FindConnection4(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
+	seq := uint64(1)
+	for index, syscallEvent := range syscallEvents {
+		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
+			connIdDirect:          bpf.AgentTrafficDirectionTKIngress,
+			pid:                   uint64(os.Getpid()),
+			fd:                    uint32(conn.TgidFd),
+			funcName:              "syscall",
+			dataLen:               uint32(readBufSizeSlice[index]),
+			seq:                   seq,
+			step:                  bpf.AgentStepTSYSCALL_IN,
+			tsAssertFunction:      func(u uint64) bool { return u > 0 },
+			bufSizeAssertFunction: func(u uint32) bool { return u == uint32(readBufSizeSlice[index]) },
+			bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg[seq-1:int(seq)-1+readBufSizeSlice[index]] },
+		})
+		seq += uint64(readBufSizeSlice[index])
+	}
+}
+
+func TestRecvmsg(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	agentStopper := make(chan os.Signal, 1)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallRecvMsgEntry,
+			bpf.AttachSyscallRecvMsgExit,
+			bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper)
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+
+	ip := "127.0.0.1"
+	sendMsg := "GET TestRecvmsg\n"
+	readBufSizeSlice := []int{len(sendMsg) / 2, len(sendMsg) - len(sendMsg)/2}
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:                t,
+		server:           ip + ":" + fmt.Sprint(echoTcpServerPort),
+		message:          sendMsg,
+		readResponse:     true,
+		writeSyscall:     Write,
+		readSyscall:      Recvmsg,
+		readBufSizeSlice: readBufSizeSlice,
+	})
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, syscallEventList)
+	syscallEvents := findInterestedSyscallEvents(t, syscallEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       uint16(echoTcpServerPort),
+		connEventList:    connEventList,
+	})
+	assert.Equal(t, len(readBufSizeSlice), len(syscallEvents))
+	conn := connManager.FindConnection4(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
+	seq := uint64(1)
+	for index, syscallEvent := range syscallEvents {
+		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
+			connIdDirect:          bpf.AgentTrafficDirectionTKIngress,
+			pid:                   uint64(os.Getpid()),
+			fd:                    uint32(conn.TgidFd),
+			funcName:              "syscall",
+			dataLen:               uint32(readBufSizeSlice[index]),
+			seq:                   seq,
+			step:                  bpf.AgentStepTSYSCALL_IN,
+			tsAssertFunction:      func(u uint64) bool { return u > 0 },
+			bufSizeAssertFunction: func(u uint32) bool { return u == uint32(readBufSizeSlice[index]) },
+			bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg[seq-1:int(seq)-1+readBufSizeSlice[index]] },
+		})
+		seq += uint64(readBufSizeSlice[index])
+	}
+}
+
 func TestWrite(t *testing.T) {
 	StartEchoTcpServerAndWait()
 	connEventList := make([]bpf.AgentConnEvtT, 0)
 	syscallEventList := make([]bpf.SyscallEventData, 0)
 	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
 	StartAgent(
 		[]bpf.AttachBpfProgFunction{
 			bpf.AttachSyscallConnectEntry,
@@ -491,11 +710,21 @@ func TestWrite(t *testing.T) {
 		&syscallEventList,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
-		})
+		}, agentStopper)
 
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
 	ip := "127.0.0.1"
-	sendMsg := "GET hello\n"
-	WriteToEchoTcpServerAndReadResponse(ip+":"+fmt.Sprint(echoTcpServerPort), sendMsg, true)
+	sendMsg := "GET TestWrite\n"
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:            t,
+		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
+		message:      sendMsg,
+		readResponse: true,
+		writeSyscall: Write,
+		readSyscall:  Read,
+	})
 	time.Sleep(500 * time.Millisecond)
 
 	assert.NotEmpty(t, syscallEventList)
@@ -520,6 +749,185 @@ func TestWrite(t *testing.T) {
 	})
 }
 
+func TestSendto(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallSendtoEntry,
+			bpf.AttachSyscallSendtoExit,
+			bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper)
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+
+	ip := "127.0.0.1"
+	sendMsg := "GET TestSendto\n"
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:            t,
+		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
+		message:      sendMsg,
+		readResponse: true,
+		writeSyscall: SentTo,
+		readSyscall:  Read,
+	})
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, syscallEventList)
+	syscallEvents := findInterestedSyscallEvents(t, syscallEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       uint16(echoTcpServerPort),
+		connEventList:    connEventList,
+	})
+	syscallEvent := syscallEvents[0]
+	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
+	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
+		connIdDirect:          bpf.AgentTrafficDirectionTKEgress,
+		pid:                   uint64(os.Getpid()),
+		fd:                    uint32(conn.TgidFd),
+		funcName:              "syscall",
+		dataLen:               uint32(len(sendMsg)),
+		seq:                   1,
+		step:                  bpf.AgentStepTSYSCALL_OUT,
+		tsAssertFunction:      func(u uint64) bool { return u > 0 },
+		bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMsg)) },
+		bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg },
+	})
+}
+
+func TestWritev(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	agentStopper := make(chan os.Signal, 1)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallWritevEntry,
+			bpf.AttachSyscallWritevExit,
+			bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper)
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+
+	ip := "127.0.0.1"
+	sendMessages := []string{"GET writevhellohellohellohello\n", "abchellohellohellohello\n"}
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:            t,
+		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
+		messageSlice: sendMessages,
+		readResponse: true,
+		writeSyscall: Writev,
+		readSyscall:  Read,
+	})
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, syscallEventList)
+	syscallEvents := findInterestedSyscallEvents(t, syscallEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       uint16(echoTcpServerPort),
+		connEventList:    connEventList,
+	})
+	assert.Equal(t, 2, len(syscallEvents))
+	conn := connManager.FindConnection4(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
+	seq := uint64(1)
+	for index, syscallEvent := range syscallEvents {
+		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
+			connIdDirect:          bpf.AgentTrafficDirectionTKEgress,
+			pid:                   uint64(os.Getpid()),
+			fd:                    uint32(conn.TgidFd),
+			funcName:              "syscall",
+			dataLen:               uint32(len(sendMessages[index])),
+			seq:                   seq,
+			step:                  bpf.AgentStepTSYSCALL_OUT,
+			tsAssertFunction:      func(u uint64) bool { return u > 0 },
+			bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMessages[index])) },
+			bufAssertFunction:     func(b []byte) bool { return string(b) == sendMessages[index] },
+		})
+		seq += uint64(len(sendMessages[index]))
+	}
+}
+
+func TestSendMsg(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallSendMsgEntry,
+			bpf.AttachSyscallSendMsgExit,
+			bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper)
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+
+	ip := "127.0.0.1"
+	sendMessages := []string{"GET sendmsghellohellohellohello\n", "aabchellohellohellohello\n"}
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:            t,
+		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
+		messageSlice: sendMessages,
+		readResponse: true,
+		writeSyscall: Sendmsg,
+		readSyscall:  Read,
+	})
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, syscallEventList)
+	syscallEvents := findInterestedSyscallEvents(t, syscallEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       uint16(echoTcpServerPort),
+		connEventList:    connEventList,
+	})
+	assert.Equal(t, 2, len(syscallEvents))
+	conn := connManager.FindConnection4(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
+	seq := uint64(1)
+	for index, syscallEvent := range syscallEvents {
+		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
+			connIdDirect:          bpf.AgentTrafficDirectionTKEgress,
+			pid:                   uint64(os.Getpid()),
+			fd:                    uint32(conn.TgidFd),
+			funcName:              "syscall",
+			dataLen:               uint32(len(sendMessages[index])),
+			seq:                   seq,
+			step:                  bpf.AgentStepTSYSCALL_OUT,
+			tsAssertFunction:      func(u uint64) bool { return u > 0 },
+			bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMessages[index])) },
+			bufAssertFunction:     func(b []byte) bool { return string(b) == sendMessages[index] },
+		})
+		seq += uint64(len(sendMessages[index]))
+	}
+}
+
 func StartEchoTcpServerAndWait() {
 	startCompleted := make(chan net.Listener)
 	go StartEchoTcpServer(startCompleted)
@@ -529,24 +937,92 @@ func StartEchoTcpServerAndWait() {
 	fmt.Println("Start Echo Server Completed! Listening Port is: ", echoTcpServerPort)
 }
 
-func WriteToEchoTcpServerAndReadResponse(server string, message string, readResponse bool) {
+type WriteSyscallType int
+type ReadSyscallType int
 
+const (
+	Write WriteSyscallType = iota
+	SentTo
+	Writev
+	Sendmsg
+)
+
+const (
+	Read ReadSyscallType = iota
+	RecvFrom
+	Readv
+	Recvmsg
+)
+
+type WriteToEchoServerOptions struct {
+	t                *testing.T
+	server           string
+	message          string
+	messageSlice     []string
+	readResponse     bool
+	writeSyscall     WriteSyscallType
+	readSyscall      ReadSyscallType
+	readBufSizeSlice []int
+}
+
+func WriteToEchoTcpServerAndReadResponse(options WriteToEchoServerOptions) {
+	connection, fd, _ := getConnectionAndFdToRemoteServer(options.server)
+	defer connection.Close()
+	syscall.SetNonblock(int(fd), false)
+	switch options.writeSyscall {
+	case Write:
+		syscall.Write(int(fd), []byte(options.message))
+	case SentTo:
+		syscall.Sendto(int(fd), []byte(options.message), 0, nil)
+	case Writev:
+		var iovecs [][]byte = make([][]byte, 0)
+		for _, each := range options.messageSlice {
+			iovecs = append(iovecs, []byte(each))
+		}
+		unix.Writev(int(fd), iovecs)
+	case Sendmsg:
+		var iovecs [][]byte = make([][]byte, 0)
+		for _, each := range options.messageSlice {
+			iovecs = append(iovecs, []byte(each))
+		}
+		unix.SendmsgBuffers(int(fd), iovecs, nil, nil, 0)
+
+	default:
+		options.t.Fatal("write syscall invalid")
+	}
+	if options.readResponse {
+		readBytes := make([]byte, 1000)
+		switch options.readSyscall {
+		case Read:
+			syscall.Read(int(fd), readBytes)
+		case RecvFrom:
+			syscall.Recvfrom(int(fd), readBytes, 0)
+		case Readv:
+			var iovecs [][]byte = make([][]byte, 0)
+			for _, each := range options.readBufSizeSlice {
+				iovecs = append(iovecs, make([]byte, each))
+			}
+			unix.Readv(int(fd), iovecs)
+		case Recvmsg:
+			var iovecs [][]byte = make([][]byte, 0)
+			for _, each := range options.readBufSizeSlice {
+				iovecs = append(iovecs, make([]byte, each))
+			}
+			unix.RecvmsgBuffers(int(fd), iovecs, nil, 0)
+		}
+		fmt.Printf("Read  from conn: %s\n", string(readBytes))
+	}
+}
+func getConnectionAndFdToRemoteServer(server string) (net.Conn, int64, error) {
 	connection, err := net.Dial("tcp", server)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "无法连接到服务器 %s: %v\n", server, err)
-		return
+		return nil, 0, err
 	}
-	defer connection.Close()
 	tcpConn := connection.(*net.TCPConn)
 	tcpConnV := reflect.ValueOf(*tcpConn)
 	fd := tcpConnV.FieldByName("conn").FieldByName("fd").Elem().FieldByName("pfd").FieldByName("Sysfd").Int()
-	syscall.SetNonblock(int(fd), false)
-	syscall.Write(int(fd), []byte(message))
-	if readResponse {
-		readBytes := make([]byte, 1000)
-		syscall.Read(int(fd), readBytes)
-		fmt.Printf("Read from conn: %s\n", string(readBytes))
-	}
+	return connection, fd, nil
 }
 
 var echoTcpServerPort int = 10266
@@ -597,4 +1073,14 @@ func handleConnection(conn net.Conn, prefix string) {
 		fmt.Printf("response: %s", line)
 		conn.Write([]byte(line))
 	}
+}
+
+type MySignal struct {
+}
+
+func (MySignal) String() string {
+	return "MySignal"
+}
+func (MySignal) Signal() {
+
 }

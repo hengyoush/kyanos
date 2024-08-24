@@ -61,7 +61,7 @@ func AttachSyscallSendMsgExit(objs AgentObjects) link.Link {
 
 /* recvmsg pair */
 func AttachSyscallRecvMsgEntry(objs AgentObjects) link.Link {
-	return kprobe("sys_recvmsg", objs.AgentPrograms.RecvfromEnter)
+	return kprobe("sys_recvmsg", objs.AgentPrograms.RecvmsgEnter)
 }
 
 func AttachSyscallRecvMsgExit(objs AgentObjects) link.Link {

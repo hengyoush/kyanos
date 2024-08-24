@@ -184,7 +184,7 @@ func (p *Processor) run() {
 				conn.OnSyscallEvent(event.Buf, &event.SyscallEvent)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
-				log.Infof("[syscall][protocol unset][tgidfd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd, conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
+				log.Infof("[syscall][protocol unset][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd

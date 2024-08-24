@@ -54,11 +54,15 @@ func SetConnManagerInitHook(f func(*conn.ConnManager)) {
 	connManagerInitHook = f
 }
 
-func SetupAgent() {
+type AgentOptions struct {
+	Stopper chan os.Signal
+}
+
+func SetupAgent(options AgentOptions) {
 	InitReporter()
 
 	common.LaunchEpochTime = GetMachineStartTimeNano()
-	stopper := make(chan os.Signal, 1)
+	stopper := options.Stopper
 	connManager := conn.InitConnManager()
 	connManagerInitHook(connManager)
 	statRecorder := stat.InitStatRecorder()
@@ -108,16 +112,21 @@ func SetupAgent() {
 
 	links := loadBpfProgram(objs)
 
-	for e := links.Front(); e != nil; e = e.Next() {
-		if e.Value == nil {
-			continue
+	defer func() {
+		for e := links.Front(); e != nil; e = e.Next() {
+			if e.Value == nil {
+				continue
+			}
+			if l, ok := e.Value.(link.Link); ok {
+				err := l.Close()
+				if err != nil {
+					info, _ := l.Info()
+					log.Errorf("Fail to close link for: %v\n", info)
+				}
+			}
 		}
-		if l, ok := e.Value.(link.Link); ok {
-			defer func() {
-				l.Close()
-			}()
-		}
-	}
+		log.Infoln("All links closed!")
+	}()
 	// kernel >= 5.8
 	syscallDataReader, err := ringbuf.NewReader(objs.AgentMaps.SyscallRb)
 	if err != nil {
@@ -224,7 +233,7 @@ func SetupAgent() {
 	for !stop {
 		time.Sleep(time.Second * 1)
 	}
-	log.Println("Stopped")
+	log.Infoln("Agent Stopped")
 	return
 }
 

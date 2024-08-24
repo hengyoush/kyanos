@@ -257,7 +257,7 @@ static __always_inline void  report_kern_evt(u32 seq, struct sock_key* key,struc
 	bpf_ringbuf_submit(evt, 0);
 	// evt->inode = get_netns(skb);
 }
-static void __always_inline report_syscall_buf(uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, uint64_t ts, const char* buf) {
+static void __always_inline report_syscall_buf(uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn) {
 	uint32_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
 		return;
@@ -278,6 +278,10 @@ static void __always_inline report_syscall_buf(uint64_t seq, struct conn_id_s_t 
 		evt->ke.ts = bpf_ktime_get_ns();
 	}
 	char *func_name = "syscall";
+	// int syscall_names_idx = (int)source_fn;
+	// if (syscall_names_idx >= 0 && syscall_names_idx < sizeof(syscall_names)) {
+	// 	func_name = syscall_names[syscall_names_idx];
+	// }
 	my_strcpy(evt->ke.func_name, func_name, FUNC_NAME_LIMIT);
 	evt->buf_size = _len;
 
@@ -296,7 +300,7 @@ static void __always_inline report_syscall_buf(uint64_t seq, struct conn_id_s_t 
 	bpf_ringbuf_output(&syscall_rb, evt, sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied, 0);
 }
 static void __always_inline report_syscall_evt(uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args) {
-	report_syscall_buf(seq, conn_id_s, len, step, args->ts, args->buf);
+	report_syscall_buf(seq, conn_id_s, len, step, args->ts, args->buf, args->source_fn);
 }
 static void __always_inline report_syscall_evt_vecs(uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t total_size, enum step_t step, struct data_args *args) {
 	int bytes_sent = 0;
@@ -306,7 +310,7 @@ static void __always_inline report_syscall_evt_vecs(uint64_t seq, struct conn_id
 		bpf_probe_read_user(&iov_cpy, sizeof(iov_cpy), &args->iov[i]);
 		const int bytes_remaining = total_size - bytes_sent;
 		const size_t iov_size = iov_cpy.iov_len < bytes_remaining ? iov_cpy.iov_len : bytes_remaining;
-		report_syscall_buf(seq, conn_id_s, iov_size, step, args->ts, iov_cpy.iov_base);
+		report_syscall_buf(seq, conn_id_s, iov_size, step, args->ts, iov_cpy.iov_base, args->source_fn);
 		bytes_sent += iov_size;
 		seq += iov_size;
 	}

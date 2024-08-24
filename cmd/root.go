@@ -45,10 +45,14 @@ var rootCmd = &cobra.Command{
 			defer cntxt.Release()
 			logger.Println("----------------------")
 			logger.Println("eAPM eBPF agent started!")
-			agent.SetupAgent()
+			agent.SetupAgent(agent.AgentOptions{
+				Stopper: make(chan os.Signal),
+			})
 		} else {
 			initLog()
-			agent.SetupAgent()
+			agent.SetupAgent(agent.AgentOptions{
+				Stopper: make(chan os.Signal),
+			})
 		}
 	},
 }
