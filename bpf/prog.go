@@ -7,32 +7,7 @@ import (
 	"github.com/cilium/ebpf/link"
 )
 
-func kprobe(func_name string, prog *ebpf.Program) link.Link {
-	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
-		log.Fatalf("kprobe failed: %s, %s", func_name, err)
-		return nil
-	} else {
-		return link
-	}
-}
-
-func kretprobe(func_name string, prog *ebpf.Program) link.Link {
-	if link, err := link.Kretprobe(func_name, prog, nil); err != nil {
-		log.Fatalf("kretprobe failed: %s, %s", func_name, err)
-		return nil
-	} else {
-		return link
-	}
-}
-
-func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
-	if link, err := link.Tracepoint(group, name, prog, nil); err != nil {
-		log.Fatalf("tp failed: %s, %s", group+":"+name, err)
-		return nil
-	} else {
-		return link
-	}
-}
+type AttachBpfProgFunction func(AgentObjects) link.Link
 
 /* accept pair */
 func AttachSyscallAcceptEntry(objs AgentObjects) link.Link {
@@ -158,4 +133,31 @@ func AttachRawTracepointTcpDestroySockEntry(objs AgentObjects) link.Link {
 		log.Fatal("tcp_destroy_sock failed: ", err)
 	}
 	return l
+}
+
+func kprobe(func_name string, prog *ebpf.Program) link.Link {
+	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
+		log.Fatalf("kprobe failed: %s, %s", func_name, err)
+		return nil
+	} else {
+		return link
+	}
+}
+
+func kretprobe(func_name string, prog *ebpf.Program) link.Link {
+	if link, err := link.Kretprobe(func_name, prog, nil); err != nil {
+		log.Fatalf("kretprobe failed: %s, %s", func_name, err)
+		return nil
+	} else {
+		return link
+	}
+}
+
+func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
+	if link, err := link.Tracepoint(group, name, prog, nil); err != nil {
+		log.Fatalf("tp failed: %s, %s", group+":"+name, err)
+		return nil
+	} else {
+		return link
+	}
 }

@@ -245,6 +245,10 @@ type AgentMapSpecs struct {
 	ConnectArgsMap                      *ebpf.MapSpec `ebpf:"connect_args_map"`
 	ControlValues                       *ebpf.MapSpec `ebpf:"control_values"`
 	CurRedisReq                         *ebpf.MapSpec `ebpf:"cur_redis_req"`
+	EnabledLocalIpv4Map                 *ebpf.MapSpec `ebpf:"enabled_local_ipv4_map"`
+	EnabledLocalPortMap                 *ebpf.MapSpec `ebpf:"enabled_local_port_map"`
+	EnabledRemoteIpv4Map                *ebpf.MapSpec `ebpf:"enabled_remote_ipv4_map"`
+	EnabledRemotePortMap                *ebpf.MapSpec `ebpf:"enabled_remote_port_map"`
 	ProcessMultibulkBufferReturnArgsMap *ebpf.MapSpec `ebpf:"processMultibulkBufferReturn_args_map"`
 	Rb                                  *ebpf.MapSpec `ebpf:"rb"`
 	ReadArgsMap                         *ebpf.MapSpec `ebpf:"read_args_map"`
@@ -286,6 +290,10 @@ type AgentMaps struct {
 	ConnectArgsMap                      *ebpf.Map `ebpf:"connect_args_map"`
 	ControlValues                       *ebpf.Map `ebpf:"control_values"`
 	CurRedisReq                         *ebpf.Map `ebpf:"cur_redis_req"`
+	EnabledLocalIpv4Map                 *ebpf.Map `ebpf:"enabled_local_ipv4_map"`
+	EnabledLocalPortMap                 *ebpf.Map `ebpf:"enabled_local_port_map"`
+	EnabledRemoteIpv4Map                *ebpf.Map `ebpf:"enabled_remote_ipv4_map"`
+	EnabledRemotePortMap                *ebpf.Map `ebpf:"enabled_remote_port_map"`
 	ProcessMultibulkBufferReturnArgsMap *ebpf.Map `ebpf:"processMultibulkBufferReturn_args_map"`
 	Rb                                  *ebpf.Map `ebpf:"rb"`
 	ReadArgsMap                         *ebpf.Map `ebpf:"read_args_map"`
@@ -310,6 +318,10 @@ func (m *AgentMaps) Close() error {
 		m.ConnectArgsMap,
 		m.ControlValues,
 		m.CurRedisReq,
+		m.EnabledLocalIpv4Map,
+		m.EnabledLocalPortMap,
+		m.EnabledRemoteIpv4Map,
+		m.EnabledRemotePortMap,
 		m.ProcessMultibulkBufferReturnArgsMap,
 		m.Rb,
 		m.ReadArgsMap,

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"container/list"
 	"eapm-ebpf/agent"
+	"eapm-ebpf/agent/conn"
 	"eapm-ebpf/bpf"
 	"eapm-ebpf/cmd"
 	"eapm-ebpf/common"
@@ -13,10 +14,14 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type ConnEventAssertions struct {
@@ -38,7 +43,7 @@ type ConnEventAssertions struct {
 func AssertConnEvent(t *testing.T, connectEvent bpf.AgentConnEvtT, assert ConnEventAssertions) {
 	t.Helper()
 	if connectEvent.ConnInfo.ConnId.Upid.Pid != assert.expectPid {
-		t.Fatalf("Pid Incorrect: %d != %d", connectEvent.ConnInfo.ConnId.Upid.Pid, assert.expectPid)
+		t.Fatalf("Pid Incorrect: %d !=  %d", connectEvent.ConnInfo.ConnId.Upid.Pid, assert.expectPid)
 	}
 	expectLocalIp := assert.expectLocalIp
 	localIp := common.IntToIP(connectEvent.ConnInfo.Laddr.In4.SinAddr.S_addr)
@@ -105,25 +110,145 @@ func AssertConnEvent(t *testing.T, connectEvent bpf.AgentConnEvtT, assert ConnEv
 	}
 }
 
-type FindInterestedConnEventOptions struct {
-	remotePort uint16
-	localPort  uint16
-	connType   bpf.AgentConnTypeT
-	throw      bool
+type SyscallDataEventAssertConditions struct {
+	ignoreConnIdDirect    bool
+	connIdDirect          bpf.AgentTrafficDirectionT
+	ignorePid             bool
+	pid                   uint64
+	ignoreFd              bool
+	fd                    uint32
+	ignoreFuncName        bool
+	funcName              string
+	ignoreDataLen         bool
+	dataLen               uint32
+	ignoreSeq             bool
+	seq                   uint64
+	ignoreStep            bool
+	step                  bpf.AgentStepT
+	tsAssertFunction      func(uint64) bool
+	bufSizeAssertFunction func(uint32) bool
+	bufAssertFunction     func([]byte) bool
 }
 
-func findInterestedConnEvent(t *testing.T, connEventList []bpf.AgentConnEvtT, options FindInterestedConnEventOptions) bpf.AgentConnEvtT {
-	for _, connEvent := range connEventList {
-		if connEvent.ConnType == options.connType &&
-			(connEvent.ConnInfo.Raddr.In4.SinPort == options.remotePort || options.remotePort == 0) &&
-			(connEvent.ConnInfo.Laddr.In4.SinPort == options.localPort || options.localPort == 0) {
-			return connEvent
-		}
+func AssertSyscallEventData(t *testing.T, event bpf.SyscallEventData, conditions SyscallDataEventAssertConditions) {
+	connId := event.SyscallEvent.Ke.ConnIdS
+	direct := connId.Direct
+	if !conditions.ignoreConnIdDirect {
+		assert.Equal(t, conditions.connIdDirect, direct)
 	}
-	if options.throw {
+	pid := connId.TgidFd >> 32
+	if !conditions.ignorePid {
+		assert.Equal(t, conditions.pid, pid)
+	}
+	fd := uint32(connId.TgidFd)
+	if !conditions.ignoreFd {
+		assert.Equal(t, conditions.fd, fd)
+	}
+	funcName := event.SyscallEvent.Ke.FuncName
+	if !conditions.ignoreFuncName {
+		assert.Equal(t, conditions.funcName, common.Int8ToStr(funcName[:len(conditions.funcName)]))
+	}
+	dataLen := event.SyscallEvent.Ke.Len
+	if !conditions.ignoreDataLen {
+		assert.Equal(t, conditions.dataLen, dataLen)
+	}
+	seq := event.SyscallEvent.Ke.Seq
+	if !conditions.ignoreSeq {
+		assert.Equal(t, conditions.seq, seq)
+	}
+	step := event.SyscallEvent.Ke.Step
+	if !conditions.ignoreStep {
+		assert.Equal(t, conditions.step, step)
+	}
+	ts := event.SyscallEvent.Ke.Ts
+	if conditions.tsAssertFunction != nil {
+		assert.True(t, conditions.tsAssertFunction(ts))
+	}
+	bufSize := event.SyscallEvent.BufSize
+	if conditions.bufSizeAssertFunction != nil {
+		assert.True(t, conditions.bufSizeAssertFunction(bufSize))
+	}
+	buf := event.Buf
+	if conditions.bufAssertFunction != nil {
+		assert.True(t, conditions.bufAssertFunction(buf))
+	}
+}
+
+type FindInterestedConnEventOptions struct {
+	findByRemotePort bool
+	remotePort       uint16
+	findByLocalPort  bool
+	localPort        uint16
+	findByConnType   bool
+	connType         bpf.AgentConnTypeT
+	findByTgidFd     bool
+	tgidFd           uint64
+	throw            bool
+}
+
+type FindInterestedSyscallEventOptions struct {
+	findByRemotePort bool
+	remotePort       uint16
+	findByLocalPort  bool
+	localPort        uint16
+	throw            bool
+
+	connEventList []bpf.AgentConnEvtT
+}
+
+var CONN_EVENT_NOT_FOUND bpf.AgentConnEvtT = bpf.AgentConnEvtT{}
+
+func findInterestedConnEvent(t *testing.T, connEventList []bpf.AgentConnEvtT, options FindInterestedConnEventOptions) []bpf.AgentConnEvtT {
+	t.Helper()
+	resultList := make([]bpf.AgentConnEvtT, 0)
+	for _, connEvent := range connEventList {
+		if options.findByRemotePort && options.remotePort != connEvent.ConnInfo.Raddr.In4.SinPort {
+			continue
+		}
+		if options.findByLocalPort && options.localPort != connEvent.ConnInfo.Laddr.In4.SinPort {
+			continue
+		}
+		if options.findByConnType && options.connType != connEvent.ConnType {
+			continue
+		}
+		if options.findByTgidFd && options.tgidFd != (uint64(connEvent.ConnInfo.ConnId.Upid.Pid)<<32|uint64(connEvent.ConnInfo.ConnId.Fd)) {
+			continue
+		}
+		resultList = append(resultList, connEvent)
+	}
+	if options.throw && len(resultList) == 0 {
 		t.Fatalf("no conn event found for: %v", options)
 	}
-	return bpf.AgentConnEvtT{}
+	return resultList
+}
+
+func findInterestedSyscallEvents(t *testing.T, syscallEventList []bpf.SyscallEventData, options FindInterestedSyscallEventOptions) []bpf.SyscallEventData {
+	t.Helper()
+	resultList := make([]bpf.SyscallEventData, 0)
+	for _, each := range syscallEventList {
+		connectEvents := findInterestedConnEvent(t, options.connEventList, FindInterestedConnEventOptions{
+			findByTgidFd:   true,
+			findByConnType: true,
+			tgidFd:         each.SyscallEvent.Ke.ConnIdS.TgidFd,
+			connType:       bpf.AgentConnTypeTKConnect,
+			throw:          false,
+		})
+		if len(connectEvents) == 0 {
+			continue
+		}
+		connectEvent := connectEvents[0]
+		if options.findByRemotePort && connectEvent.ConnInfo.Raddr.In4.SinPort != options.remotePort {
+			continue
+		}
+		if options.findByLocalPort && connectEvent.ConnInfo.Laddr.In4.SinPort != options.localPort {
+			continue
+		}
+		resultList = append(resultList, each)
+	}
+	if options.throw && len(resultList) == 0 {
+		t.Fatalf("no syscall event found for: %v", options)
+	}
+	return resultList
 }
 
 type SendTestHttpRequestOptions struct {
@@ -158,35 +283,16 @@ func sendTestRequest(t *testing.T, options SendTestHttpRequestOptions) error {
 	return err
 }
 
-func TestSend(t *testing.T) {
-	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true})
-}
-
 func TestConnectSyscall(t *testing.T) {
 	connEventList := make([]bpf.AgentConnEvtT, 0)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func(pid int) {
-		agent.SetLoadBpfProgram(func(objs bpf.AgentObjects) *list.List {
-			linkList := list.New()
-			linkList.PushBack(bpf.AttachSyscallConnectEntry(objs))
-			linkList.PushBack(bpf.AttachSyscallConnectExit(objs))
-			return linkList
-		})
-		agent.SetCustomSyscallEventHook(func(evt *bpf.SyscallEventData) {
-		})
-		agent.SetInitCompletedHook(func() {
-			wg.Done()
-		})
-		agent.SetCustomConnEventHook(func(evt *bpf.AgentConnEvtT) {
-			connEventList = append(connEventList, *evt)
-		})
-		cmd.FilterPid = int64(pid)
-
-		agent.SetupAgent()
-	}(os.Getpid())
-
-	wg.Wait()
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+		},
+		&connEventList,
+		nil,
+		nil)
 	fmt.Println("Start Send Http Request")
 	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true})
 
@@ -194,7 +300,12 @@ func TestConnectSyscall(t *testing.T) {
 	if len(connEventList) == 0 {
 		t.Fatalf("no conn event!")
 	}
-	connectEvent := findInterestedConnEvent(t, connEventList, FindInterestedConnEventOptions{remotePort: 80, connType: bpf.AgentConnTypeTKConnect, throw: true})
+	connectEvent := findInterestedConnEvent(t, connEventList, FindInterestedConnEventOptions{
+		findByRemotePort: true,
+		findByConnType:   true,
+		remotePort:       80,
+		connType:         bpf.AgentConnTypeTKConnect,
+		throw:            true})[0]
 	AssertConnEvent(t, connectEvent, ConnEventAssertions{
 		expectPid:             uint32(os.Getpid()),
 		expectRemotePort:      80,
@@ -207,33 +318,53 @@ func TestConnectSyscall(t *testing.T) {
 	})
 }
 
-func TestCloseSyscall(t *testing.T) {
-	connEventList := make([]bpf.AgentConnEvtT, 0)
+func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction, connEventList *[]bpf.AgentConnEvtT,
+	syscallEventList *[]bpf.SyscallEventData, connManagerInitHook func(*conn.ConnManager)) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func(pid int) {
 		agent.SetLoadBpfProgram(func(objs bpf.AgentObjects) *list.List {
-			linkList := list.New()
-			linkList.PushBack(bpf.AttachSyscallConnectEntry(objs))
-			linkList.PushBack(bpf.AttachSyscallConnectExit(objs))
-			linkList.PushBack(bpf.AttachSyscallCloseEntry(objs))
-			linkList.PushBack(bpf.AttachSyscallCloseExit(objs))
-			return linkList
+			progs := list.New()
+			for _, each := range bpfAttachFunctions {
+				progs.PushBack(each(objs))
+			}
+			return progs
 		})
 		agent.SetCustomSyscallEventHook(func(evt *bpf.SyscallEventData) {
+			if syscallEventList != nil {
+				*syscallEventList = append(*syscallEventList, *evt)
+			}
 		})
 		agent.SetInitCompletedHook(func() {
 			wg.Done()
 		})
 		agent.SetCustomConnEventHook(func(evt *bpf.AgentConnEvtT) {
-			connEventList = append(connEventList, *evt)
+			if connEventList != nil {
+				*connEventList = append(*connEventList, *evt)
+			}
 		})
+		if connManagerInitHook != nil {
+			agent.SetConnManagerInitHook(connManagerInitHook)
+		}
 		cmd.FilterPid = int64(pid)
 
 		agent.SetupAgent()
 	}(os.Getpid())
 
 	wg.Wait()
+}
+
+func TestCloseSyscall(t *testing.T) {
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallCloseEntry,
+			bpf.AttachSyscallCloseExit},
+		&connEventList,
+		nil,
+		nil)
 	fmt.Println("Start Send Http Request")
 	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true})
 
@@ -241,7 +372,12 @@ func TestCloseSyscall(t *testing.T) {
 	if len(connEventList) == 0 {
 		t.Fatalf("no conn event!")
 	}
-	connectEvent := findInterestedConnEvent(t, connEventList, FindInterestedConnEventOptions{remotePort: 80, connType: bpf.AgentConnTypeTKClose, throw: true})
+	connectEvent := findInterestedConnEvent(t, connEventList, FindInterestedConnEventOptions{
+		findByRemotePort: true,
+		findByConnType:   true,
+		remotePort:       80,
+		connType:         bpf.AgentConnTypeTKClose,
+		throw:            true})[0]
 	AssertConnEvent(t, connectEvent, ConnEventAssertions{
 		expectPid:                  uint32(os.Getpid()),
 		expectRemotePort:           80,
@@ -255,44 +391,31 @@ func TestCloseSyscall(t *testing.T) {
 }
 
 func TestAccept(t *testing.T) {
-	startCompleted := make(chan net.Listener)
-	go StartEchoTcpServer(startCompleted)
-	<-startCompleted
-	fmt.Println("Start Echo Server Completed!")
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	StartEchoTcpServerAndWait()
 	connEventList := make([]bpf.AgentConnEvtT, 0)
-	go func(pid int) {
-		agent.SetLoadBpfProgram(func(objs bpf.AgentObjects) *list.List {
-			linkList := list.New()
-			linkList.PushBack(bpf.AttachSyscallAcceptEntry(objs))
-			linkList.PushBack(bpf.AttachSyscallAcceptExit(objs))
-			return linkList
-		})
-		agent.SetCustomSyscallEventHook(func(evt *bpf.SyscallEventData) {
-		})
-		agent.SetInitCompletedHook(func() {
-			wg.Done()
-		})
-		agent.SetCustomConnEventHook(func(evt *bpf.AgentConnEvtT) {
-			connEventList = append(connEventList, *evt)
-		})
-		cmd.FilterPid = int64(pid)
 
-		agent.SetupAgent()
-	}(os.Getpid())
-
-	wg.Wait()
-
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallAcceptEntry,
+			bpf.AttachSyscallAcceptExit,
+		},
+		&connEventList,
+		nil,
+		nil)
 	// ip, _ := common.GetIPAddrByInterfaceName("eth0")
 	ip := "127.0.0.1"
-	WriteToEchoTcpServer(ip+":"+fmt.Sprint(echoTcpServerPort), "hello\n", true)
+	WriteToEchoTcpServerAndReadResponse(ip+":"+fmt.Sprint(echoTcpServerPort), "hello\n", true)
 	time.Sleep(1 * time.Second)
 	if len(connEventList) == 0 {
 		t.Fatalf("no conn event!")
 	}
 
-	connectEvent := findInterestedConnEvent(t, connEventList, FindInterestedConnEventOptions{localPort: uint16(echoTcpServerPort), connType: bpf.AgentConnTypeTKConnect, throw: true})
+	connectEvent := findInterestedConnEvent(t, connEventList, FindInterestedConnEventOptions{
+		findByLocalPort: true,
+		findByConnType:  true,
+		localPort:       uint16(echoTcpServerPort),
+		connType:        bpf.AgentConnTypeTKConnect,
+		throw:           true})[0]
 	AssertConnEvent(t, connectEvent, ConnEventAssertions{
 		expectPid:                  uint32(os.Getpid()),
 		expectRemotePort:           -1,
@@ -305,7 +428,62 @@ func TestAccept(t *testing.T) {
 	})
 }
 
-func WriteToEchoTcpServer(server string, message string, readResponse bool) {
+func TestRead(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallReadEntry,
+			bpf.AttachSyscallReadExit,
+			bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		})
+
+	ip := "127.0.0.1"
+	sendMsg := "GET hello\n"
+	WriteToEchoTcpServerAndReadResponse(ip+":"+fmt.Sprint(echoTcpServerPort), sendMsg, true)
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, syscallEventList)
+	syscallEvents := findInterestedSyscallEvents(t, syscallEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       uint16(echoTcpServerPort),
+		connEventList:    connEventList,
+	})
+	syscallEvent := syscallEvents[0]
+	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
+	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
+		connIdDirect:          bpf.AgentTrafficDirectionTKIngress,
+		pid:                   uint64(os.Getpid()),
+		fd:                    uint32(conn.TgidFd),
+		funcName:              "syscall",
+		dataLen:               uint32(len(sendMsg)),
+		seq:                   1,
+		step:                  bpf.AgentStepTSYSCALL_IN,
+		tsAssertFunction:      func(u uint64) bool { return u > 0 },
+		bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMsg)) },
+		bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg },
+	})
+}
+
+func StartEchoTcpServerAndWait() {
+	startCompleted := make(chan net.Listener)
+	go StartEchoTcpServer(startCompleted)
+	listener := <-startCompleted
+	addr := listener.Addr().String()
+	echoTcpServerPort, _ = strconv.Atoi(addr[strings.LastIndex(addr, ":")+1:])
+	fmt.Println("Start Echo Server Completed! Listening Port is: ", echoTcpServerPort)
+}
+
+func WriteToEchoTcpServerAndReadResponse(server string, message string, readResponse bool) {
 
 	connection, err := net.Dial("tcp", server)
 	if err != nil {
@@ -325,12 +503,12 @@ func WriteToEchoTcpServer(server string, message string, readResponse bool) {
 	}
 }
 
-const echoTcpServerPort int = 10266
+var echoTcpServerPort int = 10266
 
 func StartEchoTcpServer(startCompleted chan net.Listener) {
 
 	// obtain the port and prefix via program arguments
-	port := ":" + fmt.Sprint(echoTcpServerPort)
+	port := ":0"
 	prefix := ""
 
 	// create a tcp listener on the given port
@@ -339,6 +517,7 @@ func StartEchoTcpServer(startCompleted chan net.Listener) {
 		fmt.Println("failed to create listener, err:", err)
 		os.Exit(1)
 	}
+	defer listener.Close()
 	fmt.Printf("listening on %s, prefix: %s\n", listener.Addr(), prefix)
 	startCompleted <- listener
 	// listen for new connections
@@ -368,7 +547,7 @@ func handleConnection(conn net.Conn, prefix string) {
 		fmt.Printf("request: %s", bytes)
 
 		// prepend prefix and send as response
-		line := fmt.Sprintf("%s %s", prefix, bytes)
+		line := fmt.Sprintf("%s%s", prefix, bytes)
 		fmt.Printf("response: %s", line)
 		conn.Write([]byte(line))
 	}
