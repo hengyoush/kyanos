@@ -474,6 +474,52 @@ func TestRead(t *testing.T) {
 	})
 }
 
+func TestWrite(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallWriteEntry,
+			bpf.AttachSyscallWriteExit,
+			bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		})
+
+	ip := "127.0.0.1"
+	sendMsg := "GET hello\n"
+	WriteToEchoTcpServerAndReadResponse(ip+":"+fmt.Sprint(echoTcpServerPort), sendMsg, true)
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, syscallEventList)
+	syscallEvents := findInterestedSyscallEvents(t, syscallEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       uint16(echoTcpServerPort),
+		connEventList:    connEventList,
+	})
+	syscallEvent := syscallEvents[0]
+	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
+	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
+		connIdDirect:          bpf.AgentTrafficDirectionTKEgress,
+		pid:                   uint64(os.Getpid()),
+		fd:                    uint32(conn.TgidFd),
+		funcName:              "syscall",
+		dataLen:               uint32(len(sendMsg)),
+		seq:                   1,
+		step:                  bpf.AgentStepTSYSCALL_OUT,
+		tsAssertFunction:      func(u uint64) bool { return u > 0 },
+		bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMsg)) },
+		bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg },
+	})
+}
+
 func StartEchoTcpServerAndWait() {
 	startCompleted := make(chan net.Listener)
 	go StartEchoTcpServer(startCompleted)
