@@ -953,6 +953,10 @@ MY_BPF_HASH(connect_args_map, uint64_t, struct connect_args)
 MY_BPF_HASH(close_args_map, uint64_t, struct close_args)
 MY_BPF_HASH(write_args_map, uint64_t, struct data_args)
 MY_BPF_HASH(read_args_map, uint64_t, struct data_args)
+MY_BPF_HASH(enabled_remote_port_map, uint16_t, uint8_t)
+MY_BPF_HASH(enabled_local_port_map, uint16_t, uint8_t)
+MY_BPF_HASH(enabled_remote_ipv4_map, uint32_t, uint8_t)
+MY_BPF_HASH(enabled_local_ipv4_map, uint32_t, uint8_t)
 
 
 static __inline void read_sockaddr_kernel(struct conn_info_t* conn_info,
@@ -1061,6 +1065,32 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		conn_info.raddr.in4.sin_port = role == kRoleClient ? key.dport : key.sport;
 		conn_info.laddr.in4.sin_family = key.family;
 		conn_info.raddr.in4.sin_family = key.family;
+	}
+
+	uint16_t zero = 0;
+	uint8_t* enable_local_port_filter = bpf_map_lookup_elem(&enabled_local_port_map, &zero);
+	if (enable_local_port_filter != NULL) {
+		uint8_t* enabled_local_port = bpf_map_lookup_elem(&enabled_local_port_map, &conn_info.laddr.in4.sin_port);
+		if (enabled_local_port == NULL) {
+			return;
+		}
+	}
+	uint8_t* enable_remote_port_filter = bpf_map_lookup_elem(&enabled_remote_port_map, &zero);
+	if (enable_remote_port_filter != NULL) {
+		uint8_t* enabled_remote_port = bpf_map_lookup_elem(&enabled_remote_port_map, &conn_info.raddr.in4.sin_port);
+		if (enabled_remote_port == NULL) {
+			return;
+		}
+	}
+	uint32_t zero32 = 0;
+	if (conn_info.raddr.in4.sin_family == AF_INET) {
+		uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &zero32);
+		if (enable_remote_ipv4_filter != NULL) {
+			uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &conn_info.raddr.in4.sin_addr.s_addr);
+			if (enabled_remote_ipv4 == NULL || conn_info.raddr.in4.sin_addr.s_addr == 0) {
+				return;
+			}
+		}
 	}
 	// bpf_printk("submit_new_conn laddr: port:%u", conn_info.laddr.in4.sin_port);
 	// bpf_printk("submit_new_conn raddr: port:%u", conn_info.raddr.in4.sin_port);
@@ -1391,7 +1421,6 @@ int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
 	// } else {
 	// 	// bpf_printk("read_return2 tp tgid:%lu, bc:%d",id>>32, bytes_count);
 	// }
-
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->ts = bpf_ktime_get_ns();

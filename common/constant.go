@@ -15,6 +15,9 @@ var VerboseVarName string = "verbose"
 var DaemonVarName string = "daemon"
 var LogDirVarName string = "log-dir"
 var FilterPidVarName string = "filter-pid"
+var RemotePortsVarName string = "remote-ports"
+var LocalPortsVarName string = "local-ports"
+var RemoteIpsVarName string = "remote-ips"
 var LaunchEpochTime uint64
 
 var AF_INET = 2

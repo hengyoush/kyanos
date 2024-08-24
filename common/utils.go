@@ -115,3 +115,26 @@ func GetIPAddrByInterfaceName(filter string) (string, error) {
 	return nameIPS[names[0]], nil
 
 }
+
+func IPv4ToUint32(ipStr string) (uint32, error) {
+	// 解析IPv4地址
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return 0, fmt.Errorf("invalid IP address: %s", ipStr)
+	}
+
+	// 检查是否为IPv4地址
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return 0, fmt.Errorf("not an IPv4 address: %s", ipStr)
+	}
+
+	// 将IPv4地址的四个字节组合成一个uint32
+	var result uint32
+	for i := 3; i >= 0; i-- {
+		byteValue := uint32(ip4[i])
+		result = (result << 8) | byteValue
+	}
+
+	return result, nil
+}

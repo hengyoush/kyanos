@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 	"unsafe"
@@ -31,6 +32,7 @@ var loadBpfProgram func(objs bpf.AgentObjects) *list.List = attachBpfProgs
 var customSyscallEventHook func(evt *bpf.SyscallEventData) = func(evt *bpf.SyscallEventData) {}
 var customConnEventHook func(evt *bpf.AgentConnEvtT) = func(evt *bpf.AgentConnEvtT) {}
 var initCompletedHook func() = func() {}
+var connManagerInitHook func(*conn.ConnManager) = func(cm *conn.ConnManager) {}
 
 func SetLoadBpfProgram(f func(objs bpf.AgentObjects) *list.List) {
 	loadBpfProgram = f
@@ -48,12 +50,17 @@ func SetInitCompletedHook(f func()) {
 	initCompletedHook = f
 }
 
+func SetConnManagerInitHook(f func(*conn.ConnManager)) {
+	connManagerInitHook = f
+}
+
 func SetupAgent() {
 	InitReporter()
 
 	common.LaunchEpochTime = GetMachineStartTimeNano()
 	stopper := make(chan os.Signal, 1)
 	connManager := conn.InitConnManager()
+	connManagerInitHook(connManager)
 	statRecorder := stat.InitStatRecorder()
 	pm := conn.InitProcessorManager(processorsNum, connManager)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
@@ -94,9 +101,9 @@ func SetupAgent() {
 	}
 
 	defer objs.Close()
-	if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
-		log.Infoln("filter for pid: ", targetPid)
-		objs.AgentMaps.ControlValues.Update(bpf.AgentControlValueIndexTKTargetTGIDIndex, targetPid, ebpf.UpdateAny)
+	validateResult := setAndValidateParameters(objs)
+	if !validateResult {
+		return
 	}
 
 	links := loadBpfProgram(objs)
@@ -219,6 +226,82 @@ func SetupAgent() {
 	}
 	log.Println("Stopped")
 	return
+}
+
+func setAndValidateParameters(objs bpf.AgentObjects) bool {
+	if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
+		log.Infoln("filter for pid: ", targetPid)
+		objs.AgentMaps.ControlValues.Update(bpf.AgentControlValueIndexTKTargetTGIDIndex, targetPid, ebpf.UpdateAny)
+	}
+
+	remotePorts := viper.GetStringSlice(common.RemotePortsVarName)
+	zeroKey := uint16(0)
+	zeroValue := uint8(0)
+	if len(remotePorts) > 0 {
+		log.Infoln("filter for remote ports: ", remotePorts)
+		err := objs.AgentMaps.EnabledRemotePortMap.Update(&zeroKey, &zeroValue, ebpf.UpdateAny)
+		if err != nil {
+			log.Errorln("Update EnabledRemotePortMap failed: ", err)
+		}
+		for _, each := range remotePorts {
+			portInt, err := strconv.Atoi(each)
+			if err != nil || portInt <= 0 {
+				log.Errorf("Invalid remote port : %s\n", each)
+				return false
+			}
+			portNumber := uint16(portInt)
+			err = objs.AgentMaps.EnabledRemotePortMap.Update(&portNumber, &zeroValue, ebpf.UpdateAny)
+			if err != nil {
+				log.Errorln("Update EnabledRemotePortMap failed: ", err)
+			}
+		}
+	}
+
+	remoteIps := viper.GetStringSlice(common.RemoteIpsVarName)
+	if len(remoteIps) > 0 {
+		log.Infoln("filter for remote ips: ", remoteIps)
+		zeroKeyU32 := uint32(0)
+		err := objs.AgentMaps.EnabledRemoteIpv4Map.Update(&zeroKeyU32, &zeroValue, ebpf.UpdateAny)
+		if err != nil {
+			log.Errorln("Update EnabledRemoteIpv4Map failed: ", err)
+		}
+		for _, each := range remoteIps {
+			ipInt32, err := common.IPv4ToUint32(each)
+			if err != nil {
+				log.Errorf("IPv4ToUint32 parse failed, ip string is: %s, err: %v", each, err)
+				return false
+			} else {
+				log.Debugln("Update EnabledRemoteIpv4Map, key: ", ipInt32, common.IntToIP(ipInt32))
+				err = objs.AgentMaps.EnabledRemoteIpv4Map.Update(&ipInt32, &zeroValue, ebpf.UpdateAny)
+				if err != nil {
+					log.Errorln("Update EnabledRemoteIpv4Map failed: ", err)
+				}
+			}
+		}
+	}
+
+	localPorts := viper.GetStringSlice(common.LocalPortsVarName)
+	if len(localPorts) > 0 {
+		log.Infoln("filter for local ports: ", localPorts)
+		err := objs.AgentMaps.EnabledLocalPortMap.Update(&zeroKey, &zeroKey, ebpf.UpdateAny)
+		if err != nil {
+			log.Errorln("Update EnabledLocalPortMap failed: ", err)
+		}
+		for _, each := range localPorts {
+			portInt, err := strconv.Atoi(each)
+			if err != nil || portInt <= 0 {
+				log.Errorf("Invalid local port : %s\n", each)
+				return false
+			}
+			portNumber := uint16(portInt)
+			err = objs.AgentMaps.EnabledLocalPortMap.Update(&portNumber, &zeroValue, ebpf.UpdateAny)
+			if err != nil {
+				log.Errorln("Update EnabledLocalPortMap failed: ", err)
+			}
+		}
+	}
+
+	return true
 }
 
 func handleConnEvt(record []byte, pm *conn.ProcessorManager) error {
