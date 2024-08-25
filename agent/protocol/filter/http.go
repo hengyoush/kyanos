@@ -10,8 +10,9 @@ import (
 var _ MessageFilter = HttpFilter{}
 
 type HttpFilter struct {
-	TargetPath    string
-	TargetMethods []string
+	TargetPath     string
+	TargetHostName string
+	TargetMethods  []string
 }
 
 func (filter HttpFilter) FilterByProtocol(protocol bpf.AgentTrafficProtocolT) bool {
@@ -19,7 +20,7 @@ func (filter HttpFilter) FilterByProtocol(protocol bpf.AgentTrafficProtocolT) bo
 }
 
 func (filter HttpFilter) FilterByRequest() bool {
-	return filter.TargetPath != "" || len(filter.TargetMethods) > 0
+	return filter.TargetPath != "" || len(filter.TargetMethods) > 0 || filter.TargetHostName != ""
 }
 
 func (filter HttpFilter) FilterByResponse() bool {
@@ -42,6 +43,9 @@ func (filter HttpFilter) Filter(parsedReq ParsedMessage, parsedResp ParsedMessag
 		return false
 	}
 	if len(filter.TargetMethods) > 0 && !slices.Contains(filter.TargetMethods, req.Method) {
+		return false
+	}
+	if filter.TargetHostName != "" && filter.TargetHostName != req.Host {
 		return false
 	}
 	return true
