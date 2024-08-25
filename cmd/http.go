@@ -8,7 +8,7 @@ import (
 )
 
 var httpCmd *cobra.Command = &cobra.Command{
-	Use:   "http --path /abc",
+	Use:   "http --path /foo/bar",
 	Short: "watch HTTP message",
 	Run: func(cmd *cobra.Command, args []string) {
 		path, err := cmd.Flags().GetString("path")
@@ -25,5 +25,7 @@ var httpCmd *cobra.Command = &cobra.Command{
 
 func init() {
 	httpCmd.Flags().String("path", "", "--path /foo/bar")
+	httpCmd.Flags().SortFlags = false
+	httpCmd.PersistentFlags().SortFlags = false
 	watchCmd.AddCommand(httpCmd)
 }

@@ -27,5 +27,7 @@ var watchCmd = &cobra.Command{
 
 func init() {
 	watchCmd.Flags().BoolP("list", "l", false, "false | true")
+	watchCmd.Flags().SortFlags = false
+	watchCmd.PersistentFlags().SortFlags = false
 	rootCmd.AddCommand(watchCmd)
 }
