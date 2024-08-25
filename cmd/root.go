@@ -9,7 +9,6 @@ import (
 
 	"github.com/jefurry/logrus"
 	"github.com/jefurry/logrus/hooks/rotatelog"
-	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -21,39 +20,7 @@ var rootCmd = &cobra.Command{
 	Short: "eapm-ebpf is an eBPF agent of eAPM",
 	Long:  `An easy to use extension of famous apm system, gain the ability of inspect network latency`,
 	Run: func(cmd *cobra.Command, args []string) {
-		initLog()
-		logger.Println("run eAPM eBPF Agent ...")
-		logger.Printf("collector-addr: %s\n", viper.GetString(common.CollectorAddrVarName))
-		if viper.GetBool(common.DaemonVarName) {
-			cntxt := &daemon.Context{
-				PidFileName: "./eapm-ebpf.pid",
-				PidFilePerm: 0644,
-				LogFileName: "./eapm-ebpf.log",
-				LogFilePerm: 0640,
-				WorkDir:     "./",
-				// Umask:       027,
-				Args: nil, // use current os args
-			}
-			d, err := cntxt.Reborn()
-			if err != nil {
-				logger.Fatal("Unable to run: ", err)
-			}
-			if d != nil {
-				logger.Println("eAPM eBPF agent started!")
-				return
-			}
-			defer cntxt.Release()
-			logger.Println("----------------------")
-			logger.Println("eAPM eBPF agent started!")
-			agent.SetupAgent(agent.AgentOptions{
-				Stopper: make(chan os.Signal),
-			})
-		} else {
-			initLog()
-			agent.SetupAgent(agent.AgentOptions{
-				Stopper: make(chan os.Signal),
-			})
-		}
+		startAgent(agent.AgentOptions{})
 	},
 }
 
@@ -70,15 +37,16 @@ var RemoteIps []string
 var LocalIps []string
 
 func init() {
-	rootCmd.Flags().StringVar(&LogDir, "log-dir", "", "log file dir")
+	rootCmd.PersistentFlags().StringVar(&LogDir, "log-dir", "", "log file dir")
 	rootCmd.Flags().BoolVarP(&ConsoleOutput, "console-output", "c", true, "print trace data to console")
-	rootCmd.Flags().BoolVarP(&Verbose, "verbose", "v", false, "print verbose log")
-	rootCmd.Flags().BoolVarP(&Daemon, "daemon", "d", false, "run in background")
-	rootCmd.Flags().Int64VarP(&FilterPid, "pid", "p", -1, "the pid to filter")
-	rootCmd.Flags().StringSliceVarP(&RemotePorts, "remote-ports", "", []string{}, "specify remote ports to trace, default trace all")
-	rootCmd.Flags().StringSliceVarP(&LocalPorts, "local-ports", "", []string{}, "specify local ports to trace, default trace all")
-	rootCmd.Flags().StringSliceVarP(&RemoteIps, "remote-ips", "", []string{}, "specify remote ips to trace, default trace all")
+	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "print verbose log")
+	rootCmd.PersistentFlags().BoolVarP(&Daemon, "daemon", "d", false, "run in background")
+	rootCmd.PersistentFlags().Int64VarP(&FilterPid, "pid", "p", -1, "the pid to filter")
+	rootCmd.PersistentFlags().StringSliceVarP(&RemotePorts, "remote-ports", "", []string{}, "specify remote ports to trace, default trace all")
+	rootCmd.PersistentFlags().StringSliceVarP(&LocalPorts, "local-ports", "", []string{}, "specify local ports to trace, default trace all")
+	rootCmd.PersistentFlags().StringSliceVarP(&RemoteIps, "remote-ips", "", []string{}, "specify remote ips to trace, default trace all")
 	viper.BindPFlags(rootCmd.Flags())
+	viper.BindPFlags(rootCmd.PersistentFlags())
 }
 
 func Execute() {

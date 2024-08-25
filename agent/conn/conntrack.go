@@ -2,6 +2,8 @@ package conn
 
 import (
 	"eapm-ebpf/agent/protocol"
+	"eapm-ebpf/agent/protocol/filter"
+	"eapm-ebpf/agent/protocol/parser"
 	"eapm-ebpf/bpf"
 	"eapm-ebpf/common"
 	"fmt"
@@ -33,6 +35,7 @@ type Connection4 struct {
 	CurReq            *protocol.BaseProtocolMessage
 	CurResp           *protocol.BaseProtocolMessage
 	TCPHandshakeStatus
+	MessageFilter filter.MessageFilter
 }
 
 type ConnStatus uint8
@@ -85,6 +88,44 @@ func (c *Connection4) ProtocolInferred() bool {
 	return (c.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown) && (c.Protocol != bpf.AgentTrafficProtocolTKProtocolUnset)
 }
 
+func (c *Connection4) submitRecord(record protocol.Record) {
+	var err error
+	var needSubmit bool
+
+	needSubmit = c.MessageFilter.FilterByProtocol(c.Protocol)
+	parser := parser.GetParserByProtocol(c.Protocol)
+	if parser != nil {
+		var parsedRequest, parsedResponse any
+		if c.MessageFilter.FilterByRequest() {
+			parsedRequest, err = parser.Parse(record.Request)
+			if err != nil {
+				log.Warnf("%s Fail to parse request when submit record!\n", c.ToString())
+				return
+			}
+		}
+		if c.MessageFilter.FilterByResponse() {
+			parsedResponse, err = parser.Parse(record.Response)
+			if err != nil {
+				log.Warnf("%s Fail to parse response when submit record!\n", c.ToString())
+				return
+			}
+		}
+		if parsedRequest != nil || parsedResponse != nil {
+			needSubmit = c.MessageFilter.Filter(parsedRequest, parsedResponse)
+		} else {
+			needSubmit = true
+		}
+
+	} else {
+		needSubmit = false
+		log.Warnf("%s no protocol parser found!\n", c.ToString())
+	}
+	if needSubmit {
+		RecordFunc(record, c)
+	}
+
+}
+
 func (c *Connection4) OnClose() {
 	if c.CurResp.HasData() || c.CurReq.HasData() {
 		record := protocol.Record{
@@ -97,18 +138,14 @@ func (c *Connection4) OnClose() {
 		} else {
 			record.Duration = c.CurResp.EndTs - c.CurReq.StartTs
 		}
-		RecordFunc(record, c)
+		c.submitRecord(record)
 	}
 	OnCloseRecordFunc(c)
 	c.Status = Closed
 }
 
-func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
-	parser := protocol.GetProtocolParser(protocol.ProtocolType(c.Protocol))
-	if parser == nil {
-		return
-	}
-	isReq := isReq(c, &event.Ke)
+func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
+	isReq := isReq(c, &event.SyscallEvent.Ke)
 	if isReq {
 		// 首先要尝试匹配之前的req和resp
 		if c.CurResp.HasData() && c.CurReq.HasData() {
@@ -118,7 +155,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 				Response: c.CurResp,
 				Duration: c.CurResp.EndTs - c.CurReq.StartTs,
 			}
-			RecordFunc(record, c)
+			c.submitRecord(record)
 			// 然后再更新状态
 			c.CurReq = protocol.InitProtocolMessage(true, c.IsServerSide())
 			c.CurResp = protocol.InitProtocolMessage(false, c.IsServerSide())
@@ -127,36 +164,36 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEvent) {
 			c.CurReq.AppendData(data)
 		} else {
 			tempReq := c.CurReq
-			c.CurReq = parser.Parse(event, data, isReq, c.IsServerSide())
+			c.CurReq = protocol.InitProtocolMessageWithEvent(event, isReq, c.IsServerSide())
 			c.CurResp = protocol.InitProtocolMessage(false, c.IsServerSide())
 			if tempReq.HasEvent() {
 				c.CurReq.CopyTimeDetailFrom(tempReq)
 			}
 			if c.IsServerSide() {
-				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, event.Ke.Ts)
+				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, event.SyscallEvent.Ke.Ts)
 			} else {
-				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, event.Ke.Ts)
+				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, event.SyscallEvent.Ke.Ts)
 			}
 		}
 		c.CurReq.IncrSyscallCount()
-		c.CurReq.IncrTotalBytesBy(uint(event.Ke.Len))
+		c.CurReq.IncrTotalBytesBy(uint(event.SyscallEvent.Ke.Len))
 	} else {
 		if c.CurResp.HasData() {
 			c.CurResp.AppendData(data)
 		} else {
 			tempResp := c.CurResp
-			c.CurResp = parser.Parse(event, data, isReq, c.IsServerSide())
+			c.CurResp = protocol.InitProtocolMessageWithEvent(event, isReq, c.IsServerSide())
 			if tempResp.HasEvent() {
 				c.CurResp.CopyTimeDetailFrom(tempResp)
 			}
 			if c.IsServerSide() {
-				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, event.Ke.Ts)
+				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, event.SyscallEvent.Ke.Ts)
 			} else {
-				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, event.Ke.Ts)
+				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, event.SyscallEvent.Ke.Ts)
 			}
 		}
 		c.CurResp.IncrSyscallCount()
-		c.CurResp.IncrTotalBytesBy(uint(event.Ke.Len))
+		c.CurResp.IncrTotalBytesBy(uint(event.SyscallEvent.Ke.Len))
 	}
 }
 
@@ -184,7 +221,7 @@ func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 		if (event.Flags&uint8(common.TCP_FLAGS_ACK) != 0) && isReq && c.ServerSynReceived && !c.ClientAckSent && event.Step == bpf.AgentStepTIP_OUT {
 			c.ClientAckSent = true
 			c.ClientAckSentTs = event.Ts
-			log.Warnf("[kern][handshake]%s sent ack, complete handshake, use time: %d(%d-%d)\n", c.ToString(), c.ClientAckSentTs-c.ConnectStartTs, c.ClientAckSentTs, c.ConnectStartTs)
+			log.Debugf("[kern][handshake]%s sent ack, complete handshake, use time: %d(%d-%d)\n", c.ToString(), c.ClientAckSentTs-c.ConnectStartTs, c.ClientAckSentTs, c.ConnectStartTs)
 		}
 	}
 

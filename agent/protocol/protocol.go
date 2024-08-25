@@ -12,17 +12,7 @@ var log *logrus.Logger = common.Log
 
 type ProtocolType uint32
 
-type ProtocolParser interface {
-	Parse(*bpf.SyscallEvent, []byte, bool, bool) *BaseProtocolMessage
-	FormatData([]byte) string
-}
-
-func GetProtocolParser(ProtocolType) ProtocolParser {
-	return &StringParser{}
-}
-
 type BaseProtocolMessage struct {
-	Parser       ProtocolParser
 	IsReq        bool
 	IsServerSide bool
 	StartTs      uint64
@@ -30,7 +20,7 @@ type BaseProtocolMessage struct {
 	isTruncated  bool
 	timedetails0 map[uint8]uint64
 	timedetails1 map[uint8]uint64
-	formatString string
+	rawString    string
 	buf          []byte
 	syscallCnt   uint
 	duration     uint // 读/写总用时
@@ -44,7 +34,19 @@ func InitProtocolMessage(isReq bool, isServerSide bool) *BaseProtocolMessage {
 	msg.timedetails0 = make(map[uint8]uint64)
 	msg.timedetails1 = make(map[uint8]uint64)
 	msg.buf = make([]byte, 0)
-	msg.Parser = &StringParser{}
+	return msg
+}
+
+func InitProtocolMessageWithEvent(evt *bpf.SyscallEventData, isReq bool, isServerSide bool) *BaseProtocolMessage {
+	msg := new(BaseProtocolMessage)
+	msg.StartTs = evt.SyscallEvent.Ke.Ts
+	msg.EndTs = evt.SyscallEvent.Ke.Ts
+	msg.isTruncated = evt.SyscallEvent.BufSize != uint32(len(evt.Buf))
+	msg.buf = append(msg.buf, evt.Buf...)
+	msg.timedetails0 = make(map[uint8]uint64)
+	msg.timedetails1 = make(map[uint8]uint64)
+	msg.IsReq = isReq
+	msg.IsServerSide = isServerSide
 	return msg
 }
 
@@ -56,12 +58,12 @@ func (s *BaseProtocolMessage) IsTruncated() bool {
 	return s.isTruncated
 }
 
-func (s *BaseProtocolMessage) FormatString() string {
-	if s.formatString != "" {
-		return s.formatString
+func (s *BaseProtocolMessage) FormatRawBufToString() string {
+	if s.rawString != "" {
+		return s.rawString
 	}
-	s.formatString = s.Parser.FormatData(s.buf)
-	return s.formatString
+	s.rawString = string(s.buf)
+	return s.rawString
 }
 
 func (s *BaseProtocolMessage) ExportTimeDetails() string {
@@ -197,6 +199,10 @@ func (s *BaseProtocolMessage) IncrSyscallCount() {
 
 func (s *BaseProtocolMessage) IncrTotalBytesBy(bytes uint) {
 	s.totalBytes += bytes
+}
+
+func (s *BaseProtocolMessage) Data() []byte {
+	return s.buf
 }
 
 type Record struct {

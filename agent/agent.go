@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"eapm-ebpf/agent/conn"
 	"eapm-ebpf/agent/protocol"
+	"eapm-ebpf/agent/protocol/filter"
 	"eapm-ebpf/agent/stat"
 	"eapm-ebpf/bpf"
 	"eapm-ebpf/common"
@@ -36,33 +37,6 @@ type ConnManagerInitHook func(*conn.ConnManager)
 
 var log *logrus.Logger = common.Log
 
-// var processorsNum int = 4
-// var loadBpfProgram LoadBpfProgramFunction = attachBpfProgs
-// var customSyscallEventHook CustomSyscallEventHook = func(evt *bpf.SyscallEventData) {}
-// var customConnEventHook CustomConnEventHook = func(evt *bpf.AgentConnEvtT) {}
-// var initCompletedHook func() = func() {}
-// var connManagerInitHook func(*conn.ConnManager) = func(cm *conn.ConnManager) {}
-
-// func SetLoadBpfProgram(f func(objs bpf.AgentObjects) *list.List) {
-// 	loadBpfProgram = f
-// }
-
-// func SetCustomSyscallEventHook(f func(evt *bpf.SyscallEventData)) {
-// 	customSyscallEventHook = f
-// }
-
-// func SetCustomConnEventHook(f func(evt *bpf.AgentConnEvtT)) {
-// 	customConnEventHook = f
-// }
-
-// func SetInitCompletedHook(f func()) {
-// 	initCompletedHook = f
-// }
-
-// func SetConnManagerInitHook(f func(*conn.ConnManager)) {
-// 	connManagerInitHook = f
-// }
-
 type AgentOptions struct {
 	Stopper                chan os.Signal
 	CustomSyscallEventHook SyscallEventHook
@@ -72,6 +46,7 @@ type AgentOptions struct {
 	ConnManagerInitHook    ConnManagerInitHook
 	LoadBpfProgramFunction LoadBpfProgramFunction
 	ProcessorsNum          int
+	MessageFilter          filter.MessageFilter
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -81,6 +56,9 @@ func validateAndRepairOptions(options AgentOptions) AgentOptions {
 	}
 	if newOptions.ProcessorsNum == 0 {
 		newOptions.ProcessorsNum = runtime.NumCPU()
+	}
+	if newOptions.MessageFilter == nil {
+		newOptions.MessageFilter = filter.NoopFilter{}
 	}
 	return newOptions
 }
@@ -94,7 +72,7 @@ func SetupAgent(options AgentOptions) {
 		options.ConnManagerInitHook(connManager)
 	}
 	statRecorder := stat.InitStatRecorder()
-	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager)
+	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c)
 	}
@@ -157,7 +135,7 @@ func SetupAgent(options AgentOptions) {
 				}
 			}
 		}
-		log.Infoln("All links closed!")
+		log.Debugln("All links closed!")
 	}()
 	// kernel >= 5.8
 	syscallDataReader, err := ringbuf.NewReader(objs.AgentMaps.SyscallRb)
@@ -186,7 +164,7 @@ func SetupAgent(options AgentOptions) {
 	stop := false
 	go func() {
 		<-stopper
-		log.Println("stop!")
+		log.Debugln("stop!")
 		if err := dataReader.Close(); err != nil {
 			log.Fatalf("closing dataReader error: %s", err)
 		}
@@ -208,15 +186,15 @@ func SetupAgent(options AgentOptions) {
 			record, err := dataReader.Read()
 			if err != nil {
 				if errors.Is(err, ringbuf.ErrClosed) {
-					log.Infoln("[dataReader] Received signal, exiting..")
+					log.Debug("[dataReader] Received signal, exiting..")
 					return
 				}
-				log.Infof("[dataReader] reading from reader: %s\n", err)
+				log.Debugf("[dataReader] reading from reader: %s\n", err)
 				continue
 			}
 
 			if err := handleKernEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook); err != nil {
-				log.Infof("[dataReader] handleKernEvt err: %s\n", err)
+				log.Errorf("[dataReader] handleKernEvt err: %s\n", err)
 				continue
 			}
 
@@ -228,14 +206,14 @@ func SetupAgent(options AgentOptions) {
 			record, err := syscallDataReader.Read()
 			if err != nil {
 				if errors.Is(err, ringbuf.ErrClosed) {
-					log.Infoln("[syscallDataReader] Received signal, exiting..")
+					log.Debugf("[syscallDataReader] Received signal, exiting..")
 					return
 				}
-				log.Infof("[syscallDataReader] reading from reader: %s\n", err)
+				log.Debugf("[syscallDataReader] reading from reader: %s\n", err)
 				continue
 			}
 			if err := handleSyscallEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook); err != nil {
-				log.Infof("[syscallDataReader] handleSyscallEvt err: %s\n", err)
+				log.Errorf("[syscallDataReader] handleSyscallEvt err: %s\n", err)
 				continue
 			}
 		}
@@ -246,14 +224,14 @@ func SetupAgent(options AgentOptions) {
 			record, err := connEvtReader.Read()
 			if err != nil {
 				if errors.Is(err, ringbuf.ErrClosed) {
-					log.Infoln("[connEvtReader] Received signal, exiting..")
+					log.Debugln("[connEvtReader] Received signal, exiting..")
 					return
 				}
-				log.Infof("[connEvtReader] reading from reader: %s\n", err)
+				log.Debugf("[connEvtReader] reading from reader: %s\n", err)
 				continue
 			}
 			if err := handleConnEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook); err != nil {
-				log.Infof("[connEvtReader] handleKernEvt err: %s\n", err)
+				log.Errorf("[connEvtReader] handleKernEvt err: %s\n", err)
 				continue
 			}
 		}

@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 	"eapm-ebpf/agent/protocol"
+	"eapm-ebpf/agent/protocol/filter"
 	"eapm-ebpf/bpf"
 	"eapm-ebpf/common"
 	"fmt"
@@ -23,14 +24,14 @@ type ProcessorManager struct {
 	cancel      context.CancelFunc
 }
 
-func InitProcessorManager(n int, connManager *ConnManager) *ProcessorManager {
+func InitProcessorManager(n int, connManager *ConnManager, filter filter.MessageFilter) *ProcessorManager {
 	pm := new(ProcessorManager)
 	pm.processors = make([]*Processor, n)
 	pm.wg = new(sync.WaitGroup)
 	pm.ctx, pm.cancel = context.WithCancel(context.Background())
 	pm.connManager = connManager
 	for i := 0; i < n; i++ {
-		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager)
+		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter)
 		go pm.processors[i].run()
 		pm.wg.Add(1)
 	}
@@ -47,7 +48,7 @@ func (pm *ProcessorManager) GetProcessor(i int) *Processor {
 func (pm *ProcessorManager) StopAll() error {
 	pm.cancel()
 	pm.wg.Wait()
-	log.Infoln("All Processor Stopped!")
+	log.Debugln("All Processor Stopped!")
 	return nil
 }
 
@@ -59,9 +60,10 @@ type Processor struct {
 	syscallEvents chan *bpf.SyscallEventData
 	kernEvents    chan *bpf.AgentKernEvt
 	name          string
+	messageFilter filter.MessageFilter
 }
 
-func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager) *Processor {
+func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter filter.MessageFilter) *Processor {
 	p := new(Processor)
 	p.wg = wg
 	p.ctx = ctx
@@ -70,6 +72,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.syscallEvents = make(chan *bpf.SyscallEventData)
 	p.kernEvents = make(chan *bpf.AgentKernEvt)
 	p.name = name
+	p.messageFilter = filter
 	return p
 }
 
@@ -89,7 +92,7 @@ func (p *Processor) run() {
 	for {
 		select {
 		case <-p.ctx.Done():
-			common.Log.Infof("[%s] stopped", p.name)
+			common.Log.Debugf("[%s] stopped", p.name)
 			p.wg.Done()
 			return
 		case event := <-p.connEvents:
@@ -105,6 +108,8 @@ func (p *Processor) run() {
 				Status:     Connected,
 				CurReq:     protocol.InitProtocolMessage(true, event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleServer),
 				CurResp:    protocol.InitProtocolMessage(false, event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleServer),
+
+				MessageFilter: p.messageFilter,
 			}
 			// remove this TODO
 			// if conn.LocalPort != 16660 {
@@ -135,7 +140,7 @@ func (p *Processor) run() {
 					// ReportDataEvents(conn.TempKernEvents, conn)
 					// ReportConnEvents(conn.TempConnEvents)
 					for _, sysEvent := range conn.TempSyscallEvents {
-						conn.OnSyscallEvent(sysEvent.Buf, &sysEvent.SyscallEvent)
+						conn.OnSyscallEvent(sysEvent.Buf, sysEvent)
 					}
 				}
 				// 清空, 这里可能有race
@@ -161,10 +166,11 @@ func (p *Processor) run() {
 			} else if event.ConnType == bpf.AgentConnTypeTKConnect {
 				conn.AddConnEvent(event)
 			}
+
 			if event.ConnType == bpf.AgentConnTypeTKProtocolInfer && conn.ProtocolInferred() {
-				log.Infof("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
+				log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
 			} else {
-				log.Infof("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
+				log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
 			}
 			if reportEvt {
 				go func() {
@@ -180,11 +186,12 @@ func (p *Processor) run() {
 				direct = "<="
 			}
 			if conn != nil && conn.ProtocolInferred() {
-				log.Infof("[syscall][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
-				conn.OnSyscallEvent(event.Buf, &event.SyscallEvent)
+				log.Debugf("[syscall][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
+
+				conn.OnSyscallEvent(event.Buf, event)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
-				log.Infof("[syscall][protocol unset][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
+				log.Debugf("[syscall][protocol unset][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
@@ -195,20 +202,19 @@ func (p *Processor) run() {
 				direct = "<="
 			}
 			if conn != nil {
-				if viper.GetBool(common.ConsoleOutputVarName) {
-					log.Infof("[data][tgid=%d fd=%d][func=%s][ts=%d][%s] *%s:%d %s %s:%d | %d:%d flags:%s\n",
-						tgidFd>>32, uint32(event.ConnIdS.TgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts,
-						common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp),
-						conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len,
-						common.DisplayTcpFlags(event.Flags))
-				}
+
+				log.Debugf("[data][tgid=%d fd=%d][func=%s][ts=%d][%s] *%s:%d %s %s:%d | %d:%d flags:%s\n",
+					tgidFd>>32, uint32(event.ConnIdS.TgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts,
+					common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp),
+					conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len,
+					common.DisplayTcpFlags(event.Flags))
 
 			} else {
-				if viper.GetBool(common.ConsoleOutputVarName) {
-					// log.Debugf("[data no conn][tgid_fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n",
-					// 	tgidFd, common.Int8ToStr(event.FuncName[:]), event.Ts,
-					// 	common.StepCNNames[event.Step], event.Seq, event.Len,
-					// 	common.DisplayTcpFlags(event.Flags))
+				if viper.GetBool(common.VerboseVarName) {
+					log.Debugf("[data no conn][tgid_fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n",
+						tgidFd, common.Int8ToStr(event.FuncName[:]), event.Ts,
+						common.StepCNNames[event.Step], event.Seq, event.Len,
+						common.DisplayTcpFlags(event.Flags))
 				}
 			}
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
@@ -216,17 +222,17 @@ func (p *Processor) run() {
 					// TODO 推断出协议之前的事件需要处理，这里暂时略过
 					// conn.AddKernEvent(&event)
 					conn.OnKernEvent(event)
-					log.Infof("[skip] skip due to protocol unset")
+					log.Debug("[skip] skip due to protocol unset")
 					// log.Infof("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 					flag := conn.OnKernEvent(event)
 					if !flag {
-						log.Infof("[skip] skip due to cur req/resp is nil ?(maybe bug)")
+						log.Debug("[skip] skip due to cur req/resp is nil ?(maybe bug)")
 					}
 				}
 			} else if event.Len > 0 && conn != nil {
-				log.Infof("[skip] skip due to protocol is unknwon")
-				log.Infof("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
+				log.Debug("[skip] skip due to protocol is unknwon")
+				log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 			} else if event.Len == 0 && conn != nil {
 				conn.OnKernEvent(event)
 			}
