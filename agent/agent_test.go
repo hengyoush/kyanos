@@ -8,6 +8,7 @@ import (
 	"eapm-ebpf/bpf"
 	"eapm-ebpf/cmd"
 	"eapm-ebpf/common"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -282,6 +283,19 @@ func sendTestRequest(t *testing.T, options SendTestHttpRequestOptions) error {
 	fmt.Printf("Status Code: %d\n", resp.StatusCode)
 	resp.Body.Close()
 	return err
+}
+
+func TestMain(m *testing.M) {
+	// call flag.Parse() here if TestMain uses flags
+	retCode := m.Run()
+	tearDown()
+	os.Exit(retCode)
+}
+
+func tearDown() {
+	// Do something here.
+	time.Sleep(1 * time.Second)
+	fmt.Println("teardown!")
 }
 
 func TestConnectSyscall(t *testing.T) {
@@ -955,20 +969,25 @@ const (
 )
 
 type WriteToEchoServerOptions struct {
-	t                *testing.T
-	server           string
-	message          string
-	messageSlice     []string
-	readResponse     bool
-	writeSyscall     WriteSyscallType
-	readSyscall      ReadSyscallType
-	readBufSizeSlice []int
+	t                     *testing.T
+	server                string
+	message               string
+	messageSlice          []string
+	readResponse          bool
+	writeSyscall          WriteSyscallType
+	readSyscall           ReadSyscallType
+	readBufSizeSlice      []int
+	useNonBlockingSoscket bool
 }
 
 func WriteToEchoTcpServerAndReadResponse(options WriteToEchoServerOptions) {
 	connection, fd, _ := getConnectionAndFdToRemoteServer(options.server)
 	defer connection.Close()
-	syscall.SetNonblock(int(fd), false)
+	if options.useNonBlockingSoscket {
+		syscall.SetNonblock(int(fd), true)
+	} else {
+		syscall.SetNonblock(int(fd), false)
+	}
 	switch options.writeSyscall {
 	case Write:
 		syscall.Write(int(fd), []byte(options.message))
@@ -994,21 +1013,50 @@ func WriteToEchoTcpServerAndReadResponse(options WriteToEchoServerOptions) {
 		readBytes := make([]byte, 1000)
 		switch options.readSyscall {
 		case Read:
-			syscall.Read(int(fd), readBytes)
+			for {
+				_, err := syscall.Read(int(fd), readBytes)
+				if err == nil {
+					break
+				} else if !errors.Is(err, syscall.EAGAIN) {
+					fmt.Printf("Read from socket failed: %v\n", err)
+				}
+			}
+
 		case RecvFrom:
-			syscall.Recvfrom(int(fd), readBytes, 0)
+			for {
+				_, _, err := syscall.Recvfrom(int(fd), readBytes, 0)
+				if err == nil {
+					break
+				} else if !errors.Is(err, syscall.EAGAIN) {
+					fmt.Printf("RecvFrom from socket failed: %v\n", err)
+				}
+			}
 		case Readv:
 			var iovecs [][]byte = make([][]byte, 0)
 			for _, each := range options.readBufSizeSlice {
 				iovecs = append(iovecs, make([]byte, each))
 			}
-			unix.Readv(int(fd), iovecs)
+			for {
+				_, err := unix.Readv(int(fd), iovecs)
+				if err == nil {
+					break
+				} else if !errors.Is(err, syscall.EAGAIN) {
+					fmt.Printf("Readv from socket failed: %v\n", err)
+				}
+			}
 		case Recvmsg:
 			var iovecs [][]byte = make([][]byte, 0)
 			for _, each := range options.readBufSizeSlice {
 				iovecs = append(iovecs, make([]byte, each))
 			}
-			unix.RecvmsgBuffers(int(fd), iovecs, nil, 0)
+			for {
+				_, _, _, _, err := unix.RecvmsgBuffers(int(fd), iovecs, nil, 0)
+				if err == nil {
+					break
+				} else if !errors.Is(err, syscall.EAGAIN) {
+					fmt.Printf("Readv from socket failed: %v\n", err)
+				}
+			}
 		}
 		fmt.Printf("Read  from conn: %s\n", string(readBytes))
 	}
