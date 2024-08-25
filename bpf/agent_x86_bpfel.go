@@ -204,7 +204,6 @@ type AgentProgramSpecs struct {
 	ReadvEnter                        *ebpf.ProgramSpec `ebpf:"readv_enter"`
 	ReadvReturn                       *ebpf.ProgramSpec `ebpf:"readv_return"`
 	RecvfromEnter                     *ebpf.ProgramSpec `ebpf:"recvfrom_enter"`
-	RecvfromReturn                    *ebpf.ProgramSpec `ebpf:"recvfrom_return"`
 	RecvmsgEnter                      *ebpf.ProgramSpec `ebpf:"recvmsg_enter"`
 	SecuritySocketRecvmsgEnter        *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter        *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
@@ -358,7 +357,6 @@ type AgentPrograms struct {
 	ReadvEnter                        *ebpf.Program `ebpf:"readv_enter"`
 	ReadvReturn                       *ebpf.Program `ebpf:"readv_return"`
 	RecvfromEnter                     *ebpf.Program `ebpf:"recvfrom_enter"`
-	RecvfromReturn                    *ebpf.Program `ebpf:"recvfrom_return"`
 	RecvmsgEnter                      *ebpf.Program `ebpf:"recvmsg_enter"`
 	SecuritySocketRecvmsgEnter        *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter        *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
@@ -406,7 +404,6 @@ func (p *AgentPrograms) Close() error {
 		p.ReadvEnter,
 		p.ReadvReturn,
 		p.RecvfromEnter,
-		p.RecvfromReturn,
 		p.RecvmsgEnter,
 		p.SecuritySocketRecvmsgEnter,
 		p.SecuritySocketSendmsgEnter,

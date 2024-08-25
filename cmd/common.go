@@ -11,7 +11,7 @@ import (
 func startAgent(options agent.AgentOptions) {
 
 	initLog()
-	logger.Println("running kyanos ...")
+	logger.Infoln("Kyanos starting...")
 	if viper.GetBool(common.DaemonVarName) {
 		cntxt := &daemon.Context{
 			PidFileName: "./kyanos.pid",
@@ -27,12 +27,12 @@ func startAgent(options agent.AgentOptions) {
 			logger.Fatal("Unable to run: ", err)
 		}
 		if d != nil {
-			logger.Println("kyanos started!")
+			logger.Println("Kyanos started!")
 			return
 		}
 		defer cntxt.Release()
 		logger.Println("----------------------")
-		logger.Println("kyanos started!")
+		logger.Println("Kyanos started!")
 		agent.SetupAgent(options)
 	} else {
 		initLog()

@@ -1022,10 +1022,10 @@ static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 	struct socket __socket;
 	if (socket_file != file) {
 		// check_file = __socket.wq;
-		sk = _(socket->file);
+		sk = (struct tcp_sock *)_(socket->file);
 	} else {
 		check_file = _(socket->file);
-		sk = _(socket->sk);
+		sk = (struct tcp_sock *)_(socket->sk);
 	}
 	if ((socket_type == SOCK_STREAM || socket_type == SOCK_DGRAM) &&
 	    check_file == file /*&& __socket.state == SS_CONNECTED */) {
@@ -1116,18 +1116,8 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		report_conn_evt(&conn_info, kConnect, start_ts);
 	}
 
-	// struct sock_key key;
-	// if (role == kRoleServer) {
-	// 	key.sip = conn_info.raddr.in4.sin_addr.s_addr;
-	// 	key.dip = conn
-	// }
 }
 
-// static __inline void update_traffic_class(struct conn_info_t* conn_info,enum traffic_direction_t direction, const char* buf,size_t count) {
-// 	if (conn_info == NULL) {
-// 		return
-// 	} 
-// }
 
 static __always_inline void process_syscall_close(int ret_val, struct close_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
@@ -1204,15 +1194,12 @@ static __always_inline void process_syscall_data_vecs(struct pt_regs* ctx, struc
 	uint32_t tgid = id >> 32;
 	uint64_t _tgidfd = (((uint64_t)tgid) << 32 | args->fd);
 	if (args->iov == NULL) {
-		// bpf_printk("[protocol infer(vecs)]: exit 0, %lu,fn: %d bc:%d", _tgidfd, args->source_fn, bytes_count);
 		return;
 	}
 	if (args->iovlen <= 0) {
-		// bpf_printk("[protocol infer(vecs)]: exit 1, %ld", id);
 		return;
 	}
 	if (args->fd < 0) {
-		// bpf_printk("[protocol infer(vecs)]: exit 2, %lu, fd: %d fn:%d", _tgidfd, args->fd, args->source_fn);
 		return;
 	}
 	if (bytes_count <= 0) {
@@ -1270,15 +1257,8 @@ static __always_inline void process_syscall_data(struct pt_regs* ctx, struct dat
 	uint64_t tgid_fd = gen_tgid_fd(tgid, args->fd);
 	struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 	if (!conn_info) {
-		if (tgid == 2509849) {
-			bpf_printk("conn_info == null, tgid:%lu,fd:%d,func:%d", tgid,args->fd,args->source_fn);
-		}
 		return;
-	} else {
-		// if (tgid == 2509849) {
-		// 	bpf_printk("conn_info != null, tgid:%lu,fd:%d,func:%d", tgid,args->fd,args->source_fn);
-		// }
-	}
+	} 
 	if (conn_info->protocol == kProtocolUnset) {
 		bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
 		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
@@ -1382,23 +1362,6 @@ int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx
 	return 0;
 }
 
-SEC("kretprobe/__sys_recvfrom")
-int BPF_KRETPROBE(recvfrom_return) {
-	// uint64_t id = bpf_get_current_pid_tgid();
-	// ssize_t bytes_count = PT_REGS_RC_CORE((struct pt_regs*)ctx);
-
-	// struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
-	// if (args != NULL) {
-	// 	if (id >> 32 == 2509849) {
-	// 		bpf_printk("recvfrom fd:%u,buf:%x", args->fd, args->buf);
-	// 	}
-	// 	args->ts = bpf_ktime_get_ns();
-	// 	process_syscall_data((struct pt_regs*)ctx, args, id, kIngress, bytes_count);
-	// }
-
-	// bpf_map_delete_elem(&read_args_map, &id);
-	return 0;
-}
 
 SEC("kprobe/__x64_sys_read")
 int BPF_KSYSCALL(read_enter,  uint32_t fd, char* buf, size_t count) {
@@ -1407,10 +1370,6 @@ int BPF_KSYSCALL(read_enter,  uint32_t fd, char* buf, size_t count) {
 	struct data_args args = {0};
 	args.fd = fd;
 	args.buf = buf;
-	// if (id>>32 == 1573997) {
-	// 	bpf_printk("read_enter fd:%d,tgid:%lu", fd,id>>32);
-	// }
-	// bpf_printk("read_enter fd:%d,tgid:%lu", fd,id>>32);
 	args.source_fn = kSyscallRead;
 	bpf_map_update_elem(&read_args_map, &id, &args, BPF_ANY);
 	return 0;
@@ -1420,11 +1379,6 @@ SEC("tracepoint/syscalls/sys_exit_read")
 int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count = ctx->ret;
-	// if (id>>32 == 1573997) {
-	// 	bpf_printk("read_return tp tgid:%lu, bc:%d",id>>32, bytes_count);
-	// } else {
-	// 	// bpf_printk("read_return2 tp tgid:%lu, bc:%d",id>>32, bytes_count);
-	// }
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->ts = bpf_ktime_get_ns();
@@ -1713,8 +1667,6 @@ int BPF_KRETPROBE(sock_alloc_ret)
 
 SEC("kretprobe/__sys_accept4")
 int BPF_KRETPROBE(sys_accept4_ret)
-// SEC("tracepoint/syscalls/sys_exit_accept4")
-// int _sys_exit_accept4(struct pt_regs* ctx)
 {
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct accept_args *args = bpf_map_lookup_elem(&accept_args_map, &id);
