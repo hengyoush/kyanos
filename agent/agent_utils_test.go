@@ -36,7 +36,6 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 	go func(pid int) {
 		cmd.FilterPid = int64(pid)
 		cmd.Verbose = true
-		cmd.ConsoleOutput = true
 		agent.SetupAgent(agent.AgentOptions{
 			Stopper: agentStopper,
 			LoadBpfProgramFunction: func(objs bpf.AgentObjects) *list.List {
