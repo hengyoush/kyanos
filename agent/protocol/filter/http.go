@@ -4,12 +4,14 @@ import (
 	"kyanos/bpf"
 	"net/http"
 	"net/url"
+	"slices"
 )
 
 var _ MessageFilter = HttpFilter{}
 
 type HttpFilter struct {
-	TargetPath string
+	TargetPath    string
+	TargetMethods []string
 }
 
 func (filter HttpFilter) FilterByProtocol(protocol bpf.AgentTrafficProtocolT) bool {
@@ -17,7 +19,7 @@ func (filter HttpFilter) FilterByProtocol(protocol bpf.AgentTrafficProtocolT) bo
 }
 
 func (filter HttpFilter) FilterByRequest() bool {
-	return filter.TargetPath != ""
+	return filter.TargetPath != "" || len(filter.TargetMethods) > 0
 }
 
 func (filter HttpFilter) FilterByResponse() bool {
@@ -37,6 +39,9 @@ func (filter HttpFilter) Filter(parsedReq ParsedMessage, parsedResp ParsedMessag
 	}
 
 	if filter.TargetPath != "" && filter.TargetPath != uri.Path {
+		return false
+	}
+	if len(filter.TargetMethods) > 0 && !slices.Contains(filter.TargetMethods, req.Method) {
 		return false
 	}
 	return true
