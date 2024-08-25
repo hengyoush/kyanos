@@ -196,7 +196,7 @@ func (p *Processor) run() {
 			}
 			if conn != nil {
 				if viper.GetBool(common.ConsoleOutputVarName) {
-					log.Debugf("[data][tgid=%d fd=%d][func=%s][ts=%d][%s] *%s:%d %s %s:%d | %d:%d flags:%s\n",
+					log.Infof("[data][tgid=%d fd=%d][func=%s][ts=%d][%s] *%s:%d %s %s:%d | %d:%d flags:%s\n",
 						tgidFd>>32, uint32(event.ConnIdS.TgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts,
 						common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp),
 						conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len,

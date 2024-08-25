@@ -1,289 +1,16 @@
 package agent_test
 
 import (
-	"bufio"
-	"container/list"
-	"eapm-ebpf/agent"
 	"eapm-ebpf/agent/conn"
 	"eapm-ebpf/bpf"
-	"eapm-ebpf/cmd"
 	"eapm-ebpf/common"
-	"errors"
 	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"os"
-	"reflect"
-	"strconv"
-	"strings"
-	"sync"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/sys/unix"
 )
-
-type ConnEventAssertions struct {
-	expectPid                  uint32
-	expectLocalIp              string
-	expectLocalAddrFamily      int
-	expectLocalPort            int
-	expectProtocol             bpf.AgentTrafficProtocolT
-	expectRemoteIp             string
-	expectRemoteFamily         int
-	expectRemotePort           int
-	expectReadBytes            uint64
-	expectWriteBytes           uint64
-	expectReadBytesPredicator  func(uint64) bool
-	expectWriteBytesPredicator func(uint64) bool
-	expectConnEventType        bpf.AgentConnTypeT
-}
-
-func AssertConnEvent(t *testing.T, connectEvent bpf.AgentConnEvtT, assert ConnEventAssertions) {
-	t.Helper()
-	if connectEvent.ConnInfo.ConnId.Upid.Pid != assert.expectPid {
-		t.Fatalf("Pid Incorrect: %d !=  %d", connectEvent.ConnInfo.ConnId.Upid.Pid, assert.expectPid)
-	}
-	expectLocalIp := assert.expectLocalIp
-	localIp := common.IntToIP(connectEvent.ConnInfo.Laddr.In4.SinAddr.S_addr)
-	if expectLocalIp != "" && localIp != expectLocalIp {
-		t.Fatalf("Local IP Incorrect: %s != %s", localIp, expectLocalIp)
-	}
-	localAddr := connectEvent.ConnInfo.Laddr
-	localAddrFamily := localAddr.In4.SinFamily
-	expectLocalAddrFamily := assert.expectLocalAddrFamily
-	if expectLocalAddrFamily >= 0 && expectLocalAddrFamily != int(localAddrFamily) {
-		t.Fatalf("LocalAddr Family Incorrect: %d != %d", localAddrFamily, expectLocalAddrFamily)
-	}
-	localPort := localAddr.In4.SinPort
-	expectLocalPort := assert.expectLocalPort
-	if expectLocalPort >= 0 && expectLocalPort != int(localPort) {
-		t.Fatalf("Local Port Incorrect: %d != %d", localPort, expectLocalPort)
-	}
-	protocol := connectEvent.ConnInfo.Protocol
-	expectProtocol := assert.expectProtocol
-	if expectProtocol >= 0 && expectProtocol != protocol {
-		t.Fatalf("Protocol Incorrect: %d != %d", protocol, expectProtocol)
-	}
-	remoteAddr := connectEvent.ConnInfo.Raddr
-	remoteIp := common.IntToIP(remoteAddr.In4.SinAddr.S_addr)
-	expectRemoteIp := assert.expectRemoteIp
-	if expectRemoteIp != "" && expectRemoteIp != remoteIp {
-		t.Fatalf("Remote IP Incorrect: %s != %s", remoteIp, expectRemoteIp)
-	}
-	remoteAddrFamily := remoteAddr.In4.SinFamily
-	expectRemoteFamily := assert.expectRemoteFamily
-	if expectRemoteFamily >= 0 && expectRemoteFamily != int(remoteAddrFamily) {
-		t.Fatalf("RemoteAddr Family Incorrect: %d != %d", remoteAddrFamily, expectRemoteFamily)
-	}
-	remotePort := remoteAddr.In4.SinPort
-	expectRemotePort := assert.expectRemotePort
-	if expectRemotePort >= 0 && expectRemotePort != int(remotePort) {
-		t.Fatalf("Remote Port Incorrect: %d != %d", remotePort, expectRemotePort)
-	}
-	if connectEvent.Ts <= 0 {
-		t.Fatalf("Ts Incorrect: %d", connectEvent.Ts)
-	}
-	if connectEvent.ConnInfo.ConnId.Fd <= 0 {
-		t.Fatalf("Fd Incorrect: %d", connectEvent.ConnInfo.ConnId.Fd)
-	}
-	readBytes := connectEvent.ConnInfo.ReadBytes
-	expectReadBytes := assert.expectReadBytes
-	if expectReadBytes >= 0 && readBytes != uint64(expectReadBytes) {
-		t.Fatalf("ReadBytes Incorrect: %d != %d", readBytes, expectReadBytes)
-	}
-	if assert.expectReadBytesPredicator != nil && !assert.expectReadBytesPredicator(readBytes) {
-		t.Fatalf("ReadBytes Predicate return false: %d", readBytes)
-	}
-	writeBytes := connectEvent.ConnInfo.WriteBytes
-	expectWriteBytes := assert.expectWriteBytes
-	if expectWriteBytes >= 0 && writeBytes != uint64(expectWriteBytes) {
-		t.Fatalf("WriteBytes Incorrect: %d != %d", writeBytes, expectWriteBytes)
-	}
-	if assert.expectWriteBytesPredicator != nil && !assert.expectWriteBytesPredicator(writeBytes) {
-		t.Fatalf("WriteBytes Predicate return false: %d", writeBytes)
-	}
-	expectConnEventType := assert.expectConnEventType
-	if connectEvent.ConnType != expectConnEventType {
-		t.Fatalf("ConnType Incorrect: %d", connectEvent.ConnType)
-	}
-}
-
-type SyscallDataEventAssertConditions struct {
-	ignoreConnIdDirect    bool
-	connIdDirect          bpf.AgentTrafficDirectionT
-	ignorePid             bool
-	pid                   uint64
-	ignoreFd              bool
-	fd                    uint32
-	ignoreFuncName        bool
-	funcName              string
-	ignoreDataLen         bool
-	dataLen               uint32
-	ignoreSeq             bool
-	seq                   uint64
-	ignoreStep            bool
-	step                  bpf.AgentStepT
-	tsAssertFunction      func(uint64) bool
-	bufSizeAssertFunction func(uint32) bool
-	bufAssertFunction     func([]byte) bool
-}
-
-func AssertSyscallEventData(t *testing.T, event bpf.SyscallEventData, conditions SyscallDataEventAssertConditions) {
-	connId := event.SyscallEvent.Ke.ConnIdS
-	direct := connId.Direct
-	if !conditions.ignoreConnIdDirect {
-		assert.Equal(t, conditions.connIdDirect, direct)
-	}
-	pid := connId.TgidFd >> 32
-	if !conditions.ignorePid {
-		assert.Equal(t, conditions.pid, pid)
-	}
-	fd := uint32(connId.TgidFd)
-	if !conditions.ignoreFd {
-		assert.Equal(t, conditions.fd, fd)
-	}
-	funcName := event.SyscallEvent.Ke.FuncName
-	if !conditions.ignoreFuncName {
-		assert.Equal(t, conditions.funcName, common.Int8ToStr(funcName[:len(conditions.funcName)]))
-	}
-	dataLen := event.SyscallEvent.Ke.Len
-	if !conditions.ignoreDataLen {
-		assert.Equal(t, conditions.dataLen, dataLen)
-	}
-	seq := event.SyscallEvent.Ke.Seq
-	if !conditions.ignoreSeq {
-		assert.Equal(t, conditions.seq, seq)
-	}
-	step := event.SyscallEvent.Ke.Step
-	if !conditions.ignoreStep {
-		assert.Equal(t, conditions.step, step)
-	}
-	ts := event.SyscallEvent.Ke.Ts
-	if conditions.tsAssertFunction != nil {
-		assert.True(t, conditions.tsAssertFunction(ts))
-	}
-	bufSize := event.SyscallEvent.BufSize
-	if conditions.bufSizeAssertFunction != nil {
-		assert.True(t, conditions.bufSizeAssertFunction(bufSize))
-	}
-	buf := event.Buf
-	if conditions.bufAssertFunction != nil {
-		assert.True(t, conditions.bufAssertFunction(buf))
-	}
-}
-
-type FindInterestedConnEventOptions struct {
-	findByRemotePort bool
-	remotePort       uint16
-	findByLocalPort  bool
-	localPort        uint16
-	findByConnType   bool
-	connType         bpf.AgentConnTypeT
-	findByTgidFd     bool
-	tgidFd           uint64
-	throw            bool
-}
-
-type FindInterestedSyscallEventOptions struct {
-	findByRemotePort bool
-	remotePort       uint16
-	findByLocalPort  bool
-	localPort        uint16
-	throw            bool
-
-	connEventList []bpf.AgentConnEvtT
-}
-
-var CONN_EVENT_NOT_FOUND bpf.AgentConnEvtT = bpf.AgentConnEvtT{}
-
-func findInterestedConnEvent(t *testing.T, connEventList []bpf.AgentConnEvtT, options FindInterestedConnEventOptions) []bpf.AgentConnEvtT {
-	t.Helper()
-	resultList := make([]bpf.AgentConnEvtT, 0)
-	for _, connEvent := range connEventList {
-		if options.findByRemotePort && options.remotePort != connEvent.ConnInfo.Raddr.In4.SinPort {
-			continue
-		}
-		if options.findByLocalPort && options.localPort != connEvent.ConnInfo.Laddr.In4.SinPort {
-			continue
-		}
-		if options.findByConnType && options.connType != connEvent.ConnType {
-			continue
-		}
-		if options.findByTgidFd && options.tgidFd != (uint64(connEvent.ConnInfo.ConnId.Upid.Pid)<<32|uint64(connEvent.ConnInfo.ConnId.Fd)) {
-			continue
-		}
-		resultList = append(resultList, connEvent)
-	}
-	if options.throw && len(resultList) == 0 {
-		t.Fatalf("no conn event found for: %v", options)
-	}
-	return resultList
-}
-
-func findInterestedSyscallEvents(t *testing.T, syscallEventList []bpf.SyscallEventData, options FindInterestedSyscallEventOptions) []bpf.SyscallEventData {
-	t.Helper()
-	resultList := make([]bpf.SyscallEventData, 0)
-	for _, each := range syscallEventList {
-		connectEvents := findInterestedConnEvent(t, options.connEventList, FindInterestedConnEventOptions{
-			findByTgidFd:   true,
-			findByConnType: true,
-			tgidFd:         each.SyscallEvent.Ke.ConnIdS.TgidFd,
-			connType:       bpf.AgentConnTypeTKConnect,
-			throw:          false,
-		})
-		if len(connectEvents) == 0 {
-			continue
-		}
-		connectEvent := connectEvents[0]
-		if options.findByRemotePort && connectEvent.ConnInfo.Raddr.In4.SinPort != options.remotePort {
-			continue
-		}
-		if options.findByLocalPort && connectEvent.ConnInfo.Laddr.In4.SinPort != options.localPort {
-			continue
-		}
-		resultList = append(resultList, each)
-	}
-	if options.throw && len(resultList) == 0 {
-		t.Fatalf("no syscall event found for: %v", options)
-	}
-	return resultList
-}
-
-type SendTestHttpRequestOptions struct {
-	disableKeepAlived bool
-}
-
-func sendTestRequest(t *testing.T, options SendTestHttpRequestOptions) error {
-	// 创建http客户端，连接baidu.com
-	// 创建一个HTTP客户端（实际上，在这个例子中直接使用http.Get也是可以的，因为它内部会创建一个默认的客户端）
-	client := &http.Client{
-		Transport: &http.Transport{
-			DisableKeepAlives: options.disableKeepAlived,
-		},
-	}
-
-	// 创建一个请求
-	req, err := http.NewRequest("GET", "http://www.baidu.com", nil)
-	resp, err := client.Do(req)
-	if err != nil {
-		// 如果有错误，则打印错误并退出
-		t.Fatal("Error sending request:", err)
-		return err
-	}
-	_, err = io.ReadAll(resp.Body)
-	if err != nil {
-		// 如果有错误，则打印错误并退出
-		t.Fatal("Error reading response body:", err)
-		return err
-	}
-	fmt.Printf("Status Code: %d\n", resp.StatusCode)
-	resp.Body.Close()
-	return err
-}
 
 func TestMain(m *testing.M) {
 	// call flag.Parse() here if TestMain uses flags
@@ -307,6 +34,7 @@ func TestConnectSyscall(t *testing.T) {
 			bpf.AttachSyscallConnectExit,
 		},
 		&connEventList,
+		nil,
 		nil,
 		nil,
 		agentStopper)
@@ -339,44 +67,6 @@ func TestConnectSyscall(t *testing.T) {
 
 }
 
-func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction, connEventList *[]bpf.AgentConnEvtT,
-	syscallEventList *[]bpf.SyscallEventData, connManagerInitHook func(*conn.ConnManager), agentStopper chan os.Signal) {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func(pid int) {
-		agent.SetLoadBpfProgram(func(objs bpf.AgentObjects) *list.List {
-			progs := list.New()
-			for _, each := range bpfAttachFunctions {
-				progs.PushBack(each(objs))
-			}
-			return progs
-		})
-		agent.SetCustomSyscallEventHook(func(evt *bpf.SyscallEventData) {
-			if syscallEventList != nil {
-				*syscallEventList = append(*syscallEventList, *evt)
-			}
-		})
-		agent.SetInitCompletedHook(func() {
-			wg.Done()
-		})
-		agent.SetCustomConnEventHook(func(evt *bpf.AgentConnEvtT) {
-			if connEventList != nil {
-				*connEventList = append(*connEventList, *evt)
-			}
-		})
-		if connManagerInitHook != nil {
-			agent.SetConnManagerInitHook(connManagerInitHook)
-		}
-		cmd.FilterPid = int64(pid)
-
-		agent.SetupAgent(agent.AgentOptions{
-			Stopper: agentStopper,
-		})
-	}(os.Getpid())
-
-	wg.Wait()
-}
-
 func TestCloseSyscall(t *testing.T) {
 	connEventList := make([]bpf.AgentConnEvtT, 0)
 	agentStopper := make(chan os.Signal, 1)
@@ -387,6 +77,7 @@ func TestCloseSyscall(t *testing.T) {
 			bpf.AttachSyscallCloseEntry,
 			bpf.AttachSyscallCloseExit},
 		&connEventList,
+		nil,
 		nil,
 		nil, agentStopper)
 	defer func() {
@@ -428,6 +119,7 @@ func TestAccept(t *testing.T) {
 			bpf.AttachSyscallAcceptExit,
 		},
 		&connEventList,
+		nil,
 		nil,
 		nil, agentStopper)
 	defer func() {
@@ -482,6 +174,7 @@ func TestRead(t *testing.T) {
 		},
 		&connEventList,
 		&syscallEventList,
+		nil,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
 		}, agentStopper)
@@ -510,14 +203,16 @@ func TestRead(t *testing.T) {
 	syscallEvent := syscallEvents[0]
 	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-		connIdDirect:          bpf.AgentTrafficDirectionTKIngress,
-		pid:                   uint64(os.Getpid()),
-		fd:                    uint32(conn.TgidFd),
-		funcName:              "syscall",
-		dataLen:               uint32(len(sendMsg)),
-		seq:                   1,
-		step:                  bpf.AgentStepTSYSCALL_IN,
-		tsAssertFunction:      func(u uint64) bool { return u > 0 },
+		KernDataEventAssertConditions: KernDataEventAssertConditions{
+			connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
+			pid:              uint64(os.Getpid()),
+			fd:               uint32(conn.TgidFd),
+			funcName:         "syscall",
+			dataLen:          uint32(len(sendMsg)),
+			seq:              1,
+			step:             bpf.AgentStepTSYSCALL_IN,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		},
 		bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMsg)) },
 		bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg },
 	})
@@ -539,6 +234,7 @@ func TestRecvFrom(t *testing.T) {
 		},
 		&connEventList,
 		&syscallEventList,
+		nil,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
 		}, agentStopper)
@@ -567,14 +263,16 @@ func TestRecvFrom(t *testing.T) {
 	syscallEvent := syscallEvents[0]
 	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-		connIdDirect:          bpf.AgentTrafficDirectionTKIngress,
-		pid:                   uint64(os.Getpid()),
-		fd:                    uint32(conn.TgidFd),
-		funcName:              "syscall",
-		dataLen:               uint32(len(sendMsg)),
-		seq:                   1,
-		step:                  bpf.AgentStepTSYSCALL_IN,
-		tsAssertFunction:      func(u uint64) bool { return u > 0 },
+		KernDataEventAssertConditions: KernDataEventAssertConditions{
+			connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
+			pid:              uint64(os.Getpid()),
+			fd:               uint32(conn.TgidFd),
+			funcName:         "syscall",
+			dataLen:          uint32(len(sendMsg)),
+			seq:              1,
+			step:             bpf.AgentStepTSYSCALL_IN,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		},
 		bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMsg)) },
 		bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg },
 	})
@@ -596,6 +294,7 @@ func TestReadv(t *testing.T) {
 		},
 		&connEventList,
 		&syscallEventList,
+		nil,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
 		}, agentStopper)
@@ -628,14 +327,16 @@ func TestReadv(t *testing.T) {
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-			connIdDirect:          bpf.AgentTrafficDirectionTKIngress,
-			pid:                   uint64(os.Getpid()),
-			fd:                    uint32(conn.TgidFd),
-			funcName:              "syscall",
-			dataLen:               uint32(readBufSizeSlice[index]),
-			seq:                   seq,
-			step:                  bpf.AgentStepTSYSCALL_IN,
-			tsAssertFunction:      func(u uint64) bool { return u > 0 },
+			KernDataEventAssertConditions: KernDataEventAssertConditions{
+				connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
+				pid:              uint64(os.Getpid()),
+				fd:               uint32(conn.TgidFd),
+				funcName:         "syscall",
+				dataLen:          uint32(readBufSizeSlice[index]),
+				seq:              seq,
+				step:             bpf.AgentStepTSYSCALL_IN,
+				tsAssertFunction: func(u uint64) bool { return u > 0 },
+			},
 			bufSizeAssertFunction: func(u uint32) bool { return u == uint32(readBufSizeSlice[index]) },
 			bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg[seq-1:int(seq)-1+readBufSizeSlice[index]] },
 		})
@@ -659,6 +360,7 @@ func TestRecvmsg(t *testing.T) {
 		},
 		&connEventList,
 		&syscallEventList,
+		nil,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
 		}, agentStopper)
@@ -691,14 +393,16 @@ func TestRecvmsg(t *testing.T) {
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-			connIdDirect:          bpf.AgentTrafficDirectionTKIngress,
-			pid:                   uint64(os.Getpid()),
-			fd:                    uint32(conn.TgidFd),
-			funcName:              "syscall",
-			dataLen:               uint32(readBufSizeSlice[index]),
-			seq:                   seq,
-			step:                  bpf.AgentStepTSYSCALL_IN,
-			tsAssertFunction:      func(u uint64) bool { return u > 0 },
+			KernDataEventAssertConditions: KernDataEventAssertConditions{
+				connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
+				pid:              uint64(os.Getpid()),
+				fd:               uint32(conn.TgidFd),
+				funcName:         "syscall",
+				dataLen:          uint32(readBufSizeSlice[index]),
+				seq:              seq,
+				step:             bpf.AgentStepTSYSCALL_IN,
+				tsAssertFunction: func(u uint64) bool { return u > 0 },
+			},
 			bufSizeAssertFunction: func(u uint32) bool { return u == uint32(readBufSizeSlice[index]) },
 			bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg[seq-1:int(seq)-1+readBufSizeSlice[index]] },
 		})
@@ -722,6 +426,7 @@ func TestWrite(t *testing.T) {
 		},
 		&connEventList,
 		&syscallEventList,
+		nil,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
 		}, agentStopper)
@@ -750,14 +455,16 @@ func TestWrite(t *testing.T) {
 	syscallEvent := syscallEvents[0]
 	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-		connIdDirect:          bpf.AgentTrafficDirectionTKEgress,
-		pid:                   uint64(os.Getpid()),
-		fd:                    uint32(conn.TgidFd),
-		funcName:              "syscall",
-		dataLen:               uint32(len(sendMsg)),
-		seq:                   1,
-		step:                  bpf.AgentStepTSYSCALL_OUT,
-		tsAssertFunction:      func(u uint64) bool { return u > 0 },
+		KernDataEventAssertConditions: KernDataEventAssertConditions{
+			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			pid:              uint64(os.Getpid()),
+			fd:               uint32(conn.TgidFd),
+			funcName:         "syscall",
+			dataLen:          uint32(len(sendMsg)),
+			seq:              1,
+			step:             bpf.AgentStepTSYSCALL_OUT,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		},
 		bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMsg)) },
 		bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg },
 	})
@@ -779,6 +486,7 @@ func TestSendto(t *testing.T) {
 		},
 		&connEventList,
 		&syscallEventList,
+		nil,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
 		}, agentStopper)
@@ -807,14 +515,16 @@ func TestSendto(t *testing.T) {
 	syscallEvent := syscallEvents[0]
 	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-		connIdDirect:          bpf.AgentTrafficDirectionTKEgress,
-		pid:                   uint64(os.Getpid()),
-		fd:                    uint32(conn.TgidFd),
-		funcName:              "syscall",
-		dataLen:               uint32(len(sendMsg)),
-		seq:                   1,
-		step:                  bpf.AgentStepTSYSCALL_OUT,
-		tsAssertFunction:      func(u uint64) bool { return u > 0 },
+		KernDataEventAssertConditions: KernDataEventAssertConditions{
+			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			pid:              uint64(os.Getpid()),
+			fd:               uint32(conn.TgidFd),
+			funcName:         "syscall",
+			dataLen:          uint32(len(sendMsg)),
+			seq:              1,
+			step:             bpf.AgentStepTSYSCALL_OUT,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		},
 		bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMsg)) },
 		bufAssertFunction:     func(b []byte) bool { return string(b) == sendMsg },
 	})
@@ -836,6 +546,7 @@ func TestWritev(t *testing.T) {
 		},
 		&connEventList,
 		&syscallEventList,
+		nil,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
 		}, agentStopper)
@@ -866,14 +577,16 @@ func TestWritev(t *testing.T) {
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-			connIdDirect:          bpf.AgentTrafficDirectionTKEgress,
-			pid:                   uint64(os.Getpid()),
-			fd:                    uint32(conn.TgidFd),
-			funcName:              "syscall",
-			dataLen:               uint32(len(sendMessages[index])),
-			seq:                   seq,
-			step:                  bpf.AgentStepTSYSCALL_OUT,
-			tsAssertFunction:      func(u uint64) bool { return u > 0 },
+			KernDataEventAssertConditions: KernDataEventAssertConditions{
+				connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+				pid:              uint64(os.Getpid()),
+				fd:               uint32(conn.TgidFd),
+				funcName:         "syscall",
+				dataLen:          uint32(len(sendMessages[index])),
+				seq:              seq,
+				step:             bpf.AgentStepTSYSCALL_OUT,
+				tsAssertFunction: func(u uint64) bool { return u > 0 },
+			},
 			bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMessages[index])) },
 			bufAssertFunction:     func(b []byte) bool { return string(b) == sendMessages[index] },
 		})
@@ -897,6 +610,7 @@ func TestSendMsg(t *testing.T) {
 		},
 		&connEventList,
 		&syscallEventList,
+		nil,
 		func(cm *conn.ConnManager) {
 			*connManager = *cm
 		}, agentStopper)
@@ -927,14 +641,15 @@ func TestSendMsg(t *testing.T) {
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-			connIdDirect:          bpf.AgentTrafficDirectionTKEgress,
-			pid:                   uint64(os.Getpid()),
-			fd:                    uint32(conn.TgidFd),
-			funcName:              "syscall",
-			dataLen:               uint32(len(sendMessages[index])),
-			seq:                   seq,
-			step:                  bpf.AgentStepTSYSCALL_OUT,
-			tsAssertFunction:      func(u uint64) bool { return u > 0 },
+			KernDataEventAssertConditions: KernDataEventAssertConditions{connIdDirect: bpf.AgentTrafficDirectionTKEgress,
+				pid:              uint64(os.Getpid()),
+				fd:               uint32(conn.TgidFd),
+				funcName:         "syscall",
+				dataLen:          uint32(len(sendMessages[index])),
+				seq:              seq,
+				step:             bpf.AgentStepTSYSCALL_OUT,
+				tsAssertFunction: func(u uint64) bool { return u > 0 },
+			},
 			bufSizeAssertFunction: func(u uint32) bool { return u == uint32(len(sendMessages[index])) },
 			bufAssertFunction:     func(b []byte) bool { return string(b) == sendMessages[index] },
 		})
@@ -942,193 +657,61 @@ func TestSendMsg(t *testing.T) {
 	}
 }
 
-func StartEchoTcpServerAndWait() {
-	startCompleted := make(chan net.Listener)
-	go StartEchoTcpServer(startCompleted)
-	listener := <-startCompleted
-	addr := listener.Addr().String()
-	echoTcpServerPort, _ = strconv.Atoi(addr[strings.LastIndex(addr, ":")+1:])
-	fmt.Println("Start Echo Server Completed! Listening Port is: ", echoTcpServerPort)
-}
+func TestIpXmit(t *testing.T) {
+	StartEchoTcpServerAndWait()
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	kernEventList := make([]bpf.AgentKernEvt, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
+	StartAgent(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallWriteEntry,
+			bpf.AttachSyscallWriteExit,
+			bpf.AttachKProbeSecuritySocketSendmsgEntry,
+			bpf.AttachKProbeIpQueueXmitEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		&kernEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper)
 
-type WriteSyscallType int
-type ReadSyscallType int
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+	ip := "127.0.0.1"
+	sendMsg := "GET TestIpXmit\n"
+	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
+		t:            t,
+		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
+		message:      sendMsg,
+		readResponse: true,
+		writeSyscall: Write,
+		readSyscall:  Read,
+	})
+	time.Sleep(500 * time.Millisecond)
+	intersetedKernEvents := findInterestedKernEvents(t, kernEventList, FindInterestedKernEventOptions{
+		connEventList:          connEventList,
+		findDataLenGtZeroEvent: true,
+		findByDirect:           true,
+		direct:                 bpf.AgentTrafficDirectionTKEgress,
+	})
+	assert.Equal(t, 1, len(intersetedKernEvents))
+	kernEvent := intersetedKernEvents[0]
+	conn := connManager.FindConnection4(kernEvent.ConnIdS.TgidFd)
+	AssertKernEvent(t, &kernEvent, KernDataEventAssertConditions{
 
-const (
-	Write WriteSyscallType = iota
-	SentTo
-	Writev
-	Sendmsg
-)
-
-const (
-	Read ReadSyscallType = iota
-	RecvFrom
-	Readv
-	Recvmsg
-)
-
-type WriteToEchoServerOptions struct {
-	t                     *testing.T
-	server                string
-	message               string
-	messageSlice          []string
-	readResponse          bool
-	writeSyscall          WriteSyscallType
-	readSyscall           ReadSyscallType
-	readBufSizeSlice      []int
-	useNonBlockingSoscket bool
-}
-
-func WriteToEchoTcpServerAndReadResponse(options WriteToEchoServerOptions) {
-	connection, fd, _ := getConnectionAndFdToRemoteServer(options.server)
-	defer connection.Close()
-	if options.useNonBlockingSoscket {
-		syscall.SetNonblock(int(fd), true)
-	} else {
-		syscall.SetNonblock(int(fd), false)
-	}
-	switch options.writeSyscall {
-	case Write:
-		syscall.Write(int(fd), []byte(options.message))
-	case SentTo:
-		syscall.Sendto(int(fd), []byte(options.message), 0, nil)
-	case Writev:
-		var iovecs [][]byte = make([][]byte, 0)
-		for _, each := range options.messageSlice {
-			iovecs = append(iovecs, []byte(each))
-		}
-		unix.Writev(int(fd), iovecs)
-	case Sendmsg:
-		var iovecs [][]byte = make([][]byte, 0)
-		for _, each := range options.messageSlice {
-			iovecs = append(iovecs, []byte(each))
-		}
-		unix.SendmsgBuffers(int(fd), iovecs, nil, nil, 0)
-
-	default:
-		options.t.Fatal("write syscall invalid")
-	}
-	if options.readResponse {
-		readBytes := make([]byte, 1000)
-		switch options.readSyscall {
-		case Read:
-			for {
-				_, err := syscall.Read(int(fd), readBytes)
-				if err == nil {
-					break
-				} else if !errors.Is(err, syscall.EAGAIN) {
-					fmt.Printf("Read from socket failed: %v\n", err)
-				}
-			}
-
-		case RecvFrom:
-			for {
-				_, _, err := syscall.Recvfrom(int(fd), readBytes, 0)
-				if err == nil {
-					break
-				} else if !errors.Is(err, syscall.EAGAIN) {
-					fmt.Printf("RecvFrom from socket failed: %v\n", err)
-				}
-			}
-		case Readv:
-			var iovecs [][]byte = make([][]byte, 0)
-			for _, each := range options.readBufSizeSlice {
-				iovecs = append(iovecs, make([]byte, each))
-			}
-			for {
-				_, err := unix.Readv(int(fd), iovecs)
-				if err == nil {
-					break
-				} else if !errors.Is(err, syscall.EAGAIN) {
-					fmt.Printf("Readv from socket failed: %v\n", err)
-				}
-			}
-		case Recvmsg:
-			var iovecs [][]byte = make([][]byte, 0)
-			for _, each := range options.readBufSizeSlice {
-				iovecs = append(iovecs, make([]byte, each))
-			}
-			for {
-				_, _, _, _, err := unix.RecvmsgBuffers(int(fd), iovecs, nil, 0)
-				if err == nil {
-					break
-				} else if !errors.Is(err, syscall.EAGAIN) {
-					fmt.Printf("Readv from socket failed: %v\n", err)
-				}
-			}
-		}
-		fmt.Printf("Read  from conn: %s\n", string(readBytes))
-	}
-}
-func getConnectionAndFdToRemoteServer(server string) (net.Conn, int64, error) {
-	connection, err := net.Dial("tcp", server)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "无法连接到服务器 %s: %v\n", server, err)
-		return nil, 0, err
-	}
-	tcpConn := connection.(*net.TCPConn)
-	tcpConnV := reflect.ValueOf(*tcpConn)
-	fd := tcpConnV.FieldByName("conn").FieldByName("fd").Elem().FieldByName("pfd").FieldByName("Sysfd").Int()
-	return connection, fd, nil
-}
-
-var echoTcpServerPort int = 10266
-
-func StartEchoTcpServer(startCompleted chan net.Listener) {
-
-	// obtain the port and prefix via program arguments
-	port := ":0"
-	prefix := ""
-
-	// create a tcp listener on the given port
-	listener, err := net.Listen("tcp4", port)
-	if err != nil {
-		fmt.Println("failed to create listener, err:", err)
-		os.Exit(1)
-	}
-	defer listener.Close()
-	fmt.Printf("listening on %s, prefix: %s\n", listener.Addr(), prefix)
-	startCompleted <- listener
-	// listen for new connections
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Println("failed to accept connection, err:", err)
-			continue
-		}
-
-		// pass an accepted connection to a handler goroutine
-		go handleConnection(conn, prefix)
-	}
-}
-func handleConnection(conn net.Conn, prefix string) {
-	defer conn.Close()
-	reader := bufio.NewReader(conn)
-	for {
-		// read client request data
-		bytes, err := reader.ReadBytes(byte('\n'))
-		if err != nil {
-			if err != io.EOF {
-				fmt.Println("failed to read data, err:", err)
-			}
-			return
-		}
-		fmt.Printf("request: %s", bytes)
-
-		// prepend prefix and send as response
-		line := fmt.Sprintf("%s%s", prefix, bytes)
-		fmt.Printf("response: %s", line)
-		conn.Write([]byte(line))
-	}
-}
-
-type MySignal struct {
-}
-
-func (MySignal) String() string {
-	return "MySignal"
-}
-func (MySignal) Signal() {
-
+		connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+		pid:              uint64(os.Getpid()),
+		fd:               uint32(conn.TgidFd),
+		funcName:         "ip_queue_xmit",
+		dataLen:          uint32(len(sendMsg)),
+		seq:              1,
+		step:             bpf.AgentStepTIP_OUT,
+		tsAssertFunction: func(u uint64) bool { return u > 0 },
+	})
 }

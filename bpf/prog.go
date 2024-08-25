@@ -135,6 +135,28 @@ func AttachRawTracepointTcpDestroySockEntry(objs AgentObjects) link.Link {
 	return l
 }
 
+func AttachKProbeIpQueueXmitEntry(objs AgentObjects) link.Link {
+	return kprobe("ip_queue_xmit", objs.AgentPrograms.IpQueueXmit)
+}
+func AttachKProbeDevQueueXmitEntry(objs AgentObjects) link.Link {
+	return kprobe("dev_queue_xmit", objs.AgentPrograms.DevQueueXmit)
+}
+func AttachKProbeDevHardStartXmitEntry(objs AgentObjects) link.Link {
+	return kprobe("dev_hard_start_xmit", objs.AgentPrograms.DevHardStartXmit)
+}
+func AttachKProbIpRcvCoreEntry(objs AgentObjects) link.Link {
+	l, err := kprobe2("ip_rcv_core", objs.AgentPrograms.IpRcvCore)
+	if err != nil {
+		l = kprobe("ip_rcv_core.isra.0", objs.AgentPrograms.IpRcvCore)
+	}
+	return l
+}
+func AttachKProbeTcpV4DoRcvEntry(objs AgentObjects) link.Link {
+	return kprobe("tcp_v4_do_rcv", objs.AgentPrograms.TcpV4DoRcv)
+}
+func AttachKProbeSkbCopyDatagramIterEntry(objs AgentObjects) link.Link {
+	return kprobe("__skb_datagram_iter", objs.AgentPrograms.SkbCopyDatagramIter)
+}
 func kprobe(func_name string, prog *ebpf.Program) link.Link {
 	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
 		log.Fatalf("kprobe failed: %s, %s", func_name, err)
@@ -159,5 +181,13 @@ func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
 		return nil
 	} else {
 		return link
+	}
+}
+func kprobe2(func_name string, prog *ebpf.Program) (link.Link, error) {
+	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
+		log.Fatalf("kprobe2 failed: %s, %s", func_name, err)
+		return nil, err
+	} else {
+		return link, nil
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -26,47 +27,74 @@ import (
 	"github.com/spf13/viper"
 )
 
+type LoadBpfProgramFunction func(objs bpf.AgentObjects) *list.List
+type SyscallEventHook func(evt *bpf.SyscallEventData)
+type ConnEventHook func(evt *bpf.AgentConnEvtT)
+type KernEventHook func(evt *bpf.AgentKernEvt)
+type InitCompletedHook func()
+type ConnManagerInitHook func(*conn.ConnManager)
+
 var log *logrus.Logger = common.Log
-var processorsNum int = 4
-var loadBpfProgram func(objs bpf.AgentObjects) *list.List = attachBpfProgs
-var customSyscallEventHook func(evt *bpf.SyscallEventData) = func(evt *bpf.SyscallEventData) {}
-var customConnEventHook func(evt *bpf.AgentConnEvtT) = func(evt *bpf.AgentConnEvtT) {}
-var initCompletedHook func() = func() {}
-var connManagerInitHook func(*conn.ConnManager) = func(cm *conn.ConnManager) {}
 
-func SetLoadBpfProgram(f func(objs bpf.AgentObjects) *list.List) {
-	loadBpfProgram = f
-}
+// var processorsNum int = 4
+// var loadBpfProgram LoadBpfProgramFunction = attachBpfProgs
+// var customSyscallEventHook CustomSyscallEventHook = func(evt *bpf.SyscallEventData) {}
+// var customConnEventHook CustomConnEventHook = func(evt *bpf.AgentConnEvtT) {}
+// var initCompletedHook func() = func() {}
+// var connManagerInitHook func(*conn.ConnManager) = func(cm *conn.ConnManager) {}
 
-func SetCustomSyscallEventHook(f func(evt *bpf.SyscallEventData)) {
-	customSyscallEventHook = f
-}
+// func SetLoadBpfProgram(f func(objs bpf.AgentObjects) *list.List) {
+// 	loadBpfProgram = f
+// }
 
-func SetCustomConnEventHook(f func(evt *bpf.AgentConnEvtT)) {
-	customConnEventHook = f
-}
+// func SetCustomSyscallEventHook(f func(evt *bpf.SyscallEventData)) {
+// 	customSyscallEventHook = f
+// }
 
-func SetInitCompletedHook(f func()) {
-	initCompletedHook = f
-}
+// func SetCustomConnEventHook(f func(evt *bpf.AgentConnEvtT)) {
+// 	customConnEventHook = f
+// }
 
-func SetConnManagerInitHook(f func(*conn.ConnManager)) {
-	connManagerInitHook = f
-}
+// func SetInitCompletedHook(f func()) {
+// 	initCompletedHook = f
+// }
+
+// func SetConnManagerInitHook(f func(*conn.ConnManager)) {
+// 	connManagerInitHook = f
+// }
 
 type AgentOptions struct {
-	Stopper chan os.Signal
+	Stopper                chan os.Signal
+	CustomSyscallEventHook SyscallEventHook
+	CustomConnEventHook    ConnEventHook
+	CustomKernEventHook    KernEventHook
+	InitCompletedHook      InitCompletedHook
+	ConnManagerInitHook    ConnManagerInitHook
+	LoadBpfProgramFunction LoadBpfProgramFunction
+	ProcessorsNum          int
+}
+
+func validateAndRepairOptions(options AgentOptions) AgentOptions {
+	var newOptions = options
+	if newOptions.Stopper == nil {
+		newOptions.Stopper = make(chan os.Signal)
+	}
+	if newOptions.ProcessorsNum == 0 {
+		newOptions.ProcessorsNum = runtime.NumCPU()
+	}
+	return newOptions
 }
 
 func SetupAgent(options AgentOptions) {
-	InitReporter()
-
+	options = validateAndRepairOptions(options)
 	common.LaunchEpochTime = GetMachineStartTimeNano()
 	stopper := options.Stopper
 	connManager := conn.InitConnManager()
-	connManagerInitHook(connManager)
+	if options.ConnManagerInitHook != nil {
+		options.ConnManagerInitHook(connManager)
+	}
 	statRecorder := stat.InitStatRecorder()
-	pm := conn.InitProcessorManager(processorsNum, connManager)
+	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c)
 	}
@@ -109,8 +137,12 @@ func SetupAgent(options AgentOptions) {
 	if !validateResult {
 		return
 	}
-
-	links := loadBpfProgram(objs)
+	var links *list.List
+	if options.LoadBpfProgramFunction != nil {
+		links = options.LoadBpfProgramFunction(objs)
+	} else {
+		links = attachBpfProgs(objs)
+	}
 
 	defer func() {
 		for e := links.Front(); e != nil; e = e.Next() {
@@ -183,7 +215,7 @@ func SetupAgent(options AgentOptions) {
 				continue
 			}
 
-			if err := handleKernEvt(record.RawSample, pm); err != nil {
+			if err := handleKernEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook); err != nil {
 				log.Infof("[dataReader] handleKernEvt err: %s\n", err)
 				continue
 			}
@@ -202,7 +234,7 @@ func SetupAgent(options AgentOptions) {
 				log.Infof("[syscallDataReader] reading from reader: %s\n", err)
 				continue
 			}
-			if err := handleSyscallEvt(record.RawSample, pm); err != nil {
+			if err := handleSyscallEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook); err != nil {
 				log.Infof("[syscallDataReader] handleSyscallEvt err: %s\n", err)
 				continue
 			}
@@ -220,15 +252,15 @@ func SetupAgent(options AgentOptions) {
 				log.Infof("[connEvtReader] reading from reader: %s\n", err)
 				continue
 			}
-			if err := handleConnEvt(record.RawSample, pm); err != nil {
+			if err := handleConnEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook); err != nil {
 				log.Infof("[connEvtReader] handleKernEvt err: %s\n", err)
 				continue
 			}
 		}
 	}()
 
-	if initCompletedHook != nil {
-		initCompletedHook()
+	if options.InitCompletedHook != nil {
+		options.InitCompletedHook()
 	}
 	for !stop {
 		time.Sleep(time.Second * 1)
@@ -313,7 +345,7 @@ func setAndValidateParameters(objs bpf.AgentObjects) bool {
 	return true
 }
 
-func handleConnEvt(record []byte, pm *conn.ProcessorManager) error {
+func handleConnEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customConnEventHook ConnEventHook) error {
 	var event bpf.AgentConnEvtT
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event)
 	if err != nil {
@@ -328,7 +360,7 @@ func handleConnEvt(record []byte, pm *conn.ProcessorManager) error {
 	p.AddConnEvent(&event)
 	return nil
 }
-func handleSyscallEvt(record []byte, pm *conn.ProcessorManager) error {
+func handleSyscallEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customSyscallEventHook SyscallEventHook) error {
 	// 首先看这个连接上有没有堆积的请求，如果有继续堆积
 	// 如果没有作为新的请求
 	event := new(bpf.SyscallEventData)
@@ -350,7 +382,7 @@ func handleSyscallEvt(record []byte, pm *conn.ProcessorManager) error {
 	p.AddSyscallEvent(event)
 	return nil
 }
-func handleKernEvt(record []byte, pm *conn.ProcessorManager) error {
+func handleKernEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customKernEventHook KernEventHook) error {
 	var event bpf.AgentKernEvt
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event)
 	if err != nil {
@@ -358,11 +390,15 @@ func handleKernEvt(record []byte, pm *conn.ProcessorManager) error {
 	}
 	tgidFd := event.ConnIdS.TgidFd
 	p := pm.GetProcessor(int(tgidFd) % processorsNum)
+	if customKernEventHook != nil {
+		customKernEventHook(&event)
+	}
 	p.AddKernEvent(&event)
 	return nil
 }
 
 func attachBpfProgs(objs bpf.AgentObjects) *list.List {
+	var err error
 	linkList := list.New()
 
 	linkList.PushBack(bpf.AttachSyscallAcceptEntry(objs))
@@ -404,23 +440,13 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry(objs))
 
 	linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(objs))
-	var err error
-	l := kprobe("ip_queue_xmit", objs.AgentPrograms.IpQueueXmit)
-	linkList.PushBack(l)
-	l = kprobe("dev_queue_xmit", objs.AgentPrograms.DevQueueXmit)
-	linkList.PushBack(l)
-	l = kprobe("dev_hard_start_xmit", objs.AgentPrograms.DevHardStartXmit)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachKProbeIpQueueXmitEntry(objs))
+	linkList.PushBack(bpf.AttachKProbeDevQueueXmitEntry(objs))
+	linkList.PushBack(bpf.AttachKProbeDevHardStartXmitEntry(objs))
 
-	if l, err = kprobe2("ip_rcv_core", objs.AgentPrograms.IpRcvCore); err != nil {
-		l = kprobe("ip_rcv_core.isra.0", objs.AgentPrograms.IpRcvCore)
-	}
-	linkList.PushBack(l)
-
-	l = kprobe("tcp_v4_do_rcv", objs.AgentPrograms.TcpV4DoRcv)
-	linkList.PushBack(l)
-	l = kprobe("__skb_datagram_iter", objs.AgentPrograms.SkbCopyDatagramIter)
-	linkList.PushBack(l)
+	linkList.PushBack(bpf.AttachKProbIpRcvCoreEntry(objs))
+	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(objs))
+	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(objs))
 
 	ifname := "eth0" // TODO
 	iface, err := net.InterfaceByName(ifname)
@@ -428,7 +454,7 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 		log.Fatalf("Getting interface %s: %s", ifname, err)
 	}
 
-	l, err = link.AttachXDP(link.XDPOptions{
+	l, err := link.AttachXDP(link.XDPOptions{
 		Program:   objs.AgentPrograms.XdpProxy,
 		Interface: iface.Index,
 		Flags:     link.XDPDriverMode,
