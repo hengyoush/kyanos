@@ -1,7 +1,7 @@
 package common
 
 import (
-	"eapm-ebpf/bpf"
+	"kyanos/bpf"
 
 	"github.com/jefurry/logrus"
 )

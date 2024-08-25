@@ -1,6 +1,6 @@
 package main
 
-import "eapm-ebpf/cmd"
+import "kyanos/cmd"
 
 func main() {
 	cmd.Execute()

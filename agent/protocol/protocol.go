@@ -1,9 +1,9 @@
 package protocol
 
 import (
-	"eapm-ebpf/bpf"
-	"eapm-ebpf/common"
 	"fmt"
+	"kyanos/bpf"
+	"kyanos/common"
 
 	"github.com/jefurry/logrus"
 )

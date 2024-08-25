@@ -1,10 +1,10 @@
 package agent_test
 
 import (
-	"eapm-ebpf/agent/conn"
-	"eapm-ebpf/bpf"
-	"eapm-ebpf/common"
 	"fmt"
+	"kyanos/agent/conn"
+	"kyanos/bpf"
+	"kyanos/common"
 	"os"
 	"testing"
 	"time"

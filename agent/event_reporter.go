@@ -2,11 +2,11 @@ package agent
 
 import (
 	"bytes"
-	"eapm-ebpf/agent/conn"
-	"eapm-ebpf/bpf"
-	"eapm-ebpf/common"
 	"encoding/json"
 	"io"
+	"kyanos/agent/conn"
+	"kyanos/bpf"
+	"kyanos/common"
 	"net/http"
 
 	"github.com/spf13/viper"

@@ -1,8 +1,8 @@
 package filter
 
 import (
-	"eapm-ebpf/bpf"
-	"eapm-ebpf/common"
+	"kyanos/bpf"
+	"kyanos/common"
 
 	"github.com/jefurry/logrus"
 )

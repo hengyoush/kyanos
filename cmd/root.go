@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"eapm-ebpf/agent"
-	"eapm-ebpf/common"
 	"fmt"
+	"kyanos/agent"
+	"kyanos/common"
 	"os"
 	"time"
 
@@ -16,9 +16,8 @@ import (
 var logger *logrus.Logger = common.Log
 
 var rootCmd = &cobra.Command{
-	Use:   "eapm-ebpf",
-	Short: "eapm-ebpf is an eBPF agent of eAPM",
-	Long:  `An easy to use extension of famous apm system, gain the ability of inspect network latency`,
+	Use:   "kyanos",
+	Short: "Kyanos is a command line tool used to analyze network request issues.",
 	CompletionOptions: cobra.CompletionOptions{
 		DisableDefaultCmd: true,
 	},
@@ -71,7 +70,7 @@ func initLog() {
 	logdir := viper.GetString(common.LogDirVarName)
 	if logdir != "" {
 		hook, err := rotatelog.NewHook(
-			logdir+"/eapm-ebpf.log.%Y%m%d",
+			logdir+"/kyanos.log.%Y%m%d",
 			rotatelog.WithMaxAge(time.Hour*24),
 			rotatelog.WithRotationTime(time.Hour),
 		)

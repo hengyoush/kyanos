@@ -18,7 +18,7 @@ ARCH ?= $(shell uname -m | sed 's/x86_64/x86/' \
 
 CLANG_BPF_SYS_INCLUDES ?= $(shell $(CLANG) -v -E - </dev/null 2>&1 \
 	| sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }')
-APPS = eapm-ebpf
+APPS = kyanos
 CFLAGS := -O2 -Wall 
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
@@ -43,7 +43,7 @@ all: $(APPS)
 
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(APPS) eapm-ebpf eapm-ebpf.log
+	$(Q)rm -rf $(OUTPUT) $(APPS) kyanos kyanos.log
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)
@@ -64,7 +64,7 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 
 GO_FILES := $(shell find $(SRC_DIR) -type f -name '*.go' | sort)  
 
-eapm-ebpf: $(LIBBPF_OBJ) $(GO_FILES) pktlatency.bpf.c pktlatency.h | $(OUTPUT)
+kyanos: $(LIBBPF_OBJ) $(GO_FILES) pktlatency.bpf.c pktlatency.h | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	./build.sh
 # delete failed targets

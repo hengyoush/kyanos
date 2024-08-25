@@ -1,9 +1,9 @@
 package stat
 
 import (
-	"eapm-ebpf/agent/conn"
-	"eapm-ebpf/agent/protocol"
-	"eapm-ebpf/common"
+	"kyanos/agent/conn"
+	"kyanos/agent/protocol"
+	"kyanos/common"
 
 	"github.com/jefurry/logrus"
 )

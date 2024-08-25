@@ -1,12 +1,12 @@
 package conn
 
 import (
-	"eapm-ebpf/agent/protocol"
-	"eapm-ebpf/agent/protocol/filter"
-	"eapm-ebpf/agent/protocol/parser"
-	"eapm-ebpf/bpf"
-	"eapm-ebpf/common"
 	"fmt"
+	"kyanos/agent/protocol"
+	"kyanos/agent/protocol/filter"
+	"kyanos/agent/protocol/parser"
+	"kyanos/bpf"
+	"kyanos/common"
 	"sync"
 )
 

@@ -8,10 +8,10 @@ import (
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print version number of eAPM eBPF Agent",
-	Long:  `Print version number of eAPM eBPF Agent`,
+	Short: "Print version number of kyanos",
+	Long:  `Print version number of kyanos`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("eAPM eBPF Agent version v1.0.0 -- Release")
+		fmt.Println("kyanos version v1.0.0 -- Release")
 	},
 }
 

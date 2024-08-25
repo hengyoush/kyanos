@@ -3,8 +3,8 @@ package parser
 import (
 	"bufio"
 	"bytes"
-	"eapm-ebpf/agent/protocol"
 	"errors"
+	"kyanos/agent/protocol"
 	"net/http"
 )
 

@@ -1,4 +1,4 @@
-module eapm-ebpf
+module kyanos
 
 go 1.21.0
 

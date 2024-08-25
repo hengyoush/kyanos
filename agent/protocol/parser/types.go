@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"eapm-ebpf/agent/protocol"
-	"eapm-ebpf/bpf"
-	"eapm-ebpf/common"
+	"kyanos/agent/protocol"
+	"kyanos/bpf"
+	"kyanos/common"
 
 	"github.com/jefurry/logrus"
 )

@@ -1,7 +1,7 @@
 package filter
 
 import (
-	"eapm-ebpf/bpf"
+	"kyanos/bpf"
 	"net/http"
 	"net/url"
 )

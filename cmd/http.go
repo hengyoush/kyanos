@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"eapm-ebpf/agent"
-	"eapm-ebpf/agent/protocol/filter"
+	"kyanos/agent"
+	"kyanos/agent/protocol/filter"
 
 	"github.com/spf13/cobra"
 )

@@ -3,14 +3,14 @@ package agent
 import (
 	"bytes"
 	"container/list"
-	"eapm-ebpf/agent/conn"
-	"eapm-ebpf/agent/protocol"
-	"eapm-ebpf/agent/protocol/filter"
-	"eapm-ebpf/agent/stat"
-	"eapm-ebpf/bpf"
-	"eapm-ebpf/common"
 	"encoding/binary"
 	"errors"
+	"kyanos/agent/conn"
+	"kyanos/agent/protocol"
+	"kyanos/agent/protocol/filter"
+	"kyanos/agent/stat"
+	"kyanos/bpf"
+	"kyanos/common"
 	"net"
 	"os"
 	"os/signal"
@@ -243,7 +243,7 @@ func SetupAgent(options AgentOptions) {
 	for !stop {
 		time.Sleep(time.Second * 1)
 	}
-	log.Infoln("Agent Stopped")
+	log.Infoln("Kyanos Stopped")
 	return
 }
 

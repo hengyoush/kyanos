@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"eapm-ebpf/agent"
-	"eapm-ebpf/common"
+	"kyanos/agent"
+	"kyanos/common"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/viper"
@@ -11,12 +11,12 @@ import (
 func startAgent(options agent.AgentOptions) {
 
 	initLog()
-	logger.Println("run eAPM eBPF Agent ...")
+	logger.Println("running kyanos ...")
 	if viper.GetBool(common.DaemonVarName) {
 		cntxt := &daemon.Context{
-			PidFileName: "./eapm-ebpf.pid",
+			PidFileName: "./kyanos.pid",
 			PidFilePerm: 0644,
-			LogFileName: "./eapm-ebpf.log",
+			LogFileName: "./kyanos.log",
 			LogFilePerm: 0640,
 			WorkDir:     "./",
 			// Umask:       027,
@@ -27,12 +27,12 @@ func startAgent(options agent.AgentOptions) {
 			logger.Fatal("Unable to run: ", err)
 		}
 		if d != nil {
-			logger.Println("eAPM eBPF agent started!")
+			logger.Println("kyanos started!")
 			return
 		}
 		defer cntxt.Release()
 		logger.Println("----------------------")
-		logger.Println("eAPM eBPF agent started!")
+		logger.Println("kyanos started!")
 		agent.SetupAgent(options)
 	} else {
 		initLog()
