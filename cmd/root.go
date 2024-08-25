@@ -19,6 +19,9 @@ var rootCmd = &cobra.Command{
 	Use:   "eapm-ebpf",
 	Short: "eapm-ebpf is an eBPF agent of eAPM",
 	Long:  `An easy to use extension of famous apm system, gain the ability of inspect network latency`,
+	CompletionOptions: cobra.CompletionOptions{
+		DisableDefaultCmd: true,
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		startAgent(agent.AgentOptions{})
 	},
