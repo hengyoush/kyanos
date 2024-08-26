@@ -26,7 +26,8 @@ var watchCmd = &cobra.Command{
 }
 
 func init() {
-	watchCmd.Flags().BoolP("list", "l", false, "false | true")
+	watchCmd.Flags().BoolP("list", "l", false, "--list # list all support protocols")
+	watchCmd.PersistentFlags().Float64("latency", 0, "--latency 100 # millseconds")
 	watchCmd.Flags().SortFlags = false
 	watchCmd.PersistentFlags().SortFlags = false
 	rootCmd.AddCommand(watchCmd)

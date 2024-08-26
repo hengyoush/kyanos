@@ -46,6 +46,7 @@ type AgentOptions struct {
 	LoadBpfProgramFunction LoadBpfProgramFunction
 	ProcessorsNum          int
 	MessageFilter          filter.MessageFilter
+	LatencyFilter          filter.LatencyFilter
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -71,7 +72,7 @@ func SetupAgent(options AgentOptions) {
 		options.ConnManagerInitHook(connManager)
 	}
 	statRecorder := stat.InitStatRecorder()
-	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter)
+	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c)
 	}

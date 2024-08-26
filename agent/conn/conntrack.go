@@ -36,6 +36,7 @@ type Connection4 struct {
 	CurResp           *protocol.BaseProtocolMessage
 	TCPHandshakeStatus
 	MessageFilter filter.MessageFilter
+	filter.LatencyFilter
 }
 
 type ConnStatus uint8
@@ -93,8 +94,8 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 	var needSubmit bool
 
 	needSubmit = c.MessageFilter.FilterByProtocol(c.Protocol)
-	parser := parser.GetParserByProtocol(c.Protocol)
-	if parser != nil {
+	needSubmit = needSubmit && c.LatencyFilter.Filter(float64(record.Duration)/1000000)
+	if parser := parser.GetParserByProtocol(c.Protocol); needSubmit && parser != nil {
 		var parsedRequest, parsedResponse any
 		if c.MessageFilter.FilterByRequest() {
 			parsedRequest, err = parser.Parse(record.Request)
@@ -118,7 +119,7 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 
 	} else {
 		needSubmit = false
-		log.Warnf("%s no protocol parser found!\n", c.ToString())
+		// log.Warnf("%s no protocol parser found!\n", c.ToString())
 	}
 	if needSubmit {
 		RecordFunc(record, c)

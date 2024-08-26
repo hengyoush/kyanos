@@ -24,14 +24,15 @@ type ProcessorManager struct {
 	cancel      context.CancelFunc
 }
 
-func InitProcessorManager(n int, connManager *ConnManager, filter filter.MessageFilter) *ProcessorManager {
+func InitProcessorManager(n int, connManager *ConnManager, filter filter.MessageFilter,
+	latencyFilter filter.LatencyFilter) *ProcessorManager {
 	pm := new(ProcessorManager)
 	pm.processors = make([]*Processor, n)
 	pm.wg = new(sync.WaitGroup)
 	pm.ctx, pm.cancel = context.WithCancel(context.Background())
 	pm.connManager = connManager
 	for i := 0; i < n; i++ {
-		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter)
+		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter)
 		go pm.processors[i].run()
 		pm.wg.Add(1)
 	}
@@ -61,9 +62,11 @@ type Processor struct {
 	kernEvents    chan *bpf.AgentKernEvt
 	name          string
 	messageFilter filter.MessageFilter
+	latencyFilter filter.LatencyFilter
 }
 
-func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter filter.MessageFilter) *Processor {
+func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter filter.MessageFilter,
+	latencyFilter filter.LatencyFilter) *Processor {
 	p := new(Processor)
 	p.wg = wg
 	p.ctx = ctx
@@ -73,6 +76,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.kernEvents = make(chan *bpf.AgentKernEvt)
 	p.name = name
 	p.messageFilter = filter
+	p.latencyFilter = latencyFilter
 	return p
 }
 
@@ -110,6 +114,7 @@ func (p *Processor) run() {
 				CurResp:    protocol.InitProtocolMessage(false, event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleServer),
 
 				MessageFilter: p.messageFilter,
+				LatencyFilter: p.latencyFilter,
 			}
 			// remove this TODO
 			// if conn.LocalPort != 16660 {
