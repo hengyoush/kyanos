@@ -2,6 +2,7 @@ package bpf
 
 import (
 	"log"
+	"net"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -157,6 +158,25 @@ func AttachKProbeTcpV4DoRcvEntry(objs AgentObjects) link.Link {
 func AttachKProbeSkbCopyDatagramIterEntry(objs AgentObjects) link.Link {
 	return kprobe("__skb_datagram_iter", objs.AgentPrograms.SkbCopyDatagramIter)
 }
+
+func AttachXdp(objs AgentObjects) link.Link {
+	ifname := "eth0"
+	iface, err := net.InterfaceByName(ifname)
+	if err != nil {
+		log.Fatalf("Getting interface %s: %s", ifname, err)
+	}
+
+	l, err := link.AttachXDP(link.XDPOptions{
+		Program:   objs.AgentPrograms.XdpProxy,
+		Interface: iface.Index,
+		Flags:     link.XDPDriverMode,
+	})
+	if err != nil {
+		log.Fatal("Attaching XDP:", err)
+	}
+	return l
+}
+
 func kprobe(func_name string, prog *ebpf.Program) link.Link {
 	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
 		log.Fatalf("kprobe failed: %s, %s", func_name, err)

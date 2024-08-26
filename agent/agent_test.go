@@ -42,7 +42,7 @@ func TestConnectSyscall(t *testing.T) {
 		agentStopper <- MySignal{}
 	}()
 	fmt.Println("Start Send Http Request")
-	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true})
+	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true, targetUrl: "http://www.baidu.com"})
 
 	time.Sleep(1 * time.Second)
 	if len(connEventList) == 0 {
@@ -84,7 +84,7 @@ func TestCloseSyscall(t *testing.T) {
 		agentStopper <- MySignal{}
 	}()
 	fmt.Println("Start Send Http Request")
-	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true})
+	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true, targetUrl: "http://www.baidu.com"})
 
 	time.Sleep(1 * time.Second)
 	if len(connEventList) == 0 {
@@ -657,7 +657,43 @@ func TestSendMsg(t *testing.T) {
 	}
 }
 
-func TestIpXmit(t *testing.T) {
+func KernRcvTestWithHTTP(t *testing.T, progs []bpf.AttachBpfProgFunction, kernEvtFilter FindInterestedKernEventOptions, kernEvtAsserts KernDataEventAssertConditions) {
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	kernEventList := make([]bpf.AgentKernEvt, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
+	StartAgent(
+		progs,
+		&connEventList,
+		&syscallEventList,
+		&kernEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper)
+
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+	sendTestRequest(t, SendTestHttpRequestOptions{
+		targetUrl:         "http://www.baidu.com/abc",
+		disableKeepAlived: true,
+	})
+
+	time.Sleep(500 * time.Millisecond)
+	kernEvtFilter.connEventList = connEventList
+	intersetedKernEvents := findInterestedKernEvents(t, kernEventList, kernEvtFilter)
+	assert.Equal(t, 1, len(intersetedKernEvents))
+	kernEvent := intersetedKernEvents[0]
+	conn := connManager.FindConnection4(kernEvent.ConnIdS.TgidFd)
+	if !kernEvtAsserts.ignoreFd && kernEvtAsserts.fd == 0 {
+		kernEvtAsserts.fd = uint32(conn.TgidFd)
+	}
+	AssertKernEvent(t, &kernEvent, kernEvtAsserts)
+}
+
+func KernTestWithTcpEchoServer(t *testing.T, progs []bpf.AttachBpfProgFunction, testMessage string, writeSyscall WriteSyscallType,
+	readSyscall ReadSyscallType, kernEvtFilter FindInterestedKernEventOptions, kernEvtAsserts KernDataEventAssertConditions) {
 	StartEchoTcpServerAndWait()
 	connEventList := make([]bpf.AgentConnEvtT, 0)
 	syscallEventList := make([]bpf.SyscallEventData, 0)
@@ -665,14 +701,7 @@ func TestIpXmit(t *testing.T) {
 	var connManager *conn.ConnManager = conn.InitConnManager()
 	agentStopper := make(chan os.Signal, 1)
 	StartAgent(
-		[]bpf.AttachBpfProgFunction{
-			bpf.AttachSyscallConnectEntry,
-			bpf.AttachSyscallConnectExit,
-			bpf.AttachSyscallWriteEntry,
-			bpf.AttachSyscallWriteExit,
-			bpf.AttachKProbeSecuritySocketSendmsgEntry,
-			bpf.AttachKProbeIpQueueXmitEntry,
-		},
+		progs,
 		&connEventList,
 		&syscallEventList,
 		&kernEventList,
@@ -684,34 +713,138 @@ func TestIpXmit(t *testing.T) {
 		agentStopper <- MySignal{}
 	}()
 	ip := "127.0.0.1"
-	sendMsg := "GET TestIpXmit\n"
+	sendMsg := testMessage
 	WriteToEchoTcpServerAndReadResponse(WriteToEchoServerOptions{
 		t:            t,
 		server:       ip + ":" + fmt.Sprint(echoTcpServerPort),
 		message:      sendMsg,
 		readResponse: true,
-		writeSyscall: Write,
-		readSyscall:  Read,
+		writeSyscall: writeSyscall,
+		readSyscall:  readSyscall,
 	})
 	time.Sleep(500 * time.Millisecond)
-	intersetedKernEvents := findInterestedKernEvents(t, kernEventList, FindInterestedKernEventOptions{
-		connEventList:          connEventList,
-		findDataLenGtZeroEvent: true,
-		findByDirect:           true,
-		direct:                 bpf.AgentTrafficDirectionTKEgress,
-	})
+	kernEvtFilter.connEventList = connEventList
+	intersetedKernEvents := findInterestedKernEvents(t, kernEventList, kernEvtFilter)
 	assert.Equal(t, 1, len(intersetedKernEvents))
 	kernEvent := intersetedKernEvents[0]
 	conn := connManager.FindConnection4(kernEvent.ConnIdS.TgidFd)
-	AssertKernEvent(t, &kernEvent, KernDataEventAssertConditions{
+	if !kernEvtAsserts.ignoreFd && kernEvtAsserts.fd == 0 {
+		kernEvtAsserts.fd = uint32(conn.TgidFd)
+	}
 
-		connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
-		pid:              uint64(os.Getpid()),
-		fd:               uint32(conn.TgidFd),
-		funcName:         "ip_queue_xmit",
-		dataLen:          uint32(len(sendMsg)),
-		seq:              1,
-		step:             bpf.AgentStepTIP_OUT,
-		tsAssertFunction: func(u uint64) bool { return u > 0 },
-	})
+	if !kernEvtAsserts.ignoreDataLen && kernEvtAsserts.dataLen == 0 {
+		kernEvtAsserts.dataLen = uint32(len(sendMsg))
+	}
+	AssertKernEvent(t, &kernEvent, kernEvtAsserts)
+}
+func TestIpXmit(t *testing.T) {
+	KernTestWithTcpEchoServer(t, []bpf.AttachBpfProgFunction{
+		bpf.AttachSyscallConnectEntry,
+		bpf.AttachSyscallConnectExit,
+		bpf.AttachSyscallWriteEntry,
+		bpf.AttachSyscallWriteExit,
+		bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		bpf.AttachKProbeIpQueueXmitEntry,
+	}, "GET TestIpXmit\n", Write, Read,
+		FindInterestedKernEventOptions{
+			findDataLenGtZeroEvent: true,
+			findByDirect:           true,
+			direct:                 bpf.AgentTrafficDirectionTKEgress,
+		}, KernDataEventAssertConditions{
+
+			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			pid:              uint64(os.Getpid()),
+			funcName:         "ip_queue_xmit",
+			seq:              1,
+			step:             bpf.AgentStepTIP_OUT,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		})
+}
+
+func TestDevQueueXmit(t *testing.T) {
+	KernTestWithTcpEchoServer(t, []bpf.AttachBpfProgFunction{
+		bpf.AttachSyscallConnectEntry,
+		bpf.AttachSyscallConnectExit,
+		bpf.AttachSyscallWriteEntry,
+		bpf.AttachSyscallWriteExit,
+		bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		bpf.AttachKProbeIpQueueXmitEntry,
+		bpf.AttachKProbeDevQueueXmitEntry,
+	}, "GET DevQueueXmit\n", Write, Read,
+		FindInterestedKernEventOptions{
+			findDataLenGtZeroEvent: true,
+			findByDirect:           true,
+			direct:                 bpf.AgentTrafficDirectionTKEgress,
+			findByFuncName:         true,
+			funcName:               "dev_queue_xmit",
+		}, KernDataEventAssertConditions{
+
+			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			pid:              uint64(os.Getpid()),
+			funcName:         "dev_queue_xmit",
+			seq:              1,
+			step:             bpf.AgentStepTQDISC_OUT,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		})
+}
+
+func TestDevHardStartXmit(t *testing.T) {
+	KernTestWithTcpEchoServer(t, []bpf.AttachBpfProgFunction{
+		bpf.AttachSyscallConnectEntry,
+		bpf.AttachSyscallConnectExit,
+		bpf.AttachSyscallWriteEntry,
+		bpf.AttachSyscallWriteExit,
+		bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		bpf.AttachKProbeIpQueueXmitEntry,
+		bpf.AttachKProbeDevHardStartXmitEntry,
+	}, "GET DevHardStartXmit\n", Write, Read,
+		FindInterestedKernEventOptions{
+			findDataLenGtZeroEvent: true,
+			findByDirect:           true,
+			direct:                 bpf.AgentTrafficDirectionTKEgress,
+			findByFuncName:         true,
+			funcName:               "dev_hard_start",
+		}, KernDataEventAssertConditions{
+
+			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			pid:              uint64(os.Getpid()),
+			funcName:         "dev_hard_start",
+			seq:              1,
+			step:             bpf.AgentStepTDEV_OUT,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		})
+}
+
+func TestIpRcvCore(t *testing.T) {
+	KernRcvTestWithHTTP(t, []bpf.AttachBpfProgFunction{
+		bpf.AttachSyscallConnectEntry,
+		bpf.AttachSyscallConnectExit,
+		bpf.AttachSyscallRecvfromEntry,
+		bpf.AttachSyscallRecvfromExit,
+		bpf.AttachSyscallReadEntry,
+		bpf.AttachSyscallReadExit,
+		bpf.AttachSyscallWriteEntry,
+		bpf.AttachSyscallWriteExit,
+		bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+		bpf.AttachXdp,
+		bpf.AttachKProbIpRcvCoreEntry,
+	},
+		FindInterestedKernEventOptions{
+			findDataLenGtZeroEvent: true,
+			findByDirect:           true,
+			direct:                 bpf.AgentTrafficDirectionTKIngress,
+			findByFuncName:         true,
+			funcName:               "ip_rcv_core",
+		}, KernDataEventAssertConditions{
+
+			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
+			pid:               uint64(os.Getpid()),
+			funcName:          "ip_rcv_core",
+			seq:               1,
+			step:              bpf.AgentStepTIP_IN,
+			ignoreDataLen:     true,
+			dataLenAssertFunc: func(u uint32) bool { return u > 10 },
+			tsAssertFunction:  func(u uint64) bool { return u > 0 },
+		})
 }

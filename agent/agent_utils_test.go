@@ -21,6 +21,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/jefurry/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
 )
@@ -36,6 +37,8 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 	go func(pid int) {
 		cmd.FilterPid = int64(pid)
 		cmd.Verbose = true
+		cmd.Debug = true
+		common.Log.SetLevel(logrus.DebugLevel)
 		agent.SetupAgent(agent.AgentOptions{
 			Stopper: agentStopper,
 			LoadBpfProgramFunction: func(objs bpf.AgentObjects) *list.List {
@@ -167,6 +170,7 @@ type KernDataEventAssertConditions struct {
 	funcName           string
 	ignoreDataLen      bool
 	dataLen            uint32
+	dataLenAssertFunc  func(uint32) bool
 	ignoreSeq          bool
 	seq                uint64
 	ignoreStep         bool
@@ -196,11 +200,15 @@ func AssertKernEvent(t *testing.T, kernEvt *bpf.AgentKernEvt, conditions KernDat
 	}
 	funcName := kernEvt.FuncName
 	if !conditions.ignoreFuncName {
-		assert.Equal(t, conditions.funcName, common.Int8ToStr(funcName[:len(conditions.funcName)]))
+		assert.True(t, strings.Contains(common.Int8ToStr(funcName[:len(conditions.funcName)]), conditions.funcName))
 	}
 	dataLen := kernEvt.Len
 	if !conditions.ignoreDataLen {
-		assert.Equal(t, conditions.dataLen, dataLen)
+		assert.Equal(t, uint64(conditions.dataLen), uint64(dataLen))
+	}
+
+	if conditions.dataLenAssertFunc != nil {
+		assert.True(t, conditions.dataLenAssertFunc(dataLen))
 	}
 	seq := kernEvt.Seq
 	if !conditions.ignoreSeq {
@@ -210,6 +218,7 @@ func AssertKernEvent(t *testing.T, kernEvt *bpf.AgentKernEvt, conditions KernDat
 	if !conditions.ignoreStep {
 		assert.Equal(t, conditions.step, step)
 	}
+
 	ts := kernEvt.Ts
 	if conditions.tsAssertFunction != nil {
 		assert.True(t, conditions.tsAssertFunction(ts))
@@ -259,6 +268,8 @@ type FindInterestedKernEventOptions struct {
 	findDataLenGtZeroEvent bool
 	findByDirect           bool
 	direct                 bpf.AgentTrafficDirectionT
+	findByFuncName         bool
+	funcName               string
 	throw                  bool
 
 	connEventList []bpf.AgentConnEvtT
@@ -346,6 +357,10 @@ func findInterestedKernEvents(t *testing.T, kernEventList []bpf.AgentKernEvt, op
 		if options.findByDirect && options.direct != each.ConnIdS.Direct {
 			continue
 		}
+		if options.findByFuncName && !strings.Contains(common.Int8ToStr(each.FuncName[:]), options.funcName) {
+			continue
+		}
+
 		resultList = append(resultList, each)
 	}
 	if options.throw && len(resultList) == 0 {
@@ -356,6 +371,7 @@ func findInterestedKernEvents(t *testing.T, kernEventList []bpf.AgentKernEvt, op
 
 type SendTestHttpRequestOptions struct {
 	disableKeepAlived bool
+	targetUrl         string
 }
 
 func sendTestRequest(t *testing.T, options SendTestHttpRequestOptions) error {
@@ -368,7 +384,7 @@ func sendTestRequest(t *testing.T, options SendTestHttpRequestOptions) error {
 	}
 
 	// 创建一个请求
-	req, err := http.NewRequest("GET", "http://www.baidu.com", nil)
+	req, err := http.NewRequest("GET", options.targetUrl, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		// 如果有错误，则打印错误并退出

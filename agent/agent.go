@@ -11,7 +11,6 @@ import (
 	"kyanos/agent/stat"
 	"kyanos/bpf"
 	"kyanos/common"
-	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -376,7 +375,6 @@ func handleKernEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, 
 }
 
 func attachBpfProgs(objs bpf.AgentObjects) *list.List {
-	var err error
 	linkList := list.New()
 
 	linkList.PushBack(bpf.AttachSyscallAcceptEntry(objs))
@@ -425,22 +423,23 @@ func attachBpfProgs(objs bpf.AgentObjects) *list.List {
 	linkList.PushBack(bpf.AttachKProbIpRcvCoreEntry(objs))
 	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(objs))
 	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(objs))
+	linkList.PushBack(bpf.AttachXdp(objs))
+	// ifname := "eth0" // TODO
 
-	ifname := "eth0" // TODO
-	iface, err := net.InterfaceByName(ifname)
-	if err != nil {
-		log.Fatalf("Getting interface %s: %s", ifname, err)
-	}
+	// iface, err := net.InterfaceByName(ifname)
+	// if err != nil {
+	// 	log.Fatalf("Getting interface %s: %s", ifname, err)
+	// }
 
-	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   objs.AgentPrograms.XdpProxy,
-		Interface: iface.Index,
-		Flags:     link.XDPDriverMode,
-	})
-	if err != nil {
-		log.Fatal("Attaching XDP:", err)
-	}
-	linkList.PushBack(l)
+	// l, err := link.AttachXDP(link.XDPOptions{
+	// 	Program:   objs.AgentPrograms.XdpProxy,
+	// 	Interface: iface.Index,
+	// 	Flags:     link.XDPDriverMode,
+	// })
+	// if err != nil {
+	// 	log.Fatal("Attaching XDP:", err)
+	// }
+	// linkList.PushBack(l)
 	return linkList
 }
 

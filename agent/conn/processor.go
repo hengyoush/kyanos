@@ -192,6 +192,8 @@ func (p *Processor) run() {
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
 				log.Debugf("[syscall][protocol unset][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
+			} else {
+				log.Debugf("[syscall lost]")
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
