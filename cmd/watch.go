@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"kyanos/agent"
+	"kyanos/agent/protocol/filter"
 
 	"github.com/spf13/cobra"
 )
@@ -19,10 +20,21 @@ var watchCmd = &cobra.Command{
 			if list {
 				fmt.Println([]string{"http", "redis"})
 			} else {
-				startAgent(agent.AgentOptions{})
+				startAgent(agent.AgentOptions{LatencyFilter: initLatencyFilter(cmd)})
 			}
 		}
 	},
+}
+
+func initLatencyFilter(cmd *cobra.Command) filter.LatencyFilter {
+	latency, err := cmd.Flags().GetFloat64("latency")
+	if err != nil {
+		logger.Fatalf("invalid latency: %v\n", err)
+	}
+	latencyFilter := filter.LatencyFilter{
+		MinLatency: latency,
+	}
+	return latencyFilter
 }
 
 func init() {

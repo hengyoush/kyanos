@@ -23,21 +23,26 @@ var httpCmd *cobra.Command = &cobra.Command{
 		if err != nil {
 			logger.Fatalf("invalid host: %v\n", err)
 		}
-		latency, err := cmd.Flags().GetFloat64("latency")
-		if err != nil {
-			logger.Fatalf("invalid latency: %v\n", err)
-		}
 		startAgent(agent.AgentOptions{
 			MessageFilter: filter.HttpFilter{
 				TargetPath:     path,
 				TargetMethods:  methods,
 				TargetHostName: host,
 			},
-			LatencyFilter: filter.LatencyFilter{
-				MinLatency: latency,
-			},
+			LatencyFilter: initLatencyFilter(cmd),
 		})
 	},
+}
+
+func initLatencyFilter(cmd *cobra.Command) filter.LatencyFilter {
+	latency, err := cmd.Flags().GetFloat64("latency")
+	if err != nil {
+		logger.Fatalf("invalid latency: %v\n", err)
+	}
+	latencyFilter := filter.LatencyFilter{
+		MinLatency: latency,
+	}
+	return latencyFilter
 }
 
 func init() {
