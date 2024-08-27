@@ -34,17 +34,6 @@ var httpCmd *cobra.Command = &cobra.Command{
 	},
 }
 
-func initLatencyFilter(cmd *cobra.Command) filter.LatencyFilter {
-	latency, err := cmd.Flags().GetFloat64("latency")
-	if err != nil {
-		logger.Fatalf("invalid latency: %v\n", err)
-	}
-	latencyFilter := filter.LatencyFilter{
-		MinLatency: latency,
-	}
-	return latencyFilter
-}
-
 func init() {
 	httpCmd.Flags().StringSlice("method", []string{}, "--method GET,POST")
 	httpCmd.Flags().String("host", "", "--host www.baidu.com")

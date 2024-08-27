@@ -848,3 +848,71 @@ func TestIpRcvCore(t *testing.T) {
 			tsAssertFunction:  func(u uint64) bool { return u > 0 },
 		})
 }
+
+func TestTcpV4DoRcv(t *testing.T) {
+	KernRcvTestWithHTTP(t, []bpf.AttachBpfProgFunction{
+		bpf.AttachSyscallConnectEntry,
+		bpf.AttachSyscallConnectExit,
+		bpf.AttachSyscallRecvfromEntry,
+		bpf.AttachSyscallRecvfromExit,
+		bpf.AttachSyscallReadEntry,
+		bpf.AttachSyscallReadExit,
+		bpf.AttachSyscallWriteEntry,
+		bpf.AttachSyscallWriteExit,
+		bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+		bpf.AttachXdp,
+		bpf.AttachKProbeTcpV4DoRcvEntry,
+	},
+		FindInterestedKernEventOptions{
+			findDataLenGtZeroEvent: true,
+			findByDirect:           true,
+			direct:                 bpf.AgentTrafficDirectionTKIngress,
+			findByFuncName:         true,
+			funcName:               "tcp_v4_do_rcv",
+		}, KernDataEventAssertConditions{
+
+			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
+			pid:               uint64(os.Getpid()),
+			funcName:          "tcp_v4_do_rcv",
+			seq:               1,
+			step:              bpf.AgentStepTTCP_IN,
+			ignoreDataLen:     true,
+			dataLenAssertFunc: func(u uint32) bool { return u > 10 },
+			tsAssertFunction:  func(u uint64) bool { return u > 0 },
+		})
+}
+
+func TestSkbCopyDatagramIter(t *testing.T) {
+	KernRcvTestWithHTTP(t, []bpf.AttachBpfProgFunction{
+		bpf.AttachSyscallConnectEntry,
+		bpf.AttachSyscallConnectExit,
+		bpf.AttachSyscallRecvfromEntry,
+		bpf.AttachSyscallRecvfromExit,
+		bpf.AttachSyscallReadEntry,
+		bpf.AttachSyscallReadExit,
+		bpf.AttachSyscallWriteEntry,
+		bpf.AttachSyscallWriteExit,
+		bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+		bpf.AttachXdp,
+		bpf.AttachKProbeSkbCopyDatagramIterEntry,
+	},
+		FindInterestedKernEventOptions{
+			findDataLenGtZeroEvent: true,
+			findByDirect:           true,
+			direct:                 bpf.AgentTrafficDirectionTKIngress,
+			findByFuncName:         true,
+			funcName:               "skb_copy_datagr",
+		}, KernDataEventAssertConditions{
+
+			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
+			pid:               uint64(os.Getpid()),
+			funcName:          "skb_copy_datagr",
+			seq:               1,
+			step:              bpf.AgentStepTUSER_COPY,
+			ignoreDataLen:     true,
+			dataLenAssertFunc: func(u uint32) bool { return u > 10 },
+			tsAssertFunction:  func(u uint64) bool { return u > 0 },
+		})
+}
