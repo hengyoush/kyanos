@@ -37,6 +37,7 @@ type Connection4 struct {
 	TCPHandshakeStatus
 	MessageFilter filter.MessageFilter
 	filter.LatencyFilter
+	filter.SizeFilter
 }
 
 type ConnStatus uint8
@@ -95,6 +96,9 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 
 	needSubmit = c.MessageFilter.FilterByProtocol(c.Protocol)
 	needSubmit = needSubmit && c.LatencyFilter.Filter(float64(record.Duration)/1000000)
+	needSubmit = needSubmit &&
+		c.SizeFilter.FilterByReqSize(int64(record.Request.TotalBytes())) &&
+		c.SizeFilter.FilterByRespSize(record.Response.TotalBytes())
 	if parser := parser.GetParserByProtocol(c.Protocol); needSubmit && parser != nil {
 		var parsedRequest, parsedResponse any
 		if c.MessageFilter.FilterByRequest() {
@@ -147,6 +151,7 @@ func (c *Connection4) OnClose() {
 
 func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
 	isReq := isReq(c, &event.SyscallEvent.Ke)
+	// 以下只能作用于单发单收（一个syscall不包含多个消息，且客户端在接收请求的响应之前不能再发送请求）
 	if isReq {
 		// 首先要尝试匹配之前的req和resp
 		if c.CurResp.HasData() && c.CurReq.HasData() {

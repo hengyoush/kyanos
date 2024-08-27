@@ -47,6 +47,7 @@ type AgentOptions struct {
 	ProcessorsNum          int
 	MessageFilter          filter.MessageFilter
 	LatencyFilter          filter.LatencyFilter
+	filter.SizeFilter
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -72,7 +73,7 @@ func SetupAgent(options AgentOptions) {
 		options.ConnManagerInitHook(connManager)
 	}
 	statRecorder := stat.InitStatRecorder()
-	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter)
+	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c)
 	}

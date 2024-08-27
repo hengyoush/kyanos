@@ -30,6 +30,7 @@ var httpCmd *cobra.Command = &cobra.Command{
 				TargetHostName: host,
 			},
 			LatencyFilter: initLatencyFilter(cmd),
+			SizeFilter:    initSizeFilter(cmd),
 		})
 	},
 }

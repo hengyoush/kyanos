@@ -205,6 +205,10 @@ func (s *BaseProtocolMessage) Data() []byte {
 	return s.buf
 }
 
+func (s *BaseProtocolMessage) TotalBytes() int64 {
+	return int64(s.totalBytes)
+}
+
 type Record struct {
 	Request  *BaseProtocolMessage
 	Response *BaseProtocolMessage

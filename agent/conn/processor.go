@@ -25,14 +25,14 @@ type ProcessorManager struct {
 }
 
 func InitProcessorManager(n int, connManager *ConnManager, filter filter.MessageFilter,
-	latencyFilter filter.LatencyFilter) *ProcessorManager {
+	latencyFilter filter.LatencyFilter, sizeFilter filter.SizeFilter) *ProcessorManager {
 	pm := new(ProcessorManager)
 	pm.processors = make([]*Processor, n)
 	pm.wg = new(sync.WaitGroup)
 	pm.ctx, pm.cancel = context.WithCancel(context.Background())
 	pm.connManager = connManager
 	for i := 0; i < n; i++ {
-		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter)
+		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter, sizeFilter)
 		go pm.processors[i].run()
 		pm.wg.Add(1)
 	}
@@ -63,10 +63,11 @@ type Processor struct {
 	name          string
 	messageFilter filter.MessageFilter
 	latencyFilter filter.LatencyFilter
+	filter.SizeFilter
 }
 
 func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter filter.MessageFilter,
-	latencyFilter filter.LatencyFilter) *Processor {
+	latencyFilter filter.LatencyFilter, sizeFilter filter.SizeFilter) *Processor {
 	p := new(Processor)
 	p.wg = wg
 	p.ctx = ctx
@@ -77,6 +78,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.name = name
 	p.messageFilter = filter
 	p.latencyFilter = latencyFilter
+	p.SizeFilter = sizeFilter
 	return p
 }
 
@@ -115,6 +117,7 @@ func (p *Processor) run() {
 
 				MessageFilter: p.messageFilter,
 				LatencyFilter: p.latencyFilter,
+				SizeFilter:    p.SizeFilter,
 			}
 			// remove this TODO
 			// if conn.LocalPort != 16660 {
