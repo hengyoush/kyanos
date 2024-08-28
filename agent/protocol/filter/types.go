@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"kyanos/agent/protocol"
 	"kyanos/bpf"
 	"kyanos/common"
 
@@ -9,15 +10,7 @@ import (
 
 var log *logrus.Logger = common.Log
 
-type ParsedMessage any
-type MessageFilter interface {
-	Filter(req ParsedMessage, resp ParsedMessage) bool
-	FilterByProtocol(bpf.AgentTrafficProtocolT) bool
-	FilterByRequest() bool
-	FilterByResponse() bool
-}
-
-var _ MessageFilter = NoopFilter{}
+var _ protocol.ProtocolFilter = NoopFilter{}
 
 type NoopFilter struct {
 }
@@ -34,11 +27,11 @@ func (n NoopFilter) FilterByResponse() bool {
 	return false
 }
 
-func (NoopFilter) Filter(ParsedMessage, ParsedMessage) bool {
+func (NoopFilter) Filter(protocol.ParsedMessage, protocol.ParsedMessage) bool {
 	return true
 }
 
-func IsNoopFilter(filter MessageFilter) bool {
+func IsNoopFilter(filter protocol.ProtocolFilter) bool {
 	_, ok := filter.(NoopFilter)
 	return ok
 }

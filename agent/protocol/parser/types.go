@@ -10,16 +10,12 @@ import (
 
 var log *logrus.Logger = common.Log
 
-type ParsedMessage any
-
-type ProtocolParser interface {
-	Parse(*protocol.BaseProtocolMessage) (any, error)
-}
-
-func GetParserByProtocol(protocol bpf.AgentTrafficProtocolT) ProtocolParser {
+func GetParserByProtocol(protocol bpf.AgentTrafficProtocolT) protocol.ProtocolParser {
 	switch protocol {
 	case bpf.AgentTrafficProtocolTKProtocolHTTP:
 		return HttpParser{}
+	case bpf.AgentTrafficProtocolTKProtocolRedis:
+		return RedisParser{}
 	default:
 		return nil
 	}

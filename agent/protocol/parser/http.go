@@ -8,12 +8,34 @@ import (
 	"net/http"
 )
 
-var _ ProtocolParser = HttpParser{}
+var _ protocol.ProtocolParser = HttpParser{}
 
 type HttpParser struct {
 }
 
-func (HttpParser) Parse(msg *protocol.BaseProtocolMessage) (any, error) {
+type ParsedHttpRequest struct {
+	protocol.FrameBase
+	Path   string
+	Host   string
+	Method string
+
+	buf []byte
+}
+
+func (req *ParsedHttpRequest) FormatToString() string {
+	return string(req.buf)
+}
+
+type ParsedHttpResponse struct {
+	protocol.FrameBase
+	buf []byte
+}
+
+func (resp *ParsedHttpResponse) FormatToString() string {
+	return string(resp.buf)
+}
+
+func (HttpParser) Parse(msg *protocol.BaseProtocolMessage) (protocol.ParsedMessage, error) {
 	if msg.IsTruncated() {
 		return nil, errors.New("Can't parse truncated data")
 	}
@@ -23,12 +45,21 @@ func (HttpParser) Parse(msg *protocol.BaseProtocolMessage) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return req, nil
+		return &ParsedHttpRequest{
+			FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
+			Path:      req.URL.Path,
+			Host:      req.Host,
+			Method:    req.Method,
+			buf:       msg.Data(),
+		}, nil
 	} else {
-		resp, err := http.ReadResponse(bufio.NewReader(reader), nil)
+		_, err := http.ReadResponse(bufio.NewReader(reader), nil)
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		return &ParsedHttpResponse{
+			FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
+			buf:       msg.Data(),
+		}, nil
 	}
 }

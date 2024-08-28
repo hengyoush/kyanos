@@ -1,13 +1,13 @@
 package filter
 
 import (
+	"kyanos/agent/protocol"
+	"kyanos/agent/protocol/parser"
 	"kyanos/bpf"
-	"net/http"
-	"net/url"
 	"slices"
 )
 
-var _ MessageFilter = HttpFilter{}
+var _ protocol.ProtocolFilter = HttpFilter{}
 
 type HttpFilter struct {
 	TargetPath     string
@@ -27,19 +27,14 @@ func (filter HttpFilter) FilterByResponse() bool {
 	return false
 }
 
-func (filter HttpFilter) Filter(parsedReq ParsedMessage, parsedResp ParsedMessage) bool {
-	req, ok := parsedReq.(*http.Request)
+func (filter HttpFilter) Filter(parsedReq protocol.ParsedMessage, parsedResp protocol.ParsedMessage) bool {
+	req, ok := parsedReq.(*parser.ParsedHttpRequest)
 	if !ok {
 		log.Warnf("[HttpFilter] cast to http.Request failed: %v\n", req)
 		return false
 	}
-	uri, err := url.ParseRequestURI(req.RequestURI)
-	if err != nil {
-		log.Errorln("[HttpFilter] parse uri failed:", err)
-		return false
-	}
 
-	if filter.TargetPath != "" && filter.TargetPath != uri.Path {
+	if filter.TargetPath != "" && filter.TargetPath != req.Path {
 		return false
 	}
 	if len(filter.TargetMethods) > 0 && !slices.Contains(filter.TargetMethods, req.Method) {

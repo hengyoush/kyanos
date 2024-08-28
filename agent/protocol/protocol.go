@@ -12,6 +12,50 @@ var log *logrus.Logger = common.Log
 
 type ProtocolType uint32
 
+type ProtocolParser interface {
+	Parse(*BaseProtocolMessage) (ParsedMessage, error)
+}
+
+type FrameBase struct {
+	timestampNs uint64
+	byteSize    int
+}
+
+func NewFrameBase(timestampNs uint64, byteSize int) FrameBase {
+	return FrameBase{timestampNs: timestampNs, byteSize: byteSize}
+}
+
+func (f *FrameBase) TimestampNs() uint64 {
+	return f.timestampNs
+}
+
+func (f *FrameBase) ByteSize() int {
+	return f.byteSize
+}
+
+func (f *FrameBase) String() string {
+	return fmt.Sprintf("timestamp_ns=%d byte_size=%d", f.timestampNs, f.byteSize)
+}
+
+type ParsedMessage interface {
+	FormatToString() string
+	TimestampNs() uint64
+	ByteSize() int
+}
+
+type ProtocolFilter interface {
+	Filter(req ParsedMessage, resp ParsedMessage) bool
+	FilterByProtocol(bpf.AgentTrafficProtocolT) bool
+	FilterByRequest() bool
+	FilterByResponse() bool
+}
+
+type MessageProtocol struct {
+	ProtocolType
+	ProtocolParser
+	ProtocolFilter
+}
+
 type BaseProtocolMessage struct {
 	IsReq        bool
 	IsServerSide bool

@@ -35,7 +35,7 @@ type Connection4 struct {
 	CurReq            *protocol.BaseProtocolMessage
 	CurResp           *protocol.BaseProtocolMessage
 	TCPHandshakeStatus
-	MessageFilter filter.MessageFilter
+	MessageFilter protocol.ProtocolFilter
 	filter.LatencyFilter
 	filter.SizeFilter
 }
@@ -100,7 +100,7 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 		c.SizeFilter.FilterByReqSize(int64(record.Request.TotalBytes())) &&
 		c.SizeFilter.FilterByRespSize(record.Response.TotalBytes())
 	if parser := parser.GetParserByProtocol(c.Protocol); needSubmit && parser != nil {
-		var parsedRequest, parsedResponse any
+		var parsedRequest, parsedResponse protocol.ParsedMessage
 		if c.MessageFilter.FilterByRequest() {
 			parsedRequest, err = parser.Parse(record.Request)
 			if err != nil {

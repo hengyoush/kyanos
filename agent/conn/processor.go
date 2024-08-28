@@ -24,7 +24,7 @@ type ProcessorManager struct {
 	cancel      context.CancelFunc
 }
 
-func InitProcessorManager(n int, connManager *ConnManager, filter filter.MessageFilter,
+func InitProcessorManager(n int, connManager *ConnManager, filter protocol.ProtocolFilter,
 	latencyFilter filter.LatencyFilter, sizeFilter filter.SizeFilter) *ProcessorManager {
 	pm := new(ProcessorManager)
 	pm.processors = make([]*Processor, n)
@@ -61,12 +61,12 @@ type Processor struct {
 	syscallEvents chan *bpf.SyscallEventData
 	kernEvents    chan *bpf.AgentKernEvt
 	name          string
-	messageFilter filter.MessageFilter
+	messageFilter protocol.ProtocolFilter
 	latencyFilter filter.LatencyFilter
 	filter.SizeFilter
 }
 
-func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter filter.MessageFilter,
+func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter protocol.ProtocolFilter,
 	latencyFilter filter.LatencyFilter, sizeFilter filter.SizeFilter) *Processor {
 	p := new(Processor)
 	p.wg = wg

@@ -45,7 +45,7 @@ type AgentOptions struct {
 	ConnManagerInitHook    ConnManagerInitHook
 	LoadBpfProgramFunction LoadBpfProgramFunction
 	ProcessorsNum          int
-	MessageFilter          filter.MessageFilter
+	MessageFilter          protocol.ProtocolFilter
 	LatencyFilter          filter.LatencyFilter
 	filter.SizeFilter
 }
