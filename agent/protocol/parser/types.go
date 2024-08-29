@@ -10,13 +10,7 @@ import (
 
 var log *logrus.Logger = common.Log
 
-func GetParserByProtocol(protocol bpf.AgentTrafficProtocolT) protocol.ProtocolParser {
-	switch protocol {
-	case bpf.AgentTrafficProtocolTKProtocolHTTP:
-		return HttpParser{}
-	case bpf.AgentTrafficProtocolTKProtocolRedis:
-		return RedisParser{}
-	default:
-		return nil
-	}
+func init() {
+	protocol.ParsersMap[bpf.AgentTrafficProtocolTKProtocolHTTP] = HttpParser{}
+	protocol.ParsersMap[bpf.AgentTrafficProtocolTKProtocolRedis] = RedisParser{}
 }

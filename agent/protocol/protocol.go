@@ -9,6 +9,15 @@ import (
 )
 
 var log *logrus.Logger = common.Log
+var ParsersMap map[bpf.AgentTrafficProtocolT]ProtocolParser = make(map[bpf.AgentTrafficProtocolT]ProtocolParser)
+
+func GetParserByProtocol(protocol bpf.AgentTrafficProtocolT) ProtocolParser {
+	parser, ok := ParsersMap[protocol]
+	if ok {
+		return parser
+	}
+	return nil
+}
 
 type ProtocolType uint32
 
@@ -43,6 +52,25 @@ type ParsedMessage interface {
 	ByteSize() int
 }
 
+type StringParsedMessage struct {
+	Buf []byte
+	Ts  uint64
+}
+
+func (s StringParsedMessage) ByteSize() int {
+	return len(s.Buf)
+}
+
+func (s StringParsedMessage) FormatToString() string {
+	return string(s.Buf)
+}
+
+func (s StringParsedMessage) TimestampNs() uint64 {
+	return s.Ts
+}
+
+var _ ParsedMessage = StringParsedMessage{}
+
 type ProtocolFilter interface {
 	Filter(req ParsedMessage, resp ParsedMessage) bool
 	FilterByProtocol(bpf.AgentTrafficProtocolT) bool
@@ -69,6 +97,9 @@ type BaseProtocolMessage struct {
 	syscallCnt   uint
 	duration     uint // 读/写总用时
 	totalBytes   uint // 读/写总字节数
+
+	protocol bpf.AgentTrafficProtocolT
+	parsed   ParsedMessage
 }
 
 func InitProtocolMessage(isReq bool, isServerSide bool) *BaseProtocolMessage {
@@ -81,7 +112,7 @@ func InitProtocolMessage(isReq bool, isServerSide bool) *BaseProtocolMessage {
 	return msg
 }
 
-func InitProtocolMessageWithEvent(evt *bpf.SyscallEventData, isReq bool, isServerSide bool) *BaseProtocolMessage {
+func InitProtocolMessageWithEvent(evt *bpf.SyscallEventData, isReq bool, isServerSide bool, protocol bpf.AgentTrafficProtocolT) *BaseProtocolMessage {
 	msg := new(BaseProtocolMessage)
 	msg.StartTs = evt.SyscallEvent.Ke.Ts
 	msg.EndTs = evt.SyscallEvent.Ke.Ts
@@ -91,6 +122,7 @@ func InitProtocolMessageWithEvent(evt *bpf.SyscallEventData, isReq bool, isServe
 	msg.timedetails1 = make(map[uint8]uint64)
 	msg.IsReq = isReq
 	msg.IsServerSide = isServerSide
+	msg.protocol = protocol
 	return msg
 }
 
@@ -251,6 +283,38 @@ func (s *BaseProtocolMessage) Data() []byte {
 
 func (s *BaseProtocolMessage) TotalBytes() int64 {
 	return int64(s.totalBytes)
+}
+
+func (s *BaseProtocolMessage) GetParser() ProtocolParser {
+	return GetParserByProtocol(s.protocol)
+}
+func (s *BaseProtocolMessage) SetParsed(p ParsedMessage) {
+	s.parsed = p
+}
+func (s *BaseProtocolMessage) RequireParsed() ParsedMessage {
+	if s.parsed != nil {
+		return s.parsed
+	}
+	parser := s.GetParser()
+	if parser == nil {
+		s.parsed = StringParsedMessage{
+			Buf: s.Data(),
+			Ts:  s.StartTs,
+		}
+	} else {
+		parsed, err := parser.Parse(s)
+		if err != nil {
+			if err != nil {
+				log.Warnf("Fail to parse response when submit record!\n")
+			}
+			s.parsed = StringParsedMessage{
+				Buf: s.Data(),
+				Ts:  s.StartTs,
+			}
+		}
+		s.parsed = parsed
+	}
+	return s.parsed
 }
 
 type Record struct {

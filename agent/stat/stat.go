@@ -42,7 +42,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, conn *conn.Connection4) 
 		record.max = r.Duration
 	}
 	log.Infof("%s cur avg: %f, count: %d, max: %d\nreq: %s\nresp: %s", conn.ToString(),
-		record.avg, record.count, record.max, r.Request.FormatRawBufToString(), r.Response.FormatRawBufToString())
+		record.avg, record.count, record.max, r.Request.RequireParsed().FormatToString(), r.Response.RequireParsed().FormatToString())
 	log.Infof("req time detail: \n" + r.Request.ExportTimeDetails())
 	log.Infof("network time detail: \n" + r.Request.ExportReqRespTimeDetails(r.Response))
 	log.Infof("resp time detail: \n" + r.Response.ExportTimeDetails())

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"kyanos/agent/protocol"
 	"kyanos/agent/protocol/filter"
-	"kyanos/agent/protocol/parser"
 	"kyanos/bpf"
 	"kyanos/common"
 	"sync"
@@ -95,7 +94,6 @@ func (c *Connection4) ProtocolInferred() bool {
 }
 
 func (c *Connection4) submitRecord(record protocol.Record) {
-	var err error
 	var needSubmit bool
 
 	needSubmit = c.MessageFilter.FilterByProtocol(c.Protocol)
@@ -103,21 +101,13 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 	needSubmit = needSubmit &&
 		c.SizeFilter.FilterByReqSize(int64(record.Request.TotalBytes())) &&
 		c.SizeFilter.FilterByRespSize(record.Response.TotalBytes())
-	if parser := parser.GetParserByProtocol(c.Protocol); needSubmit && parser != nil {
+	if parser := protocol.GetParserByProtocol(c.Protocol); needSubmit && parser != nil {
 		var parsedRequest, parsedResponse protocol.ParsedMessage
 		if c.MessageFilter.FilterByRequest() {
-			parsedRequest, err = parser.Parse(record.Request)
-			if err != nil {
-				log.Warnf("%s Fail to parse request when submit record!\n", c.ToString())
-				return
-			}
+			parsedRequest = record.Request.RequireParsed()
 		}
 		if c.MessageFilter.FilterByResponse() {
-			parsedResponse, err = parser.Parse(record.Response)
-			if err != nil {
-				log.Warnf("%s Fail to parse response when submit record!\n", c.ToString())
-				return
-			}
+			parsedResponse = record.Response.RequireParsed()
 		}
 		if parsedRequest != nil || parsedResponse != nil {
 			needSubmit = c.MessageFilter.Filter(parsedRequest, parsedResponse)
@@ -174,7 +164,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
 			c.CurReq.AppendData(data)
 		} else {
 			tempReq := c.CurReq
-			c.CurReq = protocol.InitProtocolMessageWithEvent(event, isReq, c.IsServerSide())
+			c.CurReq = protocol.InitProtocolMessageWithEvent(event, isReq, c.IsServerSide(), c.Protocol)
 			c.CurResp = protocol.InitProtocolMessage(false, c.IsServerSide())
 			if tempReq.HasEvent() {
 				c.CurReq.CopyTimeDetailFrom(tempReq)
@@ -192,7 +182,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
 			c.CurResp.AppendData(data)
 		} else {
 			tempResp := c.CurResp
-			c.CurResp = protocol.InitProtocolMessageWithEvent(event, isReq, c.IsServerSide())
+			c.CurResp = protocol.InitProtocolMessageWithEvent(event, isReq, c.IsServerSide(), c.Protocol)
 			if tempResp.HasEvent() {
 				c.CurResp.CopyTimeDetailFrom(tempResp)
 			}
