@@ -56,7 +56,11 @@ func InitConnManager() *ConnManager {
 }
 
 func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
-	c.connMap.Store(TgidFd, conn)
+	_, loaded := c.connMap.LoadOrStore(TgidFd, conn)
+	if !loaded {
+		// log.Warnf("%s has already in connMap, why same conn (%s) come again?\n", c.FindConnection4(TgidFd).ToString(), conn.ToString())
+	}
+	// c.connMap.Store(TgidFd, conn)
 	return nil
 }
 

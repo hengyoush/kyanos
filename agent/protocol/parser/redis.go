@@ -5,6 +5,7 @@ import (
 	"kyanos/agent/protocol"
 	"kyanos/common"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -20,6 +21,7 @@ const (
 var redisCommandsMap map[string][]string
 
 func init() {
+	redisCommandsMap = make(map[string][]string)
 	redisCommandsMap["ACL LOAD"] = []string{"ACL LOAD"}
 	redisCommandsMap["ACL SAVE"] = []string{"ACL SAVE"}
 	redisCommandsMap["ACL LIST"] = []string{"ACL LIST"}
@@ -319,7 +321,7 @@ func (m *RedisMessage) Command() string {
 }
 
 func (m *RedisMessage) FormatToString() string {
-	return fmt.Sprintf("base=[%s] payload=[%s]", m.FrameBase.String(), m.payload)
+	return fmt.Sprintf("base=[%s] command=[%s] payload=[%s]", m.FrameBase.String(), m.command, m.payload)
 }
 
 func ParseSize(decoder *protocol.BinaryDecoder) (int, error) {
@@ -362,6 +364,7 @@ func ParseBulkString(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocol
 	if err != nil {
 		return "", err
 	}
+	str = str[:length]
 	return str, nil
 }
 
@@ -376,36 +379,52 @@ func ParseArray(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMessa
 			payload:   "[NULL]",
 		}, nil
 	}
-	msgSlice := make([]*RedisMessage, 0)
+	msgSlice := make([]RedisMessage, 0)
 	for i := 0; i < size; i++ {
 		_msg, err := ParseMessage(decoder, msg)
 		if err != nil {
 			return nil, err
 		}
-		msgSlice = append(msgSlice, _msg)
+		msgSlice = append(msgSlice, *_msg)
 	}
 
 	ret := &RedisMessage{
 		FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
 	}
-	if len(msgSlice) >= 2 {
-		candidateCmd := msgSlice[0].payload + " " + msgSlice[1].payload
+	cmd, payload := getCmdAndArgs(msgSlice)
+	ret.command = cmd
+	ret.payload = payload
+
+	return ret, nil
+}
+
+func getCmdAndArgs(payloads []RedisMessage) (string, string) {
+	cmd := ""
+	finalPayload := ""
+	if len(payloads) >= 2 {
+		candidateCmd := strings.ToUpper(payloads[0].payload + " " + payloads[1].payload)
 		_, ok := redisCommandsMap[candidateCmd]
 		if ok {
-			msgSlice = msgSlice[2:]
-			ret.command = candidateCmd
-			for _, each := range msgSlice {
-				ret.payload += each.payload
-				ret.payload += " "
-			}
-		} else {
-			for _, each := range msgSlice {
-				ret.payload += each.payload
-				ret.payload += " "
+			payloads = payloads[2:]
+			cmd = candidateCmd
+			for _, each := range payloads {
+				finalPayload += each.payload
+				finalPayload += " "
 			}
 		}
 	}
-	return ret, nil
+
+	candidateCmd := strings.ToUpper(payloads[0].payload)
+	_, ok := redisCommandsMap[candidateCmd]
+	if ok {
+		cmd = candidateCmd
+		payloads = payloads[1:]
+		for _, each := range payloads {
+			finalPayload += each.payload
+			finalPayload += " "
+		}
+	}
+	return cmd, finalPayload
 }
 
 func ParseMessage(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMessage) (*RedisMessage, error) {

@@ -1132,7 +1132,7 @@ static __always_inline void process_syscall_close(int ret_val, struct close_args
 	uint64_t tgid_fd = gen_tgid_fd(tgid, args->fd);
 	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 	if (conn_info == NULL) {
-		bpf_printk("close syscall no conn find,tgid:%u,fd:%d",  tgid, args->fd);
+		// bpf_printk("close syscall no conn find,tgid:%u,fd:%d",  tgid, args->fd);
 		return;
 	}
 	
