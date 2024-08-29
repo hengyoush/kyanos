@@ -320,6 +320,10 @@ func (m *RedisMessage) Command() string {
 	return m.command
 }
 
+func (m *RedisMessage) Payload() string {
+	return m.payload
+}
+
 func (m *RedisMessage) FormatToString() string {
 	return fmt.Sprintf("base=[%s] command=[%s] payload=[%s]", m.FrameBase.String(), m.command, m.payload)
 }
@@ -423,6 +427,9 @@ func getCmdAndArgs(payloads []RedisMessage) (string, string) {
 			finalPayload += each.payload
 			finalPayload += " "
 		}
+	}
+	if strings.HasSuffix(finalPayload, " ") {
+		finalPayload = finalPayload[:len(finalPayload)-1]
 	}
 	return cmd, finalPayload
 }

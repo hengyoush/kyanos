@@ -304,9 +304,7 @@ func (s *BaseProtocolMessage) RequireParsed() ParsedMessage {
 	} else {
 		parsed, err := parser.Parse(s)
 		if err != nil {
-			if err != nil {
-				log.Warnf("Fail to parse response when submit record!\n")
-			}
+			log.Warnf("Fail to parse response when submit record!\n")
 			s.parsed = StringParsedMessage{
 				Buf: s.Data(),
 				Ts:  s.StartTs,
