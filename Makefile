@@ -64,7 +64,7 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 
 GO_FILES := $(shell find $(SRC_DIR) -type f -name '*.go' | sort)  
 
-kyanos: $(LIBBPF_OBJ) $(GO_FILES) bpf/pktlatency.bpf.c bpf/pktlatency.h | $(OUTPUT)
+kyanos: $(LIBBPF_OBJ) $(GO_FILES) $(wildcard bpf/*.[ch]) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	./build.sh
 # delete failed targets

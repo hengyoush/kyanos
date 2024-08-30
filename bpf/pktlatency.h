@@ -10,7 +10,7 @@
 // #include <bpf/bpf_tracing.h>
 // #include <bpf/bpf_endian.h>
 // #include <linux/in.h>
-// #include <linux/in6.h>
+// #include <linux/in6.h> 
 // #include <linux/socket.h>
 
 enum step_t {
@@ -255,6 +255,12 @@ struct conn_info_t {
   enum traffic_protocol_t protocol;
   // Classify traffic as requests, responses or mixed.
   enum endpoint_role_t role;
+  // Keep the header of the last packet suspected to be MySQL/Kafka. MySQL/Kafka server does 2
+  // separate read syscalls, first to read the header, and second the body of the packet. Thus, we
+  // keep a state. (MySQL): Length(3 bytes) + seq_number(1 byte). (Kafka): Length(4 bytes)
+  size_t prev_count;
+  char prev_buf[4];
+  bool prepend_length_header;
 };
 
 
@@ -264,58 +270,5 @@ struct conn_evt_t {
 	uint64_t ts;
 };
 
-static __always_inline int is_redis_protocol(const char *old_buf, size_t count) {
-  if (count < 3) {
-    return false;
-  }
-  
-  char buf[1] = {};
-  bpf_probe_read_user(buf, 1, old_buf);
-  const char first_byte = buf[0];
-  if (  // Simple strings start with +
-      first_byte != '+' &&
-      // Errors start with -
-      first_byte != '-' &&
-      // Integers start with :
-      first_byte != ':' &&
-      // Bulk strings start with $
-      first_byte != '$' &&
-      // Arrays start with *
-      first_byte != '*') {
-    return false;
-  }
-  return true;
-}
-
-static __always_inline int is_http_protocol(const char *old_buf, size_t count) {
-  if (count < 5) {
-    return 0;
-  }
-  char buf[4] = {};
-  bpf_probe_read_user(buf, 4, old_buf);
-  if (buf[0] == 'G' && buf[1] == 'E' && buf[2] == 'T') {
-    return 1;
-  }
-  if (buf[0] == 'H' && buf[1] == 'E' && buf[2] == 'A' && buf[3] == 'D') {
-    return 1;
-  }
-  if (buf[0] == 'P' && buf[1] == 'O' && buf[2] == 'S' && buf[3] == 'T') {
-    return 1;
-  }
-  return 0;
-}
-
-static __always_inline struct protocol_message_t infer_protocol(const char *buf, size_t count, struct conn_info_t *conn_info) {
-  struct protocol_message_t protocol_message;
-  protocol_message.protocol = kProtocolUnknown;
-  protocol_message.type = kUnknown;
-  if (is_http_protocol(buf, count)) {
-    protocol_message.protocol = kProtocolHTTP;
-  } else if (is_redis_protocol(buf, count)) {
-    protocol_message.protocol = kProtocolRedis;
-  }
-  conn_info->protocol = protocol_message.protocol;
-  return protocol_message;
-}
 
 #endif		

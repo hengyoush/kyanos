@@ -44,8 +44,12 @@ type AgentConnEvtT struct {
 			}
 			_ [12]byte
 		}
-		Protocol AgentTrafficProtocolT
-		Role     AgentEndpointRoleT
+		Protocol            AgentTrafficProtocolT
+		Role                AgentEndpointRoleT
+		PrevCount           uint64
+		PrevBuf             [4]int8
+		PrependLengthHeader bool
+		_                   [3]byte
 	}
 	ConnType AgentConnTypeT
 	_        [4]byte
@@ -186,20 +190,13 @@ type AgentSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type AgentProgramSpecs struct {
-	AddReplyToBufferOrList            *ebpf.ProgramSpec `ebpf:"_addReplyToBufferOrList"`
-	AddReplyToBufferOrListReturn      *ebpf.ProgramSpec `ebpf:"_addReplyToBufferOrListReturn"`
-	WriteToClient                     *ebpf.ProgramSpec `ebpf:"_writeToClient"`
-	WriteToClientReturn               *ebpf.ProgramSpec `ebpf:"_writeToClientReturn"`
 	Accept4Entry                      *ebpf.ProgramSpec `ebpf:"accept4_entry"`
 	CloseEntry                        *ebpf.ProgramSpec `ebpf:"close_entry"`
-	ConnSocketRead                    *ebpf.ProgramSpec `ebpf:"connSocketRead"`
 	ConnectEntry                      *ebpf.ProgramSpec `ebpf:"connect_entry"`
 	DevHardStartXmit                  *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                      *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                       *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
 	IpRcvCore                         *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
-	ProcessMultibulkBuffer            *ebpf.ProgramSpec `ebpf:"processMultibulkBuffer"`
-	ProcessMultibulkBufferReturn      *ebpf.ProgramSpec `ebpf:"processMultibulkBufferReturn"`
 	ReadEnter                         *ebpf.ProgramSpec `ebpf:"read_enter"`
 	ReadvEnter                        *ebpf.ProgramSpec `ebpf:"readv_enter"`
 	ReadvReturn                       *ebpf.ProgramSpec `ebpf:"readv_return"`
@@ -235,30 +232,24 @@ type AgentProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type AgentMapSpecs struct {
-	AddReplyToBufferOrListArgsMap       *ebpf.MapSpec `ebpf:"_addReplyToBufferOrList_args_map"`
-	WriteToClientArgsMap                *ebpf.MapSpec `ebpf:"_writeToClient_args_map"`
-	AcceptArgsMap                       *ebpf.MapSpec `ebpf:"accept_args_map"`
-	CloseArgsMap                        *ebpf.MapSpec `ebpf:"close_args_map"`
-	ConnEvtRb                           *ebpf.MapSpec `ebpf:"conn_evt_rb"`
-	ConnInfoMap                         *ebpf.MapSpec `ebpf:"conn_info_map"`
-	ConnectArgsMap                      *ebpf.MapSpec `ebpf:"connect_args_map"`
-	ControlValues                       *ebpf.MapSpec `ebpf:"control_values"`
-	CurRedisReq                         *ebpf.MapSpec `ebpf:"cur_redis_req"`
-	EnabledLocalIpv4Map                 *ebpf.MapSpec `ebpf:"enabled_local_ipv4_map"`
-	EnabledLocalPortMap                 *ebpf.MapSpec `ebpf:"enabled_local_port_map"`
-	EnabledRemoteIpv4Map                *ebpf.MapSpec `ebpf:"enabled_remote_ipv4_map"`
-	EnabledRemotePortMap                *ebpf.MapSpec `ebpf:"enabled_remote_port_map"`
-	ProcessMultibulkBufferReturnArgsMap *ebpf.MapSpec `ebpf:"processMultibulkBufferReturn_args_map"`
-	Rb                                  *ebpf.MapSpec `ebpf:"rb"`
-	ReadArgsMap                         *ebpf.MapSpec `ebpf:"read_args_map"`
-	RedisClientSeq                      *ebpf.MapSpec `ebpf:"redis_client_seq"`
-	RedisResponseSeq                    *ebpf.MapSpec `ebpf:"redis_response_seq"`
-	SockKeyConnIdMap                    *ebpf.MapSpec `ebpf:"sock_key_conn_id_map"`
-	SockRecmMap                         *ebpf.MapSpec `ebpf:"sock_recm_map"`
-	SockXmitMap                         *ebpf.MapSpec `ebpf:"sock_xmit_map"`
-	SyscallDataMap                      *ebpf.MapSpec `ebpf:"syscall_data_map"`
-	SyscallRb                           *ebpf.MapSpec `ebpf:"syscall_rb"`
-	WriteArgsMap                        *ebpf.MapSpec `ebpf:"write_args_map"`
+	AcceptArgsMap        *ebpf.MapSpec `ebpf:"accept_args_map"`
+	CloseArgsMap         *ebpf.MapSpec `ebpf:"close_args_map"`
+	ConnEvtRb            *ebpf.MapSpec `ebpf:"conn_evt_rb"`
+	ConnInfoMap          *ebpf.MapSpec `ebpf:"conn_info_map"`
+	ConnectArgsMap       *ebpf.MapSpec `ebpf:"connect_args_map"`
+	ControlValues        *ebpf.MapSpec `ebpf:"control_values"`
+	EnabledLocalIpv4Map  *ebpf.MapSpec `ebpf:"enabled_local_ipv4_map"`
+	EnabledLocalPortMap  *ebpf.MapSpec `ebpf:"enabled_local_port_map"`
+	EnabledRemoteIpv4Map *ebpf.MapSpec `ebpf:"enabled_remote_ipv4_map"`
+	EnabledRemotePortMap *ebpf.MapSpec `ebpf:"enabled_remote_port_map"`
+	Rb                   *ebpf.MapSpec `ebpf:"rb"`
+	ReadArgsMap          *ebpf.MapSpec `ebpf:"read_args_map"`
+	SockKeyConnIdMap     *ebpf.MapSpec `ebpf:"sock_key_conn_id_map"`
+	SockRecmMap          *ebpf.MapSpec `ebpf:"sock_recm_map"`
+	SockXmitMap          *ebpf.MapSpec `ebpf:"sock_xmit_map"`
+	SyscallDataMap       *ebpf.MapSpec `ebpf:"syscall_data_map"`
+	SyscallRb            *ebpf.MapSpec `ebpf:"syscall_rb"`
+	WriteArgsMap         *ebpf.MapSpec `ebpf:"write_args_map"`
 }
 
 // AgentObjects contains all objects after they have been loaded into the kernel.
@@ -280,52 +271,40 @@ func (o *AgentObjects) Close() error {
 //
 // It can be passed to LoadAgentObjects or ebpf.CollectionSpec.LoadAndAssign.
 type AgentMaps struct {
-	AddReplyToBufferOrListArgsMap       *ebpf.Map `ebpf:"_addReplyToBufferOrList_args_map"`
-	WriteToClientArgsMap                *ebpf.Map `ebpf:"_writeToClient_args_map"`
-	AcceptArgsMap                       *ebpf.Map `ebpf:"accept_args_map"`
-	CloseArgsMap                        *ebpf.Map `ebpf:"close_args_map"`
-	ConnEvtRb                           *ebpf.Map `ebpf:"conn_evt_rb"`
-	ConnInfoMap                         *ebpf.Map `ebpf:"conn_info_map"`
-	ConnectArgsMap                      *ebpf.Map `ebpf:"connect_args_map"`
-	ControlValues                       *ebpf.Map `ebpf:"control_values"`
-	CurRedisReq                         *ebpf.Map `ebpf:"cur_redis_req"`
-	EnabledLocalIpv4Map                 *ebpf.Map `ebpf:"enabled_local_ipv4_map"`
-	EnabledLocalPortMap                 *ebpf.Map `ebpf:"enabled_local_port_map"`
-	EnabledRemoteIpv4Map                *ebpf.Map `ebpf:"enabled_remote_ipv4_map"`
-	EnabledRemotePortMap                *ebpf.Map `ebpf:"enabled_remote_port_map"`
-	ProcessMultibulkBufferReturnArgsMap *ebpf.Map `ebpf:"processMultibulkBufferReturn_args_map"`
-	Rb                                  *ebpf.Map `ebpf:"rb"`
-	ReadArgsMap                         *ebpf.Map `ebpf:"read_args_map"`
-	RedisClientSeq                      *ebpf.Map `ebpf:"redis_client_seq"`
-	RedisResponseSeq                    *ebpf.Map `ebpf:"redis_response_seq"`
-	SockKeyConnIdMap                    *ebpf.Map `ebpf:"sock_key_conn_id_map"`
-	SockRecmMap                         *ebpf.Map `ebpf:"sock_recm_map"`
-	SockXmitMap                         *ebpf.Map `ebpf:"sock_xmit_map"`
-	SyscallDataMap                      *ebpf.Map `ebpf:"syscall_data_map"`
-	SyscallRb                           *ebpf.Map `ebpf:"syscall_rb"`
-	WriteArgsMap                        *ebpf.Map `ebpf:"write_args_map"`
+	AcceptArgsMap        *ebpf.Map `ebpf:"accept_args_map"`
+	CloseArgsMap         *ebpf.Map `ebpf:"close_args_map"`
+	ConnEvtRb            *ebpf.Map `ebpf:"conn_evt_rb"`
+	ConnInfoMap          *ebpf.Map `ebpf:"conn_info_map"`
+	ConnectArgsMap       *ebpf.Map `ebpf:"connect_args_map"`
+	ControlValues        *ebpf.Map `ebpf:"control_values"`
+	EnabledLocalIpv4Map  *ebpf.Map `ebpf:"enabled_local_ipv4_map"`
+	EnabledLocalPortMap  *ebpf.Map `ebpf:"enabled_local_port_map"`
+	EnabledRemoteIpv4Map *ebpf.Map `ebpf:"enabled_remote_ipv4_map"`
+	EnabledRemotePortMap *ebpf.Map `ebpf:"enabled_remote_port_map"`
+	Rb                   *ebpf.Map `ebpf:"rb"`
+	ReadArgsMap          *ebpf.Map `ebpf:"read_args_map"`
+	SockKeyConnIdMap     *ebpf.Map `ebpf:"sock_key_conn_id_map"`
+	SockRecmMap          *ebpf.Map `ebpf:"sock_recm_map"`
+	SockXmitMap          *ebpf.Map `ebpf:"sock_xmit_map"`
+	SyscallDataMap       *ebpf.Map `ebpf:"syscall_data_map"`
+	SyscallRb            *ebpf.Map `ebpf:"syscall_rb"`
+	WriteArgsMap         *ebpf.Map `ebpf:"write_args_map"`
 }
 
 func (m *AgentMaps) Close() error {
 	return _AgentClose(
-		m.AddReplyToBufferOrListArgsMap,
-		m.WriteToClientArgsMap,
 		m.AcceptArgsMap,
 		m.CloseArgsMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
 		m.ConnectArgsMap,
 		m.ControlValues,
-		m.CurRedisReq,
 		m.EnabledLocalIpv4Map,
 		m.EnabledLocalPortMap,
 		m.EnabledRemoteIpv4Map,
 		m.EnabledRemotePortMap,
-		m.ProcessMultibulkBufferReturnArgsMap,
 		m.Rb,
 		m.ReadArgsMap,
-		m.RedisClientSeq,
-		m.RedisResponseSeq,
 		m.SockKeyConnIdMap,
 		m.SockRecmMap,
 		m.SockXmitMap,
@@ -339,20 +318,13 @@ func (m *AgentMaps) Close() error {
 //
 // It can be passed to LoadAgentObjects or ebpf.CollectionSpec.LoadAndAssign.
 type AgentPrograms struct {
-	AddReplyToBufferOrList            *ebpf.Program `ebpf:"_addReplyToBufferOrList"`
-	AddReplyToBufferOrListReturn      *ebpf.Program `ebpf:"_addReplyToBufferOrListReturn"`
-	WriteToClient                     *ebpf.Program `ebpf:"_writeToClient"`
-	WriteToClientReturn               *ebpf.Program `ebpf:"_writeToClientReturn"`
 	Accept4Entry                      *ebpf.Program `ebpf:"accept4_entry"`
 	CloseEntry                        *ebpf.Program `ebpf:"close_entry"`
-	ConnSocketRead                    *ebpf.Program `ebpf:"connSocketRead"`
 	ConnectEntry                      *ebpf.Program `ebpf:"connect_entry"`
 	DevHardStartXmit                  *ebpf.Program `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                      *ebpf.Program `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                       *ebpf.Program `ebpf:"ip_queue_xmit"`
 	IpRcvCore                         *ebpf.Program `ebpf:"ip_rcv_core"`
-	ProcessMultibulkBuffer            *ebpf.Program `ebpf:"processMultibulkBuffer"`
-	ProcessMultibulkBufferReturn      *ebpf.Program `ebpf:"processMultibulkBufferReturn"`
 	ReadEnter                         *ebpf.Program `ebpf:"read_enter"`
 	ReadvEnter                        *ebpf.Program `ebpf:"readv_enter"`
 	ReadvReturn                       *ebpf.Program `ebpf:"readv_return"`
@@ -386,20 +358,13 @@ type AgentPrograms struct {
 
 func (p *AgentPrograms) Close() error {
 	return _AgentClose(
-		p.AddReplyToBufferOrList,
-		p.AddReplyToBufferOrListReturn,
-		p.WriteToClient,
-		p.WriteToClientReturn,
 		p.Accept4Entry,
 		p.CloseEntry,
-		p.ConnSocketRead,
 		p.ConnectEntry,
 		p.DevHardStartXmit,
 		p.DevQueueXmit,
 		p.IpQueueXmit,
 		p.IpRcvCore,
-		p.ProcessMultibulkBuffer,
-		p.ProcessMultibulkBufferReturn,
 		p.ReadEnter,
 		p.ReadvEnter,
 		p.ReadvReturn,

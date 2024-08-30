@@ -674,6 +674,7 @@ func KernRcvTestWithHTTP(t *testing.T, progs []bpf.AttachBpfProgFunction, kernEv
 
 	defer func() {
 		agentStopper <- MySignal{}
+		time.Sleep(1 * time.Second)
 	}()
 	sendTestRequest(t, SendTestHttpRequestOptions{
 		targetUrl:         "http://www.baidu.com/abc",
