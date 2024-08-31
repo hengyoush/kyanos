@@ -12,14 +12,6 @@ type StreamBuffer struct {
 	capacity int
 }
 
-type bufferRelativePostitonType int
-
-const (
-	LEFT bufferRelativePostitonType = iota
-	LEFT_CROSS
-	LEFT_CONTAINS
-)
-
 func New(capacity int) *StreamBuffer {
 	return &StreamBuffer{
 		buffers:  make([]*Buffer, 0),
@@ -77,7 +69,7 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
 	}
 
 	leftIndex, leftBuffer := sb.FindLeftBufferBySeq(seq)
-	rightIndex, rightBuffer := sb.FindRightBufferBySeq(seq)
+	_, rightBuffer := sb.FindRightBufferBySeq(seq)
 	if leftBuffer == nil && rightBuffer == nil {
 		sb.buffers = append(sb.buffers, newBuffer)
 	} else if leftBuffer == nil && rightBuffer != nil {
@@ -95,8 +87,8 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
 	} else {
 		if leftBuffer.CanFuseAsLeft(seq, dataLen) && rightBuffer.CanFuseAsRight(seq, dataLen) {
 			leftBuffer.FuseAsLeft(seq, data)
-			leftBuffer.FuseAsLeft(rightBuffer.seq, rightBuffer.buf)
-			sb.buffers = slices.Delete(sb.buffers, rightIndex, rightIndex+1)
+			rightBuffer.FuseAsRight(leftBuffer.seq, leftBuffer.buf)
+			sb.buffers = slices.Delete(sb.buffers, leftIndex, leftIndex+1)
 		} else if leftBuffer.CanFuseAsLeft(seq, dataLen) && !rightBuffer.CanFuseAsRight(seq, dataLen) {
 			leftBuffer.FuseAsLeft(seq, data)
 		} else if !leftBuffer.CanFuseAsLeft(seq, dataLen) && rightBuffer.CanFuseAsRight(seq, dataLen) {
