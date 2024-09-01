@@ -44,9 +44,10 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVarP(&RemotePorts, common.RemotePortsVarName, "", []string{}, "specify remote ports to trace, default trace all")
 	rootCmd.PersistentFlags().StringSliceVarP(&LocalPorts, common.LocalPortsVarName, "", []string{}, "specify local ports to trace, default trace all")
 	rootCmd.PersistentFlags().StringSliceVarP(&RemoteIps, common.RemoteIpsVarName, "", []string{}, "specify remote ips to trace, default trace all")
-	rootCmd.Flags().BoolVar(&Compatible, "compatible", true, "run in compatibility mode")
+	rootCmd.Flags().BoolVar(&Compatible, "compatible", false, "run in compatibility mode")
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "print more logs helpful to debug")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "print verbose message")
+	rootCmd.Flags().MarkHidden("compatible")
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false
 	viper.BindPFlags(rootCmd.Flags())
