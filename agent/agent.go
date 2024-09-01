@@ -533,56 +533,56 @@ func handleKernEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, 
 	return nil
 }
 
-func attachBpfProgs(objs any) *list.List {
+func attachBpfProgs(maps any) *list.List {
 	linkList := list.New()
 
-	linkList.PushBack(bpf.AttachSyscallAcceptEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallAcceptExit(objs))
+	linkList.PushBack(bpf.AttachSyscallAcceptEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallAcceptExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallSockAllocExit(objs))
+	linkList.PushBack(bpf.AttachSyscallSockAllocExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallConnectEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallConnectExit(objs))
+	linkList.PushBack(bpf.AttachSyscallConnectEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallConnectExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallCloseEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallCloseExit(objs))
+	linkList.PushBack(bpf.AttachSyscallCloseEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallCloseExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallWriteEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallWriteExit(objs))
+	linkList.PushBack(bpf.AttachSyscallWriteEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallWriteExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallSendMsgEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallSendMsgExit(objs))
+	linkList.PushBack(bpf.AttachSyscallSendMsgEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallSendMsgExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallRecvMsgEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallRecvMsgExit(objs))
+	linkList.PushBack(bpf.AttachSyscallRecvMsgEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallRecvMsgExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallWritevEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallWritevExit(objs))
+	linkList.PushBack(bpf.AttachSyscallWritevEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallWritevExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallSendtoEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallSendtoExit(objs))
+	linkList.PushBack(bpf.AttachSyscallSendtoEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallSendtoExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallReadEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallReadExit(objs))
+	linkList.PushBack(bpf.AttachSyscallReadEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallReadExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallReadvEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallReadvExit(objs))
+	linkList.PushBack(bpf.AttachSyscallReadvEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallReadvExit(maps))
 
-	linkList.PushBack(bpf.AttachSyscallRecvfromEntry(objs))
-	linkList.PushBack(bpf.AttachSyscallRecvfromExit(objs))
+	linkList.PushBack(bpf.AttachSyscallRecvfromEntry(maps))
+	linkList.PushBack(bpf.AttachSyscallRecvfromExit(maps))
 
-	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry(objs))
-	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry(objs))
+	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry(maps))
+	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry(maps))
 
-	linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(objs))
-	linkList.PushBack(bpf.AttachKProbeIpQueueXmitEntry(objs))
-	linkList.PushBack(bpf.AttachKProbeDevQueueXmitEntry(objs))
-	linkList.PushBack(bpf.AttachKProbeDevHardStartXmitEntry(objs))
+	linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(maps))
+	linkList.PushBack(bpf.AttachKProbeIpQueueXmitEntry(maps))
+	linkList.PushBack(bpf.AttachKProbeDevQueueXmitEntry(maps))
+	linkList.PushBack(bpf.AttachKProbeDevHardStartXmitEntry(maps))
 
-	linkList.PushBack(bpf.AttachKProbIpRcvCoreEntry(objs))
-	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(objs))
-	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(objs))
-	linkList.PushBack(bpf.AttachXdp(objs))
+	linkList.PushBack(bpf.AttachKProbIpRcvCoreEntry(maps))
+	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(maps))
+	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(maps))
+	linkList.PushBack(bpf.AttachXdp(maps))
 	// ifname := "eth0" // TODO
 
 	// iface, err := net.InterfaceByName(ifname)
