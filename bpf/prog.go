@@ -3,132 +3,147 @@ package bpf
 import (
 	"log"
 	"net"
+	"reflect"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 )
 
-type AttachBpfProgFunction func(AgentObjects) link.Link
+type AttachBpfProgFunction func(interface{}) link.Link
 
-/* accept pair */
-func AttachSyscallAcceptEntry(objs AgentObjects) link.Link {
-	return kprobe("__sys_accept4", objs.AgentPrograms.Accept4Entry)
+func GetProgram(objs any, fieldName string) *ebpf.Program {
+	oldObjs, isOld := objs.(AgentOldPrograms)
+	if isOld {
+		v := reflect.ValueOf(oldObjs)
+		f := v.FieldByName(fieldName).Interface()
+		return f.(*ebpf.Program)
+	} else {
+		newObjs := objs.(AgentPrograms)
+		v := reflect.ValueOf(newObjs)
+		f := v.FieldByName(fieldName).Interface()
+		return f.(*ebpf.Program)
+	}
 }
 
-func AttachSyscallAcceptExit(objs AgentObjects) link.Link {
-	return kretprobe("__sys_accept4", objs.AgentPrograms.SysAccept4Ret)
+/* accept pair */
+func AttachSyscallAcceptEntry(objs interface{}) link.Link {
+	return kprobe("__sys_accept4", GetProgram(objs, "Accept4Entry"))
+}
+
+func AttachSyscallAcceptExit(objs interface{}) link.Link {
+	return kretprobe("__sys_accept4", GetProgram(objs, "SysAccept4Ret"))
 }
 
 /* sock_alloc */
-func AttachSyscallSockAllocExit(objs AgentObjects) link.Link {
-	return kretprobe("sock_alloc", objs.AgentPrograms.SockAllocRet)
+func AttachSyscallSockAllocExit(objs interface{}) link.Link {
+	return kretprobe("sock_alloc", GetProgram(objs, "SockAllocRet"))
 }
 
 /* connect pair */
-func AttachSyscallConnectEntry(objs AgentObjects) link.Link {
-	return kprobe("__sys_connect", objs.AgentPrograms.ConnectEntry)
+func AttachSyscallConnectEntry(objs interface{}) link.Link {
+	return kprobe("__sys_connect", GetProgram(objs, "ConnectEntry"))
 }
 
-func AttachSyscallConnectExit(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_exit_connect", objs.AgentPrograms.TracepointSyscallsSysExitConnect)
+func AttachSyscallConnectExit(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_connect", GetProgram(objs, "TracepointSyscallsSysExitConnect"))
 }
 
 /* close pair */
-func AttachSyscallCloseEntry(objs AgentObjects) link.Link {
-	return kprobe("sys_close", objs.AgentPrograms.CloseEntry)
+func AttachSyscallCloseEntry(objs interface{}) link.Link {
+	return kprobe("sys_close", GetProgram(objs, "CloseEntry"))
 }
 
-func AttachSyscallCloseExit(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_exit_close", objs.AgentPrograms.TracepointSyscallsSysExitClose)
+func AttachSyscallCloseExit(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_close", GetProgram(objs, "TracepointSyscallsSysExitClose"))
 }
 
 /* write pair */
-func AttachSyscallWriteEntry(objs AgentObjects) link.Link {
-	return kprobe("sys_write", objs.AgentPrograms.WriteEnter)
+func AttachSyscallWriteEntry(objs interface{}) link.Link {
+	return kprobe("sys_write", GetProgram(objs, "WriteEnter"))
 }
 
-func AttachSyscallWriteExit(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_exit_write", objs.AgentPrograms.TracepointSyscallsSysExitWrite)
+func AttachSyscallWriteExit(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_write", GetProgram(objs, "TracepointSyscallsSysExitWrite"))
 }
 
 /* sendmsg pair */
-func AttachSyscallSendMsgEntry(objs AgentObjects) link.Link {
-	return kprobe("sys_sendmsg", objs.AgentPrograms.SendmsgEnter)
+func AttachSyscallSendMsgEntry(objs interface{}) link.Link {
+	return kprobe("sys_sendmsg", GetProgram(objs, "SendmsgEnter"))
 }
 
-func AttachSyscallSendMsgExit(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_exit_sendmsg", objs.AgentPrograms.TracepointSyscallsSysExitSendmsg)
+func AttachSyscallSendMsgExit(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_sendmsg", GetProgram(objs, "TracepointSyscallsSysExitSendmsg"))
 }
 
 /* recvmsg pair */
-func AttachSyscallRecvMsgEntry(objs AgentObjects) link.Link {
-	return kprobe("sys_recvmsg", objs.AgentPrograms.RecvmsgEnter)
+func AttachSyscallRecvMsgEntry(objs interface{}) link.Link {
+	return kprobe("sys_recvmsg", GetProgram(objs, "RecvmsgEnter"))
 }
 
-func AttachSyscallRecvMsgExit(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_exit_recvmsg", objs.AgentPrograms.TracepointSyscallsSysExitRecvmsg)
+func AttachSyscallRecvMsgExit(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_recvmsg", GetProgram(objs, "TracepointSyscallsSysExitRecvmsg"))
 }
 
 /* writev pair */
-func AttachSyscallWritevEntry(objs AgentObjects) link.Link {
-	return kprobe("do_writev", objs.AgentPrograms.WritevEnter)
+func AttachSyscallWritevEntry(objs interface{}) link.Link {
+	return kprobe("do_writev", GetProgram(objs, "WritevEnter"))
 }
 
-func AttachSyscallWritevExit(objs AgentObjects) link.Link {
-	return kretprobe("do_writev", objs.AgentPrograms.WritevReturn)
+func AttachSyscallWritevExit(objs interface{}) link.Link {
+	return kretprobe("do_writev", GetProgram(objs, "WritevReturn"))
 }
 
 /* sendto pair */
-func AttachSyscallSendtoEntry(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_enter_sendto", objs.AgentPrograms.TracepointSyscallsSysEnterSendto)
+func AttachSyscallSendtoEntry(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_enter_sendto", GetProgram(objs, "TracepointSyscallsSysEnterSendto"))
 }
 
-func AttachSyscallSendtoExit(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_exit_sendto", objs.AgentPrograms.TracepointSyscallsSysExitSendto)
+func AttachSyscallSendtoExit(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_sendto", GetProgram(objs, "TracepointSyscallsSysExitSendto"))
 }
 
 /* read pair */
-func AttachSyscallReadEntry(objs AgentObjects) link.Link {
-	return kprobe("sys_read", objs.AgentPrograms.ReadEnter)
+func AttachSyscallReadEntry(objs interface{}) link.Link {
+	return kprobe("sys_read", GetProgram(objs, "ReadEnter"))
 }
 
-func AttachSyscallReadExit(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_exit_read", objs.AgentPrograms.TracepointSyscallsSysExitRead)
+func AttachSyscallReadExit(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_read", GetProgram(objs, "TracepointSyscallsSysExitRead"))
 }
 
 /* readv pair */
-func AttachSyscallReadvEntry(objs AgentObjects) link.Link {
-	return kprobe("do_readv", objs.AgentPrograms.ReadvEnter)
+func AttachSyscallReadvEntry(objs interface{}) link.Link {
+	return kprobe("do_readv", GetProgram(objs, "ReadvEnter"))
 }
 
-func AttachSyscallReadvExit(objs AgentObjects) link.Link {
-	return kretprobe("do_readv", objs.AgentPrograms.ReadvReturn)
+func AttachSyscallReadvExit(objs interface{}) link.Link {
+	return kretprobe("do_readv", GetProgram(objs, "ReadvReturn"))
 }
 
 /* recvfrom pair */
-func AttachSyscallRecvfromEntry(objs AgentObjects) link.Link {
-	return kprobe("__sys_recvfrom", objs.AgentPrograms.RecvfromEnter)
+func AttachSyscallRecvfromEntry(objs interface{}) link.Link {
+	return kprobe("__sys_recvfrom", GetProgram(objs, "RecvfromEnter"))
 }
 
-func AttachSyscallRecvfromExit(objs AgentObjects) link.Link {
-	return tracepoint("syscalls", "sys_exit_recvfrom", objs.AgentPrograms.TracepointSyscallsSysExitRecvfrom)
+func AttachSyscallRecvfromExit(objs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_recvfrom", GetProgram(objs, "TracepointSyscallsSysExitRecvfrom"))
 }
 
 /* security_socket_recvmsg */
-func AttachKProbeSecuritySocketRecvmsgEntry(objs AgentObjects) link.Link {
-	return kprobe("security_socket_recvmsg", objs.AgentPrograms.SecuritySocketRecvmsgEnter)
+func AttachKProbeSecuritySocketRecvmsgEntry(objs interface{}) link.Link {
+	return kprobe("security_socket_recvmsg", GetProgram(objs, "SecuritySocketRecvmsgEnter"))
 }
 
 /* security_socket_sendmsg */
-func AttachKProbeSecuritySocketSendmsgEntry(objs AgentObjects) link.Link {
-	return kprobe("security_socket_sendmsg", objs.AgentPrograms.SecuritySocketSendmsgEnter)
+func AttachKProbeSecuritySocketSendmsgEntry(objs interface{}) link.Link {
+	return kprobe("security_socket_sendmsg", GetProgram(objs, "SecuritySocketSendmsgEnter"))
 }
 
 /* tcp_destroy_sock */
-func AttachRawTracepointTcpDestroySockEntry(objs AgentObjects) link.Link {
+func AttachRawTracepointTcpDestroySockEntry(objs interface{}) link.Link {
 	l, err := link.AttachRawTracepoint(link.RawTracepointOptions{
 		Name:    "tcp_destroy_sock",
-		Program: objs.AgentPrograms.TcpDestroySock,
+		Program: GetProgram(objs, "TcpDestroySock"),
 	})
 	if err != nil {
 		log.Fatal("tcp_destroy_sock failed: ", err)
@@ -136,30 +151,30 @@ func AttachRawTracepointTcpDestroySockEntry(objs AgentObjects) link.Link {
 	return l
 }
 
-func AttachKProbeIpQueueXmitEntry(objs AgentObjects) link.Link {
-	return kprobe("ip_queue_xmit", objs.AgentPrograms.IpQueueXmit)
+func AttachKProbeIpQueueXmitEntry(objs interface{}) link.Link {
+	return kprobe("ip_queue_xmit", GetProgram(objs, "IpQueueXmit"))
 }
-func AttachKProbeDevQueueXmitEntry(objs AgentObjects) link.Link {
-	return kprobe("dev_queue_xmit", objs.AgentPrograms.DevQueueXmit)
+func AttachKProbeDevQueueXmitEntry(objs interface{}) link.Link {
+	return kprobe("dev_queue_xmit", GetProgram(objs, "DevQueueXmit"))
 }
-func AttachKProbeDevHardStartXmitEntry(objs AgentObjects) link.Link {
-	return kprobe("dev_hard_start_xmit", objs.AgentPrograms.DevHardStartXmit)
+func AttachKProbeDevHardStartXmitEntry(objs interface{}) link.Link {
+	return kprobe("dev_hard_start_xmit", GetProgram(objs, "DevHardStartXmit"))
 }
-func AttachKProbIpRcvCoreEntry(objs AgentObjects) link.Link {
-	l, err := kprobe2("ip_rcv_core", objs.AgentPrograms.IpRcvCore)
+func AttachKProbIpRcvCoreEntry(objs interface{}) link.Link {
+	l, err := kprobe2("ip_rcv_core", GetProgram(objs, "IpRcvCore"))
 	if err != nil {
-		l = kprobe("ip_rcv_core.isra.0", objs.AgentPrograms.IpRcvCore)
+		l = kprobe("ip_rcv_core.isra.0", GetProgram(objs, "IpRcvCore"))
 	}
 	return l
 }
-func AttachKProbeTcpV4DoRcvEntry(objs AgentObjects) link.Link {
-	return kprobe("tcp_v4_do_rcv", objs.AgentPrograms.TcpV4DoRcv)
+func AttachKProbeTcpV4DoRcvEntry(objs interface{}) link.Link {
+	return kprobe("tcp_v4_do_rcv", GetProgram(objs, "TcpV4DoRcv"))
 }
-func AttachKProbeSkbCopyDatagramIterEntry(objs AgentObjects) link.Link {
-	return kprobe("__skb_datagram_iter", objs.AgentPrograms.SkbCopyDatagramIter)
+func AttachKProbeSkbCopyDatagramIterEntry(objs interface{}) link.Link {
+	return kprobe("__skb_datagram_iter", GetProgram(objs, "SkbCopyDatagramIter"))
 }
 
-func AttachXdp(objs AgentObjects) link.Link {
+func AttachXdp(objs interface{}) link.Link {
 	ifname := "eth0"
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
@@ -167,7 +182,7 @@ func AttachXdp(objs AgentObjects) link.Link {
 	}
 
 	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   objs.AgentPrograms.XdpProxy,
+		Program:   GetProgram(objs, "XdpProxy"),
 		Interface: iface.Index,
 		Flags:     link.XDPDriverMode,
 	})

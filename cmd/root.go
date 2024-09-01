@@ -29,6 +29,7 @@ var rootCmd = &cobra.Command{
 // var LogDir string
 var Verbose bool
 var Daemon bool
+var Compatible bool
 var Debug bool
 var FilterPid int64
 var RemotePorts []string
@@ -43,6 +44,7 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceVarP(&RemotePorts, common.RemotePortsVarName, "", []string{}, "specify remote ports to trace, default trace all")
 	rootCmd.PersistentFlags().StringSliceVarP(&LocalPorts, common.LocalPortsVarName, "", []string{}, "specify local ports to trace, default trace all")
 	rootCmd.PersistentFlags().StringSliceVarP(&RemoteIps, common.RemoteIpsVarName, "", []string{}, "specify remote ips to trace, default trace all")
+	rootCmd.Flags().BoolVar(&Compatible, "compatible", true, "run in compatibility mode")
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "print more logs helpful to debug")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "print verbose message")
 	rootCmd.Flags().SortFlags = false

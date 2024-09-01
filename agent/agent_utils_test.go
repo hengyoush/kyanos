@@ -41,7 +41,7 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 		common.Log.SetLevel(logrus.DebugLevel)
 		agent.SetupAgent(agent.AgentOptions{
 			Stopper: agentStopper,
-			LoadBpfProgramFunction: func(objs bpf.AgentObjects) *list.List {
+			LoadBpfProgramFunction: func(objs interface{}) *list.List {
 				progs := list.New()
 				for _, each := range bpfAttachFunctions {
 					progs.PushBack(each(objs))

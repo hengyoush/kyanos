@@ -71,14 +71,14 @@ func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string 
 	nano := options.nano
 	firstPart := fmt.Sprintf("req: %s\n\nresp:%s\n\n[total duration] = %d(%s)(start=%s, end=%s)\n",
 		r.Request().FormatToString(), r.Response().FormatToString(),
-		common.ConvertDurationToMillisecondsIfNeeded(uint64(r.totalDuration), nano), timeUnitName(nano),
+		common.ConvertDurationToMillisecondsIfNeeded(int64(r.totalDuration), nano), timeUnitName(nano),
 		common.FormatTimestampWithPrecision(r.startTs, nano),
 		common.FormatTimestampWithPrecision(r.endTs, nano))
 
 	secondPart := fmt.Sprintf("[%s]=%d(%s) [copy from sockbuf]=%d(%s)\n", r.blackboxName(),
-		common.ConvertDurationToMillisecondsIfNeeded(uint64(r.blackBoxDuration), nano),
+		common.ConvertDurationToMillisecondsIfNeeded(int64(r.blackBoxDuration), nano),
 		timeUnitName(nano),
-		common.ConvertDurationToMillisecondsIfNeeded(uint64(r.readFromSocketBufferDuration), nano),
+		common.ConvertDurationToMillisecondsIfNeeded(int64(r.readFromSocketBufferDuration), nano),
 		timeUnitName(nano))
 	thirdPart := fmt.Sprintf("[syscall] [%s count]=%d [%s count]=%d\n", r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
 		r.syscallDisplayName(false), len(r.respSyscallEventDetails))
@@ -184,9 +184,6 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
 			annotatedRecord.readFromSocketBufferDuration = int(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - int(tcpInEvents[0].GetTimestamp())
-			if annotatedRecord.readFromSocketBufferDuration/1000000 > 10 {
-				fmt.Println("!")
-			}
 		}
 		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](writeSyscallEvents)
 		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](readSyscallEvents)

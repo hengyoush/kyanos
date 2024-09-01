@@ -157,7 +157,7 @@ func FormatTimestampWithPrecision(timestamp uint64, nano bool) string {
 	}
 }
 
-func ConvertDurationToMillisecondsIfNeeded(duration uint64, nano bool) uint64 {
+func ConvertDurationToMillisecondsIfNeeded(duration int64, nano bool) int64 {
 	if nano {
 		return duration
 	} else {
