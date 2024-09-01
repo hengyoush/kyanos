@@ -40,8 +40,6 @@ type AnnotatedRecord struct {
 	totalDuration                int
 	blackBoxDuration             int
 	readFromSocketBufferDuration int
-	reqSyscallCount              int
-	respSyscallCount             int
 	reqSyscallEventDetails       []SyscallEventDetail
 	respSyscallEventDetails      []SyscallEventDetail
 	reqNicEventDetails           []NicEventDetail
@@ -57,8 +55,6 @@ func CreateAnnotedRecord() *AnnotatedRecord {
 		totalDuration:                -1,
 		blackBoxDuration:             -1,
 		readFromSocketBufferDuration: -1,
-		reqSyscallCount:              -1,
-		respSyscallCount:             -1,
 		reqSyscallEventDetails:       make([]SyscallEventDetail, 0),
 		respSyscallEventDetails:      make([]SyscallEventDetail, 0),
 		reqNicEventDetails:           make([]NicEventDetail, 0),
@@ -73,19 +69,19 @@ type AnnotatedRecordToStringOptions struct {
 
 func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string {
 	nano := options.nano
-	firstPart := fmt.Sprintf("req: %s\n\nresp:%s\n[total duration] = %d(%s)(start=%s, end=%s)\n\n",
+	firstPart := fmt.Sprintf("req: %s\n\nresp:%s\n\n[total duration] = %d(%s)(start=%s, end=%s)\n",
 		r.Request().FormatToString(), r.Response().FormatToString(),
 		common.ConvertDurationToMillisecondsIfNeeded(uint64(r.totalDuration), nano), timeUnitName(nano),
 		common.FormatTimestampWithPrecision(r.startTs, nano),
 		common.FormatTimestampWithPrecision(r.endTs, nano))
 
-	secondPart := fmt.Sprintf("[%s]=%d(%s) [copy from sockbuf]=%d(%s)\n\n", r.blackboxName(),
+	secondPart := fmt.Sprintf("[%s]=%d(%s) [copy from sockbuf]=%d(%s)\n", r.blackboxName(),
 		common.ConvertDurationToMillisecondsIfNeeded(uint64(r.blackBoxDuration), nano),
 		timeUnitName(nano),
 		common.ConvertDurationToMillisecondsIfNeeded(uint64(r.readFromSocketBufferDuration), nano),
 		timeUnitName(nano))
-	thirdPart := fmt.Sprintf("[syscall] [%s count]=%d [%s count]=%d\n", r.syscallDisplayName(true), r.reqSyscallCount,
-		r.syscallDisplayName(false), r.respSyscallCount)
+	thirdPart := fmt.Sprintf("[syscall] [%s count]=%d [%s count]=%d\n", r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
+		r.syscallDisplayName(false), len(r.respSyscallEventDetails))
 	return firstPart + secondPart + thirdPart
 }
 
@@ -167,8 +163,6 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		if hasUserCopyEvents && hasTcpInEvents {
 			annotatedRecord.readFromSocketBufferDuration = int(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - int(tcpInEvents[0].GetTimestamp())
 		}
-		annotatedRecord.reqSyscallCount = len(readSyscallEvents)
-		annotatedRecord.respSyscallCount = len(writeSyscallEvents)
 		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](readSyscallEvents)
 		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](writeSyscallEvents)
 		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](nicIngressEvents)
@@ -194,8 +188,6 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 				fmt.Println("!")
 			}
 		}
-		annotatedRecord.reqSyscallCount = len(writeSyscallEvents)
-		annotatedRecord.respSyscallCount = len(readSyscallEvents)
 		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](writeSyscallEvents)
 		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](readSyscallEvents)
 		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](devOutSyscallEvents)
