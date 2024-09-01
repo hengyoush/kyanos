@@ -3,8 +3,8 @@ package conn
 import (
 	"context"
 	"fmt"
+	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
-	"kyanos/agent/protocol/filter"
 	"kyanos/bpf"
 	"kyanos/common"
 	"sync"
@@ -25,7 +25,7 @@ type ProcessorManager struct {
 }
 
 func InitProcessorManager(n int, connManager *ConnManager, filter protocol.ProtocolFilter,
-	latencyFilter filter.LatencyFilter, sizeFilter filter.SizeFilter) *ProcessorManager {
+	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter) *ProcessorManager {
 	pm := new(ProcessorManager)
 	pm.processors = make([]*Processor, n)
 	pm.wg = new(sync.WaitGroup)
@@ -62,12 +62,12 @@ type Processor struct {
 	kernEvents    chan *bpf.AgentKernEvt
 	name          string
 	messageFilter protocol.ProtocolFilter
-	latencyFilter filter.LatencyFilter
-	filter.SizeFilter
+	latencyFilter protocol.LatencyFilter
+	protocol.SizeFilter
 }
 
 func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter protocol.ProtocolFilter,
-	latencyFilter filter.LatencyFilter, sizeFilter filter.SizeFilter) *Processor {
+	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter) *Processor {
 	p := new(Processor)
 	p.wg = wg
 	p.ctx = ctx
@@ -93,7 +93,6 @@ func (p *Processor) AddSyscallEvent(evt *bpf.SyscallEventData) {
 func (p *Processor) AddKernEvent(record *bpf.AgentKernEvt) {
 	p.kernEvents <- record
 }
-
 func (p *Processor) run() {
 	for {
 		select {
@@ -103,43 +102,46 @@ func (p *Processor) run() {
 			return
 		case event := <-p.connEvents:
 			TgidFd := uint64(event.ConnInfo.ConnId.Upid.Pid)<<32 | uint64(event.ConnInfo.ConnId.Fd)
-			conn := Connection4{
-				LocalIp:    event.ConnInfo.Laddr.In4.SinAddr.S_addr,
-				RemoteIp:   event.ConnInfo.Raddr.In4.SinAddr.S_addr,
-				LocalPort:  event.ConnInfo.Laddr.In4.SinPort,
-				RemotePort: event.ConnInfo.Raddr.In4.SinPort,
-				Protocol:   event.ConnInfo.Protocol,
-				Role:       event.ConnInfo.Role,
-				TgidFd:     TgidFd,
-				Status:     Connected,
-				CurReq:     protocol.InitProtocolMessage(true, event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleServer),
-				CurResp:    protocol.InitProtocolMessage(false, event.ConnInfo.Role == bpf.AgentEndpointRoleTKRoleServer),
-
-				MessageFilter: p.messageFilter,
-				LatencyFilter: p.latencyFilter,
-				SizeFilter:    p.SizeFilter,
-			}
-			// remove this TODO
-			// if conn.LocalPort != 16660 {
-			// 	continue
-			// }
-
+			var conn *Connection4
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
+				conn = &Connection4{
+					LocalIp:    event.ConnInfo.Laddr.In4.SinAddr.S_addr,
+					RemoteIp:   event.ConnInfo.Raddr.In4.SinAddr.S_addr,
+					LocalPort:  event.ConnInfo.Laddr.In4.SinPort,
+					RemotePort: event.ConnInfo.Raddr.In4.SinPort,
+					Protocol:   event.ConnInfo.Protocol,
+					Role:       event.ConnInfo.Role,
+					TgidFd:     TgidFd,
+					Status:     Connected,
+
+					MessageFilter: p.messageFilter,
+					LatencyFilter: p.latencyFilter,
+					SizeFilter:    p.SizeFilter,
+
+					reqStreamBuffer:  buffer.New(1024 * 1024),
+					respStreamBuffer: buffer.New(1024 * 1024),
+					ReqQueue:         make([]protocol.ParsedMessage, 0),
+					RespQueue:        make([]protocol.ParsedMessage, 0),
+					StreamEvents:     NewKernEventStream(nil),
+					prevConn:         []*Connection4{},
+				}
 				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
-				p.connManager.AddConnection4(TgidFd, &conn)
+				p.connManager.AddConnection4(TgidFd, conn)
 			} else if event.ConnType == bpf.AgentConnTypeTKClose {
-				go func() {
+				conn = p.connManager.FindConnection4Exactly(TgidFd)
+				if conn == nil {
+					continue
+				} else {
+					conn.CloseTs = event.Ts + common.LaunchEpochTime
+				}
+				go func(c *Connection4) {
 					time.Sleep(1 * time.Second)
-					conn := p.connManager.FindConnection4(TgidFd)
-					if conn != nil {
-						conn.OnClose()
-					}
-					p.connManager.RemoveConnection4(TgidFd)
-				}()
+					c.OnClose()
+				}(conn)
 			} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
 				// 协议推断
-				conn := p.connManager.FindConnection4(TgidFd)
-				if conn != nil {
+				conn = p.connManager.FindConnection4Or(TgidFd, event.Ts+common.LaunchEpochTime)
+				if conn != nil && conn.Status != Closed {
 					conn.Protocol = event.ConnInfo.Protocol
 				} else {
 					continue
@@ -148,7 +150,7 @@ func (p *Processor) run() {
 					// ReportDataEvents(conn.TempKernEvents, conn)
 					// ReportConnEvents(conn.TempConnEvents)
 					for _, sysEvent := range conn.TempSyscallEvents {
-						conn.OnSyscallEvent(sysEvent.Buf, sysEvent)
+						conn.OnSyscallEvent2(sysEvent.Buf, sysEvent)
 					}
 				}
 				// 清空, 这里可能有race
@@ -187,7 +189,7 @@ func (p *Processor) run() {
 			}
 		case event := <-p.syscallEvents:
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
-			conn := p.connManager.FindConnection4(tgidFd)
+			conn := p.connManager.FindConnection4Or(tgidFd, event.SyscallEvent.Ke.Ts+common.LaunchEpochTime)
 			event.SyscallEvent.Ke.Ts += common.LaunchEpochTime
 			direct := "=>"
 			if event.SyscallEvent.Ke.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
@@ -196,7 +198,7 @@ func (p *Processor) run() {
 			if conn != nil && conn.ProtocolInferred() {
 				log.Debugf("[syscall][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
 
-				conn.OnSyscallEvent(event.Buf, event)
+				conn.OnSyscallEvent2(event.Buf, event)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
 				log.Debugf("[syscall][protocol unset][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
@@ -205,7 +207,7 @@ func (p *Processor) run() {
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
-			conn := p.connManager.FindConnection4(tgidFd)
+			conn := p.connManager.FindConnection4Or(tgidFd, event.Ts+common.LaunchEpochTime)
 			event.Ts += common.LaunchEpochTime
 			direct := "=>"
 			if event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
@@ -231,11 +233,11 @@ func (p *Processor) run() {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					// TODO 推断出协议之前的事件需要处理，这里暂时略过
 					// conn.AddKernEvent(&event)
-					conn.OnKernEvent(event)
+					conn.OnKernEvent2(event)
 					log.Debug("[skip] skip due to protocol unset")
 					// log.Infof("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
-					flag := conn.OnKernEvent(event)
+					flag := conn.OnKernEvent2(event)
 					if !flag {
 						log.Debug("[skip] skip due to cur req/resp is nil ?(maybe bug)")
 					}
@@ -244,7 +246,7 @@ func (p *Processor) run() {
 				log.Debug("[skip] skip due to protocol is unknwon")
 				log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 			} else if event.Len == 0 && conn != nil {
-				conn.OnKernEvent(event)
+				conn.OnKernEvent2(event)
 			}
 		}
 	}

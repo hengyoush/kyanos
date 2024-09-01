@@ -1,9 +1,12 @@
-package parser
+package protocol
 
 import (
+	"errors"
 	"fmt"
-	"kyanos/agent/protocol"
+	"kyanos/agent/buffer"
+	"kyanos/bpf"
 	"kyanos/common"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -307,15 +310,21 @@ func init() {
 	redisCommandsMap["REPLCONF ACK"] = []string{"REPLCONF ACK", "offset"}
 }
 
-type RedisParser struct {
-}
+var _ ProtocolStreamParser = RedisStreamParser{}
+var _ ParsedMessage = &RedisMessage{}
 
+type RedisStreamParser struct {
+}
 type RedisMessage struct {
-	protocol.FrameBase
+	FrameBase
 	payload string
 	command string
+	isReq   bool
 }
 
+func (req *RedisMessage) IsReq() bool {
+	return req.isReq
+}
 func (m *RedisMessage) Command() string {
 	return m.command
 }
@@ -328,7 +337,24 @@ func (m *RedisMessage) FormatToString() string {
 	return fmt.Sprintf("base=[%s] command=[%s] payload=[%s]", m.FrameBase.String(), m.command, m.payload)
 }
 
-func ParseSize(decoder *protocol.BinaryDecoder) (int, error) {
+func (r RedisStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
+	head := streamBuffer.Head().Buffer()
+	for ; startPos < len(head); startPos++ {
+		typeMarker := head[startPos]
+		if typeMarker == kSimpleStringMarker || typeMarker == kErrorMarker ||
+			typeMarker == kIntegerMarker || typeMarker == kBulkStringsMarker ||
+			typeMarker == kArrayMarker {
+			return startPos
+		}
+
+	}
+	return -1
+}
+
+func (r RedisStreamParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
+	return matchByTimestamp(reqStream, respStream)
+}
+func ParseSize(decoder *BinaryDecoder) (int, error) {
 	str, err := decoder.ExtractStringUntil(kTerminalSequence)
 	if err != nil {
 		return 0, err
@@ -351,8 +377,7 @@ func ParseSize(decoder *protocol.BinaryDecoder) (int, error) {
 	}
 	return size, nil
 }
-
-func ParseBulkString(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMessage) (string, error) {
+func ParseBulkString(decoder *BinaryDecoder, timestamp uint64, seq uint64) (string, error) {
 	const maxLen int = 512 * 1024 * 1024
 	length, err := ParseSize(decoder)
 	if err != nil {
@@ -372,20 +397,20 @@ func ParseBulkString(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocol
 	return str, nil
 }
 
-func ParseArray(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMessage) (*RedisMessage, error) {
+func ParseArray(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMessage, error) {
 	size, err := ParseSize(decoder)
 	if err != nil {
 		return nil, err
 	}
 	if size == kNullSize {
 		return &RedisMessage{
-			FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   "[NULL]",
 		}, nil
 	}
 	msgSlice := make([]RedisMessage, 0)
 	for i := 0; i < size; i++ {
-		_msg, err := ParseMessage(decoder, msg)
+		_msg, err := ParseMessage(decoder, timestamp, seq)
 		if err != nil {
 			return nil, err
 		}
@@ -393,11 +418,12 @@ func ParseArray(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMessa
 	}
 
 	ret := &RedisMessage{
-		FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
+		FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), uint64(decoder.readBytes)),
 	}
 	cmd, payload := getCmdAndArgs(msgSlice)
 	ret.command = cmd
 	ret.payload = payload
+	ret.isReq = true
 
 	return ret, nil
 }
@@ -434,7 +460,7 @@ func getCmdAndArgs(payloads []RedisMessage) (string, string) {
 	return cmd, finalPayload
 }
 
-func ParseMessage(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMessage) (*RedisMessage, error) {
+func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMessage, error) {
 
 	typeMarker, err := decoder.ExtractByte()
 	if err != nil {
@@ -448,16 +474,16 @@ func ParseMessage(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMes
 			return nil, err
 		}
 		return &RedisMessage{
-			FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   str,
 		}, nil
 	case kBulkStringsMarker:
-		str, err := ParseBulkString(decoder, msg)
+		str, err := ParseBulkString(decoder, timestamp, seq)
 		if err != nil {
 			return nil, err
 		}
 		return &RedisMessage{
-			FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   str,
 		}, nil
 	case kErrorMarker:
@@ -466,7 +492,7 @@ func ParseMessage(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMes
 			return nil, err
 		}
 		return &RedisMessage{
-			FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   "-" + str,
 		}, nil
 	case kIntegerMarker:
@@ -475,17 +501,86 @@ func ParseMessage(decoder *protocol.BinaryDecoder, msg *protocol.BaseProtocolMes
 			return nil, err
 		}
 		return &RedisMessage{
-			FrameBase: protocol.NewFrameBase(msg.StartTs, int(msg.TotalBytes())),
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   str,
 		}, nil
 	case kArrayMarker:
-		return ParseArray(decoder, msg)
+		return ParseArray(decoder, timestamp, seq)
 	default:
 		return nil, common.NewInvalidArgument(fmt.Sprintf("Unexpected Redis type marker char (displayed as integer): %d", typeMarker))
 	}
 }
 
-func (RedisParser) Parse(msg *protocol.BaseProtocolMessage) (protocol.ParsedMessage, error) {
-	decoder := protocol.NewBinaryDecoder(msg.Data())
-	return ParseMessage(decoder, msg)
+func (r RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult {
+	head := streamBuffer.Head().Buffer()
+	ts, ok := streamBuffer.FindTimestampBySeq(streamBuffer.Head().LeftBoundary())
+	if !ok {
+		return ParseResult{
+			ParseState: Invalid,
+		}
+	}
+	decoder := NewBinaryDecoder(head)
+	redisMessage, err := ParseMessage(decoder, ts, streamBuffer.Head().LeftBoundary())
+	result := ParseResult{}
+	if err != nil {
+		if errors.Is(err, &NotFoundError{}) || errors.Is(err, &ResourceNotAvailbleError{}) {
+			result.ParseState = NeedsMoreData
+		} else {
+			result.ParseState = Invalid
+		}
+	} else {
+		result.ParseState = Success
+		result.ReadBytes = redisMessage.ByteSize()
+		result.ParsedMessages = []ParsedMessage{redisMessage}
+	}
+
+	return result
 }
+func init() {
+	ParsersMap[bpf.AgentTrafficProtocolTKProtocolRedis] = RedisStreamParser{}
+}
+
+type RedisFilter struct {
+	TargetCommands []string
+	TargetKeys     []string
+	KeyPrefix      string
+}
+
+func extractKeyFromPayLoad(redisMessage *RedisMessage) string {
+	payload := redisMessage.Payload()
+	spaceIdx := strings.Index(payload, " ")
+	if spaceIdx == -1 {
+		return payload
+	} else {
+		return payload[0:spaceIdx]
+	}
+}
+
+func (r RedisFilter) Filter(req ParsedMessage, resp ParsedMessage) bool {
+	redisReq, ok := req.(*RedisMessage)
+	if !ok {
+		log.Warnf("[RedisFilter] cast to RedisMessage failed: %v\n", req)
+		return false
+	}
+	pass := true
+	pass = pass && (len(r.TargetCommands) == 0 || slices.Index(r.TargetCommands, redisReq.Command()) != -1)
+	firstKey := extractKeyFromPayLoad(redisReq)
+	pass = pass && (len(r.TargetKeys) == 0 || slices.Index(r.TargetKeys, firstKey) != -1)
+	pass = pass && (r.KeyPrefix == "" || strings.HasPrefix(firstKey, r.KeyPrefix))
+
+	return pass
+}
+
+func (r RedisFilter) FilterByProtocol(p bpf.AgentTrafficProtocolT) bool {
+	return p == bpf.AgentTrafficProtocolTKProtocolRedis
+}
+
+func (r RedisFilter) FilterByRequest() bool {
+	return len(r.TargetCommands) > 0 || len(r.TargetKeys) > 0 || r.KeyPrefix != ""
+}
+
+func (r RedisFilter) FilterByResponse() bool {
+	return false
+}
+
+var _ ProtocolFilter = RedisFilter{}

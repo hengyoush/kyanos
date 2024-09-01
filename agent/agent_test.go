@@ -201,7 +201,7 @@ func TestRead(t *testing.T) {
 		connEventList:    connEventList,
 	})
 	syscallEvent := syscallEvents[0]
-	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 		KernDataEventAssertConditions: KernDataEventAssertConditions{
 			connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
@@ -261,7 +261,7 @@ func TestRecvFrom(t *testing.T) {
 		connEventList:    connEventList,
 	})
 	syscallEvent := syscallEvents[0]
-	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 		KernDataEventAssertConditions: KernDataEventAssertConditions{
 			connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
@@ -323,7 +323,7 @@ func TestReadv(t *testing.T) {
 		connEventList:    connEventList,
 	})
 	assert.Equal(t, len(readBufSizeSlice), len(syscallEvents))
-	conn := connManager.FindConnection4(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
@@ -389,7 +389,7 @@ func TestRecvmsg(t *testing.T) {
 		connEventList:    connEventList,
 	})
 	assert.Equal(t, len(readBufSizeSlice), len(syscallEvents))
-	conn := connManager.FindConnection4(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
@@ -453,7 +453,7 @@ func TestWrite(t *testing.T) {
 		connEventList:    connEventList,
 	})
 	syscallEvent := syscallEvents[0]
-	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 		KernDataEventAssertConditions: KernDataEventAssertConditions{
 			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
@@ -513,7 +513,7 @@ func TestSendto(t *testing.T) {
 		connEventList:    connEventList,
 	})
 	syscallEvent := syscallEvents[0]
-	conn := connManager.FindConnection4(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 		KernDataEventAssertConditions: KernDataEventAssertConditions{
 			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
@@ -573,7 +573,7 @@ func TestWritev(t *testing.T) {
 		connEventList:    connEventList,
 	})
 	assert.Equal(t, 2, len(syscallEvents))
-	conn := connManager.FindConnection4(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
@@ -637,7 +637,7 @@ func TestSendMsg(t *testing.T) {
 		connEventList:    connEventList,
 	})
 	assert.Equal(t, 2, len(syscallEvents))
-	conn := connManager.FindConnection4(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(syscallEvents[0].SyscallEvent.Ke.ConnIdS.TgidFd)
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
@@ -686,7 +686,7 @@ func KernRcvTestWithHTTP(t *testing.T, progs []bpf.AttachBpfProgFunction, kernEv
 	intersetedKernEvents := findInterestedKernEvents(t, kernEventList, kernEvtFilter)
 	assert.Equal(t, 1, len(intersetedKernEvents))
 	kernEvent := intersetedKernEvents[0]
-	conn := connManager.FindConnection4(kernEvent.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(kernEvent.ConnIdS.TgidFd)
 	if !kernEvtAsserts.ignoreFd && kernEvtAsserts.fd == 0 {
 		kernEvtAsserts.fd = uint32(conn.TgidFd)
 	}
@@ -728,7 +728,7 @@ func KernTestWithTcpEchoServer(t *testing.T, progs []bpf.AttachBpfProgFunction, 
 	intersetedKernEvents := findInterestedKernEvents(t, kernEventList, kernEvtFilter)
 	assert.Equal(t, 1, len(intersetedKernEvents))
 	kernEvent := intersetedKernEvents[0]
-	conn := connManager.FindConnection4(kernEvent.ConnIdS.TgidFd)
+	conn := connManager.FindConnection4Exactly(kernEvent.ConnIdS.TgidFd)
 	if !kernEvtAsserts.ignoreFd && kernEvtAsserts.fd == 0 {
 		kernEvtAsserts.fd = uint32(conn.TgidFd)
 	}

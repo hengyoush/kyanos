@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"kyanos/agent"
-	"kyanos/agent/protocol/filter"
+	"kyanos/agent/protocol"
 
 	"github.com/spf13/cobra"
 )
@@ -24,7 +24,7 @@ var redisCmd *cobra.Command = &cobra.Command{
 			logger.Fatalf("invalid prefix: %v\n", err)
 		}
 		startAgent(agent.AgentOptions{
-			MessageFilter: filter.RedisFilter{
+			MessageFilter: protocol.RedisFilter{
 				TargetCommands: commands,
 				TargetKeys:     keys,
 				KeyPrefix:      prefix,

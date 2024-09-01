@@ -2,15 +2,50 @@ package conn
 
 import (
 	"fmt"
+	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
-	"kyanos/agent/protocol/filter"
 	"kyanos/bpf"
 	"kyanos/common"
 	"sync"
 )
 
+// var RecordFunc func(protocol.Record, *Connection4) error
 var RecordFunc func(protocol.Record, *Connection4) error
 var OnCloseRecordFunc func(*Connection4) error
+
+type Connection4 struct {
+	LocalIp    uint32
+	RemoteIp   uint32
+	LocalPort  uint16
+	RemotePort uint16
+	Protocol   bpf.AgentTrafficProtocolT
+	Role       bpf.AgentEndpointRoleT
+	TgidFd     uint64
+
+	TempKernEvents    []*bpf.AgentKernEvt
+	TempConnEvents    []*bpf.AgentConnEvtT
+	TempSyscallEvents []*bpf.SyscallEventData
+	Status            ConnStatus
+	// CurReq            *protocol.BaseProtocolMessage
+	// CurResp           *protocol.BaseProtocolMessage
+	TCPHandshakeStatus
+	// MessageFilter protocol.ProtocolFilter
+	// filter.LatencyFilter
+	// filter.SizeFilter
+
+	reqStreamBuffer  *buffer.StreamBuffer
+	respStreamBuffer *buffer.StreamBuffer
+	ReqQueue         []protocol.ParsedMessage
+	RespQueue        []protocol.ParsedMessage
+	StreamEvents     *KernEventStream
+
+	MessageFilter protocol.ProtocolFilter
+	LatencyFilter protocol.LatencyFilter
+	SizeFilter    protocol.SizeFilter
+
+	prevConn []*Connection4
+}
+type ConnStatus uint8
 
 type TCPHandshakeStatus struct {
 	ConnectStartTs      uint64 // connect syscall 开始的时间
@@ -18,28 +53,8 @@ type TCPHandshakeStatus struct {
 	ServerSynReceivedTs uint64
 	ClientAckSent       bool
 	ClientAckSentTs     uint64
+	CloseTs             uint64
 }
-type Connection4 struct {
-	LocalIp           uint32
-	RemoteIp          uint32
-	LocalPort         uint16
-	RemotePort        uint16
-	Protocol          bpf.AgentTrafficProtocolT
-	Role              bpf.AgentEndpointRoleT
-	TgidFd            uint64
-	TempKernEvents    []*bpf.AgentKernEvt
-	TempConnEvents    []*bpf.AgentConnEvtT
-	TempSyscallEvents []*bpf.SyscallEventData
-	Status            ConnStatus
-	CurReq            *protocol.BaseProtocolMessage
-	CurResp           *protocol.BaseProtocolMessage
-	TCPHandshakeStatus
-	MessageFilter protocol.ProtocolFilter
-	filter.LatencyFilter
-	filter.SizeFilter
-}
-
-type ConnStatus uint8
 
 const (
 	Connected ConnStatus = 0
@@ -55,26 +70,81 @@ func InitConnManager() *ConnManager {
 }
 
 func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
-	_, loaded := c.connMap.LoadOrStore(TgidFd, conn)
-	if !loaded {
-		// log.Warnf("%s has already in connMap, why same conn (%s) come again?\n", c.FindConnection4(TgidFd).ToString(), conn.ToString())
+	existedConn := c.FindConnection4Exactly(TgidFd)
+	if existedConn != nil {
+		if !existedConn.IsIpPortEqualsWith(conn) {
+			prevConn := existedConn.prevConn
+			deleteEndIdx := -1
+			for idx := len(prevConn) - 1; idx >= 0; idx-- {
+				if prevConn[idx].Status == Closed {
+					deleteEndIdx = idx
+					break
+				}
+			}
+			if deleteEndIdx != -1 {
+				prevConn = prevConn[deleteEndIdx+1:]
+			}
+
+			prevConn = append(prevConn, existedConn)
+			conn.prevConn = prevConn
+
+			c.connMap.Store(TgidFd, conn)
+			return nil
+		} else {
+			return nil
+		}
+	} else {
+		_, loaded := c.connMap.LoadOrStore(TgidFd, conn)
+		if !loaded {
+			// log.Warnf("%s has already in connMap, why same conn (%s) come again?\n", c.FaindConnection4(TgidFd).ToString(), conn.ToString())
+		}
+		// c.connMap.Store(TgidFd, conn)
+		return nil
 	}
-	// c.connMap.Store(TgidFd, conn)
-	return nil
+
 }
 
 func (c *ConnManager) RemoveConnection4(TgidFd uint64) {
 	c.connMap.Delete(TgidFd)
 }
 
-func (c *ConnManager) FindConnection4(TgidFd uint64) *Connection4 {
+func (c *ConnManager) FindConnection4Exactly(TgidFd uint64) *Connection4 {
 	v, _ := c.connMap.Load(TgidFd)
 	if v != nil {
 		return v.(*Connection4)
 	} else {
 		return nil
 	}
+}
 
+func (c *ConnManager) FindConnection4Or(TgidFd uint64, ts uint64) *Connection4 {
+	v, _ := c.connMap.Load(TgidFd)
+	connection, _ := v.(*Connection4)
+	if connection == nil {
+		return nil
+	} else {
+		if connection.ConnectStartTs < ts {
+			return connection
+		} else {
+			curConnList := connection.prevConn
+			if len(curConnList) > 0 {
+				prevConn := curConnList[0]
+				if prevConn.CloseTs != 0 && prevConn.CloseTs < ts {
+					return connection
+				}
+			}
+			for idx := len(curConnList) - 1; idx >= 0; idx-- {
+				if curConnList[idx].ConnectStartTs < ts {
+					return curConnList[idx]
+				}
+			}
+			return nil
+		}
+	}
+}
+
+func (c *Connection4) IsIpPortEqualsWith(o *Connection4) bool {
+	return c.LocalIp == o.LocalIp && c.RemoteIp == o.RemoteIp && c.RemotePort == o.RemotePort && c.LocalPort == o.LocalPort
 }
 
 func (c *Connection4) AddKernEvent(e *bpf.AgentKernEvt) {
@@ -97,17 +167,24 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 	var needSubmit bool
 
 	needSubmit = c.MessageFilter.FilterByProtocol(c.Protocol)
-	needSubmit = needSubmit && c.LatencyFilter.Filter(float64(record.Duration)/1000000)
+	var duration uint64
+	if c.IsServerSide() {
+		duration = record.Request().TimestampNs() - record.Response().TimestampNs()
+	} else {
+		duration = record.Response().TimestampNs() - record.Request().TimestampNs()
+	}
+
+	needSubmit = needSubmit && c.LatencyFilter.Filter(float64(duration)/1000000)
 	needSubmit = needSubmit &&
-		c.SizeFilter.FilterByReqSize(int64(record.Request.TotalBytes())) &&
-		c.SizeFilter.FilterByRespSize(record.Response.TotalBytes())
+		c.SizeFilter.FilterByReqSize(int64(record.Request().ByteSize())) &&
+		c.SizeFilter.FilterByRespSize(int64(record.Response().ByteSize()))
 	if parser := protocol.GetParserByProtocol(c.Protocol); needSubmit && parser != nil {
 		var parsedRequest, parsedResponse protocol.ParsedMessage
 		if c.MessageFilter.FilterByRequest() {
-			parsedRequest = record.Request.RequireParsed()
+			parsedRequest = record.Request()
 		}
 		if c.MessageFilter.FilterByResponse() {
-			parsedResponse = record.Response.RequireParsed()
+			parsedResponse = record.Response()
 		}
 		if parsedRequest != nil || parsedResponse != nil {
 			needSubmit = c.MessageFilter.Filter(parsedRequest, parsedResponse)
@@ -122,91 +199,29 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 	if needSubmit {
 		RecordFunc(record, c)
 	}
-
 }
 
 func (c *Connection4) OnClose() {
-	if c.CurResp.HasData() || c.CurReq.HasData() {
-		record := protocol.Record{
-			Request:  c.CurReq,
-			Response: c.CurResp,
-		}
-		if !c.CurResp.HasData() || !c.CurReq.HasData() {
-			// 缺少请求或者响应,连接就关闭了
-			record.Duration = 0
-		} else {
-			record.Duration = c.CurResp.EndTs - c.CurReq.StartTs
-		}
-		c.submitRecord(record)
-	}
+	// if c.CurResp.HasData() || c.CurReq.HasData() {
+	// 	record := protocol.Record{
+	// 		Request:  c.CurReq,
+	// 		Response: c.CurResp,
+	// 	}
+	// 	if !c.CurResp.HasData() || !c.CurReq.HasData() {
+	// 		// 缺少请求或者响应,连接就关闭了
+	// 		record.Duration = 0
+	// 	} else {
+	// 		record.Duration = c.CurResp.EndTs - c.CurReq.StartTs
+	// 	}
+	// 	// c.submitRecord(record)
+	// }
 	OnCloseRecordFunc(c)
 	c.Status = Closed
 }
-
-func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
-	isReq := isReq(c, &event.SyscallEvent.Ke)
-	// 以下只能作用于单发单收（一个syscall不包含多个消息，且客户端在接收请求的响应之前不能再发送请求）
-	if isReq {
-		// 首先要尝试匹配之前的req和resp
-		if c.CurResp.HasData() && c.CurReq.HasData() {
-			// 匹配 输出record
-			record := protocol.Record{
-				Request:  c.CurReq,
-				Response: c.CurResp,
-				Duration: c.CurResp.EndTs - c.CurReq.StartTs,
-			}
-			c.submitRecord(record)
-			// 然后再更新状态
-			c.CurReq = protocol.InitProtocolMessage(true, c.IsServerSide())
-			c.CurResp = protocol.InitProtocolMessage(false, c.IsServerSide())
-		}
-		if c.CurReq.HasData() {
-			c.CurReq.AppendData(data)
-		} else {
-			tempReq := c.CurReq
-			c.CurReq = protocol.InitProtocolMessageWithEvent(event, isReq, c.IsServerSide(), c.Protocol)
-			c.CurResp = protocol.InitProtocolMessage(false, c.IsServerSide())
-			if tempReq.HasEvent() {
-				c.CurReq.CopyTimeDetailFrom(tempReq)
-			}
-			if c.IsServerSide() {
-				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, event.SyscallEvent.Ke.Ts)
-			} else {
-				c.CurReq.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, event.SyscallEvent.Ke.Ts)
-			}
-		}
-		c.CurReq.IncrSyscallCount()
-		c.CurReq.IncrTotalBytesBy(uint(event.SyscallEvent.Ke.Len))
-	} else {
-		if c.CurResp.HasData() {
-			c.CurResp.AppendData(data)
-		} else {
-			tempResp := c.CurResp
-			c.CurResp = protocol.InitProtocolMessageWithEvent(event, isReq, c.IsServerSide(), c.Protocol)
-			if tempResp.HasEvent() {
-				c.CurResp.CopyTimeDetailFrom(tempResp)
-			}
-			if c.IsServerSide() {
-				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_OUT, event.SyscallEvent.Ke.Ts)
-			} else {
-				c.CurResp.AddTimeDetail(bpf.AgentStepTSYSCALL_IN, event.SyscallEvent.Ke.Ts)
-			}
-		}
-		c.CurResp.IncrSyscallCount()
-		c.CurResp.IncrTotalBytesBy(uint(event.SyscallEvent.Ke.Len))
-	}
-}
-
-func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
+func (c *Connection4) OnKernEvent2(event *bpf.AgentKernEvt) bool {
 	isReq := isReq(c, event)
 	if event.Len > 0 {
-		if isReq && c.CurReq != nil {
-			c.CurReq.AddTimeDetail(event.Step, event.Ts)
-		} else if !isReq && c.CurResp != nil {
-			c.CurResp.AddTimeDetail(event.Step, event.Ts)
-		} else {
-			return false
-		}
+		c.StreamEvents.AddKernEvent(event)
 	} else {
 		if (event.Flags&uint8(common.TCP_FLAGS_SYN) != 0) && !isReq && event.Step == bpf.AgentStepTIP_IN {
 			// 接收到Server给的Syn包
@@ -224,8 +239,67 @@ func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 			log.Debugf("[kern][handshake]%s sent ack, complete handshake, use time: %d(%d-%d)\n", c.ToString(), c.ClientAckSentTs-c.ConnectStartTs, c.ClientAckSentTs, c.ConnectStartTs)
 		}
 	}
-
 	return true
+}
+func (c *Connection4) OnSyscallEvent2(data []byte, event *bpf.SyscallEventData) {
+	isReq := isReq(c, &event.SyscallEvent.Ke)
+	if isReq {
+
+		c.reqStreamBuffer.Add(event.SyscallEvent.Ke.Seq, data, event.SyscallEvent.Ke.Ts)
+	} else {
+		c.respStreamBuffer.Add(event.SyscallEvent.Ke.Seq, data, event.SyscallEvent.Ke.Ts)
+	}
+
+	c.parseStreamBuffer(c.reqStreamBuffer, protocol.Request, &c.ReqQueue)
+	c.parseStreamBuffer(c.respStreamBuffer, protocol.Response, &c.RespQueue)
+	c.StreamEvents.AddSyscallEvent(event)
+
+	parser := protocol.GetParserByProtocol(c.Protocol)
+	if parser == nil {
+		panic("no protocol parser!")
+	}
+
+	records := parser.Match(&c.ReqQueue, &c.RespQueue)
+	for _, each := range records {
+		c.submitRecord(each)
+	}
+}
+
+func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage) {
+	parser := protocol.GetParserByProtocol(c.Protocol)
+	if parser == nil {
+		// panic(fmt.Sprintf("no protocol parser!, protocol: %v", c.Protocol))
+		streamBuffer.Clear()
+		return
+	}
+	if streamBuffer.IsEmpty() {
+		return
+	}
+	stop := false
+	startPos := parser.FindBoundary(streamBuffer, messageType, 0)
+	if startPos == -1 {
+		return
+	}
+	streamBuffer.RemovePrefix(startPos)
+	for !stop && !streamBuffer.IsEmpty() {
+		parseResult := parser.ParseStream(streamBuffer, messageType)
+		switch parseResult.ParseState {
+		case protocol.Success:
+			*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
+			streamBuffer.RemovePrefix(parseResult.ReadBytes)
+			// str := parseResult.ParsedMessages[0].FormatToString()
+			// if !strings.HasSuffix(str, "]") && !strings.HasSuffix(str, "}") { //}]
+			// 	fmt.Print("!")
+			// }
+		case protocol.Invalid:
+			stop = true
+		case protocol.NeedsMoreData:
+			stop = true
+		default:
+			panic("invalid parse state!")
+		}
+	}
+
 }
 
 func isReq(conn *Connection4, event *bpf.AgentKernEvt) bool {

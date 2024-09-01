@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"kyanos/agent"
-	"kyanos/agent/protocol/filter"
+	"kyanos/agent/protocol"
 
 	"github.com/spf13/cobra"
 )
@@ -26,18 +26,18 @@ var watchCmd = &cobra.Command{
 	},
 }
 
-func initLatencyFilter(cmd *cobra.Command) filter.LatencyFilter {
+func initLatencyFilter(cmd *cobra.Command) protocol.LatencyFilter {
 	latency, err := cmd.Flags().GetFloat64("latency")
 	if err != nil {
 		logger.Fatalf("invalid latency: %v\n", err)
 	}
-	latencyFilter := filter.LatencyFilter{
+	latencyFilter := protocol.LatencyFilter{
 		MinLatency: latency,
 	}
 	return latencyFilter
 }
 
-func initSizeFilter(cmd *cobra.Command) filter.SizeFilter {
+func initSizeFilter(cmd *cobra.Command) protocol.SizeFilter {
 	reqSizeLimit, err := cmd.Flags().GetInt64("req-size")
 	if err != nil {
 		logger.Fatalf("invalid req-size: %v\n", err)
@@ -46,7 +46,7 @@ func initSizeFilter(cmd *cobra.Command) filter.SizeFilter {
 	if err != nil {
 		logger.Fatalf("invalid resp-size: %v\n", err)
 	}
-	sizeFilter := filter.SizeFilter{
+	sizeFilter := protocol.SizeFilter{
 		MinReqSize:  reqSizeLimit,
 		MinRespSize: respSizeLimit,
 	}

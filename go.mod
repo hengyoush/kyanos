@@ -14,6 +14,7 @@ require (
 	github.com/airbrake/gobrake v3.7.4+incompatible // indirect
 	github.com/caio/go-tdigest v3.1.0+incompatible // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/elliotchance/orderedmap/v2 v2.4.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect

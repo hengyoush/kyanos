@@ -7,7 +7,6 @@ import (
 	"errors"
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
-	"kyanos/agent/protocol/filter"
 	"kyanos/agent/stat"
 	"kyanos/bpf"
 	"kyanos/common"
@@ -46,8 +45,8 @@ type AgentOptions struct {
 	LoadBpfProgramFunction LoadBpfProgramFunction
 	ProcessorsNum          int
 	MessageFilter          protocol.ProtocolFilter
-	LatencyFilter          filter.LatencyFilter
-	filter.SizeFilter
+	LatencyFilter          protocol.LatencyFilter
+	protocol.SizeFilter
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -59,7 +58,7 @@ func validateAndRepairOptions(options AgentOptions) AgentOptions {
 		newOptions.ProcessorsNum = runtime.NumCPU()
 	}
 	if newOptions.MessageFilter == nil {
-		newOptions.MessageFilter = filter.NoopFilter{}
+		newOptions.MessageFilter = protocol.NoopFilter{}
 	}
 	return newOptions
 }

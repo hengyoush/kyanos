@@ -145,3 +145,33 @@ func TestStreamBufferPartialOverlapAsMiddle(t *testing.T) {
 	b := buffers[0]
 	assert.Equal(t, b.Buffer(), append(append(data, data2[1:6]...), data3...))
 }
+
+func TestFindTimestamp(t *testing.T) {
+	sb := buffer.New(10)
+	data := []byte{0, 1, 2, 3, 4}
+	sb.Add(1, data, 2)
+
+	seq, ok := sb.FindTimestampBySeq(1)
+	assert.Equal(t, true, ok)
+	assert.Equal(t, uint64(2), seq)
+}
+
+func TestRemovePrefixPartially(t *testing.T) {
+	sb := buffer.New(10)
+	data := []byte{0, 1, 2, 3, 4}
+	sb.Add(1, data, 2)
+
+	sb.RemovePrefix(1)
+	assert.Equal(t, 1, len(sb.Buffers()))
+	head := sb.Head()
+	assert.Equal(t, uint64(2), head.LeftBoundary())
+	assert.Equal(t, 4, head.Len())
+}
+func TestRemovePrefixCompletely(t *testing.T) {
+	sb := buffer.New(10)
+	data := []byte{0, 1, 2, 3, 4}
+	sb.Add(1, data, 2)
+
+	sb.RemovePrefix(5)
+	assert.Equal(t, 0, len(sb.Buffers()))
+}

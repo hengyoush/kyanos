@@ -5,8 +5,9 @@ import (
 )
 
 type BinaryDecoder struct {
-	buf []byte
-	str string
+	buf       []byte
+	str       string
+	readBytes int
 }
 
 func NewBinaryDecoder(buf []byte) *BinaryDecoder {
@@ -40,6 +41,9 @@ func NewResourceNotAvailbleError(msg string) *NotFoundError {
 func (e *ResourceNotAvailbleError) Error() string {
 	return e.msg
 }
+func (d *BinaryDecoder) ReadBytes() int {
+	return d.readBytes
+}
 
 /*
 Extract until encounter the input string.
@@ -53,6 +57,7 @@ func (d *BinaryDecoder) ExtractStringUntil(sentinel string) (string, error) {
 	}
 	ret := d.str[0:idx]
 	d.str = d.str[idx+len(sentinel):]
+	d.readBytes += (idx + len(sentinel))
 	return ret, nil
 }
 
@@ -62,6 +67,7 @@ func (d *BinaryDecoder) ExtractString(length int) (string, error) {
 	}
 	ret := d.str[0:length]
 	d.str = d.str[length:]
+	d.readBytes += length
 	return ret, nil
 }
 
@@ -71,5 +77,6 @@ func (d *BinaryDecoder) ExtractByte() (byte, error) {
 	}
 	x := d.str[0]
 	d.str = d.str[1:]
+	d.readBytes++
 	return x, nil
 }

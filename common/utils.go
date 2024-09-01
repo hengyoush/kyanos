@@ -1,12 +1,15 @@
 package common
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/jefurry/logrus"
 )
@@ -137,4 +140,27 @@ func IPv4ToUint32(ipStr string) (uint32, error) {
 	}
 
 	return result, nil
+}
+
+func GetBufioReaderReadIndex(r *bufio.Reader) int {
+	_type := reflect.ValueOf(*r)
+	f := _type.FieldByName("r")
+	return int(f.Int())
+}
+
+func FormatTimestampWithPrecision(timestamp uint64, nano bool) string {
+	t := time.Unix(int64(timestamp/1000000000), int64(timestamp%1000000000))
+	if nano {
+		return t.Format("2006-01-02 15:04:05.000000000")
+	} else {
+		return t.Format("2006-01-02 15:04:05.000")
+	}
+}
+
+func ConvertDurationToMillisecondsIfNeeded(duration uint64, nano bool) uint64 {
+	if nano {
+		return duration
+	} else {
+		return duration / 1000000
+	}
 }
