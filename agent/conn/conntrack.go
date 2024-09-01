@@ -26,12 +26,7 @@ type Connection4 struct {
 	TempConnEvents    []*bpf.AgentConnEvtT
 	TempSyscallEvents []*bpf.SyscallEventData
 	Status            ConnStatus
-	// CurReq            *protocol.BaseProtocolMessage
-	// CurResp           *protocol.BaseProtocolMessage
 	TCPHandshakeStatus
-	// MessageFilter protocol.ProtocolFilter
-	// filter.LatencyFilter
-	// filter.SizeFilter
 
 	reqStreamBuffer  *buffer.StreamBuffer
 	respStreamBuffer *buffer.StreamBuffer
@@ -94,11 +89,7 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 			return nil
 		}
 	} else {
-		_, loaded := c.connMap.LoadOrStore(TgidFd, conn)
-		if !loaded {
-			// log.Warnf("%s has already in connMap, why same conn (%s) come again?\n", c.FaindConnection4(TgidFd).ToString(), conn.ToString())
-		}
-		// c.connMap.Store(TgidFd, conn)
+		c.connMap.Store(TgidFd, conn)
 		return nil
 	}
 
@@ -128,8 +119,8 @@ func (c *ConnManager) FindConnection4Or(TgidFd uint64, ts uint64) *Connection4 {
 		} else {
 			curConnList := connection.prevConn
 			if len(curConnList) > 0 {
-				prevConn := curConnList[0]
-				if prevConn.CloseTs != 0 && prevConn.CloseTs < ts {
+				lastPrevConn := curConnList[len(curConnList)-1]
+				if lastPrevConn.CloseTs != 0 && lastPrevConn.CloseTs < ts {
 					return connection
 				}
 			}
@@ -194,7 +185,6 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 
 	} else {
 		needSubmit = false
-		// log.Warnf("%s no protocol parser found!\n", c.ToString())
 	}
 	if needSubmit {
 		RecordFunc(record, c)
@@ -202,23 +192,10 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 }
 
 func (c *Connection4) OnClose() {
-	// if c.CurResp.HasData() || c.CurReq.HasData() {
-	// 	record := protocol.Record{
-	// 		Request:  c.CurReq,
-	// 		Response: c.CurResp,
-	// 	}
-	// 	if !c.CurResp.HasData() || !c.CurReq.HasData() {
-	// 		// 缺少请求或者响应,连接就关闭了
-	// 		record.Duration = 0
-	// 	} else {
-	// 		record.Duration = c.CurResp.EndTs - c.CurReq.StartTs
-	// 	}
-	// 	// c.submitRecord(record)
-	// }
 	OnCloseRecordFunc(c)
 	c.Status = Closed
 }
-func (c *Connection4) OnKernEvent2(event *bpf.AgentKernEvt) bool {
+func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 	isReq := isReq(c, event)
 	if event.Len > 0 {
 		c.StreamEvents.AddKernEvent(event)
@@ -241,7 +218,7 @@ func (c *Connection4) OnKernEvent2(event *bpf.AgentKernEvt) bool {
 	}
 	return true
 }
-func (c *Connection4) OnSyscallEvent2(data []byte, event *bpf.SyscallEventData) {
+func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
 	isReq := isReq(c, &event.SyscallEvent.Ke)
 	if isReq {
 
@@ -268,7 +245,6 @@ func (c *Connection4) OnSyscallEvent2(data []byte, event *bpf.SyscallEventData) 
 func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage) {
 	parser := protocol.GetParserByProtocol(c.Protocol)
 	if parser == nil {
-		// panic(fmt.Sprintf("no protocol parser!, protocol: %v", c.Protocol))
 		streamBuffer.Clear()
 		return
 	}
@@ -287,10 +263,6 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		case protocol.Success:
 			*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
 			streamBuffer.RemovePrefix(parseResult.ReadBytes)
-			// str := parseResult.ParsedMessages[0].FormatToString()
-			// if !strings.HasSuffix(str, "]") && !strings.HasSuffix(str, "}") { //}]
-			// 	fmt.Print("!")
-			// }
 		case protocol.Invalid:
 			stop = true
 		case protocol.NeedsMoreData:

@@ -79,7 +79,7 @@ func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string 
 		common.FormatTimestampWithPrecision(r.startTs, nano),
 		common.FormatTimestampWithPrecision(r.endTs, nano))
 
-	secondPart := fmt.Sprintf("[%s]=%d(%s) [copy from sock duration]=%d(%s)\n\n", r.blackboxName(),
+	secondPart := fmt.Sprintf("[%s]=%d(%s) [copy from sockbuf]=%d(%s)\n\n", r.blackboxName(),
 		common.ConvertDurationToMillisecondsIfNeeded(uint64(r.blackBoxDuration), nano),
 		timeUnitName(nano),
 		common.ConvertDurationToMillisecondsIfNeeded(uint64(r.readFromSocketBufferDuration), nano),

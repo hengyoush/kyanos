@@ -150,7 +150,7 @@ func (p *Processor) run() {
 					// ReportDataEvents(conn.TempKernEvents, conn)
 					// ReportConnEvents(conn.TempConnEvents)
 					for _, sysEvent := range conn.TempSyscallEvents {
-						conn.OnSyscallEvent2(sysEvent.Buf, sysEvent)
+						conn.OnSyscallEvent(sysEvent.Buf, sysEvent)
 					}
 				}
 				// 清空, 这里可能有race
@@ -198,7 +198,7 @@ func (p *Processor) run() {
 			if conn != nil && conn.ProtocolInferred() {
 				log.Debugf("[syscall][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
 
-				conn.OnSyscallEvent2(event.Buf, event)
+				conn.OnSyscallEvent(event.Buf, event)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
 				log.Debugf("[syscall][protocol unset][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
@@ -233,11 +233,11 @@ func (p *Processor) run() {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					// TODO 推断出协议之前的事件需要处理，这里暂时略过
 					// conn.AddKernEvent(&event)
-					conn.OnKernEvent2(event)
+					conn.OnKernEvent(event)
 					log.Debug("[skip] skip due to protocol unset")
 					// log.Infof("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
-					flag := conn.OnKernEvent2(event)
+					flag := conn.OnKernEvent(event)
 					if !flag {
 						log.Debug("[skip] skip due to cur req/resp is nil ?(maybe bug)")
 					}
@@ -246,7 +246,7 @@ func (p *Processor) run() {
 				log.Debug("[skip] skip due to protocol is unknwon")
 				log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 			} else if event.Len == 0 && conn != nil {
-				conn.OnKernEvent2(event)
+				conn.OnKernEvent(event)
 			}
 		}
 	}
