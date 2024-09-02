@@ -17,22 +17,22 @@ func GetParserByProtocol(protocol bpf.AgentTrafficProtocolT) ProtocolStreamParse
 }
 
 type Record struct {
-	req  ParsedMessage
-	resp ParsedMessage
+	Req  ParsedMessage
+	Resp ParsedMessage
 }
 
 func NewRecord(req ParsedMessage, resp ParsedMessage) *Record {
 	return &Record{
-		req:  req,
-		resp: resp,
+		Req:  req,
+		Resp: resp,
 	}
 }
 
 func (r *Record) Request() ParsedMessage {
-	return r.req
+	return r.Req
 }
 func (r *Record) Response() ParsedMessage {
-	return r.resp
+	return r.Resp
 }
 
 type ProtocolStreamParser interface {
@@ -61,11 +61,12 @@ const (
 	Invalid ParseState = iota
 	NeedsMoreData
 	Success
+	Ignore
 )
 
 type ParseResult struct {
-	ParsedMessages []ParsedMessage
 	ParseState     ParseState
+	ParsedMessages []ParsedMessage
 	ReadBytes      int
 }
 

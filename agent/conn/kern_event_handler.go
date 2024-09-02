@@ -94,3 +94,8 @@ func (kernevent *KernEvent) GetTimestamp() uint64 {
 func (kernevent *KernEvent) GetStep() bpf.AgentStepT {
 	return kernevent.step
 }
+
+type TcpKernEvent struct {
+	KernEvent
+	tcpFlags int
+}

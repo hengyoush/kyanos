@@ -514,11 +514,6 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisM
 func (r RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult {
 	head := streamBuffer.Head().Buffer()
 	ts, ok := streamBuffer.FindTimestampBySeq(streamBuffer.Head().LeftBoundary())
-	if !ok {
-		return ParseResult{
-			ParseState: Invalid,
-		}
-	}
 	decoder := NewBinaryDecoder(head)
 	redisMessage, err := ParseMessage(decoder, ts, streamBuffer.Head().LeftBoundary())
 	result := ParseResult{}
@@ -529,7 +524,11 @@ func (r RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messag
 			result.ParseState = Invalid
 		}
 	} else {
-		result.ParseState = Success
+		if !ok {
+			result.ParseState = Ignore
+		} else {
+			result.ParseState = Success
+		}
 		result.ReadBytes = redisMessage.ByteSize()
 		result.ParsedMessages = []ParsedMessage{redisMessage}
 	}

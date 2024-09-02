@@ -254,7 +254,8 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 	stop := false
 	startPos := parser.FindBoundary(streamBuffer, messageType, 0)
 	if startPos == -1 {
-		return
+		// TODO
+		startPos = 0
 	}
 	streamBuffer.RemovePrefix(startPos)
 	for !stop && !streamBuffer.IsEmpty() {
@@ -267,6 +268,9 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			stop = true
 		case protocol.NeedsMoreData:
 			stop = true
+		case protocol.Ignore:
+			stop = false
+			streamBuffer.RemovePrefix(parseResult.ReadBytes)
 		default:
 			panic("invalid parse state!")
 		}
