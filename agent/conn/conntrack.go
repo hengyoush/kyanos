@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
+	_ "kyanos/agent/protocol/mysql"
 	"kyanos/bpf"
 	"kyanos/common"
 	"sync"
@@ -266,7 +267,13 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
 			streamBuffer.RemovePrefix(parseResult.ReadBytes)
 		case protocol.Invalid:
-			stop = true
+			pos := parser.FindBoundary(streamBuffer, messageType, 1)
+			if pos != -1 {
+				streamBuffer.RemovePrefix(pos)
+				stop = false
+			} else {
+				stop = true
+			}
 		case protocol.NeedsMoreData:
 			stop = true
 		case protocol.Ignore:

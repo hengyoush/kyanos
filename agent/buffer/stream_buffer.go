@@ -106,8 +106,21 @@ func (sb *StreamBuffer) cleanTimestampMapBySeqNoMoreThan(targetSeq uint64) {
 	}
 }
 
-func (sb *StreamBuffer) FindTimestampBySeq(seq uint64) (uint64, bool) {
-	return sb.timestamps.Get(seq)
+func (sb *StreamBuffer) FindTimestampBySeq(targetSeq uint64) (uint64, bool) {
+	result := 0
+	for el := sb.timestamps.Front(); el != nil; el = el.Next() {
+		seq := el.Key
+		if seq <= targetSeq {
+			result = int(el.Value)
+		} else {
+			break
+		}
+	}
+	if result != 0 {
+		return uint64(result), true
+	} else {
+		return 0, false
+	}
 }
 
 func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {

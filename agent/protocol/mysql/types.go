@@ -110,7 +110,7 @@ type MysqlResponse struct {
 
 // FormatToString implements protocol.ParsedMessage.
 func (m *MysqlResponse) FormatToString() string {
-	panic("unimplemented")
+	return m.Msg
 }
 
 // IsReq implements protocol.ParsedMessage.

@@ -5,6 +5,7 @@ import (
 	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
 	. "kyanos/agent/protocol"
+	"kyanos/bpf"
 	"kyanos/common"
 )
 
@@ -49,6 +50,13 @@ type MysqlRequestPacket struct {
 
 func init() {
 	InitCommandLengthRangs()
+	protocol.ParsersMap[bpf.AgentTrafficProtocolTKProtocolMySQL] = func() ProtocolStreamParser {
+		return &MysqlParser{
+			State: &State{
+				PreparedStatements: make(map[int]PreparedStatement),
+			},
+		}
+	}
 }
 
 func (m *MysqlParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
@@ -294,7 +302,7 @@ func (m *MysqlParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType
 		return ParseResult{ParseState: NeedsMoreData}
 	}
 
-	packet.msg = string(buf[kPacketHeaderLength:packetLength])
+	packet.msg = string(buf[kPacketHeaderLength : kPacketHeaderLength+packetLength])
 	fb, ok := CreateFrameBase(streamBuffer, kPacketHeaderLength+packetLength)
 	if !ok {
 		return ParseResult{

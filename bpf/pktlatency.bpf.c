@@ -885,24 +885,24 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		conn_info.raddr.in4.sin_family = key.family;
 	}
 
-	uint16_t zero = 0;
-	uint8_t* enable_local_port_filter = bpf_map_lookup_elem(&enabled_local_port_map, &zero);
+	uint16_t one = 1;
+	uint8_t* enable_local_port_filter = bpf_map_lookup_elem(&enabled_local_port_map, &one);
 	if (enable_local_port_filter != NULL) {
 		uint8_t* enabled_local_port = bpf_map_lookup_elem(&enabled_local_port_map, &conn_info.laddr.in4.sin_port);
 		if (enabled_local_port == NULL) {
 			return;
 		}
 	}
-	uint8_t* enable_remote_port_filter = bpf_map_lookup_elem(&enabled_remote_port_map, &zero);
+	uint8_t* enable_remote_port_filter = bpf_map_lookup_elem(&enabled_remote_port_map, &one);
 	if (enable_remote_port_filter != NULL) {
 		uint8_t* enabled_remote_port = bpf_map_lookup_elem(&enabled_remote_port_map, &conn_info.raddr.in4.sin_port);
 		if (enabled_remote_port == NULL) {
 			return;
 		}
 	}
-	uint32_t zero32 = 0;
+	uint32_t one32 = 1;
 	if (conn_info.raddr.in4.sin_family == AF_INET) {
-		uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &zero32);
+		uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &one32);
 		if (enable_remote_ipv4_filter != NULL) {
 			uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &conn_info.raddr.in4.sin_addr.s_addr);
 			if (enabled_remote_ipv4 == NULL || conn_info.raddr.in4.sin_addr.s_addr == 0) {
@@ -1073,28 +1073,27 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	if (!conn_info) {
 		return;
 	} 
-	if (conn_info->protocol == kProtocolUnset) {
+	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
+		enum traffic_protocol_t before_infer = conn_info->protocol;
 		bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
 		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
 		// conn_info->protocol = protocol_message.protocol;
-		bpf_printk("[protocol infer]: %d", conn_info->protocol);
-		report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
-		if (conn_info->raddr.in4.sin_port == 6379 && bytes_count > 16) {
-			char buf[1] = {};
-			bpf_probe_read_user(buf, 1, args->buf);
-			bpf_printk("test, redis first byte is: %c", buf[0]);
+		if (before_infer != conn_info->protocol) {
+			bpf_printk("[protocol infer]: %d", conn_info->protocol);
+			report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
 		}
 	}
-	if (!should_trace_conn(conn_info)) {
-		return;
-	}
+	
 	// bpf_printk("start trace data!, bytes_count:%d,func:%d", bytes_count, args->source_fn);
 	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 	struct conn_id_s_t conn_id_s;
 	conn_id_s.tgid_fd = tgid_fd;
 	conn_id_s.direct = direct;
 	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
-	report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
+	if (should_trace_conn(conn_info)) {
+		report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
+		return;
+	}
 	
 	if (direct == kEgress) {
 		conn_info->write_bytes += bytes_count;

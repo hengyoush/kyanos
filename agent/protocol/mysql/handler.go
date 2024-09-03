@@ -520,7 +520,9 @@ func handleOkMessage(respPackets []ParsedMessage, record *Record) ParseState {
 		common.Log.Warnln("Insufficient number of bytes for an OK packet.")
 		return Invalid
 	}
-	record.Resp = resp
+	record.Resp = &MysqlResponse{
+		FrameBase: resp.FrameBase,
+	}
 	if len(respPackets) > 1 {
 		common.Log.Warningf("Did not expect additional packets after OK packet [num_extra_packets=%d].",
 			len(respPackets)-1)
@@ -558,7 +560,11 @@ func handleErrMessage(respPackets []ParsedMessage, record *Record) ParseState {
 		common.Log.Warnln("Insufficient number of bytes for an error packet.")
 		return Invalid
 	}
-
+	if record.Resp == nil {
+		record.Resp = &MysqlResponse{
+			FrameBase: mysqlResp.FrameBase,
+		}
+	}
 	record.Resp.(*MysqlResponse).Msg = mysqlResp.msg[kErrorMessagePos:]
 	common.LEndianBytesToKInt[int32]([]byte(mysqlResp.msg[kErrorCodePos:]), kErrorCodeSize)
 	if len(respPackets) > 1 {

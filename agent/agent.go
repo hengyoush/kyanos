@@ -412,11 +412,11 @@ func setAndValidateParameters(maps any) bool {
 	}
 
 	remotePorts := viper.GetStringSlice(common.RemotePortsVarName)
-	zeroKey := uint16(0)
+	oneKey := uint16(1)
 	zeroValue := uint8(0)
 	if len(remotePorts) > 0 {
 		log.Infoln("filter for remote ports: ", remotePorts)
-		err := enabledRemotePortMap.Update(&zeroKey, &zeroValue, ebpf.UpdateAny)
+		err := enabledRemotePortMap.Update(&oneKey, &zeroValue, ebpf.UpdateAny)
 		if err != nil {
 			log.Errorln("Update EnabledRemotePortMap failed: ", err)
 		}
@@ -437,8 +437,8 @@ func setAndValidateParameters(maps any) bool {
 	remoteIps := viper.GetStringSlice(common.RemoteIpsVarName)
 	if len(remoteIps) > 0 {
 		log.Infoln("filter for remote ips: ", remoteIps)
-		zeroKeyU32 := uint32(0)
-		err := enabledRemoteIpv4Map.Update(&zeroKeyU32, &zeroValue, ebpf.UpdateAny)
+		oneKeyU32 := uint32(1)
+		err := enabledRemoteIpv4Map.Update(&oneKeyU32, &zeroValue, ebpf.UpdateAny)
 		if err != nil {
 			log.Errorln("Update EnabledRemoteIpv4Map failed: ", err)
 		}
@@ -460,7 +460,7 @@ func setAndValidateParameters(maps any) bool {
 	localPorts := viper.GetStringSlice(common.LocalPortsVarName)
 	if len(localPorts) > 0 {
 		log.Infoln("filter for local ports: ", localPorts)
-		err := enabledLocalPortMap.Update(&zeroKey, &zeroKey, ebpf.UpdateAny)
+		err := enabledLocalPortMap.Update(&oneKey, &oneKey, ebpf.UpdateAny)
 		if err != nil {
 			log.Errorln("Update EnabledLocalPortMap failed: ", err)
 		}

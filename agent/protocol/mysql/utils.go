@@ -141,19 +141,16 @@ func processLengthEncodedInt(s string, offset *int) (int64, bool) {
 	const kLencIntPrefix8b byte = 0xfe
 
 	if len(s) == 0 {
-		common.Log.Errorln("Not enough bytes to extract length-encoded int")
 		return -1, false
 	}
 
 	s = s[*offset:]
 
 	if len(s) == 0 {
-		common.Log.Errorln("Not enough bytes to extract length-encoded int")
 		return -1, false
 	}
 	checkLengthFunc := func(_s string, _len int) bool {
 		if len(_s) < _len {
-			common.Log.Errorln("Not enough bytes to extract length-encoded int")
 			return false
 		}
 		return true
