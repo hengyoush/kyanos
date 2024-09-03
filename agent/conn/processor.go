@@ -124,6 +124,8 @@ func (p *Processor) run() {
 					RespQueue:        make([]protocol.ParsedMessage, 0),
 					StreamEvents:     NewKernEventStream(nil),
 					prevConn:         []*Connection4{},
+
+					protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),
 				}
 				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
 				p.connManager.AddConnection4(TgidFd, conn)

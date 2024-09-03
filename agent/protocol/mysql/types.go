@@ -1,9 +1,122 @@
 package mysql
 
+import (
+	"kyanos/agent/protocol"
+	. "kyanos/agent/protocol"
+)
+
 const kMaxPacketLength int = (1 << 24) - 1
 
+// Constants for StmtExecute packet, where the payload is as follows:
+// bytes  description
+//
+//	1   [17] COM_STMT_EXECUTE
+//	4   stmt-id
+//	1   flags
+//	4   iteration-count
+const kStmtIDStartOffset int = 1
+const kStmtIDBytes int = 4
+const kFlagsBytes int = 1
+const kIterationCountBytes int = 4
+
 type command int
+type ColType int
 type RespStatus byte
+
+const (
+	kDecimal     ColType = 0x00
+	kTiny        ColType = 0x01
+	kShort       ColType = 0x02
+	kLong        ColType = 0x03
+	kFloat       ColType = 0x04
+	kDouble      ColType = 0x05
+	kNull        ColType = 0x06
+	kTimestamp   ColType = 0x07
+	kLongLong    ColType = 0x08
+	kInt24       ColType = 0x09
+	kDate        ColType = 0x0a
+	kTimeColType ColType = 0x0b
+	kDateTime    ColType = 0x0c
+	kYear        ColType = 0x0d
+	kVarChar     ColType = 0x0f
+	kBit         ColType = 0x10
+	kNewDecimal  ColType = 0xf6
+	kEnum        ColType = 0xf7
+	kSet         ColType = 0xf8
+	kTinyBlob    ColType = 0xf9
+	kMediumBlob  ColType = 0xfa
+	kLongBlob    ColType = 0xfb
+	kBlob        ColType = 0xfc
+	kVarString   ColType = 0xfd
+	kString      ColType = 0xfe
+	kGeometry    ColType = 0xff
+)
+
+type StmtPrepareRespHeader struct {
+	StmtId       int
+	NumColumns   uint
+	NumParams    uint
+	WarningCount uint
+}
+
+/**
+ * https://dev.mysql.com/doc/internals/en/com-stmt-prepare-response.html
+ */
+type StmtPrepareOKResponse struct {
+	StmtPrepareRespHeader
+	ColDefs   []ColDefinition
+	ParamDefs []ColDefinition
+}
+
+/**
+ * PreparedStatement holds a prepared statement string, and a parsed response,
+ * which contains the placeholder column definitions.
+ */
+type PreparedStatement struct {
+	Request  string
+	Response StmtPrepareOKResponse
+}
+
+type StmtExecuteParam struct {
+	ColType ColType
+	value   string
+}
+type ColDefinition struct {
+	Catalog      string
+	Schema       string
+	Table        string
+	OrgTable     string
+	Name         string
+	OrgName      string
+	NextLength   int8 // 总是0x0c
+	CharacterSet int16
+	ColumnLength int32
+	ColumnType   ColType
+	Flags        int16
+	Decimals     int8
+}
+
+var _ ParsedMessage = &MysqlResponse{}
+
+type ResultsetRow struct {
+	msg string
+}
+
+type MysqlResponse struct {
+	protocol.FrameBase
+	RespStatus
+	Msg string
+}
+
+// FormatToString implements protocol.ParsedMessage.
+func (m *MysqlResponse) FormatToString() string {
+	panic("unimplemented")
+}
+
+// IsReq implements protocol.ParsedMessage.
+func (m *MysqlResponse) IsReq() bool {
+	return false
+}
 
 const (
 	Unknwon RespStatus = iota
@@ -47,6 +160,35 @@ const (
 	kDaemon           command = 0x1d
 	kBinlogDumpGTID   command = 0x1e
 	kResetConnection  command = 0x1f
+)
+
+const (
+	kDecimalbyte    byte = 0x00
+	kTinybyte       byte = 0x01
+	kShortbyte      byte = 0x02
+	kLongbyte       byte = 0x03
+	kFloatbyte      byte = 0x04
+	kDoublebyte     byte = 0x05
+	kNullbyte       byte = 0x06
+	kTimestampbyte  byte = 0x07
+	kLongLongbyte   byte = 0x08
+	kInt24byte      byte = 0x09
+	kDatebyte       byte = 0x0a
+	kTimebyte       byte = 0x0b
+	kDateTimebyte   byte = 0x0c
+	kYearbyte       byte = 0x0d
+	kVarCharbyte    byte = 0x0f
+	kBitbyte        byte = 0x10
+	kNewDecimalbyte byte = 0xf6
+	kEnumbyte       byte = 0xf7
+	kSetbyte        byte = 0xf8
+	kTinyBlobbyte   byte = 0xf9
+	kMediumBlobbyte byte = 0xfa
+	kLongBlobbyte   byte = 0xfb
+	kBlobbyte       byte = 0xfc
+	kVarStringbyte  byte = 0xfd
+	kStringbyte     byte = 0xfe
+	kGeometrybyte   byte = 0xff
 )
 
 func parseCommand(b byte) (command, bool) {

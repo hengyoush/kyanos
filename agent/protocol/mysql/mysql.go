@@ -8,7 +8,7 @@ import (
 	"kyanos/common"
 )
 
-var _ protocol.ProtocolStreamParser = MysqlParser{}
+var _ protocol.ProtocolStreamParser = &MysqlParser{}
 
 // See https://dev.mysql.com/doc/internals/en/mysql-packet.html.
 const kPacketHeaderLength int = 4
@@ -16,7 +16,12 @@ const kPacketHeaderLength int = 4
 // Part of kPacketHeaderLength.
 const kPayloadLengthLength int = 3
 
+type State struct {
+	PreparedStatements map[int]PreparedStatement
+	active             bool
+}
 type MysqlParser struct {
+	*State
 }
 
 var _ ParsedMessage = &MysqlPacket{}
@@ -46,7 +51,7 @@ func init() {
 	InitCommandLengthRangs()
 }
 
-func (m MysqlParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
+func (m *MysqlParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
 	head := streamBuffer.Head()
 	buf := head.Buffer()
 	if len(buf) < kPacketHeaderLength {
@@ -58,7 +63,8 @@ func (m MysqlParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType
 
 	for idx := startPos; idx < len(buf)-kPacketHeaderLength; idx++ {
 		curBuf := buf[idx:]
-		packetLength := common.LEndianBytesToInt(curBuf, kPayloadLengthLength)
+		packetLength32, _ := common.LEndianBytesToKInt[int32](curBuf, kPayloadLengthLength)
+		packetLength := int(packetLength32)
 		sequenceId := buf[kPayloadLengthLength]
 		commandByte := curBuf[kPacketHeaderLength]
 		command, ok := parseCommand(commandByte)
@@ -83,16 +89,59 @@ func (m MysqlParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType
 	return -1
 }
 
-func (m MysqlParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
-	// for len(*reqStream) != 0 {
-	// reqPacket := (*reqStream)[0].(*MysqlPacket)
-	// commandByte := reqPacket.msg[0]
-	// command, _ := parseCommand(commandByte)
-	// syncRespQueue(reqPacket, respStream)
-	// respPacketsView := getRespView(reqStream, respStream)
+func (m *MysqlParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
+	records := make([]Record, 0)
+	for len(*reqStream) != 0 {
+		reqPacket := (*reqStream)[0].(*MysqlPacket)
+		commandByte := reqPacket.msg[0]
+		command, _ := parseCommand(commandByte)
+		syncRespQueue(reqPacket, respStream)
+		respPacketsView := getRespView(reqStream, respStream)
+		record, state := m.processPackets(reqPacket, respPacketsView)
+		// This list contains the commands that, if parsed correctly,
+		// are indicative of a higher confidence that this is indeed a MySQL protocol.
+		if !m.State.active && state == Success {
+			switch command {
+			case kConnect:
+				fallthrough
+			case kInitDB:
+				fallthrough
+			case kCreateDB:
+				fallthrough
+			case kDropDB:
+				fallthrough
+			case kQuery:
+				fallthrough
+			case kStmtPrepare:
+				fallthrough
+			case kStmtExecute:
+				m.State.active = true
+			default:
 
-	// }
-	panic("unimplemented")
+			}
+		}
+
+		if state == NeedsMoreData {
+			isLastSeq := len(*reqStream) == 1
+			respLooksHealthy := len(respPacketsView) == len(*respStream)
+			if isLastSeq && respLooksHealthy {
+				common.Log.Infoln("Appears to be an incomplete message. Waiting for more data")
+				break
+			}
+			common.Log.Infof("Didn't have enough response packets, but doesn't appear to be partial either. "+
+				"[cmd=%v, cmd_msg=%s resp_packets=%d]", command, reqPacket.msg[1:], len(respPacketsView))
+		} else if state == Success {
+			records = append(records, record)
+
+		}
+
+		*reqStream = (*reqStream)[1:]
+		*respStream = (*respStream)[len(respPacketsView):]
+	}
+	if !m.State.active {
+		return []Record{}
+	}
+	return records
 }
 
 func syncRespQueue(reqPacket *MysqlPacket, respStream *[]ParsedMessage) {
@@ -120,7 +169,7 @@ func getRespView(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Pars
 	return (*respStream)[0:count]
 }
 
-func processPackets(reqPacket *MysqlPacket, respView []ParsedMessage) (protocol.Record, ParseState) {
+func (p *MysqlParser) processPackets(reqPacket *MysqlPacket, respView []ParsedMessage) (protocol.Record, ParseState) {
 	command, _ := parseCommand(reqPacket.msg[0])
 	var parseState ParseState
 	record := Record{}
@@ -159,7 +208,8 @@ func processPackets(reqPacket *MysqlPacket, respView []ParsedMessage) (protocol.
 		parseState = processRequestWithBasicResponse(reqPacket, false, respView, &record)
 		return record, parseState
 	case kQuit: // Response: OK_Packet or a connection close.
-		panic("todo")
+		parseState = processQuery(reqPacket, respView, &record)
+		return record, parseState
 		// Basic Commands with response: EOF_Packet or ERR_Packet.
 	case kShutdown:
 		fallthrough
@@ -171,150 +221,45 @@ func processPackets(reqPacket *MysqlPacket, respView []ParsedMessage) (protocol.
 	case kQuery:
 		parseState = processQuery(reqPacket, respView, &record)
 		return record, parseState
+	case kStmtPrepare:
+		parseState = p.ProcessStmtPrepare(reqPacket, respView, &record)
+		return record, parseState
+	case kStmtSendLongData:
+		parseState = p.ProcessStmtSendLongData(reqPacket, respView, &record)
+		return record, parseState
+	case kStmtExecute:
+		parseState = p.ProcessStmtExecute(reqPacket, respView, &record)
+		return record, parseState
+	case kStmtClose:
+		parseState := p.ProcessStmtClose(reqPacket, respView, &record)
+		return record, parseState
+	case kStmtReset:
+		parseState := p.ProcessStmtReset(reqPacket, respView, &record)
+		return record, parseState
+	case kStmtFetch:
+		parseState := p.ProcessStmtFetch(reqPacket, respView, &record)
+		return record, parseState
+	case kProcessInfo:
+		fallthrough
+	case kChangeUser:
+		fallthrough
+	case kBinlogDump:
+		fallthrough
+	case kBinlogDumpGTID:
+		fallthrough
+	case kTableDump:
+		fallthrough
+	case kStatistics:
+		common.Log.Warnf("Unimplemented command %d.\n", command)
+		parseState = Ignore
+		return record, parseState
 	default:
-		panic("todo")
+		common.Log.Warnf("Unknown command %d.\n", command)
+		parseState = Ignore
+		return record, parseState
 	}
 }
-
-func ProcessStmtPrepare(reqPacket *MysqlPacket, respView []ParsedMessage, record *Record) ParseState {
-	var resultReq *MysqlPacket
-	resultReq = handleStringRequest(reqPacket)
-	record.Req = resultReq
-
-	if len(respView) == 0 {
-		return NeedsMoreData
-	}
-	firstResp := respView[0].(*MysqlPacket)
-	if isErrPacket(firstResp) {
-		handleErrMessage(respView, record)
-		return Success
-	}
-	panic("todo")
-}
-
-func processQuery(reqPacket *MysqlPacket, respView []ParsedMessage, record *Record) ParseState {
-	var resultReq *MysqlPacket
-	resultReq = handleStringRequest(reqPacket)
-	record.Req = resultReq
-
-	if len(respView) == 0 {
-		return NeedsMoreData
-	}
-
-	firstResp := respView[0].(*MysqlPacket)
-	if isErrPacket(firstResp) {
-		handleErrMessage(respView, record)
-		return Success
-	}
-
-	if isOkPacket(firstResp) {
-		handleOkMessage(respView, record)
-	}
-	return Success
-}
-
-func processRequestWithBasicResponse(reqPacket *MysqlPacket, stringReq bool,
-	respView []ParsedMessage, record *Record) ParseState {
-	var resultReq *MysqlPacket
-	if stringReq {
-		resultReq = handleNonStringRequest(reqPacket)
-	} else {
-		resultReq = handleNonStringRequest(reqPacket)
-	}
-	record.Req = resultReq
-
-	if len(respView) == 0 {
-		return NeedsMoreData
-	}
-
-	if len(respView) > 1 {
-		common.Log.Warnf(
-			"Did not expect more than one response packet [cmd=%c, num_extra_packets=%d].\n",
-			reqPacket.msg[0], len(respView)-1)
-		return Invalid
-	}
-
-	respPacket := respView[0].(*MysqlPacket)
-	record.Resp = respPacket
-	if isOkPacket(respPacket) || isEOFPacketAll(respPacket) {
-		return Success
-	}
-
-	if isErrPacket(respPacket) {
-		return handleErrMessage(respView, record)
-	}
-
-	return Invalid
-}
-
-func handleStringRequest(reqPacket *MysqlPacket) *MysqlPacket {
-	if len(reqPacket.msg) == 0 {
-		panic("A request cannot have an empty payload.")
-	}
-	request := *reqPacket
-	cmd, _ := parseCommand(reqPacket.msg[0])
-	request.cmd = int(cmd)
-	request.msg = reqPacket.msg[1:]
-	return &request
-}
-
-func handleNonStringRequest(reqPacket *MysqlPacket) *MysqlPacket {
-	if len(reqPacket.msg) == 0 {
-		panic("A request cannot have an empty payload.")
-	}
-	request := *reqPacket
-	cmd, _ := parseCommand(reqPacket.msg[0])
-	request.cmd = int(cmd)
-	request.msg = reqPacket.msg[:]
-	return &request
-}
-
-func handleOkMessage(respPackets []ParsedMessage, record *Record) ParseState {
-	resp := respPackets[0].(*MysqlPacket)
-	const kMinOKPacketSize int = 7
-	if len(resp.msg) < kMinOKPacketSize {
-		common.Log.Warnln("Insufficient number of bytes for an OK packet.")
-		return Invalid
-	}
-	record.Resp = resp
-	if len(respPackets) > 1 {
-		common.Log.Warningf("Did not expect additional packets after OK packet [num_extra_packets=%d].",
-			len(respPackets)-1)
-		return Invalid
-	}
-	return Success
-}
-
-func handleErrMessage(respPackets []ParsedMessage, record *Record) ParseState {
-	mysqlResp := respPackets[0].(*MysqlPacket)
-
-	// Format of ERR packet:
-	//   1  header: 0xff
-	//   2  error_code
-	//   1  sql_state_marker
-	//   5  sql_state
-	//   x  error_message
-	// https://dev.mysql.com/doc/internals/en/packet-ERR_Packet.html
-	const kMinErrPacketSize int = 9
-	const kErrorCodePos int = 1
-	const kErrorCodeSize int = 2
-	const kErrorMessagePos int = 9
-	if len(mysqlResp.msg) < kMinErrPacketSize {
-		common.Log.Warnln("Insufficient number of bytes for an error packet.")
-		return Invalid
-	}
-
-	record.Resp.(*MysqlPacket).msg = mysqlResp.msg[kErrorMessagePos:]
-	common.LEndianBytesToKInt[int32]([]byte(mysqlResp.msg[kErrorCodePos:]), kErrorCodeSize)
-	if len(respPackets) > 1 {
-		common.Log.Warnf("Did not expect additional packets after error packet [num_extra_packets=%d].",
-			len(respPackets)-1)
-		return Invalid
-	}
-	return Success
-}
-
-func (m MysqlParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult {
+func (m *MysqlParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult {
 	head := streamBuffer.Head()
 	buf := head.Buffer()
 	if len(buf) < kPacketHeaderLength {
@@ -325,7 +270,8 @@ func (m MysqlParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType 
 
 	packet := MysqlPacket{}
 	packet.seqId = buf[3]
-	packetLength := common.LEndianBytesToInt(buf, kPayloadLengthLength)
+	packetLength32, _ := common.LEndianBytesToKInt[int32](buf, kPayloadLengthLength)
+	packetLength := int(packetLength32)
 	if messageType == Request {
 		if len(buf) < kPacketHeaderLength+1 {
 			return ParseResult{ParseState: Invalid}

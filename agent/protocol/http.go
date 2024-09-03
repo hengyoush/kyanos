@@ -12,10 +12,12 @@ import (
 	"strings"
 )
 
-var _ ProtocolStreamParser = HTTPStreamParser{}
+var _ ProtocolStreamParser = &HTTPStreamParser{}
 
 func init() {
-	ParsersMap[bpf.AgentTrafficProtocolTKProtocolHTTP] = HTTPStreamParser{}
+	ParsersMap[bpf.AgentTrafficProtocolTKProtocolHTTP] = func() ProtocolStreamParser {
+		return &HTTPStreamParser{}
+	}
 }
 
 var HTTP_REQ_START_PATTERN = []string{"GET ", "HEAD ", "POST ", "PUT ", "DELETE ", "CONNECT ", "OPTIONS ", "TRACE ", "PATCH "}
@@ -25,11 +27,11 @@ var HTTP_BOUNDARY_MARKER = "\r\n\r\n"
 type HTTPStreamParser struct {
 }
 
-func (h HTTPStreamParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
+func (h *HTTPStreamParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
 	return matchByTimestamp(reqStream, respStream)
 }
 
-func (h HTTPStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
+func (h *HTTPStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
 	var matchPattern []string
 	switch messageType {
 	case Request:
@@ -68,7 +70,7 @@ func (h HTTPStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messag
 	return -1
 }
 
-func (h HTTPStreamParser) ParseRequest(buf string, messageType MessageType, timestamp uint64, seq uint64) ParseResult {
+func (h *HTTPStreamParser) ParseRequest(buf string, messageType MessageType, timestamp uint64, seq uint64) ParseResult {
 	reader := strings.NewReader(buf)
 	bufioReader := bufio.NewReader(reader)
 	req, err := http.ReadRequest(bufioReader)
