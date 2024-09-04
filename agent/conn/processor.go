@@ -124,6 +124,8 @@ func (p *Processor) run() {
 					RespQueue:        make([]protocol.ParsedMessage, 0),
 					StreamEvents:     NewKernEventStream(nil),
 					prevConn:         []*Connection4{},
+
+					protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),
 				}
 				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
 				p.connManager.AddConnection4(TgidFd, conn)
@@ -203,7 +205,7 @@ func (p *Processor) run() {
 				conn.AddSyscallEvent(event)
 				log.Debugf("[syscall][protocol unset][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
 			} else {
-				log.Debugf("[syscall lost]")
+				log.Debugf("[syscall][lost][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
@@ -223,8 +225,8 @@ func (p *Processor) run() {
 
 			} else {
 				if viper.GetBool(common.VerboseVarName) {
-					log.Debugf("[data no conn][tgid_fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n",
-						tgidFd, common.Int8ToStr(event.FuncName[:]), event.Ts,
+					log.Debugf("[data no conn][tgid=%d fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n",
+						tgidFd>>32, uint32(event.ConnIdS.TgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts,
 						common.StepCNNames[event.Step], event.Seq, event.Len,
 						common.DisplayTcpFlags(event.Flags))
 				}

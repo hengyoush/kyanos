@@ -310,7 +310,7 @@ func init() {
 	redisCommandsMap["REPLCONF ACK"] = []string{"REPLCONF ACK", "offset"}
 }
 
-var _ ProtocolStreamParser = RedisStreamParser{}
+var _ ProtocolStreamParser = &RedisStreamParser{}
 var _ ParsedMessage = &RedisMessage{}
 
 type RedisStreamParser struct {
@@ -337,7 +337,7 @@ func (m *RedisMessage) FormatToString() string {
 	return fmt.Sprintf("base=[%s] command=[%s] payload=[%s]", m.FrameBase.String(), m.command, m.payload)
 }
 
-func (r RedisStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
+func (r *RedisStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
 	head := streamBuffer.Head().Buffer()
 	for ; startPos < len(head); startPos++ {
 		typeMarker := head[startPos]
@@ -351,7 +351,7 @@ func (r RedisStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messa
 	return -1
 }
 
-func (r RedisStreamParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
+func (r *RedisStreamParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
 	return matchByTimestamp(reqStream, respStream)
 }
 func ParseSize(decoder *BinaryDecoder) (int, error) {
@@ -511,14 +511,9 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisM
 	}
 }
 
-func (r RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult {
+func (r *RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult {
 	head := streamBuffer.Head().Buffer()
 	ts, ok := streamBuffer.FindTimestampBySeq(streamBuffer.Head().LeftBoundary())
-	if !ok {
-		return ParseResult{
-			ParseState: Invalid,
-		}
-	}
 	decoder := NewBinaryDecoder(head)
 	redisMessage, err := ParseMessage(decoder, ts, streamBuffer.Head().LeftBoundary())
 	result := ParseResult{}
@@ -529,7 +524,11 @@ func (r RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messag
 			result.ParseState = Invalid
 		}
 	} else {
-		result.ParseState = Success
+		if !ok {
+			result.ParseState = Ignore
+		} else {
+			result.ParseState = Success
+		}
 		result.ReadBytes = redisMessage.ByteSize()
 		result.ParsedMessages = []ParsedMessage{redisMessage}
 	}
@@ -537,7 +536,9 @@ func (r RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messag
 	return result
 }
 func init() {
-	ParsersMap[bpf.AgentTrafficProtocolTKProtocolRedis] = RedisStreamParser{}
+	ParsersMap[bpf.AgentTrafficProtocolTKProtocolRedis] = func() ProtocolStreamParser {
+		return &RedisStreamParser{}
+	}
 }
 
 type RedisFilter struct {

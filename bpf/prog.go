@@ -11,139 +11,139 @@ import (
 
 type AttachBpfProgFunction func(interface{}) link.Link
 
-func GetProgram(maps any, fieldName string) *ebpf.Program {
-	oldmaps, isOld := maps.(AgentOldPrograms)
+func GetProgram(programs any, fieldName string) *ebpf.Program {
+	oldprograms, isOld := programs.(AgentOldPrograms)
 	if isOld {
-		v := reflect.ValueOf(oldmaps)
+		v := reflect.ValueOf(oldprograms)
 		f := v.FieldByName(fieldName).Interface()
 		return f.(*ebpf.Program)
 	} else {
-		newmaps := maps.(AgentPrograms)
-		v := reflect.ValueOf(newmaps)
+		newprograms := programs.(AgentPrograms)
+		v := reflect.ValueOf(newprograms)
 		f := v.FieldByName(fieldName).Interface()
 		return f.(*ebpf.Program)
 	}
 }
 
 /* accept pair */
-func AttachSyscallAcceptEntry(maps interface{}) link.Link {
-	return kprobe("__sys_accept4", GetProgram(maps, "Accept4Entry"))
+func AttachSyscallAcceptEntry(programs interface{}) link.Link {
+	return kprobe("__sys_accept4", GetProgram(programs, "Accept4Entry"))
 }
 
-func AttachSyscallAcceptExit(maps interface{}) link.Link {
-	return kretprobe("__sys_accept4", GetProgram(maps, "SysAccept4Ret"))
+func AttachSyscallAcceptExit(programs interface{}) link.Link {
+	return kretprobe("__sys_accept4", GetProgram(programs, "SysAccept4Ret"))
 }
 
 /* sock_alloc */
-func AttachSyscallSockAllocExit(maps interface{}) link.Link {
-	return kretprobe("sock_alloc", GetProgram(maps, "SockAllocRet"))
+func AttachSyscallSockAllocExit(programs interface{}) link.Link {
+	return kretprobe("sock_alloc", GetProgram(programs, "SockAllocRet"))
 }
 
 /* connect pair */
-func AttachSyscallConnectEntry(maps interface{}) link.Link {
-	return kprobe("__sys_connect", GetProgram(maps, "ConnectEntry"))
+func AttachSyscallConnectEntry(programs interface{}) link.Link {
+	return kprobe("__sys_connect", GetProgram(programs, "ConnectEntry"))
 }
 
-func AttachSyscallConnectExit(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_exit_connect", GetProgram(maps, "TracepointSyscallsSysExitConnect"))
+func AttachSyscallConnectExit(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_connect", GetProgram(programs, "TracepointSyscallsSysExitConnect"))
 }
 
 /* close pair */
-func AttachSyscallCloseEntry(maps interface{}) link.Link {
-	return kprobe("sys_close", GetProgram(maps, "CloseEntry"))
+func AttachSyscallCloseEntry(programs interface{}) link.Link {
+	return kprobe("sys_close", GetProgram(programs, "CloseEntry"))
 }
 
-func AttachSyscallCloseExit(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_exit_close", GetProgram(maps, "TracepointSyscallsSysExitClose"))
+func AttachSyscallCloseExit(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_close", GetProgram(programs, "TracepointSyscallsSysExitClose"))
 }
 
 /* write pair */
-func AttachSyscallWriteEntry(maps interface{}) link.Link {
-	return kprobe("sys_write", GetProgram(maps, "WriteEnter"))
+func AttachSyscallWriteEntry(programs interface{}) link.Link {
+	return kprobe("sys_write", GetProgram(programs, "WriteEnter"))
 }
 
-func AttachSyscallWriteExit(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_exit_write", GetProgram(maps, "TracepointSyscallsSysExitWrite"))
+func AttachSyscallWriteExit(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_write", GetProgram(programs, "TracepointSyscallsSysExitWrite"))
 }
 
 /* sendmsg pair */
-func AttachSyscallSendMsgEntry(maps interface{}) link.Link {
-	return kprobe("sys_sendmsg", GetProgram(maps, "SendmsgEnter"))
+func AttachSyscallSendMsgEntry(programs interface{}) link.Link {
+	return kprobe("sys_sendmsg", GetProgram(programs, "SendmsgEnter"))
 }
 
-func AttachSyscallSendMsgExit(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_exit_sendmsg", GetProgram(maps, "TracepointSyscallsSysExitSendmsg"))
+func AttachSyscallSendMsgExit(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_sendmsg", GetProgram(programs, "TracepointSyscallsSysExitSendmsg"))
 }
 
 /* recvmsg pair */
-func AttachSyscallRecvMsgEntry(maps interface{}) link.Link {
-	return kprobe("sys_recvmsg", GetProgram(maps, "RecvmsgEnter"))
+func AttachSyscallRecvMsgEntry(programs interface{}) link.Link {
+	return kprobe("sys_recvmsg", GetProgram(programs, "RecvmsgEnter"))
 }
 
-func AttachSyscallRecvMsgExit(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_exit_recvmsg", GetProgram(maps, "TracepointSyscallsSysExitRecvmsg"))
+func AttachSyscallRecvMsgExit(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_recvmsg", GetProgram(programs, "TracepointSyscallsSysExitRecvmsg"))
 }
 
 /* writev pair */
-func AttachSyscallWritevEntry(maps interface{}) link.Link {
-	return kprobe("do_writev", GetProgram(maps, "WritevEnter"))
+func AttachSyscallWritevEntry(programs interface{}) link.Link {
+	return kprobe("do_writev", GetProgram(programs, "WritevEnter"))
 }
 
-func AttachSyscallWritevExit(maps interface{}) link.Link {
-	return kretprobe("do_writev", GetProgram(maps, "WritevReturn"))
+func AttachSyscallWritevExit(programs interface{}) link.Link {
+	return kretprobe("do_writev", GetProgram(programs, "WritevReturn"))
 }
 
 /* sendto pair */
-func AttachSyscallSendtoEntry(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_enter_sendto", GetProgram(maps, "TracepointSyscallsSysEnterSendto"))
+func AttachSyscallSendtoEntry(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_enter_sendto", GetProgram(programs, "TracepointSyscallsSysEnterSendto"))
 }
 
-func AttachSyscallSendtoExit(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_exit_sendto", GetProgram(maps, "TracepointSyscallsSysExitSendto"))
+func AttachSyscallSendtoExit(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_sendto", GetProgram(programs, "TracepointSyscallsSysExitSendto"))
 }
 
 /* read pair */
-func AttachSyscallReadEntry(maps interface{}) link.Link {
-	return kprobe("sys_read", GetProgram(maps, "ReadEnter"))
+func AttachSyscallReadEntry(programs interface{}) link.Link {
+	return kprobe("sys_read", GetProgram(programs, "ReadEnter"))
 }
 
-func AttachSyscallReadExit(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_exit_read", GetProgram(maps, "TracepointSyscallsSysExitRead"))
+func AttachSyscallReadExit(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_read", GetProgram(programs, "TracepointSyscallsSysExitRead"))
 }
 
 /* readv pair */
-func AttachSyscallReadvEntry(maps interface{}) link.Link {
-	return kprobe("do_readv", GetProgram(maps, "ReadvEnter"))
+func AttachSyscallReadvEntry(programs interface{}) link.Link {
+	return kprobe("do_readv", GetProgram(programs, "ReadvEnter"))
 }
 
-func AttachSyscallReadvExit(maps interface{}) link.Link {
-	return kretprobe("do_readv", GetProgram(maps, "ReadvReturn"))
+func AttachSyscallReadvExit(programs interface{}) link.Link {
+	return kretprobe("do_readv", GetProgram(programs, "ReadvReturn"))
 }
 
 /* recvfrom pair */
-func AttachSyscallRecvfromEntry(maps interface{}) link.Link {
-	return kprobe("__sys_recvfrom", GetProgram(maps, "RecvfromEnter"))
+func AttachSyscallRecvfromEntry(programs interface{}) link.Link {
+	return kprobe("__sys_recvfrom", GetProgram(programs, "RecvfromEnter"))
 }
 
-func AttachSyscallRecvfromExit(maps interface{}) link.Link {
-	return tracepoint("syscalls", "sys_exit_recvfrom", GetProgram(maps, "TracepointSyscallsSysExitRecvfrom"))
+func AttachSyscallRecvfromExit(programs interface{}) link.Link {
+	return tracepoint("syscalls", "sys_exit_recvfrom", GetProgram(programs, "TracepointSyscallsSysExitRecvfrom"))
 }
 
 /* security_socket_recvmsg */
-func AttachKProbeSecuritySocketRecvmsgEntry(maps interface{}) link.Link {
-	return kprobe("security_socket_recvmsg", GetProgram(maps, "SecuritySocketRecvmsgEnter"))
+func AttachKProbeSecuritySocketRecvmsgEntry(programs interface{}) link.Link {
+	return kprobe("security_socket_recvmsg", GetProgram(programs, "SecuritySocketRecvmsgEnter"))
 }
 
 /* security_socket_sendmsg */
-func AttachKProbeSecuritySocketSendmsgEntry(maps interface{}) link.Link {
-	return kprobe("security_socket_sendmsg", GetProgram(maps, "SecuritySocketSendmsgEnter"))
+func AttachKProbeSecuritySocketSendmsgEntry(programs interface{}) link.Link {
+	return kprobe("security_socket_sendmsg", GetProgram(programs, "SecuritySocketSendmsgEnter"))
 }
 
 /* tcp_destroy_sock */
-func AttachRawTracepointTcpDestroySockEntry(maps interface{}) link.Link {
+func AttachRawTracepointTcpDestroySockEntry(programs interface{}) link.Link {
 	l, err := link.AttachRawTracepoint(link.RawTracepointOptions{
 		Name:    "tcp_destroy_sock",
-		Program: GetProgram(maps, "TcpDestroySock"),
+		Program: GetProgram(programs, "TcpDestroySock"),
 	})
 	if err != nil {
 		log.Fatal("tcp_destroy_sock failed: ", err)
@@ -151,30 +151,30 @@ func AttachRawTracepointTcpDestroySockEntry(maps interface{}) link.Link {
 	return l
 }
 
-func AttachKProbeIpQueueXmitEntry(maps interface{}) link.Link {
-	return kprobe("ip_queue_xmit", GetProgram(maps, "IpQueueXmit"))
+func AttachKProbeIpQueueXmitEntry(programs interface{}) link.Link {
+	return kprobe("ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
 }
-func AttachKProbeDevQueueXmitEntry(maps interface{}) link.Link {
-	return kprobe("dev_queue_xmit", GetProgram(maps, "DevQueueXmit"))
+func AttachKProbeDevQueueXmitEntry(programs interface{}) link.Link {
+	return kprobe("dev_queue_xmit", GetProgram(programs, "DevQueueXmit"))
 }
-func AttachKProbeDevHardStartXmitEntry(maps interface{}) link.Link {
-	return kprobe("dev_hard_start_xmit", GetProgram(maps, "DevHardStartXmit"))
+func AttachKProbeDevHardStartXmitEntry(programs interface{}) link.Link {
+	return kprobe("dev_hard_start_xmit", GetProgram(programs, "DevHardStartXmit"))
 }
-func AttachKProbIpRcvCoreEntry(maps interface{}) link.Link {
-	l, err := kprobe2("ip_rcv_core", GetProgram(maps, "IpRcvCore"))
+func AttachKProbIpRcvCoreEntry(programs interface{}) link.Link {
+	l, err := kprobe2("ip_rcv_core", GetProgram(programs, "IpRcvCore"))
 	if err != nil {
-		l = kprobe("ip_rcv_core.isra.0", GetProgram(maps, "IpRcvCore"))
+		l = kprobe("ip_rcv_core.isra.0", GetProgram(programs, "IpRcvCore"))
 	}
 	return l
 }
-func AttachKProbeTcpV4DoRcvEntry(maps interface{}) link.Link {
-	return kprobe("tcp_v4_do_rcv", GetProgram(maps, "TcpV4DoRcv"))
+func AttachKProbeTcpV4DoRcvEntry(programs interface{}) link.Link {
+	return kprobe("tcp_v4_do_rcv", GetProgram(programs, "TcpV4DoRcv"))
 }
-func AttachKProbeSkbCopyDatagramIterEntry(maps interface{}) link.Link {
-	return kprobe("__skb_datagram_iter", GetProgram(maps, "SkbCopyDatagramIter"))
+func AttachKProbeSkbCopyDatagramIterEntry(programs interface{}) link.Link {
+	return kprobe("__skb_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))
 }
 
-func AttachXdp(maps interface{}) link.Link {
+func AttachXdp(programs interface{}) link.Link {
 	ifname := "eth0"
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
@@ -182,7 +182,7 @@ func AttachXdp(maps interface{}) link.Link {
 	}
 
 	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   GetProgram(maps, "XdpProxy"),
+		Program:   GetProgram(programs, "XdpProxy"),
 		Interface: iface.Index,
 		Flags:     link.XDPDriverMode,
 	})

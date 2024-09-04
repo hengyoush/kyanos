@@ -6,33 +6,36 @@ import (
 	"kyanos/bpf"
 )
 
-var ParsersMap map[bpf.AgentTrafficProtocolT]ProtocolStreamParser = make(map[bpf.AgentTrafficProtocolT]ProtocolStreamParser)
+type ProtocolCreator func() ProtocolStreamParser
 
+var ParsersMap map[bpf.AgentTrafficProtocolT]ProtocolCreator = make(map[bpf.AgentTrafficProtocolT]ProtocolCreator)
+
+// TODO 修改未每一个processor有自己的parser
 func GetParserByProtocol(protocol bpf.AgentTrafficProtocolT) ProtocolStreamParser {
-	parser, ok := ParsersMap[protocol]
+	parserCreator, ok := ParsersMap[protocol]
 	if ok {
-		return parser
+		return parserCreator()
 	}
 	return nil
 }
 
 type Record struct {
-	req  ParsedMessage
-	resp ParsedMessage
+	Req  ParsedMessage
+	Resp ParsedMessage
 }
 
 func NewRecord(req ParsedMessage, resp ParsedMessage) *Record {
 	return &Record{
-		req:  req,
-		resp: resp,
+		Req:  req,
+		Resp: resp,
 	}
 }
 
 func (r *Record) Request() ParsedMessage {
-	return r.req
+	return r.Req
 }
 func (r *Record) Response() ParsedMessage {
-	return r.resp
+	return r.Resp
 }
 
 type ProtocolStreamParser interface {
@@ -61,11 +64,12 @@ const (
 	Invalid ParseState = iota
 	NeedsMoreData
 	Success
+	Ignore
 )
 
 type ParseResult struct {
-	ParsedMessages []ParsedMessage
 	ParseState     ParseState
+	ParsedMessages []ParsedMessage
 	ReadBytes      int
 }
 
@@ -77,6 +81,10 @@ type FrameBase struct {
 
 func NewFrameBase(timestampNs uint64, byteSize int, seq uint64) FrameBase {
 	return FrameBase{timestampNs: timestampNs, byteSize: byteSize, seq: seq}
+}
+
+func (f *FrameBase) SetTimeStamp(t uint64) {
+	f.timestampNs = t
 }
 
 func (f *FrameBase) TimestampNs() uint64 {

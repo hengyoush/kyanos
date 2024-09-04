@@ -33,7 +33,8 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 			return cmp.Compare(i.seq, j.seq)
 		})
 		if found {
-			panic("found duplicate kern event on same seq")
+			return
+			// panic("found duplicate kern event on same seq")
 		}
 		s.kernEvents[event.Step] = slices.Insert(kernEvtSlice, index, KernEvent{
 			seq:       event.Seq,
@@ -93,4 +94,9 @@ func (kernevent *KernEvent) GetTimestamp() uint64 {
 
 func (kernevent *KernEvent) GetStep() bpf.AgentStepT {
 	return kernevent.step
+}
+
+type TcpKernEvent struct {
+	KernEvent
+	tcpFlags int
 }

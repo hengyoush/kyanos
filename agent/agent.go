@@ -412,11 +412,11 @@ func setAndValidateParameters(maps any) bool {
 	}
 
 	remotePorts := viper.GetStringSlice(common.RemotePortsVarName)
-	zeroKey := uint16(0)
+	oneKey := uint16(1)
 	zeroValue := uint8(0)
 	if len(remotePorts) > 0 {
 		log.Infoln("filter for remote ports: ", remotePorts)
-		err := enabledRemotePortMap.Update(&zeroKey, &zeroValue, ebpf.UpdateAny)
+		err := enabledRemotePortMap.Update(&oneKey, &zeroValue, ebpf.UpdateAny)
 		if err != nil {
 			log.Errorln("Update EnabledRemotePortMap failed: ", err)
 		}
@@ -437,8 +437,8 @@ func setAndValidateParameters(maps any) bool {
 	remoteIps := viper.GetStringSlice(common.RemoteIpsVarName)
 	if len(remoteIps) > 0 {
 		log.Infoln("filter for remote ips: ", remoteIps)
-		zeroKeyU32 := uint32(0)
-		err := enabledRemoteIpv4Map.Update(&zeroKeyU32, &zeroValue, ebpf.UpdateAny)
+		oneKeyU32 := uint32(1)
+		err := enabledRemoteIpv4Map.Update(&oneKeyU32, &zeroValue, ebpf.UpdateAny)
 		if err != nil {
 			log.Errorln("Update EnabledRemoteIpv4Map failed: ", err)
 		}
@@ -460,7 +460,7 @@ func setAndValidateParameters(maps any) bool {
 	localPorts := viper.GetStringSlice(common.LocalPortsVarName)
 	if len(localPorts) > 0 {
 		log.Infoln("filter for local ports: ", localPorts)
-		err := enabledLocalPortMap.Update(&zeroKey, &zeroKey, ebpf.UpdateAny)
+		err := enabledLocalPortMap.Update(&oneKey, &oneKey, ebpf.UpdateAny)
 		if err != nil {
 			log.Errorln("Update EnabledLocalPortMap failed: ", err)
 		}
@@ -533,56 +533,56 @@ func handleKernEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, 
 	return nil
 }
 
-func attachBpfProgs(maps any) *list.List {
+func attachBpfProgs(programs any) *list.List {
 	linkList := list.New()
 
-	linkList.PushBack(bpf.AttachSyscallAcceptEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallAcceptExit(maps))
+	linkList.PushBack(bpf.AttachSyscallAcceptEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallAcceptExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallSockAllocExit(maps))
+	linkList.PushBack(bpf.AttachSyscallSockAllocExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallConnectEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallConnectExit(maps))
+	linkList.PushBack(bpf.AttachSyscallConnectEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallConnectExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallCloseEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallCloseExit(maps))
+	linkList.PushBack(bpf.AttachSyscallCloseEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallCloseExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallWriteEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallWriteExit(maps))
+	linkList.PushBack(bpf.AttachSyscallWriteEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallWriteExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallSendMsgEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallSendMsgExit(maps))
+	linkList.PushBack(bpf.AttachSyscallSendMsgEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallSendMsgExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallRecvMsgEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallRecvMsgExit(maps))
+	linkList.PushBack(bpf.AttachSyscallRecvMsgEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallRecvMsgExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallWritevEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallWritevExit(maps))
+	linkList.PushBack(bpf.AttachSyscallWritevEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallWritevExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallSendtoEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallSendtoExit(maps))
+	linkList.PushBack(bpf.AttachSyscallSendtoEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallSendtoExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallReadEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallReadExit(maps))
+	linkList.PushBack(bpf.AttachSyscallReadEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallReadExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallReadvEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallReadvExit(maps))
+	linkList.PushBack(bpf.AttachSyscallReadvEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallReadvExit(programs))
 
-	linkList.PushBack(bpf.AttachSyscallRecvfromEntry(maps))
-	linkList.PushBack(bpf.AttachSyscallRecvfromExit(maps))
+	linkList.PushBack(bpf.AttachSyscallRecvfromEntry(programs))
+	linkList.PushBack(bpf.AttachSyscallRecvfromExit(programs))
 
-	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry(maps))
-	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry(maps))
+	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry(programs))
+	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry(programs))
 
-	linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(maps))
-	linkList.PushBack(bpf.AttachKProbeIpQueueXmitEntry(maps))
-	linkList.PushBack(bpf.AttachKProbeDevQueueXmitEntry(maps))
-	linkList.PushBack(bpf.AttachKProbeDevHardStartXmitEntry(maps))
+	linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(programs))
+	linkList.PushBack(bpf.AttachKProbeIpQueueXmitEntry(programs))
+	linkList.PushBack(bpf.AttachKProbeDevQueueXmitEntry(programs))
+	linkList.PushBack(bpf.AttachKProbeDevHardStartXmitEntry(programs))
 
-	linkList.PushBack(bpf.AttachKProbIpRcvCoreEntry(maps))
-	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(maps))
-	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(maps))
-	linkList.PushBack(bpf.AttachXdp(maps))
+	linkList.PushBack(bpf.AttachKProbIpRcvCoreEntry(programs))
+	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(programs))
+	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(programs))
+	linkList.PushBack(bpf.AttachXdp(programs))
 	// ifname := "eth0" // TODO
 
 	// iface, err := net.InterfaceByName(ifname)

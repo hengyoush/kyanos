@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"kyanos/agent/buffer"
 	"kyanos/common"
 
 	"github.com/jefurry/logrus"
@@ -25,11 +26,11 @@ func matchByTimestamp(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) [
 
 		resp := (*respStream)[0]
 		if req != nil && req.TimestampNs() < resp.TimestampNs() {
-			record.req = req
+			record.Req = req
 			*reqStream = (*reqStream)[1:]
 		} else {
-			if record.req != nil {
-				record.resp = resp
+			if record.Req != nil {
+				record.Resp = resp
 				records = append(records, record)
 				record = Record{}
 			}
@@ -38,4 +39,13 @@ func matchByTimestamp(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) [
 		}
 	}
 	return records
+}
+
+func CreateFrameBase(streamBuffer *buffer.StreamBuffer, readBytes int) (FrameBase, bool) {
+	seq := streamBuffer.Head().LeftBoundary()
+	ts, ok := streamBuffer.FindTimestampBySeq(seq)
+	if !ok {
+		return FrameBase{}, false
+	}
+	return NewFrameBase(ts, readBytes, seq), true
 }

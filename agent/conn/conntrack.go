@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
+	_ "kyanos/agent/protocol/mysql"
 	"kyanos/bpf"
 	"kyanos/common"
 	"sync"
@@ -38,7 +39,8 @@ type Connection4 struct {
 	LatencyFilter protocol.LatencyFilter
 	SizeFilter    protocol.SizeFilter
 
-	prevConn []*Connection4
+	prevConn        []*Connection4
+	protocolParsers map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser
 }
 type ConnStatus uint8
 
@@ -169,7 +171,7 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 	needSubmit = needSubmit &&
 		c.SizeFilter.FilterByReqSize(int64(record.Request().ByteSize())) &&
 		c.SizeFilter.FilterByRespSize(int64(record.Response().ByteSize()))
-	if parser := protocol.GetParserByProtocol(c.Protocol); needSubmit && parser != nil {
+	if parser := c.GetProtocolParser(c.Protocol); needSubmit && parser != nil {
 		var parsedRequest, parsedResponse protocol.ParsedMessage
 		if c.MessageFilter.FilterByRequest() {
 			parsedRequest = record.Request()
@@ -231,7 +233,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
 	c.parseStreamBuffer(c.respStreamBuffer, protocol.Response, &c.RespQueue)
 	c.StreamEvents.AddSyscallEvent(event)
 
-	parser := protocol.GetParserByProtocol(c.Protocol)
+	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
 		panic("no protocol parser!")
 	}
@@ -243,7 +245,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
 }
 
 func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage) {
-	parser := protocol.GetParserByProtocol(c.Protocol)
+	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
 		streamBuffer.Clear()
 		return
@@ -254,7 +256,8 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 	stop := false
 	startPos := parser.FindBoundary(streamBuffer, messageType, 0)
 	if startPos == -1 {
-		return
+		// TODO
+		startPos = 0
 	}
 	streamBuffer.RemovePrefix(startPos)
 	for !stop && !streamBuffer.IsEmpty() {
@@ -264,9 +267,18 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
 			streamBuffer.RemovePrefix(parseResult.ReadBytes)
 		case protocol.Invalid:
-			stop = true
+			pos := parser.FindBoundary(streamBuffer, messageType, 1)
+			if pos != -1 {
+				streamBuffer.RemovePrefix(pos)
+				stop = false
+			} else {
+				stop = true
+			}
 		case protocol.NeedsMoreData:
 			stop = true
+		case protocol.Ignore:
+			stop = false
+			streamBuffer.RemovePrefix(parseResult.ReadBytes)
 		default:
 			panic("invalid parse state!")
 		}
@@ -298,4 +310,14 @@ func (c *Connection4) ToString() string {
 		direct = "<="
 	}
 	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d] *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, common.IntToIP(c.LocalIp), c.LocalPort, direct, common.IntToIP(c.RemoteIp), c.RemotePort)
+}
+
+func (c *Connection4) GetProtocolParser(p bpf.AgentTrafficProtocolT) protocol.ProtocolStreamParser {
+	if parser, ok := c.protocolParsers[p]; ok {
+		return parser
+	} else {
+		parser := protocol.GetParserByProtocol(p)
+		c.protocolParsers[p] = parser
+		return parser
+	}
 }
