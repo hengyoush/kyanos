@@ -1026,7 +1026,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		return;
 	}
 	
-	if (conn_info->protocol == kProtocolUnset) {
+	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
 		
 		struct iovec iov_cpy;
 		size_t buf_size = 0;
@@ -1035,25 +1035,27 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 			bpf_probe_read_user(&iov_cpy, sizeof(iov_cpy), &args->iov[i]);
 			buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
 			if (buf_size != 0) {
-				
+				enum traffic_protocol_t before_infer = conn_info->protocol;
 				struct protocol_message_t protocol_message = infer_protocol(iov_cpy.iov_base, buf_size, conn_info);
-				report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
+				if (conn_info->protocol != before_infer) {
+					report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
+				}
 				break;
 			}
 		 }
 	} else {
 	}
 	
-	if (!should_trace_conn(conn_info)) {
-		return;
-	}
-	bpf_printk("start trace data(vecs)!, bytes_count:%d,func:%d", bytes_count, args->source_fn);		
+	// bpf_printk("start trace data(vecs)!, bytes_count:%d,func:%d", bytes_count, args->source_fn);		
 	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 	struct conn_id_s_t conn_id_s;
 	conn_id_s.tgid_fd = tgid_fd;
 	conn_id_s.direct = direct;
 	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
-	report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args);
+	if (should_trace_conn(conn_info)) {
+		report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args);
+	}
+	
 	if (direct == kEgress) {
 		conn_info->write_bytes += bytes_count;
 	} else {
