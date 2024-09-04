@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"fmt"
 	"kyanos/agent/protocol"
 	. "kyanos/agent/protocol"
 )
@@ -110,7 +111,7 @@ type MysqlResponse struct {
 
 // FormatToString implements protocol.ParsedMessage.
 func (m *MysqlResponse) FormatToString() string {
-	return m.Msg
+	return fmt.Sprintf("base=[%s] status=[%v] Msg=[%s]", m.FrameBase.String(), m.RespStatus, m.Msg)
 }
 
 // IsReq implements protocol.ParsedMessage.
@@ -237,4 +238,47 @@ func InitCommandLengthRangs() {
 	commandLengthRanges[kDaemon] = [2]int{1, 1}
 	commandLengthRanges[kBinlogDumpGTID] = [2]int{19, 19}
 	commandLengthRanges[kResetConnection] = [2]int{1, 1}
+}
+
+var _ protocol.ProtocolStreamParser = &MysqlParser{}
+
+// See https://dev.mysql.com/doc/internals/en/mysql-packet.html.
+const kPacketHeaderLength int = 4
+
+// Part of kPacketHeaderLength.
+const kPayloadLengthLength int = 3
+
+type State struct {
+	PreparedStatements map[int]PreparedStatement
+	active             bool
+}
+type ParseOptions struct {
+	dumpResponse  bool
+	dumpMaxRowNum int
+}
+type MysqlParser struct {
+	*State
+}
+
+var _ ParsedMessage = &MysqlPacket{}
+
+type MysqlPacket struct {
+	FrameBase
+	seqId byte
+	msg   string
+	cmd   int
+	isReq bool
+}
+
+func (m *MysqlPacket) FormatToString() string {
+	return fmt.Sprintf("base=[%s] seqId=[%d] msg=[%s] isReq=[%v]", m.FrameBase.String(), m.seqId, m.msg, m.isReq)
+}
+
+func (m *MysqlPacket) IsReq() bool {
+	return m.isReq
+}
+
+type MysqlRequestPacket struct {
+	MysqlPacket
+	cmd byte
 }

@@ -236,7 +236,7 @@ func HandleResultsetResponse(reqPacket *MysqlPacket, binaryResultset bool, multi
 		if binaryResultset {
 			status = ProcessBinaryResultsetRowPacket(rowPacket, colDefs)
 		} else {
-			status = ProcessTextResultsetRowPacket(rowPacket, len(colDefs))
+			status = ProcessTextResultsetRowPacket(rowPacket, len(colDefs), record)
 		}
 
 		if status {
@@ -279,12 +279,11 @@ func HandleResultsetResponse(reqPacket *MysqlPacket, binaryResultset bool, multi
 	return Success
 }
 
-func ProcessTextResultsetRowPacket(packet *MysqlPacket, numCol int) bool {
+func ProcessTextResultsetRowPacket(packet *MysqlPacket, numCol int, record *Record) bool {
 	const kResultsetRowNullPrefix = '\xfb'
 	if len(packet.msg) == 1 && packet.msg[0] == kResultsetRowNullPrefix {
 		return true
 	}
-
 	var result string
 	offset := 0
 	for i := 0; i < numCol; i++ {
@@ -408,6 +407,7 @@ func ProcessBinaryResultsetRowPacket(packet *MysqlPacket, columnDefs []ColDefini
 		default:
 			common.Log.Warningln("Unrecognized result column type.")
 		}
+		common.Log.Infof("col: %d, val: %v\n", i, val)
 	}
 
 	if offset != len(packet.msg) {
@@ -522,6 +522,7 @@ func handleOkMessage(respPackets []ParsedMessage, record *Record) ParseState {
 	}
 	record.Resp = &MysqlResponse{
 		FrameBase: resp.FrameBase,
+		Msg:       "OK",
 	}
 	if len(respPackets) > 1 {
 		common.Log.Warningf("Did not expect additional packets after OK packet [num_extra_packets=%d].",

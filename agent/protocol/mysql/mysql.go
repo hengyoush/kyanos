@@ -1,52 +1,12 @@
 package mysql
 
 import (
-	"fmt"
 	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
 	. "kyanos/agent/protocol"
 	"kyanos/bpf"
 	"kyanos/common"
 )
-
-var _ protocol.ProtocolStreamParser = &MysqlParser{}
-
-// See https://dev.mysql.com/doc/internals/en/mysql-packet.html.
-const kPacketHeaderLength int = 4
-
-// Part of kPacketHeaderLength.
-const kPayloadLengthLength int = 3
-
-type State struct {
-	PreparedStatements map[int]PreparedStatement
-	active             bool
-}
-type MysqlParser struct {
-	*State
-}
-
-var _ ParsedMessage = &MysqlPacket{}
-
-type MysqlPacket struct {
-	FrameBase
-	seqId byte
-	msg   string
-	cmd   int
-	isReq bool
-}
-
-func (m *MysqlPacket) FormatToString() string {
-	return fmt.Sprintf("base=[%s] seqId=[%d] msg=[%s] isReq=[%v]", m.FrameBase.String(), m.seqId, m.msg, m.isReq)
-}
-
-func (m *MysqlPacket) IsReq() bool {
-	return m.isReq
-}
-
-type MysqlRequestPacket struct {
-	MysqlPacket
-	cmd byte
-}
 
 func init() {
 	InitCommandLengthRangs()
@@ -133,7 +93,7 @@ func (m *MysqlParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMess
 			isLastSeq := len(*reqStream) == 1
 			respLooksHealthy := len(respPacketsView) == len(*respStream)
 			if isLastSeq && respLooksHealthy {
-				common.Log.Infoln("Appears to be an incomplete message. Waiting for more data")
+				common.Log.Debugln("Appears to be an incomplete message. Waiting for more data")
 				break
 			}
 			common.Log.Infof("Didn't have enough response packets, but doesn't appear to be partial either. "+
@@ -216,7 +176,7 @@ func (p *MysqlParser) processPackets(reqPacket *MysqlPacket, respView []ParsedMe
 		parseState = processRequestWithBasicResponse(reqPacket, false, respView, &record)
 		return record, parseState
 	case kQuit: // Response: OK_Packet or a connection close.
-		parseState = processQuery(reqPacket, respView, &record)
+		parseState = ProcessQuit(reqPacket, respView, &record)
 		return record, parseState
 		// Basic Commands with response: EOF_Packet or ERR_Packet.
 	case kShutdown:
@@ -281,6 +241,7 @@ func (m *MysqlParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType
 	packetLength32, _ := common.LEndianBytesToKInt[int32](buf, kPayloadLengthLength)
 	packetLength := int(packetLength32)
 	if messageType == Request {
+		packet.isReq = true
 		if len(buf) < kPacketHeaderLength+1 {
 			return ParseResult{ParseState: Invalid}
 		}

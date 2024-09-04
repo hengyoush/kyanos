@@ -152,10 +152,10 @@ func (p *Processor) run() {
 					// ReportDataEvents(conn.TempKernEvents, conn)
 					// ReportConnEvents(conn.TempConnEvents)
 					for _, sysEvent := range conn.TempSyscallEvents {
+						log.Debugf("%s process temp syscall events before infer\n", conn.ToString())
 						conn.OnSyscallEvent(sysEvent.Buf, sysEvent)
 					}
 				}
-				// 清空, 这里可能有race
 				conn.TempKernEvents = conn.TempKernEvents[0:0]
 				conn.TempConnEvents = conn.TempConnEvents[0:0]
 			}
@@ -165,13 +165,8 @@ func (p *Processor) run() {
 			}
 			eventType := "connect"
 			event.Ts += common.LaunchEpochTime
-			reportEvt := false
 			if event.ConnType == bpf.AgentConnTypeTKClose {
 				eventType = "close"
-				// 连接关闭时,如果协议已经推断出来那么上报事件 TODO还要删除conn
-				if conn.ProtocolInferred() {
-					reportEvt = true
-				}
 			} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
 				eventType = "infer"
 				// 连接推断事件可以不上报
@@ -183,11 +178,6 @@ func (p *Processor) run() {
 				log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
 			} else {
 				log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
-			}
-			if reportEvt {
-				go func() {
-					// ReportConnEvent(&event)
-				}()
 			}
 		case event := <-p.syscallEvents:
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
@@ -233,11 +223,9 @@ func (p *Processor) run() {
 			}
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
-					// TODO 推断出协议之前的事件需要处理，这里暂时略过
-					// conn.AddKernEvent(&event)
 					conn.OnKernEvent(event)
-					log.Debug("[skip] skip due to protocol unset")
-					// log.Infof("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
+					// log.Debug("[skip] skip due to protocol unset")
+					log.Debugf("[data][protocol-unset][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d \n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 					flag := conn.OnKernEvent(event)
 					if !flag {
