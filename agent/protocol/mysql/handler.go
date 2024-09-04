@@ -110,7 +110,7 @@ func processQuery(reqPacket *MysqlPacket, respView []ParsedMessage, record *Reco
 	}
 
 	if isOkPacket(firstResp) {
-		handleOkMessage(respView, record)
+		return handleOkMessage(respView, record)
 	}
 	return HandleResultsetResponse(reqPacket, false, false, respView, record)
 }
