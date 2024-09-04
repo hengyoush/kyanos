@@ -34,6 +34,7 @@ type AnnotatedRecord struct {
 	protocol.Record
 	startTs                      uint64
 	endTs                        uint64
+	connectionDesc               string
 	reqSize                      int
 	respSize                     int
 	side                         conn.SideEnum
@@ -69,8 +70,9 @@ type AnnotatedRecordToStringOptions struct {
 
 func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string {
 	nano := options.nano
-	firstPart := fmt.Sprintf("req: %s\n\nresp:%s\n\n[total duration] = %d(%s)(start=%s, end=%s)\n",
+	firstPart := fmt.Sprintf("req: %s\n\nresp:%s\n\n%s\n[total duration] = %d(%s)(start=%s, end=%s)\n",
 		r.Request().FormatToString(), r.Response().FormatToString(),
+		r.connectionDesc,
 		common.ConvertDurationToMillisecondsIfNeeded(int64(r.totalDuration), nano), timeUnitName(nano),
 		common.FormatTimestampWithPrecision(r.startTs, nano),
 		common.FormatTimestampWithPrecision(r.endTs, nano))
@@ -129,6 +131,8 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	streamEvents := connection.StreamEvents
 	annotatedRecord := CreateAnnotedRecord()
 	annotatedRecord.Record = r
+	annotatedRecord.connectionDesc = connection.ToString()
+
 	var writeSyscallEvents, readSyscallEvents, devOutSyscallEvents, nicIngressEvents, userCopyEvents, tcpInEvents []conn.KernEvent
 	egressMessage := getParsedMessageBySide(r, connection.IsServerSide(), bpf.AgentTrafficDirectionTKEgress)
 	ingressMessage := getParsedMessageBySide(r, connection.IsServerSide(), bpf.AgentTrafficDirectionTKIngress)

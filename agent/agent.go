@@ -19,6 +19,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/hashicorp/go-version"
+
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
@@ -385,7 +387,8 @@ func SetupAgent(options AgentOptions) {
 	return
 }
 func needsRunningInCompatibleMode() bool {
-	return viper.GetBool("compatible")
+	kernel58, _ := version.NewVersion("5.8")
+	return viper.GetBool("compatible") || common.GetKernelVersion().LessThan(kernel58)
 }
 func setAndValidateParameters(maps any) bool {
 	var controlValues *ebpf.Map

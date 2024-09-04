@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-version"
 	"github.com/jefurry/logrus"
+	"github.com/zcalusic/sysinfo"
 )
 
 func IntToIP(ipInt uint32) string {
@@ -163,4 +165,17 @@ func ConvertDurationToMillisecondsIfNeeded(duration int64, nano bool) int64 {
 	} else {
 		return duration / 1000000
 	}
+}
+
+// "5.15.0-72-generic"
+func GetKernelVersion() *version.Version {
+	var si sysinfo.SysInfo
+	si.GetSysInfo()
+	release := si.Kernel.Release
+	version, err := version.NewVersion(release)
+	if err != nil {
+		Log.Warningf("Parse kernel version failed: %v, using the compatible mode...", err)
+	}
+	return version
+
 }
