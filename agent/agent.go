@@ -511,6 +511,9 @@ func handleSyscallEvt(record []byte, pm *conn.ProcessorManager, processorsNum in
 	buf := make([]byte, msgSize)
 	headerSize := uint(unsafe.Sizeof(event.SyscallEvent)) - 4
 	err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
+	if err != nil {
+		return err
+	}
 	event.Buf = buf
 
 	tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
@@ -603,40 +606,4 @@ func attachBpfProgs(programs any) *list.List {
 	// }
 	// linkList.PushBack(l)
 	return linkList
-}
-
-func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
-	if link, err := link.Tracepoint(group, name, prog, nil); err != nil {
-		log.Fatalf("tp failed: %s, %s", group+":"+name, err)
-		return nil
-	} else {
-		return link
-	}
-}
-
-func kprobe(func_name string, prog *ebpf.Program) link.Link {
-	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
-		log.Fatalf("kprobe failed: %s, %s", func_name, err)
-		return nil
-	} else {
-		return link
-	}
-}
-
-func kprobe2(func_name string, prog *ebpf.Program) (link.Link, error) {
-	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
-		log.Fatalf("kprobe2 failed: %s, %s", func_name, err)
-		return nil, err
-	} else {
-		return link, nil
-	}
-}
-
-func kretprobe(func_name string, prog *ebpf.Program) link.Link {
-	if link, err := link.Kretprobe(func_name, prog, nil); err != nil {
-		log.Fatalf("kretprobe failed: %s, %s", func_name, err)
-		return nil
-	} else {
-		return link
-	}
 }
