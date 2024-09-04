@@ -1092,7 +1092,6 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 	if (should_trace_conn(conn_info)) {
 		report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
-		return;
 	}
 	
 	if (direct == kEgress) {
