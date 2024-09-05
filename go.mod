@@ -6,7 +6,8 @@ toolchain go1.22.6
 
 require (
 	github.com/cilium/ebpf v0.14.0
-	github.com/elliotchance/orderedmap/v2 v2.4.0
+	github.com/emirpasic/gods v1.18.1
+	github.com/hashicorp/go-version v1.7.0
 	github.com/jefurry/logrus v2.0.6+incompatible
 	github.com/sevlyar/go-daemon v0.1.6
 	github.com/spf13/cobra v1.8.0
@@ -20,7 +21,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect

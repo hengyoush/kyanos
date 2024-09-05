@@ -1,10 +1,11 @@
 package buffer
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 
-	"github.com/elliotchance/orderedmap/v2"
+	"github.com/emirpasic/gods/maps/treemap"
 )
 
 var maxBytesGap int = 1024 * 1024 * 1
@@ -12,14 +13,19 @@ var maxBytesGap int = 1024 * 1024 * 1
 type StreamBuffer struct {
 	buffers    []*Buffer
 	capacity   int
-	timestamps *orderedmap.OrderedMap[uint64, uint64]
+	timestamps *treemap.Map
 }
 
 func New(capacity int) *StreamBuffer {
+
 	return &StreamBuffer{
-		buffers:    make([]*Buffer, 0),
-		capacity:   capacity,
-		timestamps: orderedmap.NewOrderedMap[uint64, uint64](),
+		buffers:  make([]*Buffer, 0),
+		capacity: capacity,
+		timestamps: treemap.NewWith(func(a, b interface{}) int {
+			ai := a.(uint64)
+			bi := b.(uint64)
+			return cmp.Compare(ai, bi)
+		}),
 	}
 }
 
@@ -93,8 +99,9 @@ func (sb *StreamBuffer) shrinkBufferUntilSizeBelowCapacity() {
 }
 func (sb *StreamBuffer) cleanTimestampMapBySeqNoMoreThan(targetSeq uint64) {
 	needsDelete := make([]uint64, 0)
-	for el := sb.timestamps.Front(); el != nil; el = el.Next() {
-		seq := el.Key
+	it := sb.timestamps.Iterator()
+	for it.Next() {
+		seq := it.Key().(uint64)
 		if seq < targetSeq {
 			needsDelete = append(needsDelete, seq)
 		} else {
@@ -102,25 +109,16 @@ func (sb *StreamBuffer) cleanTimestampMapBySeqNoMoreThan(targetSeq uint64) {
 		}
 	}
 	for _, seq := range needsDelete {
-		sb.timestamps.Delete(seq)
+		sb.timestamps.Remove(seq)
 	}
 }
 
 func (sb *StreamBuffer) FindTimestampBySeq(targetSeq uint64) (uint64, bool) {
-	result := 0
-	for el := sb.timestamps.Front(); el != nil; el = el.Next() {
-		seq := el.Key
-		if seq <= targetSeq {
-			result = int(el.Value)
-		} else {
-			break
-		}
-	}
-	if result != 0 {
-		return uint64(result), true
-	} else {
+	key, value := sb.timestamps.Floor(targetSeq)
+	if key == nil {
 		return 0, false
 	}
+	return value.(uint64), true
 }
 
 func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
@@ -130,7 +128,7 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
 		seq: seq,
 	}
 	if sb.IsEmpty() {
-		sb.timestamps.Set(seq, timestamp)
+		sb.updateTimestamp(seq, timestamp)
 		sb.buffers = append(sb.buffers, newBuffer)
 		return
 	}
@@ -140,7 +138,7 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
 	if int(seq)-sb.positionN() >= maxBytesGap {
 		sb.Clear()
 		sb.buffers = append(sb.buffers, newBuffer)
-		sb.timestamps.Set(seq, timestamp)
+		sb.updateTimestamp(seq, timestamp)
 		return
 	}
 
@@ -173,8 +171,12 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
 			sb.buffers = slices.Insert(sb.buffers, leftIndex+1, newBuffer)
 		}
 	}
-	sb.timestamps.Set(seq, timestamp)
+	sb.updateTimestamp(seq, timestamp)
 	sb.shrinkBufferUntilSizeBelowCapacity()
+}
+
+func (sb *StreamBuffer) updateTimestamp(seq uint64, timestamp uint64) {
+	sb.timestamps.Put(seq, timestamp)
 }
 
 func (sb *StreamBuffer) findLeftBufferBySeq(seq uint64) (int, *Buffer) {

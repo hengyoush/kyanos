@@ -1,10 +1,13 @@
 package buffer_test
 
 import (
+	"cmp"
 	"fmt"
 	"kyanos/agent/buffer"
+	"math/rand"
 	"testing"
 
+	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -174,4 +177,28 @@ func TestRemovePrefixCompletely(t *testing.T) {
 
 	sb.RemovePrefix(5)
 	assert.Equal(t, 0, len(sb.Buffers()))
+}
+
+func TestTreeMap(t *testing.T) {
+	m := treemap.NewWith(func(a, b interface{}) int {
+		ai := a.(uint64)
+		bi := b.(uint64)
+		return cmp.Compare(ai, bi)
+	})
+	for i := 1; i < 100; i++ {
+		k := uint64(rand.Uint64())
+		m.Put(k, rand.Int31())
+	}
+
+	it := m.Iterator()
+	lastKey := uint64(0)
+	for it.Next() {
+		key := it.Key().(uint64)
+		if key < lastKey {
+			assert.Fail(t, "")
+		} else {
+			lastKey = key
+		}
+		fmt.Println(key)
+	}
 }
