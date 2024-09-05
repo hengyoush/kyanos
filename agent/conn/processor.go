@@ -122,7 +122,7 @@ func (p *Processor) run() {
 					respStreamBuffer: buffer.New(1024 * 1024),
 					ReqQueue:         make([]protocol.ParsedMessage, 0),
 					RespQueue:        make([]protocol.ParsedMessage, 0),
-					StreamEvents:     NewKernEventStream(nil),
+					StreamEvents:     NewKernEventStream(nil, 100),
 					prevConn:         []*Connection4{},
 
 					protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),

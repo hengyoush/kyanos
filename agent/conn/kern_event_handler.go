@@ -9,12 +9,14 @@ import (
 type KernEventStream struct {
 	conn       *Connection4
 	kernEvents map[bpf.AgentStepT][]KernEvent
+	maxLen     int
 }
 
-func NewKernEventStream(conn *Connection4) *KernEventStream {
+func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
 	return &KernEventStream{
 		conn:       conn,
 		kernEvents: make(map[bpf.AgentStepT][]KernEvent),
+		maxLen:     maxLen,
 	}
 }
 
@@ -36,12 +38,15 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 			return
 			// panic("found duplicate kern event on same seq")
 		}
-		s.kernEvents[event.Step] = slices.Insert(kernEvtSlice, index, KernEvent{
+		kernEvtSlice = slices.Insert(kernEvtSlice, index, KernEvent{
 			seq:       event.Seq,
 			len:       int(event.Len),
 			timestamp: event.Ts,
 			step:      event.Step,
 		})
+		for len(kernEvtSlice) > s.maxLen {
+			kernEvtSlice = kernEvtSlice[1:]
+		}
 	}
 }
 
