@@ -27,22 +27,6 @@ func GetProgram(programs any, fieldName string) *ebpf.Program {
 	}
 }
 
-func GetMap(mapName string) *ebpf.Map {
-	oldObjs, isOld := Objs.(*AgentOldObjects)
-	if isOld {
-		maps := oldObjs.AgentOldMaps
-		v := reflect.ValueOf(maps)
-		f := v.FieldByName(mapName).Interface()
-		return f.(*ebpf.Map)
-	} else {
-		newobjs := Objs.(*AgentObjects)
-		maps := newobjs.AgentMaps
-		v := reflect.ValueOf(maps)
-		f := v.FieldByName(mapName).Interface()
-		return f.(*ebpf.Map)
-	}
-}
-
 /* accept pair */
 func AttachSyscallAcceptEntry(programs interface{}) link.Link {
 	return kprobe("__sys_accept4", GetProgram(programs, "Accept4Entry"))
