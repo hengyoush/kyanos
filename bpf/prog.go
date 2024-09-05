@@ -9,6 +9,8 @@ import (
 	"github.com/cilium/ebpf/link"
 )
 
+var Objs any
+
 type AttachBpfProgFunction func(interface{}) link.Link
 
 func GetProgram(programs any, fieldName string) *ebpf.Program {
@@ -22,6 +24,22 @@ func GetProgram(programs any, fieldName string) *ebpf.Program {
 		v := reflect.ValueOf(newprograms)
 		f := v.FieldByName(fieldName).Interface()
 		return f.(*ebpf.Program)
+	}
+}
+
+func GetMap(mapName string) *ebpf.Map {
+	oldObjs, isOld := Objs.(*AgentOldObjects)
+	if isOld {
+		maps := oldObjs.AgentOldMaps
+		v := reflect.ValueOf(maps)
+		f := v.FieldByName(mapName).Interface()
+		return f.(*ebpf.Map)
+	} else {
+		newobjs := Objs.(*AgentObjects)
+		maps := newobjs.AgentMaps
+		v := reflect.ValueOf(maps)
+		f := v.FieldByName(mapName).Interface()
+		return f.(*ebpf.Map)
 	}
 }
 

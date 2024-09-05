@@ -115,6 +115,7 @@ func SetupAgent(options AgentOptions) {
 		}
 		err = spec.LoadAndAssign(objs, nil)
 	}
+	bpf.Objs = objs
 
 	if err != nil {
 		err = errors.Unwrap(errors.Unwrap(err))

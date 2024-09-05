@@ -193,9 +193,20 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 	}
 }
 
-func (c *Connection4) OnClose() {
+func (c *Connection4) OnClose(needClearBpfMap bool) {
 	OnCloseRecordFunc(c)
 	c.Status = Closed
+	if needClearBpfMap {
+		connInfoMap := bpf.GetMap("ConnInfoMap")
+		err := connInfoMap.Delete(c.TgidFd)
+		if err != nil {
+			log.Errorf("clean conn_info_map failed: %v", err)
+		}
+	}
+}
+
+func (c *Connection4) OnCloseWithoutClearBpfMap() {
+	c.OnClose(false)
 }
 func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 	isReq := isReq(c, event)
