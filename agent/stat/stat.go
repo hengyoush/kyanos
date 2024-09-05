@@ -30,14 +30,31 @@ type StatRecord struct {
 	max   uint64
 }
 
+type ConnDesc struct {
+	LocalPort  uint16
+	RemotePort uint16
+	RemoteIp   int32
+	LocalIp    int32
+	Pid        uint32
+	Protocol   bpf.AgentTrafficProtocolT
+	Side       conn.SideEnum
+}
+
+func (c *ConnDesc) String() string {
+	direct := "=>"
+	if c.Side != conn.ClientSide {
+		direct = "<="
+	}
+	return fmt.Sprintf("[pid=%d][protocol=%d] *%s:%d %s %s:%d", c.Pid, c.Protocol, common.IntToIP(uint32(c.LocalIp)), c.LocalPort, direct, common.IntToIP(uint32(c.RemoteIp)), c.RemotePort)
+}
+
 type AnnotatedRecord struct {
+	ConnDesc
 	protocol.Record
 	startTs                      uint64
 	endTs                        uint64
-	connectionDesc               string
 	reqSize                      int
 	respSize                     int
-	side                         conn.SideEnum
 	totalDuration                int
 	blackBoxDuration             int
 	readFromSocketBufferDuration int
@@ -72,7 +89,7 @@ func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string 
 	nano := options.nano
 	firstPart := fmt.Sprintf("req: %s\n\nresp:%s\n\n%s\n[total duration] = %d(%s)(start=%s, end=%s)\n",
 		r.Request().FormatToString(), r.Response().FormatToString(),
-		r.connectionDesc,
+		(&r.ConnDesc).String(),
 		common.ConvertDurationToMillisecondsIfNeeded(int64(r.totalDuration), nano), timeUnitName(nano),
 		common.FormatTimestampWithPrecision(r.startTs, nano),
 		common.FormatTimestampWithPrecision(r.endTs, nano))
@@ -96,7 +113,7 @@ func timeUnitName(nano bool) string {
 }
 
 func (r *AnnotatedRecord) blackboxName() string {
-	if r.side == conn.ServerSide {
+	if r.ConnDesc.Side == conn.ServerSide {
 		return "process internal duration"
 	} else {
 		return "network duration"
@@ -105,13 +122,13 @@ func (r *AnnotatedRecord) blackboxName() string {
 
 func (r *AnnotatedRecord) syscallDisplayName(isReq bool) string {
 	if isReq {
-		if r.side == conn.ServerSide {
+		if r.ConnDesc.Side == conn.ServerSide {
 			return "read"
 		} else {
 			return "write"
 		}
 	} else {
-		if r.side == conn.ServerSide {
+		if r.ConnDesc.Side == conn.ServerSide {
 			return "write"
 		} else {
 			return "read"
@@ -127,11 +144,18 @@ type PacketEventDetail struct {
 }
 
 func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connection4) error {
-
 	streamEvents := connection.StreamEvents
 	annotatedRecord := CreateAnnotedRecord()
 	annotatedRecord.Record = r
-	annotatedRecord.connectionDesc = connection.ToString()
+	annotatedRecord.ConnDesc = ConnDesc{
+		RemotePort: connection.RemotePort,
+		RemoteIp:   int32(connection.RemoteIp),
+		LocalIp:    int32(connection.LocalIp),
+		LocalPort:  connection.LocalPort,
+		Protocol:   connection.Protocol,
+		Pid:        uint32(connection.TgidFd >> 32),
+		Side:       conn.SideEnum(connection.IsServerSide()),
+	}
 
 	var writeSyscallEvents, readSyscallEvents, devOutSyscallEvents, nicIngressEvents, userCopyEvents, tcpInEvents []conn.KernEvent
 	egressMessage := getParsedMessageBySide(r, connection.IsServerSide(), bpf.AgentTrafficDirectionTKEgress)
