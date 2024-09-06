@@ -98,6 +98,7 @@ type ColDefinition struct {
 }
 
 var _ ParsedMessage = &MysqlResponse{}
+var _ StatusfulMessage = &MysqlResponse{}
 
 type ResultsetRow struct {
 	msg string
@@ -107,6 +108,18 @@ type MysqlResponse struct {
 	protocol.FrameBase
 	RespStatus
 	Msg string
+}
+
+func (m *MysqlResponse) Status() ResponseStatus {
+	if m.RespStatus == Ok {
+		return SuccessStatus
+	} else if m.RespStatus == Err {
+		return FailStatus
+	} else if m.RespStatus == Unknwon {
+		return UnknownStatus
+	} else {
+		return NoneStatus
+	}
 }
 
 // FormatToString implements protocol.ParsedMessage.

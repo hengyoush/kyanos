@@ -189,6 +189,8 @@ type ParsedHttpRequest struct {
 }
 
 var _ ParsedMessage = &ParsedHttpRequest{}
+var _ ParsedMessage = &ParsedHttpResponse{}
+var _ StatusfulMessage = &ParsedHttpResponse{}
 
 func (req *ParsedHttpRequest) FormatToString() string {
 	return string(req.buf)
@@ -201,6 +203,10 @@ func (req *ParsedHttpRequest) IsReq() bool {
 type ParsedHttpResponse struct {
 	FrameBase
 	buf []byte
+}
+
+func (resp *ParsedHttpResponse) Status() ResponseStatus {
+	return SuccessStatus
 }
 
 func (resp *ParsedHttpResponse) FormatToString() string {

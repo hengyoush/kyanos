@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -33,5 +34,55 @@ func TestLEndianBytesToKInt(t *testing.T) {
 				t.Errorf("LEndianBytesToKInt() got1 = %v, want %v", got1, tt.ok)
 			}
 		})
+	}
+}
+
+type I1 interface {
+	A()
+}
+
+type I2 interface {
+	B()
+}
+
+type M struct {
+}
+
+func (m *M) A() {
+
+}
+
+func (m *M) B() {
+
+}
+
+func TestAmsa(t *testing.T) {
+	var m I1 = &M{}
+	I2 := m.(I2)
+	I2.B()
+	fmt.Print(1)
+}
+
+type I3 interface {
+	kk() string
+}
+type Inner struct {
+	B string
+}
+
+func (I *Inner) kk() string {
+	return "1"
+}
+
+type Outer struct {
+	Inner
+	CM string
+}
+
+func TestAa(t *testing.T) {
+	var outer I3 = &Outer{}
+	_, ok := outer.(*Outer)
+	if !ok {
+		t.FailNow()
 	}
 }

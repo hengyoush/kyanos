@@ -20,8 +20,9 @@ func GetParserByProtocol(protocol bpf.AgentTrafficProtocolT) ProtocolStreamParse
 }
 
 type Record struct {
-	Req  ParsedMessage
-	Resp ParsedMessage
+	Req            ParsedMessage
+	Resp           ParsedMessage
+	ResponseStatus ResponseStatus
 }
 
 func NewRecord(req ParsedMessage, resp ParsedMessage) *Record {
@@ -109,3 +110,15 @@ type ProtocolFilter interface {
 	FilterByRequest() bool
 	FilterByResponse() bool
 }
+
+type StatusfulMessage interface {
+	Status() ResponseStatus
+}
+type ResponseStatus int8
+
+const (
+	NoneStatus ResponseStatus = iota
+	SuccessStatus
+	FailStatus
+	UnknownStatus
+)

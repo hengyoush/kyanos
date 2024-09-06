@@ -312,6 +312,8 @@ func init() {
 
 var _ ProtocolStreamParser = &RedisStreamParser{}
 var _ ParsedMessage = &RedisMessage{}
+var _ ParsedMessage = &RedisResponseMessage{}
+var _ StatusfulMessage = &RedisResponseMessage{}
 
 type RedisStreamParser struct {
 }
@@ -320,6 +322,14 @@ type RedisMessage struct {
 	payload string
 	command string
 	isReq   bool
+}
+type RedisResponseMessage struct {
+	RedisMessage
+	status ResponseStatus
+}
+
+func (m *RedisResponseMessage) Status() ResponseStatus {
+	return m.status
 }
 
 func (req *RedisMessage) IsReq() bool {
@@ -408,13 +418,13 @@ func ParseArray(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMes
 			payload:   "[NULL]",
 		}, nil
 	}
-	msgSlice := make([]RedisMessage, 0)
+	msgSlice := make([]ParsedMessage, 0)
 	for i := 0; i < size; i++ {
 		_msg, err := ParseMessage(decoder, timestamp, seq)
 		if err != nil {
 			return nil, err
 		}
-		msgSlice = append(msgSlice, *_msg)
+		msgSlice = append(msgSlice, _msg)
 	}
 
 	ret := &RedisMessage{
@@ -428,29 +438,39 @@ func ParseArray(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMes
 	return ret, nil
 }
 
-func getCmdAndArgs(payloads []RedisMessage) (string, string) {
+func convertParsedMessageToRedisMessage(parsedMessage ParsedMessage) *RedisMessage {
+	redisMessage, ok := parsedMessage.(*RedisMessage)
+	if !ok {
+		return &parsedMessage.(*RedisResponseMessage).RedisMessage
+	} else {
+		return redisMessage
+	}
+}
+
+func getCmdAndArgs(payloads []ParsedMessage) (string, string) {
 	cmd := ""
 	finalPayload := ""
 	if len(payloads) >= 2 {
-		candidateCmd := strings.ToUpper(payloads[0].payload + " " + payloads[1].payload)
+		firstMessage, secondMessage := convertParsedMessageToRedisMessage(payloads[0]), convertParsedMessageToRedisMessage(payloads[1])
+		candidateCmd := strings.ToUpper(firstMessage.payload + " " + secondMessage.payload)
 		_, ok := redisCommandsMap[candidateCmd]
 		if ok {
 			payloads = payloads[2:]
 			cmd = candidateCmd
 			for _, each := range payloads {
-				finalPayload += each.payload
+				finalPayload += convertParsedMessageToRedisMessage(each).payload
 				finalPayload += " "
 			}
 		}
 	}
-
-	candidateCmd := strings.ToUpper(payloads[0].payload)
+	firstMessage := convertParsedMessageToRedisMessage(payloads[0])
+	candidateCmd := strings.ToUpper(firstMessage.payload)
 	_, ok := redisCommandsMap[candidateCmd]
 	if ok {
 		cmd = candidateCmd
 		payloads = payloads[1:]
 		for _, each := range payloads {
-			finalPayload += each.payload
+			finalPayload += convertParsedMessageToRedisMessage(each).payload
 			finalPayload += " "
 		}
 	}
@@ -460,7 +480,7 @@ func getCmdAndArgs(payloads []RedisMessage) (string, string) {
 	return cmd, finalPayload
 }
 
-func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMessage, error) {
+func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedMessage, error) {
 
 	typeMarker, err := decoder.ExtractByte()
 	if err != nil {
@@ -473,36 +493,48 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisM
 		if err != nil {
 			return nil, err
 		}
-		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
-			payload:   str,
+		return &RedisResponseMessage{
+			RedisMessage: RedisMessage{
+				FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+				payload:   str,
+			},
+			status: SuccessStatus,
 		}, nil
 	case kBulkStringsMarker:
 		str, err := ParseBulkString(decoder, timestamp, seq)
 		if err != nil {
 			return nil, err
 		}
-		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
-			payload:   str,
+		return &RedisResponseMessage{
+			RedisMessage: RedisMessage{
+				FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+				payload:   str,
+			},
+			status: SuccessStatus,
 		}, nil
 	case kErrorMarker:
 		str, err := decoder.ExtractStringUntil(kTerminalSequence)
 		if err != nil {
 			return nil, err
 		}
-		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
-			payload:   "-" + str,
+		return &RedisResponseMessage{
+			RedisMessage: RedisMessage{
+				FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+				payload:   "-" + str,
+			},
+			status: FailStatus,
 		}, nil
 	case kIntegerMarker:
 		str, err := decoder.ExtractStringUntil(kTerminalSequence)
 		if err != nil {
 			return nil, err
 		}
-		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
-			payload:   str,
+		return &RedisResponseMessage{
+			RedisMessage: RedisMessage{
+				FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+				payload:   str,
+			},
+			status: SuccessStatus,
 		}, nil
 	case kArrayMarker:
 		return ParseArray(decoder, timestamp, seq)

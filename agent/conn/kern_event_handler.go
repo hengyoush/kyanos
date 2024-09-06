@@ -47,6 +47,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 		for len(kernEvtSlice) > s.maxLen {
 			kernEvtSlice = kernEvtSlice[1:]
 		}
+		s.kernEvents[event.Step] = kernEvtSlice
 	}
 }
 
