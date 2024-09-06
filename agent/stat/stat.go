@@ -29,25 +29,6 @@ type StatRecord struct {
 	count uint64
 	max   uint64
 }
-
-type ConnDesc struct {
-	LocalPort  uint16
-	RemotePort uint16
-	RemoteIp   int32
-	LocalIp    int32
-	Pid        uint32
-	Protocol   bpf.AgentTrafficProtocolT
-	Side       conn.SideEnum
-}
-
-func (c *ConnDesc) String() string {
-	direct := "=>"
-	if c.Side != conn.ClientSide {
-		direct = "<="
-	}
-	return fmt.Sprintf("[pid=%d][protocol=%d] *%s:%d %s %s:%d", c.Pid, c.Protocol, common.IntToIP(uint32(c.LocalIp)), c.LocalPort, direct, common.IntToIP(uint32(c.RemoteIp)), c.RemotePort)
-}
-
 type AnnotatedRecord struct {
 	ConnDesc
 	protocol.Record
@@ -148,10 +129,10 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	annotatedRecord := CreateAnnotedRecord()
 	annotatedRecord.Record = r
 	annotatedRecord.ConnDesc = ConnDesc{
-		RemotePort: connection.RemotePort,
-		RemoteIp:   int32(connection.RemoteIp),
-		LocalIp:    int32(connection.LocalIp),
-		LocalPort:  connection.LocalPort,
+		RemotePort: Port(connection.RemotePort),
+		RemoteAddr: Addr(common.IntToBytes(connection.RemoteIp)),
+		LocalAddr:  Addr(common.IntToBytes(connection.LocalIp)),
+		LocalPort:  Port(connection.LocalPort),
 		Protocol:   connection.Protocol,
 		Pid:        uint32(connection.TgidFd >> 32),
 		Side:       conn.SideEnum(connection.IsServerSide()),

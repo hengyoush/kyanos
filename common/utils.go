@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -26,6 +27,25 @@ func IntToIP(ipInt uint32) string {
 
 	// 将net.IP类型转换为字符串
 	return ip.String()
+}
+
+func IntToBytes[T KInt](n T) []byte {
+	// 假设我们的int是非负的，并且我们工作在64位系统上
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, n)
+	return buf.Bytes()
+}
+
+func BytesToInt[T KInt](byteArray []byte) T {
+	// 假设bytes是以BigEndian方式编码的64位整数
+	var n T
+	buf := bytes.NewReader(byteArray)
+	err := binary.Read(buf, binary.LittleEndian, &n)
+	if err != nil {
+		return 0
+	}
+	// 转换回int，注意可能的溢出
+	return T(n)
 }
 
 func Int8ToStr(arr []int8) string {
