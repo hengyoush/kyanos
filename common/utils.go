@@ -199,3 +199,7 @@ func GetKernelVersion() *version.Version {
 	return version
 
 }
+
+func NanoToMills[T KInt](x T) float64 {
+	return float64(x) / 1000000
+}

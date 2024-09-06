@@ -14,22 +14,13 @@ import (
 var log *logrus.Logger = common.Log
 
 type StatRecorder struct {
-	recordMap map[uint64]*StatRecord
 }
 
 func InitStatRecorder() *StatRecorder {
 	sr := new(StatRecorder)
-	sr.recordMap = make(map[uint64]*StatRecord)
 	return sr
 }
 
-// 每个conn要有一些统计，简单先统计avg
-type StatRecord struct {
-	avg   float64
-	total uint64
-	count uint64
-	max   uint64
-}
 type AnnotatedRecord struct {
 	ConnDesc
 	protocol.Record
@@ -44,6 +35,10 @@ type AnnotatedRecord struct {
 	respSyscallEventDetails      []SyscallEventDetail
 	reqNicEventDetails           []NicEventDetail
 	respNicEventDetails          []NicEventDetail
+}
+
+func (a *AnnotatedRecord) GetTotalDurationMills() float64 {
+	return common.NanoToMills(int32(a.totalDuration))
 }
 
 func CreateAnnotedRecord() *AnnotatedRecord {
@@ -236,5 +231,4 @@ func getParsedMessageBySide(r protocol.Record, IsServerSide bool, direct bpf.Age
 	}
 }
 func (s *StatRecorder) RemoveRecord(tgidFd uint64) {
-	delete(s.recordMap, tgidFd)
 }
