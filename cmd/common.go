@@ -8,8 +8,20 @@ import (
 	"github.com/spf13/viper"
 )
 
-func startAgent(options agent.AgentOptions) {
+type ModeEnum int
 
+var Mode ModeEnum
+
+const (
+	WatchMode ModeEnum = iota
+	AnalysisMode
+)
+
+func startAgent(options agent.AgentOptions) {
+	if Mode == AnalysisMode {
+		options.AnalysisEnable = true
+		options.AnalysisOptions = createAnalysisOptions()
+	}
 	initLog()
 	logger.Infoln("Kyanos starting...")
 	if viper.GetBool(common.DaemonVarName) {

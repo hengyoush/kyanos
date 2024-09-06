@@ -38,3 +38,10 @@ func (c *ConnDesc) String() string {
 	}
 	return fmt.Sprintf("[pid=%d][protocol=%d] *%s:%d %s %s:%d", c.Pid, c.Protocol, c.LocalAddr.String(), c.LocalPort, direct, c.RemoteAddr.String(), c.RemotePort)
 }
+
+func init() {
+	_stoppers1 := make([]chan int, 0)
+	faststoppers = &_stoppers1
+	_stoppers2 := make([]chan int, 0)
+	slowstoppers = &_stoppers2
+}

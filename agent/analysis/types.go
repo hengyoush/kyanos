@@ -1,4 +1,4 @@
-package stat
+package analysis
 
 import (
 	"golang.org/x/exp/constraints"
@@ -10,7 +10,15 @@ type MetricValueType interface {
 	constraints.Integer | constraints.Float
 }
 
-type MetricTypeSet map[int]bool
+type MetricTypeSet map[MetricType]bool
+
+func NewMetricTypeSet(metricTypes []MetricType) MetricTypeSet {
+	result := make(map[MetricType]bool)
+	for _, t := range metricTypes {
+		result[t] = true
+	}
+	return result
+}
 
 type MetricExtract[T MetricValueType] func(*AnnotatedRecord) T
 
@@ -33,9 +41,9 @@ func GetMetricExtractFunc[T MetricValueType](t MetricType) MetricExtract[T] {
 	case TotalDuration:
 		return func(ar *AnnotatedRecord) T { return T(ar.GetTotalDurationMills()) }
 	case BlackBoxDuration:
-		return func(ar *AnnotatedRecord) T { return T(ar.blackBoxDuration) }
+		return func(ar *AnnotatedRecord) T { return T(ar.GetBlackBoxDurationMills()) }
 	case ReadFromSocketBufferDuration:
-		return func(ar *AnnotatedRecord) T { return T(ar.readFromSocketBufferDuration) }
+		return func(ar *AnnotatedRecord) T { return T(ar.GetReadFromSocketBufferDurationMills()) }
 	default:
 		return func(ar *AnnotatedRecord) T { return T(ar.GetTotalDurationMills()) }
 	}
@@ -44,11 +52,12 @@ func GetMetricExtractFunc[T MetricValueType](t MetricType) MetricExtract[T] {
 type ConnStat struct {
 	Count                 int
 	FailedCount           int
-	Avg                   float32
-	Max                   float32
-	samplesMap            map[MetricType][]*AnnotatedRecord
-	percentileCalculators map[MetricType]*PercentileCalculator
+	SamplesMap            map[MetricType][]*AnnotatedRecord
+	PercentileCalculators map[MetricType]*PercentileCalculator
+	// AvgMap                map[MetricType]float32
+	MaxMap map[MetricType]float32
+	SumMap map[MetricType]float64
 
-	classId
-	sum float64
+	ClassId       ClassId
+	ClassfierType ClassfierType
 }

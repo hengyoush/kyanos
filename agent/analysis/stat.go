@@ -1,4 +1,4 @@
-package stat
+package analysis
 
 import (
 	"fmt"
@@ -39,6 +39,14 @@ type AnnotatedRecord struct {
 
 func (a *AnnotatedRecord) GetTotalDurationMills() float64 {
 	return common.NanoToMills(int32(a.totalDuration))
+}
+
+func (a *AnnotatedRecord) GetBlackBoxDurationMills() float64 {
+	return common.NanoToMills(int32(a.blackBoxDuration))
+}
+
+func (a *AnnotatedRecord) GetReadFromSocketBufferDurationMills() float64 {
+	return common.NanoToMills(int32(a.readFromSocketBufferDuration))
 }
 
 func CreateAnnotedRecord() *AnnotatedRecord {
@@ -120,7 +128,7 @@ type PacketEventDetail struct {
 	timestamp uint64
 }
 
-func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connection4) error {
+func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connection4, recordsChannel chan<- *AnnotatedRecord) error {
 	streamEvents := connection.StreamEvents
 	annotatedRecord := CreateAnnotedRecord()
 	annotatedRecord.Record = r
@@ -195,9 +203,13 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](devOutSyscallEvents)
 		annotatedRecord.respNicEventDetails = KernEventsToEventDetails[NicEventDetail](nicIngressEvents)
 	}
-	log.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
-		nano: false,
-	}))
+	if recordsChannel == nil {
+		log.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
+			nano: false,
+		}))
+	} else {
+		recordsChannel <- annotatedRecord
+	}
 	return nil
 }
 

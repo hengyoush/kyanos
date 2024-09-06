@@ -41,5 +41,8 @@ func init() {
 	httpCmd.Flags().String("path", "", "--path /foo/bar")
 	httpCmd.Flags().SortFlags = false
 	httpCmd.PersistentFlags().SortFlags = false
-	watchCmd.AddCommand(httpCmd)
+	copy := *httpCmd
+	watchCmd.AddCommand(&copy)
+	copy2 := *httpCmd
+	analysisCmd.AddCommand(&copy2)
 }

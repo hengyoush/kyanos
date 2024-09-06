@@ -21,5 +21,8 @@ var mysqlCmd *cobra.Command = &cobra.Command{
 
 func init() {
 	mysqlCmd.PersistentFlags().SortFlags = false
-	watchCmd.AddCommand(mysqlCmd)
+	copy := *mysqlCmd
+	watchCmd.AddCommand(&copy)
+	copy2 := *mysqlCmd
+	analysisCmd.AddCommand(&copy2)
 }

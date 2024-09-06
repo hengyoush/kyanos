@@ -9,16 +9,17 @@ import (
 )
 
 var watchCmd = &cobra.Command{
-	Use:   "watch [http|redis] --path /foo/bar",
-	Short: "Watch the request/response pair and print to the console",
-	Long:  `It is possible to filter network requests based on specific protocol and print the request/response data to the console. `,
+	Use:              "watch [http|redis] --path /foo/bar",
+	Short:            "Watch the request/response pair and print to the console",
+	Long:             `It is possible to filter network requests based on specific protocol and print the request/response data to the console. `,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) { Mode = WatchMode },
 	Run: func(cmd *cobra.Command, args []string) {
 		list, err := cmd.Flags().GetBool("list")
 		if err != nil {
 			logger.Errorln(err)
 		} else {
 			if list {
-				fmt.Println([]string{"http", "redis"})
+				fmt.Println([]string{"http", "redis", "mysql"})
 			} else {
 				startAgent(agent.AgentOptions{LatencyFilter: initLatencyFilter(cmd), SizeFilter: initSizeFilter(cmd)})
 			}

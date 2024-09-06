@@ -184,6 +184,9 @@ func (p *Processor) run() {
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.SyscallEvent.Ke.Ts+common.LaunchEpochTime)
 			event.SyscallEvent.Ke.Ts += common.LaunchEpochTime
+			if conn != nil && conn.Status == Closed {
+				continue
+			}
 			if conn != nil && conn.ProtocolInferred() {
 				log.Debugf("[syscall][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 

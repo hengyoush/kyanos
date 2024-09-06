@@ -201,7 +201,7 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 		connInfoMap := bpf.GetMap("ConnInfoMap")
 		err := connInfoMap.Delete(c.TgidFd)
 		if err != nil {
-			log.Errorf("clean conn_info_map failed: %v", err)
+			log.Debugf("clean conn_info_map failed: %v", err)
 		}
 	}
 }

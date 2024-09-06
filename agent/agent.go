@@ -6,9 +6,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"kyanos/agent/analysis"
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
-	"kyanos/agent/stat"
+	"kyanos/agent/render"
 	"kyanos/bpf"
 	"kyanos/common"
 	"os"
@@ -54,6 +55,8 @@ type AgentOptions struct {
 	MessageFilter          protocol.ProtocolFilter
 	LatencyFilter          protocol.LatencyFilter
 	protocol.SizeFilter
+	AnalysisEnable bool
+	analysis.AnalysisOptions
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -78,10 +81,23 @@ func SetupAgent(options AgentOptions) {
 	if options.ConnManagerInitHook != nil {
 		options.ConnManagerInitHook(connManager)
 	}
-	statRecorder := stat.InitStatRecorder()
+	statRecorder := analysis.InitStatRecorder()
+
+	var recordsChannel chan *analysis.AnnotatedRecord = nil
+	if options.AnalysisEnable {
+		recordsChannel = make(chan *analysis.AnnotatedRecord, 1000)
+		resultChannel := make(chan []*analysis.ConnStat, 1000)
+		renderStopper := make(chan int)
+		analyzer := analysis.CreateAnalyzer(recordsChannel, &options.AnalysisOptions, resultChannel, renderStopper)
+		go analyzer.Run()
+
+		render := render.CreateRender(resultChannel, renderStopper)
+		go render.Run()
+	}
+
 	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
-		return statRecorder.ReceiveRecord(r, c)
+		return statRecorder.ReceiveRecord(r, c, recordsChannel)
 	}
 	conn.OnCloseRecordFunc = func(c *conn.Connection4) error {
 		statRecorder.RemoveRecord(c.TgidFd)
@@ -207,6 +223,7 @@ func SetupAgent(options AgentOptions) {
 
 		go func() {
 			<-stopper
+			common.SendStopSignal()
 			log.Debugln("stop!")
 			if err := dataReader.Close(); err != nil {
 				log.Fatalf("closing dataReader error: %s", err)
@@ -304,6 +321,7 @@ func SetupAgent(options AgentOptions) {
 
 		go func() {
 			<-stopper
+			common.SendStopSignal()
 			log.Debugln("stop!")
 			if err := dataReader.Close(); err != nil {
 				log.Fatalf("closing dataReader error: %s", err)

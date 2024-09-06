@@ -41,5 +41,8 @@ func init() {
 	redisCmd.Flags().String("key-prefix", "", "--key-prefix foo:bar:")
 	redisCmd.Flags().SortFlags = false
 	redisCmd.PersistentFlags().SortFlags = false
-	watchCmd.AddCommand(redisCmd)
+	copy := *redisCmd
+	watchCmd.AddCommand(&copy)
+	copy2 := *redisCmd
+	analysisCmd.AddCommand(&copy2)
 }
