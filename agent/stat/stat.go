@@ -6,6 +6,7 @@ import (
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
 	"kyanos/common"
+	. "kyanos/common"
 
 	"github.com/jefurry/logrus"
 )
@@ -94,7 +95,7 @@ func timeUnitName(nano bool) string {
 }
 
 func (r *AnnotatedRecord) blackboxName() string {
-	if r.ConnDesc.Side == conn.ServerSide {
+	if r.ConnDesc.Side == ServerSide {
 		return "process internal duration"
 	} else {
 		return "network duration"
@@ -103,13 +104,13 @@ func (r *AnnotatedRecord) blackboxName() string {
 
 func (r *AnnotatedRecord) syscallDisplayName(isReq bool) string {
 	if isReq {
-		if r.ConnDesc.Side == conn.ServerSide {
+		if r.ConnDesc.Side == ServerSide {
 			return "read"
 		} else {
 			return "write"
 		}
 	} else {
-		if r.ConnDesc.Side == conn.ServerSide {
+		if r.ConnDesc.Side == ServerSide {
 			return "write"
 		} else {
 			return "read"
@@ -130,12 +131,12 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	annotatedRecord.Record = r
 	annotatedRecord.ConnDesc = ConnDesc{
 		RemotePort: Port(connection.RemotePort),
-		RemoteAddr: Addr(common.IntToBytes(connection.RemoteIp)),
-		LocalAddr:  Addr(common.IntToBytes(connection.LocalIp)),
+		RemoteAddr: connection.RemoteIp,
+		LocalAddr:  connection.LocalIp,
 		LocalPort:  Port(connection.LocalPort),
 		Protocol:   connection.Protocol,
 		Pid:        uint32(connection.TgidFd >> 32),
-		Side:       conn.SideEnum(connection.IsServerSide()),
+		Side:       SideEnum(connection.IsServerSide()),
 	}
 
 	var writeSyscallEvents, readSyscallEvents, devOutSyscallEvents, nicIngressEvents, userCopyEvents, tcpInEvents []conn.KernEvent

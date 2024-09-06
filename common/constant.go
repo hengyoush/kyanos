@@ -27,4 +27,9 @@ var TCP_FLAGS_PSH = 1 << 3
 var TCP_FLAGS_RST = 1 << 2
 var TCP_FLAGS_SYN = 1 << 1
 
+type SideEnum bool
+
+const ServerSide SideEnum = true
+const ClientSide SideEnum = false
+
 var StepCNNames [bpf.AgentStepTEnd + 1]string = [bpf.AgentStepTEnd + 1]string{"开始", "系统调用(出)", "TCP层(出)", "IP层(出)", "QDISC", "DEV层(出)", "网卡(出)", "网卡(进)", "DEV层(进)", "IP层(进)", "TCP层(进)", "用户拷贝", "系统调用(进)", "结束"}

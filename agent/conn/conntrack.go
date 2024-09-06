@@ -7,6 +7,7 @@ import (
 	_ "kyanos/agent/protocol/mysql"
 	"kyanos/bpf"
 	"kyanos/common"
+	"slices"
 	"sync"
 )
 
@@ -15,10 +16,10 @@ var RecordFunc func(protocol.Record, *Connection4) error
 var OnCloseRecordFunc func(*Connection4) error
 
 type Connection4 struct {
-	LocalIp    uint32
-	RemoteIp   uint32
-	LocalPort  uint16
-	RemotePort uint16
+	LocalIp    common.Addr
+	RemoteIp   common.Addr
+	LocalPort  common.Port
+	RemotePort common.Port
 	Protocol   bpf.AgentTrafficProtocolT
 	Role       bpf.AgentEndpointRoleT
 	TgidFd     uint64
@@ -137,7 +138,7 @@ func (c *ConnManager) FindConnection4Or(TgidFd uint64, ts uint64) *Connection4 {
 }
 
 func (c *Connection4) IsIpPortEqualsWith(o *Connection4) bool {
-	return c.LocalIp == o.LocalIp && c.RemoteIp == o.RemoteIp && c.RemotePort == o.RemotePort && c.LocalPort == o.LocalPort
+	return slices.Compare(c.LocalIp, o.LocalIp) == 0 && slices.Compare(c.RemoteIp, o.RemoteIp) == 0 && c.RemotePort == o.RemotePort && c.LocalPort == o.LocalPort
 }
 
 func (c *Connection4) AddKernEvent(e *bpf.AgentKernEvt) {
@@ -320,7 +321,7 @@ func (c *Connection4) ToString() string {
 	if c.Role != bpf.AgentEndpointRoleTKRoleClient {
 		direct = "<="
 	}
-	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d] *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, common.IntToIP(c.LocalIp), c.LocalPort, direct, common.IntToIP(c.RemoteIp), c.RemotePort)
+	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d] *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, c.LocalIp.String(), c.LocalPort, direct, c.RemoteIp.String(), c.RemotePort)
 }
 
 func (c *Connection4) GetProtocolParser(p bpf.AgentTrafficProtocolT) protocol.ProtocolStreamParser {

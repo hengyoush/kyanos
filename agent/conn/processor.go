@@ -105,10 +105,10 @@ func (p *Processor) run() {
 			var conn *Connection4
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
 				conn = &Connection4{
-					LocalIp:    event.ConnInfo.Laddr.In4.SinAddr.S_addr,
-					RemoteIp:   event.ConnInfo.Raddr.In4.SinAddr.S_addr,
-					LocalPort:  event.ConnInfo.Laddr.In4.SinPort,
-					RemotePort: event.ConnInfo.Raddr.In4.SinPort,
+					LocalIp:    common.IntToBytes(event.ConnInfo.Laddr.In4.SinAddr.S_addr),
+					RemoteIp:   common.IntToBytes(event.ConnInfo.Raddr.In4.SinAddr.S_addr),
+					LocalPort:  common.Port(event.ConnInfo.Laddr.In4.SinPort),
+					RemotePort: common.Port(event.ConnInfo.Raddr.In4.SinPort),
 					Protocol:   event.ConnInfo.Protocol,
 					Role:       event.ConnInfo.Role,
 					TgidFd:     TgidFd,
@@ -164,10 +164,6 @@ func (p *Processor) run() {
 					conn.OnClose(true)
 				}
 			}
-			direct := "=>"
-			if event.ConnInfo.Role != bpf.AgentEndpointRoleTKRoleClient {
-				direct = "<="
-			}
 			eventType := "connect"
 			event.Ts += common.LaunchEpochTime
 			if event.ConnType == bpf.AgentConnTypeTKClose {
@@ -180,25 +176,21 @@ func (p *Processor) run() {
 			}
 
 			if event.ConnType == bpf.AgentConnTypeTKProtocolInfer && conn.ProtocolInferred() {
-				log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
+				log.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
 			} else {
-				log.Debugf("[conn][tgid=%d fd=%d] %s:%d %s %s:%d | type: %s, protocol: %d, \n", event.ConnInfo.ConnId.Upid.Pid, event.ConnInfo.ConnId.Fd, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, eventType, conn.Protocol)
+				log.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
 			}
 		case event := <-p.syscallEvents:
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.SyscallEvent.Ke.Ts+common.LaunchEpochTime)
 			event.SyscallEvent.Ke.Ts += common.LaunchEpochTime
-			direct := "=>"
-			if event.SyscallEvent.Ke.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
-				direct = "<="
-			}
 			if conn != nil && conn.ProtocolInferred() {
-				log.Debugf("[syscall][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
+				log.Debugf("[syscall][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 
 				conn.OnSyscallEvent(event.Buf, event)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
-				log.Debugf("[syscall][protocol unset][tgid=%d fd=%d][protocol=%d][len=%d] %s:%d %s %s:%d | %s", tgidFd>>32, uint32(tgidFd), conn.Protocol, event.SyscallEvent.BufSize, common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, string(event.Buf))
+				log.Debugf("[syscall][protocol unset][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 			} else {
 				log.Debugf("[syscall][lost][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 			}
@@ -206,23 +198,15 @@ func (p *Processor) run() {
 			tgidFd := event.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.Ts+common.LaunchEpochTime)
 			event.Ts += common.LaunchEpochTime
-			direct := "=>"
-			if event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress {
-				direct = "<="
-			}
 			if conn != nil {
-
-				log.Debugf("[data][tgid=%d fd=%d][func=%s][ts=%d][%s] *%s:%d %s %s:%d | %d:%d flags:%s\n",
-					tgidFd>>32, uint32(event.ConnIdS.TgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts,
-					common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp),
-					conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len,
+				log.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, common.StepCNNames[event.Step],
+					conn.ToString(), event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
 
 			} else {
 				if viper.GetBool(common.VerboseVarName) {
-					log.Debugf("[data no conn][tgid=%d fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n",
-						tgidFd>>32, uint32(event.ConnIdS.TgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts,
-						common.StepCNNames[event.Step], event.Seq, event.Len,
+					log.Debugf("[data no conn][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, common.StepCNNames[event.Step],
+						conn.ToString(), event.Seq, event.Len,
 						common.DisplayTcpFlags(event.Flags))
 				}
 			}
@@ -230,7 +214,7 @@ func (p *Processor) run() {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					conn.OnKernEvent(event)
 					// log.Debug("[skip] skip due to protocol unset")
-					log.Debugf("[data][protocol-unset][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d \n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
+					log.Debugf("[data][protocol-unset][func=%s][%s]%s | %d:%d \n", common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 					flag := conn.OnKernEvent(event)
 					if !flag {
@@ -239,7 +223,7 @@ func (p *Processor) run() {
 				}
 			} else if event.Len > 0 && conn != nil {
 				log.Debug("[skip] skip due to protocol is unknwon")
-				log.Debugf("[data][tgid_fd=%d][func=%s][%s] %s:%d %s %s:%d | %d:%d\n", tgidFd, common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], common.IntToIP(conn.LocalIp), conn.LocalPort, direct, common.IntToIP(conn.RemoteIp), conn.RemotePort, event.Seq, event.Len)
+				log.Debugf("[data][func=%s][%s]%s | %d:%d\n", common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
 			} else if event.Len == 0 && conn != nil {
 				conn.OnKernEvent(event)
 			}
