@@ -51,7 +51,7 @@ func (p *PercentileCalculator) CalculatePercentile(line float64) float64 {
 	}
 
 	// 计算目标位置
-	p99Index := int(math.Floor(line * float64(p.totalValues)))
+	p99Index := int(math.Ceil(line * float64(p.totalValues)))
 
 	// 找到 P99 所在的桶
 	count := 0

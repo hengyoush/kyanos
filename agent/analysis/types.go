@@ -58,6 +58,26 @@ type ConnStat struct {
 	MaxMap map[MetricType]float32
 	SumMap map[MetricType]float64
 
-	ClassId       ClassId
-	ClassfierType ClassfierType
+	ClassId             ClassId
+	HumanReadbleClassId string
+	ClassfierType       ClassfierType
+}
+
+func (c *ConnStat) ClassIdAsHumanReadable(classId ClassId) string {
+	switch c.ClassfierType {
+	case None:
+		return "All"
+	case Conn:
+		return c.HumanReadbleClassId
+	case RemotePort:
+		fallthrough
+	case LocalPort:
+		fallthrough
+	case RemoteIp:
+		return string(classId)
+	case Protocol:
+		return c.HumanReadbleClassId
+	default:
+		return string(classId)
+	}
 }

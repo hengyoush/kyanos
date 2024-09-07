@@ -21,6 +21,12 @@ type aggregator struct {
 	*ConnStat
 }
 
+func createAggregatorWithHumanReadableClassId(humanReadableClassId string,
+	classId ClassId, aggregateOption *AnalysisOptions) *aggregator {
+	aggregator := createAggregator(classId, aggregateOption)
+	aggregator.HumanReadbleClassId = humanReadableClassId
+	return aggregator
+}
 func createAggregator(classId ClassId, aggregateOption *AnalysisOptions) *aggregator {
 	aggregator := aggregator{}
 	aggregator.reset(classId, aggregateOption)
@@ -151,7 +157,15 @@ func (a *Analyzer) analyze(record *AnnotatedRecord) {
 	if err == nil {
 		aggregator, exists := a.Aggregators[class]
 		if !exists {
-			a.Aggregators[class] = createAggregator(class, a.AnalysisOptions)
+			humanReadableFunc, ok := classIdHumanReadableMap[a.ClassfierType]
+			if ok {
+				humanReadableClassId := humanReadableFunc(record)
+				a.Aggregators[class] = createAggregatorWithHumanReadableClassId(humanReadableClassId,
+					class, a.AnalysisOptions)
+			} else {
+				a.Aggregators[class] = createAggregator(class, a.AnalysisOptions)
+			}
+
 			aggregator = a.Aggregators[class]
 		}
 		aggregator.receive(record)

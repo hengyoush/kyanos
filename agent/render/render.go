@@ -47,7 +47,7 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 		}
 		const HEADER_TEMPLATE = "%s: %s" // class type: class id
 
-		s += fmt.Sprintf(HEADER_TEMPLATE, analysis.ClassfierTypeNames[stat.ClassfierType], stat.ClassId)
+		s += fmt.Sprintf(HEADER_TEMPLATE, analysis.ClassfierTypeNames[stat.ClassfierType], stat.ClassIdAsHumanReadable(stat.ClassId))
 		s += "\n"
 
 		for metricType := range stat.SamplesMap {

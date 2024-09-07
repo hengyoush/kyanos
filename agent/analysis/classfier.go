@@ -1,10 +1,15 @@
 package analysis
 
-import "fmt"
+import (
+	"fmt"
+	"kyanos/agent/protocol"
+	"kyanos/common"
+)
 
 type ClassfierType int
 
 type Classfier func(*AnnotatedRecord) (ClassId, error)
+type ClassIdAsHumanReadable func(*AnnotatedRecord) string
 
 var ClassfierTypeNames = map[ClassfierType]string{
 	None:         "none",
@@ -35,6 +40,7 @@ const (
 type ClassId string
 
 var classfierMap map[ClassfierType]Classfier
+var classIdHumanReadableMap map[ClassfierType]ClassIdAsHumanReadable
 
 func init() {
 	classfierMap = make(map[ClassfierType]Classfier)
@@ -46,6 +52,18 @@ func init() {
 	classfierMap[LocalPort] = func(ar *AnnotatedRecord) (ClassId, error) { return ClassId(fmt.Sprintf("%d", ar.LocalPort)), nil }
 	classfierMap[RemoteIp] = func(ar *AnnotatedRecord) (ClassId, error) { return ClassId(ar.RemoteAddr.String()), nil }
 	classfierMap[Protocol] = func(ar *AnnotatedRecord) (ClassId, error) { return ClassId(fmt.Sprintf("%d", ar.Protocol)), nil }
+
+	classIdHumanReadableMap = make(map[ClassfierType]ClassIdAsHumanReadable)
+	classIdHumanReadableMap[Conn] = func(ar *AnnotatedRecord) string {
+		return ar.ConnDesc.String()
+	}
+	classIdHumanReadableMap[HttpPath] = func(ar *AnnotatedRecord) string {
+		return ar.Record.Request().(*protocol.ParsedHttpRequest).Path
+	}
+
+	classIdHumanReadableMap[Protocol] = func(ar *AnnotatedRecord) string {
+		return common.ProtocolNamesMap[ar.Protocol]
+	}
 }
 
 func getClassfier(classfierType ClassfierType) Classfier {
