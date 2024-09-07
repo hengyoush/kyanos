@@ -16,7 +16,8 @@ type AnalysisOptions struct {
 	Interval             int
 	Side                 common.SideEnum
 	ClassfierType
-	SortBy LatencyMetric
+	SortBy         LatencyMetric
+	FullRecordBody bool
 }
 
 type aggregator struct {

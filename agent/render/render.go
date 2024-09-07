@@ -88,15 +88,27 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 			for i := range records {
 				record := records[len(records)-i-1]
 				s += fmt.Sprintf("----------------------------------------Top %s Sample %d---------------------------------------------\n", metricSampleName(metricType, r.Side), i+1)
-				s += record.String(analysis.AnnotatedRecordToStringOptions{
-					MetricTypeSet: r.AnalysisOptions.EnabledMetricTypeSet,
-					RecordToStringOptions: protocol.RecordToStringOptions{
-						RecordMaxDumpBytes: 1024,
-						IncludeReqSummary:  true,
-						IncludeRespSummary: true,
-					},
-					IncludeSyscallStat: false,
-				})
+				if r.FullRecordBody {
+					s += record.String(analysis.AnnotatedRecordToStringOptions{
+						MetricTypeSet: r.AnalysisOptions.EnabledMetricTypeSet,
+						RecordToStringOptions: protocol.RecordToStringOptions{
+							RecordMaxDumpBytes: 1024,
+							IncludeReqBody:     true,
+							IncludeRespBody:    true,
+						},
+						IncludeSyscallStat: false,
+					})
+				} else {
+					s += record.String(analysis.AnnotatedRecordToStringOptions{
+						MetricTypeSet: r.AnalysisOptions.EnabledMetricTypeSet,
+						RecordToStringOptions: protocol.RecordToStringOptions{
+							RecordMaxDumpBytes: 1024,
+							IncludeReqSummary:  true,
+							IncludeRespSummary: true,
+						},
+						IncludeSyscallStat: false,
+					})
+				}
 			}
 		}
 

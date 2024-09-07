@@ -23,7 +23,7 @@ var sampleCount int
 var groupBy string
 var interval int
 var sortByPar string
-
+var fullBody bool
 var SUPPORTED_METRICS = []byte{'t', 'q', 'p', 'n', 's'}
 
 func validateEnabledMetricsString() error {
@@ -89,6 +89,10 @@ func createAnalysisOptions() (analysis.AnalysisOptions, error) {
 		logger.Warnf("unknown --sort flag: %s, use default '%s'", sortByPar, "avg")
 		options.SortBy = analysis.Avg
 	}
+
+	if fullBody {
+		options.FullRecordBody = true
+	}
 	return options, nil
 }
 
@@ -103,6 +107,7 @@ func init() {
 	statCmd.PersistentFlags().Int64("resp-size", 0, "--resp-size 1024 # bytes")
 	statCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "--side client|all|server")
 	statCmd.PersistentFlags().StringVar(&sortByPar, "sort", "avg", "--sort avg|max|p50|p90|p99")
+	statCmd.PersistentFlags().BoolVar(&fullBody, "full-body", false, "--full-body")
 
 	statCmd.Flags().SortFlags = false
 	statCmd.PersistentFlags().SortFlags = false
