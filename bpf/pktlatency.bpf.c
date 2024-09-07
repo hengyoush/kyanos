@@ -52,6 +52,7 @@ struct {													\
 const struct kern_evt *kern_evt_unused __attribute__((unused));
 const struct conn_evt_t *conn_evt_t_unused __attribute__((unused));
 const struct kern_evt_data *kern_evt_data_unused __attribute__((unused));
+const struct conn_info_t *conn_info_t_unused __attribute__((unused));
 const enum conn_type_t *conn_type_t_unused __attribute__((unused));
 const enum endpoint_role_t *endpoint_role_unused  __attribute__((unused));
 const enum traffic_direction_t *traffic_direction_t_unused __attribute__((unused));

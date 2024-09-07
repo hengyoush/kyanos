@@ -7,8 +7,11 @@ import (
 	_ "kyanos/agent/protocol/mysql"
 	"kyanos/bpf"
 	"kyanos/common"
+	"kyanos/monitor"
 	"slices"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // var RecordFunc func(protocol.Record, *Connection4) error
@@ -60,11 +63,35 @@ const (
 )
 
 type ConnManager struct {
-	connMap *sync.Map
+	connMap          *sync.Map
+	connectionAdded  int64
+	connectionClosed int64
+	ticker           *time.Ticker
 }
 
 func InitConnManager() *ConnManager {
-	return &ConnManager{connMap: new(sync.Map)}
+	connManager := &ConnManager{connMap: new(sync.Map)}
+	monitor.RegisterMetricExporter(connManager)
+	connManager.ticker = time.NewTicker(15 * time.Second)
+	go func() {
+		for i := range connManager.ticker.C {
+			i.GoString()
+			_needsDelete := make([]uint64, 0)
+			needsDelete := &_needsDelete
+			connManager.connMap.Range(func(key, value any) bool {
+				conn := value.(*Connection4)
+				if conn.Status == Closed {
+					*needsDelete = append(*needsDelete, key.(uint64))
+				}
+				return true
+			})
+			for _, tgidFd := range _needsDelete {
+				connManager.connMap.Delete(tgidFd)
+			}
+			atomic.AddInt64(&connManager.connectionClosed, int64(len(_needsDelete)))
+		}
+	}()
+	return connManager
 }
 
 func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
@@ -81,18 +108,21 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 			}
 			if deleteEndIdx != -1 {
 				prevConn = prevConn[deleteEndIdx+1:]
+				atomic.AddInt64(&c.connectionClosed, int64(deleteEndIdx)+1)
 			}
 
 			prevConn = append(prevConn, existedConn)
 			conn.prevConn = prevConn
 
 			c.connMap.Store(TgidFd, conn)
+			atomic.AddInt64(&c.connectionAdded, 1)
 			return nil
 		} else {
 			return nil
 		}
 	} else {
 		c.connMap.Store(TgidFd, conn)
+		atomic.AddInt64(&c.connectionAdded, 1)
 		return nil
 	}
 
@@ -204,6 +234,7 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 			log.Debugf("clean conn_info_map failed: %v", err)
 		}
 	}
+	monitor.UnregisterMetricExporter(c.StreamEvents)
 }
 
 func (c *Connection4) OnCloseWithoutClearBpfMap() {
@@ -323,12 +354,29 @@ func (c *Connection4) Side() common.SideEnum {
 		return common.ServerSide
 	}
 }
+func (c *Connection4) Identity() string {
+	cd := common.ConnDesc{
+		LocalPort:  c.LocalPort,
+		RemotePort: c.RemotePort,
+		LocalAddr:  c.LocalIp,
+		RemoteAddr: c.RemoteIp,
+	}
+	return cd.Identity()
+}
 func (c *Connection4) ToString() string {
 	direct := "=>"
 	if c.Role != bpf.AgentEndpointRoleTKRoleClient {
 		direct = "<="
 	}
-	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d] *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, c.LocalIp.String(), c.LocalPort, direct, c.RemoteIp.String(), c.RemotePort)
+	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d][%s] *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, c.StatusString(), c.LocalIp.String(), c.LocalPort, direct, c.RemoteIp.String(), c.RemotePort)
+}
+
+func (c *Connection4) StatusString() string {
+	if c.Status == Closed {
+		return "closed"
+	} else {
+		return "connect"
+	}
 }
 
 func (c *Connection4) GetProtocolParser(p bpf.AgentTrafficProtocolT) protocol.ProtocolStreamParser {

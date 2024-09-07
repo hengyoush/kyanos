@@ -96,7 +96,7 @@ func (m *MysqlParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMess
 				common.Log.Debugln("Appears to be an incomplete message. Waiting for more data")
 				break
 			}
-			common.Log.Infof("Didn't have enough response packets, but doesn't appear to be partial either. "+
+			common.Log.Debugf("Didn't have enough response packets, but doesn't appear to be partial either. "+
 				"[cmd=%v, cmd_msg=%s resp_packets=%d]", command, reqPacket.msg[1:], len(respPacketsView))
 		} else if state == Success {
 			records = append(records, record)

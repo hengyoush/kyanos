@@ -2,7 +2,9 @@ package conn
 
 import (
 	"cmp"
+	"fmt"
 	"kyanos/bpf"
+	"kyanos/monitor"
 	"slices"
 )
 
@@ -13,11 +15,13 @@ type KernEventStream struct {
 }
 
 func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
-	return &KernEventStream{
+	stream := &KernEventStream{
 		conn:       conn,
 		kernEvents: make(map[bpf.AgentStepT][]KernEvent),
 		maxLen:     maxLen,
 	}
+	monitor.RegisterMetricExporter(stream)
+	return stream
 }
 
 func (s *KernEventStream) AddSyscallEvent(event *bpf.SyscallEventData) {
@@ -105,4 +109,20 @@ func (kernevent *KernEvent) GetStep() bpf.AgentStepT {
 type TcpKernEvent struct {
 	KernEvent
 	tcpFlags int
+}
+
+var _ monitor.MetricExporter = &KernEventStream{}
+
+func (s *KernEventStream) ExportMetrics() monitor.MetricMap {
+	allEventsNum := 0
+	for _, events := range s.kernEvents {
+		allEventsNum += len(events)
+	}
+	return monitor.MetricMap{
+		"events_num": float64(allEventsNum),
+	}
+}
+
+func (s *KernEventStream) MetricGroupName() string {
+	return fmt.Sprintf("stream_events-%s", s.conn.Identity())
 }

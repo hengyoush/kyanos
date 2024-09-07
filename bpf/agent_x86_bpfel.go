@@ -13,47 +13,49 @@ import (
 )
 
 type AgentConnEvtT struct {
-	ConnInfo struct {
-		ConnId struct {
-			Upid struct {
-				Pid            uint32
-				_              [4]byte
-				StartTimeTicks uint64
-			}
-			Fd   int32
-			_    [4]byte
-			Tsid uint64
-		}
-		ReadBytes  uint64
-		WriteBytes uint64
-		Laddr      struct {
-			In4 struct {
-				SinFamily uint16
-				SinPort   uint16
-				SinAddr   struct{ S_addr uint32 }
-				Pad       [8]uint8
-			}
-			_ [12]byte
-		}
-		Raddr struct {
-			In4 struct {
-				SinFamily uint16
-				SinPort   uint16
-				SinAddr   struct{ S_addr uint32 }
-				Pad       [8]uint8
-			}
-			_ [12]byte
-		}
-		Protocol            AgentTrafficProtocolT
-		Role                AgentEndpointRoleT
-		PrevCount           uint64
-		PrevBuf             [4]int8
-		PrependLengthHeader bool
-		_                   [3]byte
-	}
+	ConnInfo AgentConnInfoT
 	ConnType AgentConnTypeT
 	_        [4]byte
 	Ts       uint64
+}
+
+type AgentConnInfoT struct {
+	ConnId struct {
+		Upid struct {
+			Pid            uint32
+			_              [4]byte
+			StartTimeTicks uint64
+		}
+		Fd   int32
+		_    [4]byte
+		Tsid uint64
+	}
+	ReadBytes  uint64
+	WriteBytes uint64
+	Laddr      struct {
+		In4 struct {
+			SinFamily uint16
+			SinPort   uint16
+			SinAddr   struct{ S_addr uint32 }
+			Pad       [8]uint8
+		}
+		_ [12]byte
+	}
+	Raddr struct {
+		In4 struct {
+			SinFamily uint16
+			SinPort   uint16
+			SinAddr   struct{ S_addr uint32 }
+			Pad       [8]uint8
+		}
+		_ [12]byte
+	}
+	Protocol            AgentTrafficProtocolT
+	Role                AgentEndpointRoleT
+	PrevCount           uint64
+	PrevBuf             [4]int8
+	PrependLengthHeader bool
+	_                   [3]byte
 }
 
 type AgentConnTypeT uint32
