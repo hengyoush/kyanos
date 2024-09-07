@@ -66,31 +66,49 @@ func CreateAnnotedRecord() *AnnotatedRecord {
 }
 
 type AnnotatedRecordToStringOptions struct {
-	recordMaxDumpBytes int
-	nano               bool
+	Nano bool
+	protocol.RecordToStringOptions
+	MetricTypeSet
+	IncludeSyscallStat bool
 }
 
 func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string {
-	nano := options.nano
-	firstPart := fmt.Sprintf("req: %s\n\nresp:%s\n\n%s\n[total duration] = %d(%s)(start=%s, end=%s)\n",
-		r.Request().FormatToString(), r.Response().FormatToString(),
-		(&r.ConnDesc).String(),
-		common.ConvertDurationToMillisecondsIfNeeded(int64(r.totalDuration), nano), timeUnitName(nano),
-		common.FormatTimestampWithPrecision(r.startTs, nano),
-		common.FormatTimestampWithPrecision(r.endTs, nano))
-
-	secondPart := fmt.Sprintf("[%s]=%d(%s) [copy from sockbuf]=%d(%s)\n", r.blackboxName(),
-		common.ConvertDurationToMillisecondsIfNeeded(int64(r.blackBoxDuration), nano),
-		timeUnitName(nano),
-		common.ConvertDurationToMillisecondsIfNeeded(int64(r.readFromSocketBufferDuration), nano),
-		timeUnitName(nano))
-	thirdPart := fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d [%s count]=%d [%s bytes]=%d\n",
-		r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
-		r.syscallDisplayName(true), r.reqSize,
-		r.syscallDisplayName(false), len(r.respSyscallEventDetails),
-		r.syscallDisplayName(false), r.respSize,
-	)
-	return firstPart + secondPart + thirdPart
+	nano := options.Nano
+	var result string
+	result += r.Record.String(options.RecordToStringOptions)
+	result += "\n"
+	if _, ok := options.MetricTypeSet[TotalDuration]; ok {
+		result += fmt.Sprintf("[total duration] = %d(%s)(start=%s, end=%s)\n", common.ConvertDurationToMillisecondsIfNeeded(int64(r.totalDuration), nano), timeUnitName(nano),
+			common.FormatTimestampWithPrecision(r.startTs, nano),
+			common.FormatTimestampWithPrecision(r.endTs, nano))
+	}
+	if _, ok := options.MetricTypeSet[ReadFromSocketBufferDuration]; ok {
+		result += fmt.Sprintf("[read from sockbuf]=%d(%s)\n", common.ConvertDurationToMillisecondsIfNeeded(int64(r.readFromSocketBufferDuration), nano),
+			timeUnitName(nano))
+	}
+	if _, ok := options.MetricTypeSet[BlackBoxDuration]; ok {
+		result += fmt.Sprintf("[%s]=%d(%s)\n", r.blackboxName(),
+			common.ConvertDurationToMillisecondsIfNeeded(int64(r.blackBoxDuration), nano),
+			timeUnitName(nano))
+	}
+	if _, ok := options.MetricTypeSet[RequestSize]; ok {
+		result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d\n",
+			r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
+			r.syscallDisplayName(true), r.reqSize)
+	}
+	if _, ok := options.MetricTypeSet[ResponseSize]; ok {
+		result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d\n",
+			r.syscallDisplayName(false), len(r.respSyscallEventDetails),
+			r.syscallDisplayName(false), r.respSize)
+	}
+	if options.IncludeSyscallStat {
+		result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d [%s count]=%d [%s bytes]=%d\n\n",
+			r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
+			r.syscallDisplayName(true), r.reqSize,
+			r.syscallDisplayName(false), len(r.respSyscallEventDetails),
+			r.syscallDisplayName(false), r.respSize)
+	}
+	return result
 }
 
 func timeUnitName(nano bool) string {
@@ -213,7 +231,19 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	}
 	if recordsChannel == nil {
 		log.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
-			nano: false,
+			Nano: false,
+			MetricTypeSet: MetricTypeSet{
+				ResponseSize:                 true,
+				RequestSize:                  true,
+				ReadFromSocketBufferDuration: true,
+				BlackBoxDuration:             true,
+				TotalDuration:                true,
+			}, IncludeSyscallStat: true,
+			RecordToStringOptions: protocol.RecordToStringOptions{
+				IncludeReqBody:     true,
+				IncludeRespBody:    true,
+				RecordMaxDumpBytes: 1024,
+			},
 		}))
 	} else {
 		recordsChannel <- annotatedRecord

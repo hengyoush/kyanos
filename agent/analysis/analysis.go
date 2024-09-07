@@ -16,6 +16,7 @@ type AnalysisOptions struct {
 	Interval             int
 	Side                 common.SideEnum
 	ClassfierType
+	SortBy LatencyMetric
 }
 
 type aggregator struct {
@@ -161,11 +162,12 @@ func (a *Analyzer) Run() {
 
 func (a *Analyzer) harvest() []*ConnStat {
 	result := make([]*ConnStat, 0)
-	for classId, aggregator := range a.Aggregators {
+	for _, aggregator := range a.Aggregators {
 		connstat := aggregator.ConnStat
-		aggregator.reset(classId, a.AnalysisOptions)
+		// aggregator.reset(classId, a.AnalysisOptions)
 		result = append(result, connstat)
 	}
+	a.Aggregators = make(map[ClassId]*aggregator)
 	return result
 }
 

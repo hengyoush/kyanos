@@ -192,6 +192,10 @@ var _ ParsedMessage = &ParsedHttpRequest{}
 var _ ParsedMessage = &ParsedHttpResponse{}
 var _ StatusfulMessage = &ParsedHttpResponse{}
 
+func (req *ParsedHttpRequest) FormatToSummaryString() string {
+	return fmt.Sprintf("[HTTP] %s http://%s%s", req.Method, req.Host, req.Path)
+}
+
 func (req *ParsedHttpRequest) FormatToString() string {
 	return string(req.buf)
 }
@@ -205,6 +209,9 @@ type ParsedHttpResponse struct {
 	buf []byte
 }
 
+func (resp *ParsedHttpResponse) FormatToSummaryString() string {
+	return fmt.Sprintf("[HTTP] Response len: %d", resp.byteSize)
+}
 func (resp *ParsedHttpResponse) Status() ResponseStatus {
 	return SuccessStatus
 }

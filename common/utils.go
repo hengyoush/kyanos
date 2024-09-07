@@ -203,3 +203,11 @@ func GetKernelVersion() *version.Version {
 func NanoToMills[T KInt](x T) float64 {
 	return float64(x) / 1000000
 }
+
+func TruncateString(s string, maxBytes int) string {
+	if len(s) < maxBytes {
+		return s
+	} else {
+		return fmt.Sprintf("%s...(truncated, total: %dbytes)", s[:maxBytes], len(s))
+	}
+}

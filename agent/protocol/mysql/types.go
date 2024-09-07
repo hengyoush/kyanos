@@ -121,6 +121,9 @@ func (m *MysqlResponse) Status() ResponseStatus {
 		return NoneStatus
 	}
 }
+func (m *MysqlResponse) FormatToSummaryString() string {
+	return fmt.Sprintf("base=[%s] status=[%v] Msg=[%s]", m.FrameBase.String(), m.RespStatus, m.Msg)
+}
 
 // FormatToString implements protocol.ParsedMessage.
 func (m *MysqlResponse) FormatToString() string {
@@ -281,6 +284,10 @@ type MysqlPacket struct {
 	msg   string
 	cmd   int
 	isReq bool
+}
+
+func (m *MysqlPacket) FormatToSummaryString() string {
+	return fmt.Sprintf("base=[%s] seqId=[%d] msg=[%s] isReq=[%v]", m.FrameBase.String(), m.seqId, m.msg, m.isReq)
 }
 
 func (m *MysqlPacket) FormatToString() string {

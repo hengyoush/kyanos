@@ -332,6 +332,23 @@ func (m *RedisResponseMessage) Status() ResponseStatus {
 	return m.status
 }
 
+func (r *RedisMessage) FormatToSummaryString() string {
+	if r.isReq {
+		if len(r.command)+len(r.payload) < 128 {
+			return r.String()
+		} else {
+			spaceIdx := strings.Index(r.payload, " ")
+			if spaceIdx != -1 {
+				return fmt.Sprintf("[Redis Request] %s %s", r.command, r.payload[:spaceIdx])
+			} else {
+				return r.command
+			}
+		}
+	} else {
+		return fmt.Sprintf("[Redis Response] len: %d", r.byteSize)
+	}
+}
+
 func (req *RedisMessage) IsReq() bool {
 	return req.isReq
 }

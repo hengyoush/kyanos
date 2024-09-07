@@ -22,6 +22,25 @@ func NewMetricTypeSet(metricTypes []MetricType) MetricTypeSet {
 	return result
 }
 
+func (m MetricTypeSet) AllEnabledMetrciType() []MetricType {
+	var result []MetricType
+	for metricType, enabled := range m {
+		if enabled {
+			result = append(result, metricType)
+		}
+	}
+	return result
+}
+
+func (m MetricTypeSet) GetFirstEnabledMetricType() MetricType {
+	for metricType, enabled := range m {
+		if enabled {
+			return metricType
+		}
+	}
+	return NoneType
+}
+
 type MetricExtract[T MetricValueType] func(*AnnotatedRecord) T
 
 const (
@@ -30,6 +49,7 @@ const (
 	TotalDuration
 	BlackBoxDuration
 	ReadFromSocketBufferDuration
+	NoneType
 )
 
 func GetMetricExtractFunc[T MetricValueType](t MetricType) MetricExtract[T] {
@@ -84,3 +104,46 @@ func (c *ConnStat) ClassIdAsHumanReadable(classId ClassId) string {
 		return string(classId)
 	}
 }
+
+func (c *ConnStat) GetValueByMetricType(l LatencyMetric, m MetricType) float64 {
+	if l == Avg {
+		sum, ok := c.SumMap[m]
+		if !ok {
+			return 0
+		}
+
+		return sum / float64(c.Count)
+	} else if l == Max {
+		max, ok := c.MaxMap[m]
+		if !ok {
+			return 0
+		}
+		return float64(max)
+	} else if l == P50 || l == P90 || l == P99 {
+		var percent float32
+		if l == P50 {
+			percent = 0.5
+		} else if l == P90 {
+			percent = 0.90
+		} else {
+			percent = 0.99
+		}
+		p, ok := c.PercentileCalculators[m]
+		if !ok {
+			return 0
+		}
+		return p.CalculatePercentile(float64(percent))
+	} else {
+		panic("Not implemneted!")
+	}
+}
+
+type LatencyMetric int
+
+const (
+	Avg LatencyMetric = iota
+	Max
+	P50
+	P90
+	P99
+)

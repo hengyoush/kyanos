@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"kyanos/agent/buffer"
 	"kyanos/bpf"
+	"kyanos/common"
 )
 
 type ProtocolCreator func() ProtocolStreamParser
@@ -39,6 +40,31 @@ func (r *Record) Response() ParsedMessage {
 	return r.Resp
 }
 
+type RecordToStringOptions struct {
+	RecordMaxDumpBytes int
+	IncludeReqBody     bool
+	IncludeRespBody    bool
+	IncludeReqSummary  bool
+	IncludeRespSummary bool
+}
+
+func (r *Record) String(opt RecordToStringOptions) string {
+	var result string
+	if opt.IncludeReqBody {
+		result += fmt.Sprintf("[ Request ]\n%s\n\n", common.TruncateString(r.Req.FormatToString(), opt.RecordMaxDumpBytes))
+	}
+	if opt.IncludeRespBody {
+		result += fmt.Sprintf("[ Response ]\n%s\n\n", common.TruncateString(r.Resp.FormatToString(), opt.RecordMaxDumpBytes))
+	}
+	if opt.IncludeReqSummary {
+		result += fmt.Sprintf("[ Request ]\n%s\n\n", r.Req.FormatToSummaryString())
+	}
+	if opt.IncludeRespSummary {
+		result += fmt.Sprintf("[ Response ]\n%s\n\n", r.Resp.FormatToSummaryString())
+	}
+	return result
+}
+
 type ProtocolStreamParser interface {
 	ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult
 	FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int
@@ -47,6 +73,7 @@ type ProtocolStreamParser interface {
 
 type ParsedMessage interface {
 	FormatToString() string
+	FormatToSummaryString() string
 	TimestampNs() uint64
 	ByteSize() int
 	IsReq() bool
