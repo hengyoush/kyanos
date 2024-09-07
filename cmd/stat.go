@@ -10,7 +10,7 @@ import (
 )
 
 var statCmd = &cobra.Command{
-	Use:              "stat [-t -q -p -n -s] [--sample 10] [-g remote-ip|remote-port|local-port|protocol]",
+	Use:              "stat [-m pqtsn] [-s 10] [-g conn|remote-ip|remote-port|local-port|protocol]",
 	Short:            "Analysis connections statistics",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) { Mode = AnalysisMode },
 	Run: func(cmd *cobra.Command, args []string) {
