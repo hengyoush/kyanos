@@ -44,5 +44,5 @@ func init() {
 	copy := *redisCmd
 	watchCmd.AddCommand(&copy)
 	copy2 := *redisCmd
-	analysisCmd.AddCommand(&copy2)
+	statCmd.AddCommand(&copy2)
 }

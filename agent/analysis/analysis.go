@@ -12,6 +12,7 @@ import (
 type AnalysisOptions struct {
 	EnabledMetricTypeSet MetricTypeSet
 	SampleLimit          int
+	DisplayLimit         int
 	ClassfierType
 }
 

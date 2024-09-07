@@ -31,6 +31,15 @@ type ConnDesc struct {
 	StreamId   int
 }
 
+func (c *ConnDesc) Identity() string {
+	localPortBytes := IntToBytes(uint16(c.LocalPort))
+	remotePortBytes := IntToBytes(uint16(c.RemotePort))
+
+	result := append(c.LocalAddr, localPortBytes...)
+	result = append(result, append(c.RemoteAddr, remotePortBytes...)...)
+	return string(result)
+}
+
 func (c *ConnDesc) String() string {
 	direct := "=>"
 	if c.Side != ClientSide {

@@ -84,8 +84,12 @@ func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string 
 		timeUnitName(nano),
 		common.ConvertDurationToMillisecondsIfNeeded(int64(r.readFromSocketBufferDuration), nano),
 		timeUnitName(nano))
-	thirdPart := fmt.Sprintf("[syscall] [%s count]=%d [%s count]=%d\n", r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
-		r.syscallDisplayName(false), len(r.respSyscallEventDetails))
+	thirdPart := fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d [%s count]=%d [%s bytes]=%d\n",
+		r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
+		r.syscallDisplayName(true), r.reqSize,
+		r.syscallDisplayName(false), len(r.respSyscallEventDetails),
+		r.syscallDisplayName(false), r.respSize,
+	)
 	return firstPart + secondPart + thirdPart
 }
 

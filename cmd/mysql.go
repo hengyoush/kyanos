@@ -24,5 +24,5 @@ func init() {
 	copy := *mysqlCmd
 	watchCmd.AddCommand(&copy)
 	copy2 := *mysqlCmd
-	analysisCmd.AddCommand(&copy2)
+	statCmd.AddCommand(&copy2)
 }

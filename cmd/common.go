@@ -20,7 +20,11 @@ const (
 func startAgent(options agent.AgentOptions) {
 	if Mode == AnalysisMode {
 		options.AnalysisEnable = true
-		options.AnalysisOptions = createAnalysisOptions()
+		analysisOptions, err := createAnalysisOptions()
+		if err != nil {
+			return
+		}
+		options.AnalysisOptions = analysisOptions
 	}
 	initLog()
 	logger.Infoln("Kyanos starting...")

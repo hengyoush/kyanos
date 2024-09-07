@@ -44,5 +44,5 @@ func init() {
 	copy := *httpCmd
 	watchCmd.AddCommand(&copy)
 	copy2 := *httpCmd
-	analysisCmd.AddCommand(&copy2)
+	statCmd.AddCommand(&copy2)
 }

@@ -14,12 +14,14 @@ type RenderOptions struct {
 type Render struct {
 	resultChannel <-chan []*analysis.ConnStat
 	stopper       <-chan int
+	*analysis.AnalysisOptions
 }
 
-func CreateRender(resultChannel <-chan []*analysis.ConnStat, stopper chan int) *Render {
+func CreateRender(resultChannel <-chan []*analysis.ConnStat, stopper chan int, options *analysis.AnalysisOptions) *Render {
 	return &Render{
-		resultChannel: resultChannel,
-		stopper:       stopper,
+		resultChannel:   resultChannel,
+		stopper:         stopper,
+		AnalysisOptions: options,
 	}
 }
 
@@ -39,7 +41,10 @@ func (r *Render) Run() {
 func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 
 	var s string
-	for _, stat := range constats {
+	for idx, stat := range constats {
+		if idx+1 > r.AnalysisOptions.DisplayLimit {
+			break
+		}
 		const HEADER_TEMPLATE = "%s: %s" // class type: class id
 
 		s += fmt.Sprintf(HEADER_TEMPLATE, analysis.ClassfierTypeNames[stat.ClassfierType], stat.ClassId)
