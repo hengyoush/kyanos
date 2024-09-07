@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"kyanos/agent"
 	"kyanos/agent/protocol"
 	"kyanos/common"
@@ -13,13 +14,33 @@ import (
 type ModeEnum int
 
 var Mode ModeEnum
+var SidePar string
 
 const (
 	WatchMode ModeEnum = iota
 	AnalysisMode
 )
 
+func ParseSide(side string) (common.SideEnum, error) {
+	switch side {
+	case "all":
+		return common.AllSide, nil
+	case "server":
+		return common.ServerSide, nil
+	case "client":
+		return common.ClientSide, nil
+	default:
+		logger.Errorf("invalid side: %s", side)
+		return common.AllSide, fmt.Errorf("invalid side: %s", side)
+	}
+}
+
 func startAgent(options agent.AgentOptions) {
+	side, err := ParseSide(SidePar)
+	if err != nil {
+		return
+	}
+	options.TraceSide = side
 	if Mode == AnalysisMode {
 		options.AnalysisEnable = true
 		analysisOptions, err := createAnalysisOptions()
@@ -27,7 +48,9 @@ func startAgent(options agent.AgentOptions) {
 			return
 		}
 		options.AnalysisOptions = analysisOptions
+		options.Side = side
 	}
+
 	initLog()
 	logger.Infoln("Kyanos starting...")
 	if viper.GetBool(common.DaemonVarName) {

@@ -136,6 +136,10 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	streamEvents := connection.StreamEvents
 	annotatedRecord := CreateAnnotedRecord()
 	annotatedRecord.Record = r
+	var side SideEnum = ClientSide
+	if connection.IsServerSide() {
+		side = ServerSide
+	}
 	annotatedRecord.ConnDesc = ConnDesc{
 		RemotePort: Port(connection.RemotePort),
 		RemoteAddr: connection.RemoteIp,
@@ -143,7 +147,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		LocalPort:  Port(connection.LocalPort),
 		Protocol:   connection.Protocol,
 		Pid:        uint32(connection.TgidFd >> 32),
-		Side:       SideEnum(connection.IsServerSide()),
+		Side:       side,
 	}
 
 	var writeSyscallEvents, readSyscallEvents, devOutSyscallEvents, nicIngressEvents, userCopyEvents, tcpInEvents []conn.KernEvent

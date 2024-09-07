@@ -14,6 +14,7 @@ type AnalysisOptions struct {
 	SampleLimit          int
 	DisplayLimit         int
 	Interval             int
+	Side                 common.SideEnum
 	ClassfierType
 }
 
@@ -28,6 +29,7 @@ func createAggregatorWithHumanReadableClassId(humanReadableClassId string,
 	aggregator.HumanReadbleClassId = humanReadableClassId
 	return aggregator
 }
+
 func createAggregator(classId ClassId, aggregateOption *AnalysisOptions) *aggregator {
 	aggregator := aggregator{}
 	aggregator.reset(classId, aggregateOption)
@@ -64,6 +66,7 @@ func (a *aggregator) receive(record *AnnotatedRecord) error {
 			o.FailedCount++
 		}
 	}
+	a.ConnStat.Side = record.ConnDesc.Side
 
 	for rawMetricType, enabled := range a.AnalysisOptions.EnabledMetricTypeSet {
 		metricType := MetricType(rawMetricType)

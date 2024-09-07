@@ -1,6 +1,8 @@
 package analysis
 
 import (
+	"kyanos/common"
+
 	"golang.org/x/exp/constraints"
 )
 
@@ -57,6 +59,7 @@ type ConnStat struct {
 	// AvgMap                map[MetricType]float32
 	MaxMap map[MetricType]float32
 	SumMap map[MetricType]float64
+	Side   common.SideEnum
 
 	ClassId             ClassId
 	HumanReadbleClassId string

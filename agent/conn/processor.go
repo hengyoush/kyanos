@@ -25,14 +25,14 @@ type ProcessorManager struct {
 }
 
 func InitProcessorManager(n int, connManager *ConnManager, filter protocol.ProtocolFilter,
-	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter) *ProcessorManager {
+	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum) *ProcessorManager {
 	pm := new(ProcessorManager)
 	pm.processors = make([]*Processor, n)
 	pm.wg = new(sync.WaitGroup)
 	pm.ctx, pm.cancel = context.WithCancel(context.Background())
 	pm.connManager = connManager
 	for i := 0; i < n; i++ {
-		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter, sizeFilter)
+		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter, sizeFilter, side)
 		go pm.processors[i].run()
 		pm.wg.Add(1)
 	}
@@ -64,10 +64,11 @@ type Processor struct {
 	messageFilter protocol.ProtocolFilter
 	latencyFilter protocol.LatencyFilter
 	protocol.SizeFilter
+	side common.SideEnum
 }
 
 func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter protocol.ProtocolFilter,
-	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter) *Processor {
+	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum) *Processor {
 	p := new(Processor)
 	p.wg = wg
 	p.ctx = ctx
@@ -79,6 +80,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.messageFilter = filter
 	p.latencyFilter = latencyFilter
 	p.SizeFilter = sizeFilter
+	p.side = side
 	return p
 }
 
@@ -126,6 +128,10 @@ func (p *Processor) run() {
 					prevConn:         []*Connection4{},
 
 					protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),
+				}
+				if p.side != common.AllSide && p.side != conn.Side() {
+					conn.OnClose(true)
+					continue
 				}
 				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
 				p.connManager.AddConnection4(TgidFd, conn)

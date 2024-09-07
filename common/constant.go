@@ -27,10 +27,11 @@ var TCP_FLAGS_PSH = 1 << 3
 var TCP_FLAGS_RST = 1 << 2
 var TCP_FLAGS_SYN = 1 << 1
 
-type SideEnum bool
+type SideEnum int8
 
-const ServerSide SideEnum = true
-const ClientSide SideEnum = false
+const AllSide SideEnum = 0
+const ServerSide SideEnum = 1
+const ClientSide SideEnum = 2
 
 var ProtocolNamesMap = map[bpf.AgentTrafficProtocolT]string{
 	bpf.AgentTrafficProtocolTKProtocolHTTP:  "HTTP",

@@ -61,7 +61,7 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 			pCalc := stat.PercentileCalculators[metricType]
 			p50, p90, p99 := pCalc.CalculatePercentile(0.5), pCalc.CalculatePercentile(0.9), pCalc.CalculatePercentile(0.99)
 			unit := MetricTypeUnit[metricType]
-			s += fmt.Sprintf(METRIC_TEMPLATE, MetricTypeNames[metricType], stat.Count, stat.FailedCount, avg, unit, max, unit, p50, unit, p90, unit, p99, unit)
+			s += fmt.Sprintf(METRIC_TEMPLATE, metricName(metricType, r.Side), stat.Count, stat.FailedCount, avg, unit, max, unit, p50, unit, p90, unit, p99, unit)
 		}
 		s += "\n"
 
@@ -70,7 +70,7 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 				continue
 			}
 			const SAMPLES_HEADER = "[ Top%d %s Samples ]\n"
-			s += fmt.Sprintf(SAMPLES_HEADER, len(records), MetricTypeSampleNames[metricType])
+			s += fmt.Sprintf(SAMPLES_HEADER, len(records), metricSampleName(metricType, r.Side))
 			for i := range records {
 				record := records[len(records)-i-1]
 				s += record.String(analysis.AnnotatedRecordToStringOptions{})
@@ -80,4 +80,30 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 		s += "--------------------------------------------------------------------------------------\n"
 	}
 	return s
+}
+
+func metricName(metricType analysis.MetricType, side common.SideEnum) string {
+
+	metricName := MetricTypeNames[metricType]
+	if metricType == analysis.BlackBoxDuration {
+		if side == common.ClientSide {
+			metricName = "Network Duration"
+		} else {
+			metricName = "Server Internal Duration"
+		}
+	}
+	return metricName
+}
+
+func metricSampleName(metricType analysis.MetricType, side common.SideEnum) string {
+
+	metricName := MetricTypeNames[metricType]
+	if metricType == analysis.BlackBoxDuration {
+		if side == common.ClientSide {
+			metricName = "Max Network Duration"
+		} else {
+			metricName = "Max Server Internal Duration"
+		}
+	}
+	return metricName
 }

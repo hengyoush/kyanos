@@ -31,6 +31,7 @@ func init() {
 	watchCmd.PersistentFlags().Float64("latency", 0, "--latency 100 # millseconds")
 	watchCmd.PersistentFlags().Int64("req-size", 0, "--req-size 1024 # bytes")
 	watchCmd.PersistentFlags().Int64("resp-size", 0, "--resp-size 1024 # bytes")
+	watchCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "--side client|all|server")
 	watchCmd.Flags().SortFlags = false
 	watchCmd.PersistentFlags().SortFlags = false
 	rootCmd.AddCommand(watchCmd)

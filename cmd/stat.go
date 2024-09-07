@@ -84,6 +84,7 @@ func init() {
 	statCmd.PersistentFlags().Float64("latency", 0, "--latency 100 # millseconds")
 	statCmd.PersistentFlags().Int64("req-size", 0, "--req-size 1024 # bytes")
 	statCmd.PersistentFlags().Int64("resp-size", 0, "--resp-size 1024 # bytes")
+	statCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "--side client|all|server")
 
 	statCmd.Flags().SortFlags = false
 	statCmd.PersistentFlags().SortFlags = false

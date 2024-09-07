@@ -316,6 +316,13 @@ func (c *Connection4) IsServerSide() bool {
 	}
 }
 
+func (c *Connection4) Side() common.SideEnum {
+	if c.Role == bpf.AgentEndpointRoleTKRoleClient {
+		return common.ClientSide
+	} else {
+		return common.ServerSide
+	}
+}
 func (c *Connection4) ToString() string {
 	direct := "=>"
 	if c.Role != bpf.AgentEndpointRoleTKRoleClient {

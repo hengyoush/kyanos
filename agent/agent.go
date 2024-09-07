@@ -54,6 +54,7 @@ type AgentOptions struct {
 	ProcessorsNum          int
 	MessageFilter          protocol.ProtocolFilter
 	LatencyFilter          protocol.LatencyFilter
+	TraceSide              common.SideEnum
 	protocol.SizeFilter
 	AnalysisEnable bool
 	analysis.AnalysisOptions
@@ -95,7 +96,7 @@ func SetupAgent(options AgentOptions) {
 		go render.Run()
 	}
 
-	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter)
+	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter, options.Side)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c, recordsChannel)
 	}
