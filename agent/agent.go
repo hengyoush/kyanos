@@ -96,7 +96,7 @@ func SetupAgent(options AgentOptions) {
 		go render.Run()
 	}
 
-	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter, options.Side)
+	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter, options.TraceSide)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c, recordsChannel)
 	}
