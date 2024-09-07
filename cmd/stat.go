@@ -21,6 +21,7 @@ var enabledMetricsString string
 var displayLimit int
 var sampleCount int
 var groupBy string
+var interval int
 
 var SUPPORTED_METRICS = []byte{'t', 'q', 'p', 'n', 's'}
 
@@ -69,6 +70,8 @@ func createAnalysisOptions() (analysis.AnalysisOptions, error) {
 			options.ClassfierType = key
 		}
 	}
+
+	options.Interval = interval
 	return options, nil
 }
 
@@ -76,6 +79,7 @@ func init() {
 	statCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metrics", "m", "t", "-m pqtsn")
 	statCmd.PersistentFlags().IntVarP(&sampleCount, "sample", "s", 0, "-s 10")
 	statCmd.PersistentFlags().IntVarP(&displayLimit, "limit", "l", 10, "-l 20")
+	statCmd.PersistentFlags().IntVarP(&interval, "interval", "i", 0, "-i 5")
 	statCmd.PersistentFlags().StringVarP(&groupBy, "group-by", "g", "remote-ip", "-g remote-ip")
 	statCmd.PersistentFlags().Float64("latency", 0, "--latency 100 # millseconds")
 	statCmd.PersistentFlags().Int64("req-size", 0, "--req-size 1024 # bytes")

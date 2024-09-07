@@ -13,6 +13,7 @@ type AnalysisOptions struct {
 	EnabledMetricTypeSet MetricTypeSet
 	SampleLimit          int
 	DisplayLimit         int
+	Interval             int
 	ClassfierType
 }
 
@@ -112,12 +113,14 @@ type Analyzer struct {
 	stopper         <-chan int
 	resultChannel   chan<- []*ConnStat
 	renderStopper   chan int
+	ticker          *time.Ticker
+	tickerC         <-chan time.Time
 }
 
 func CreateAnalyzer(recordsChannel <-chan *AnnotatedRecord, showOption *AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int) *Analyzer {
 	stopper := make(chan int, 0)
 	common.AddToFastStopper(stopper)
-	return &Analyzer{
+	analyzer := &Analyzer{
 		Classfier:       getClassfier(showOption.ClassfierType),
 		recordsChannel:  recordsChannel,
 		Aggregators:     make(map[ClassId]*aggregator),
@@ -126,18 +129,29 @@ func CreateAnalyzer(recordsChannel <-chan *AnnotatedRecord, showOption *Analysis
 		resultChannel:   resultChannel,
 		renderStopper:   renderStopper,
 	}
+	if showOption.Interval > 0 {
+		analyzer.ticker = time.NewTicker(time.Second * time.Duration(showOption.Interval))
+		analyzer.tickerC = analyzer.ticker.C
+	} else {
+		analyzer.tickerC = make(<-chan time.Time)
+	}
+	return analyzer
 }
 
 func (a *Analyzer) Run() {
 	for {
 		select {
 		case <-a.stopper:
-			a.resultChannel <- a.harvest()
-			time.Sleep(1 * time.Second)
+			if a.AnalysisOptions.Interval == 0 {
+				a.resultChannel <- a.harvest()
+				time.Sleep(1 * time.Second)
+			}
 			a.renderStopper <- 1
 			return
 		case record := <-a.recordsChannel:
 			a.analyze(record)
+		case <-a.tickerC:
+			a.resultChannel <- a.harvest()
 		}
 	}
 }
