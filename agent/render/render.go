@@ -71,7 +71,8 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 			}
 			const SAMPLES_HEADER = "[ Top%d %s Samples ]\n"
 			s += fmt.Sprintf(SAMPLES_HEADER, len(records), MetricTypeSampleNames[metricType])
-			for _, record := range records {
+			for i := range records {
+				record := records[len(records)-i-1]
 				s += record.String(analysis.AnnotatedRecordToStringOptions{})
 			}
 		}
