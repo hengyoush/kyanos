@@ -49,7 +49,7 @@ func (a *aggregator) reset(classId ClassId, aggregateOption *AnalysisOptions) {
 	for rawMetricType, enabled := range aggregateOption.EnabledMetricTypeSet {
 		if enabled {
 			metricType := MetricType(rawMetricType)
-			a.PercentileCalculators[metricType] = NewP99Calculator()
+			a.PercentileCalculators[metricType] = NewPercentileCalculator()
 			a.SamplesMap[metricType] = make([]*AnnotatedRecord, 0)
 		}
 	}
@@ -121,7 +121,7 @@ type Analyzer struct {
 }
 
 func CreateAnalyzer(recordsChannel <-chan *AnnotatedRecord, showOption *AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int) *Analyzer {
-	stopper := make(chan int, 0)
+	stopper := make(chan int)
 	common.AddToFastStopper(stopper)
 	analyzer := &Analyzer{
 		Classfier:       getClassfier(showOption.ClassfierType),
