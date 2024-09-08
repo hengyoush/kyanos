@@ -233,8 +233,8 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](devOutSyscallEvents)
 		annotatedRecord.respNicEventDetails = KernEventsToEventDetails[NicEventDetail](nicIngressEvents)
 	}
-	streamEvents.DiscardEventsBySeq(egressMessage.Seq()+uint64(egressMessage.ByteSize()), true)
-	streamEvents.DiscardEventsBySeq(ingressMessage.Seq()+uint64(ingressMessage.ByteSize()), false)
+	// streamEvents.DiscardEventsBySeq(egressMessage.Seq()+uint64(egressMessage.ByteSize()), true)
+	// streamEvents.DiscardEventsBySeq(ingressMessage.Seq()+uint64(ingressMessage.ByteSize()), false)
 	if recordsChannel == nil {
 		log.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
 			Nano: false,

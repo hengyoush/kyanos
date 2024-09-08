@@ -8,7 +8,7 @@ import (
 )
 
 var watchCmd = &cobra.Command{
-	Use:              "watch [http|redis] --path /foo/bar",
+	Use:              "watch [http|redis|mysql] [filter]",
 	Short:            "Watch the request/response pair and print to the console",
 	Long:             `It is possible to filter network requests based on specific protocol and print the request/response data to the console. `,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) { Mode = WatchMode },
