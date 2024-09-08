@@ -1,0 +1,37 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: kyanos-build
+
+on:
+  push:
+    branches: [ "feature/netanalysis" ]
+  pull_request:
+    branches: [ "feature/netanalysis" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Build
+      run: |
+        sudo apt update
+        sudo apt install -y git
+        git clone https://mirror.ghproxy.com/github.com/hengyoush/kyanos.git --recursive
+        sudo apt-get -y install pkg-config
+        sudo apt install -y libelf-dev
+        
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+        sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
+        sudo apt update
+        sudo apt install -y clang
+        make
+
