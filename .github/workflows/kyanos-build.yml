@@ -25,7 +25,6 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y git
-        git clone https://mirror.ghproxy.com/github.com/hengyoush/kyanos.git --recursive
         sudo apt-get -y install pkg-config
         sudo apt install -y libelf-dev
         
@@ -33,5 +32,6 @@ jobs:
         sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
         sudo apt update
         sudo apt install -y clang
+        pwd
         make clean && make
 
