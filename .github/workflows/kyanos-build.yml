@@ -33,5 +33,6 @@ jobs:
         sudo apt update
         sudo apt install -y clang
         pwd
+        ls -l
         make clean && make
 
