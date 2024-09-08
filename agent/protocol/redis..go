@@ -312,8 +312,7 @@ func init() {
 
 var _ ProtocolStreamParser = &RedisStreamParser{}
 var _ ParsedMessage = &RedisMessage{}
-var _ ParsedMessage = &RedisResponseMessage{}
-var _ StatusfulMessage = &RedisResponseMessage{}
+var _ StatusfulMessage = &RedisMessage{}
 
 type RedisStreamParser struct {
 }
@@ -322,13 +321,10 @@ type RedisMessage struct {
 	payload string
 	command string
 	isReq   bool
-}
-type RedisResponseMessage struct {
-	RedisMessage
-	status ResponseStatus
+	status  ResponseStatus
 }
 
-func (m *RedisResponseMessage) Status() ResponseStatus {
+func (m *RedisMessage) Status() ResponseStatus {
 	return m.status
 }
 
@@ -450,18 +446,13 @@ func ParseArray(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMes
 	cmd, payload := getCmdAndArgs(msgSlice)
 	ret.command = cmd
 	ret.payload = payload
-	ret.isReq = true
 
 	return ret, nil
 }
 
 func convertParsedMessageToRedisMessage(parsedMessage ParsedMessage) *RedisMessage {
-	redisMessage, ok := parsedMessage.(*RedisMessage)
-	if !ok {
-		return &parsedMessage.(*RedisResponseMessage).RedisMessage
-	} else {
-		return redisMessage
-	}
+	redisMessage, _ := parsedMessage.(*RedisMessage)
+	return redisMessage
 }
 
 func getCmdAndArgs(payloads []ParsedMessage) (string, string) {
@@ -510,48 +501,40 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 		if err != nil {
 			return nil, err
 		}
-		return &RedisResponseMessage{
-			RedisMessage: RedisMessage{
-				FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
-				payload:   str,
-			},
-			status: SuccessStatus,
+		return &RedisMessage{
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			payload:   str,
+			status:    SuccessStatus,
 		}, nil
 	case kBulkStringsMarker:
 		str, err := ParseBulkString(decoder, timestamp, seq)
 		if err != nil {
 			return nil, err
 		}
-		return &RedisResponseMessage{
-			RedisMessage: RedisMessage{
-				FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
-				payload:   str,
-			},
-			status: SuccessStatus,
+		return &RedisMessage{
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			payload:   str,
+			status:    SuccessStatus,
 		}, nil
 	case kErrorMarker:
 		str, err := decoder.ExtractStringUntil(kTerminalSequence)
 		if err != nil {
 			return nil, err
 		}
-		return &RedisResponseMessage{
-			RedisMessage: RedisMessage{
-				FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
-				payload:   "-" + str,
-			},
-			status: FailStatus,
+		return &RedisMessage{
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			payload:   "-" + str,
+			status:    FailStatus,
 		}, nil
 	case kIntegerMarker:
 		str, err := decoder.ExtractStringUntil(kTerminalSequence)
 		if err != nil {
 			return nil, err
 		}
-		return &RedisResponseMessage{
-			RedisMessage: RedisMessage{
-				FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
-				payload:   str,
-			},
-			status: SuccessStatus,
+		return &RedisMessage{
+			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			payload:   str,
+			status:    SuccessStatus,
 		}, nil
 	case kArrayMarker:
 		return ParseArray(decoder, timestamp, seq)
@@ -562,12 +545,13 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 
 func (r *RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult {
 	head := streamBuffer.Head().Buffer()
-	ts, ok := streamBuffer.FindTimestampBySeq(streamBuffer.Head().LeftBoundary())
+	seq := streamBuffer.Head().LeftBoundary()
+	ts, ok := streamBuffer.FindTimestampBySeq(seq)
 	decoder := NewBinaryDecoder(head)
-	redisMessage, err := ParseMessage(decoder, ts, streamBuffer.Head().LeftBoundary())
+	redisMessage, err := ParseMessage(decoder, ts, seq)
 	result := ParseResult{}
 	if err != nil {
-		if errors.Is(err, &NotFoundError{}) || errors.Is(err, &ResourceNotAvailbleError{}) {
+		if errors.Is(err, NotFound) || errors.Is(err, ResourceNotAvailble) {
 			result.ParseState = NeedsMoreData
 		} else {
 			result.ParseState = Invalid
@@ -578,6 +562,9 @@ func (r *RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 		} else {
 			result.ParseState = Success
 		}
+
+		redisMessage.(*RedisMessage).isReq = messageType == Request
+		redisMessage.(*RedisMessage).seq = seq
 		result.ReadBytes = redisMessage.ByteSize()
 		result.ParsedMessages = []ParsedMessage{redisMessage}
 	}

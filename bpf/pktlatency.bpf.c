@@ -297,6 +297,7 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	if (_len == 0) {
 		return;
 	}
+	
 	int zero = 0;
 	struct kern_evt_data* evt = bpf_map_lookup_elem(&syscall_data_map, &zero);
 	if(!evt || !conn_id_s) {
@@ -490,7 +491,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 	u16 mac_header = _C(skb, mac_header);
 	u16 trans_header = _C(skb, transport_header);
 	
-	bpf_printk("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
+	// bpf_printk("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
 	// bpf_printk("%s, mac_header: %d", func_name,mac_header);
 	// bpf_printk("%s, network_header: %d", func_name,network_header);
 	// bpf_printk("%s, trans_header: %d", func_name,trans_header);

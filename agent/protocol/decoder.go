@@ -45,6 +45,9 @@ func (d *BinaryDecoder) ReadBytes() int {
 	return d.readBytes
 }
 
+var ResourceNotAvailble = NewResourceNotAvailbleError("Insufficient number of bytes.")
+var NotFound = NewNotFoundError("Could not find sentinel character")
+
 /*
 Extract until encounter the input string.
 
@@ -53,7 +56,7 @@ The sentinel string is not returned, but is still removed from the buffer.
 func (d *BinaryDecoder) ExtractStringUntil(sentinel string) (string, error) {
 	idx := strings.Index(d.str, sentinel)
 	if idx == -1 {
-		return "", NewNotFoundError("Could not find sentinel character")
+		return "", NotFound
 	}
 	ret := d.str[0:idx]
 	d.str = d.str[idx+len(sentinel):]
@@ -63,7 +66,7 @@ func (d *BinaryDecoder) ExtractStringUntil(sentinel string) (string, error) {
 
 func (d *BinaryDecoder) ExtractString(length int) (string, error) {
 	if len(d.str) < length {
-		return "", NewResourceNotAvailbleError("Insufficient number of bytes.")
+		return "", ResourceNotAvailble
 	}
 	ret := d.str[0:length]
 	d.str = d.str[length:]
@@ -73,7 +76,7 @@ func (d *BinaryDecoder) ExtractString(length int) (string, error) {
 
 func (d *BinaryDecoder) ExtractByte() (byte, error) {
 	if len(d.str) < 1 {
-		return 0, NewResourceNotAvailbleError("Insufficient number of bytes.")
+		return 0, ResourceNotAvailble
 	}
 	x := d.str[0]
 	d.str = d.str[1:]

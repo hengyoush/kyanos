@@ -30,7 +30,7 @@ func (s *KernEventStream) AddSyscallEvent(event *bpf.SyscallEventData) {
 
 func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 	if event.Len > 0 {
-		if s.kernEvents[event.Step] == nil {
+		if _, ok := s.kernEvents[event.Step]; !ok {
 			s.kernEvents[event.Step] = make([]KernEvent, 0)
 		}
 
