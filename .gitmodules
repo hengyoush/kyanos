@@ -1,6 +1,6 @@
 [submodule "libbpf"]
 	path = libbpf
-	url = https://github.com/libbpf/libbpf.git
+	url = https://mirror.ghproxy.com/github.com/libbpf/libbpf.git
 [submodule "bpftool"]
 	path = bpftool
-	url = https://github.com/libbpf/bpftool
+	url = https://mirror.ghproxy.com/github.com/libbpf/bpftool
