@@ -609,22 +609,8 @@ func attachBpfProgs(programs any) *list.List {
 	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(programs))
 	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(programs))
 	linkList.PushBack(bpf.AttachTracepointNetifReceiveSkb(programs))
-	linkList.PushBack(bpf.AttachXdp(programs))
-	// ifname := "eth0" // TODO
-
-	// iface, err := net.InterfaceByName(ifname)
-	// if err != nil {
-	// 	log.Fatalf("Getting interface %s: %s", ifname, err)
-	// }
-
-	// l, err := link.AttachXDP(link.XDPOptions{
-	// 	Program:   objs.AgentPrograms.XdpProxy,
-	// 	Interface: iface.Index,
-	// 	Flags:     link.XDPDriverMode,
-	// })
-	// if err != nil {
-	// 	log.Fatal("Attaching XDP:", err)
-	// }
-	// linkList.PushBack(l)
+	if common.EnabledXdp() {
+		linkList.PushBack(bpf.AttachXdp(programs))
+	}
 	return linkList
 }
