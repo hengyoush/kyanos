@@ -39,12 +39,15 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 		cmd.Verbose = true
 		cmd.Debug = true
 		common.Log.SetLevel(logrus.DebugLevel)
+		cmd.Compatible = compatilbeMode
 		agent.SetupAgent(agent.AgentOptions{
 			Stopper: agentStopper,
 			LoadBpfProgramFunction: func(objs interface{}) *list.List {
 				progs := list.New()
 				for _, each := range bpfAttachFunctions {
-					progs.PushBack(each(objs))
+					if each != nil {
+						progs.PushBack(each(objs))
+					}
 				}
 				return progs
 			},
@@ -198,9 +201,9 @@ func AssertKernEvent(t *testing.T, kernEvt *bpf.AgentKernEvt, conditions KernDat
 	if !conditions.ignoreFd {
 		assert.Equal(t, conditions.fd, fd)
 	}
-	funcName := kernEvt.FuncName
+	funcName := common.Int8ToStr(kernEvt.FuncName[:])
 	if !conditions.ignoreFuncName {
-		assert.True(t, strings.Contains(common.Int8ToStr(funcName[:len(conditions.funcName)]), conditions.funcName))
+		assert.True(t, commonPrefixLength(funcName, conditions.funcName) >= len(conditions.funcName)-2)
 	}
 	dataLen := kernEvt.Len
 	if !conditions.ignoreDataLen {
@@ -357,7 +360,8 @@ func findInterestedKernEvents(t *testing.T, kernEventList []bpf.AgentKernEvt, op
 		if options.findByDirect && options.direct != each.ConnIdS.Direct {
 			continue
 		}
-		if options.findByFuncName && !strings.Contains(common.Int8ToStr(each.FuncName[:]), options.funcName) {
+		eventFuncName := common.Int8ToStr(each.FuncName[:])
+		if options.findByFuncName && commonPrefixLength(eventFuncName, options.funcName) < len(options.funcName)-2 {
 			continue
 		}
 
@@ -591,4 +595,38 @@ func (MySignal) String() string {
 }
 func (MySignal) Signal() {
 
+}
+
+// 计算两个字符串的公共前缀长度
+func commonPrefixLength(s1, s2 string) int {
+	minLen := min(len(s1), len(s2))
+	for i := 0; i < minLen; i++ {
+		// 比较每个字符，找到第一个不相同的字符
+		if s1[i] != s2[i] {
+			return i
+		}
+	}
+	return minLen
+}
+
+// 辅助函数，返回两个整数中的最小值
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func MayBeXdpFunction(defaultFunc bpf.AttachBpfProgFunction) bpf.AttachBpfProgFunction {
+	if !compatilbeMode {
+		return bpf.AttachXdp
+	} else {
+		return defaultFunc
+	}
+}
+
+var compatilbeMode bool = true
+
+func SetCompatibleMode(b bool) {
+	compatilbeMode = b
 }

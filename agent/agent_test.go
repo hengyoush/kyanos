@@ -681,8 +681,8 @@ func KernRcvTestWithHTTP(t *testing.T, progs []bpf.AttachBpfProgFunction, kernEv
 		disableKeepAlived: true,
 	})
 
-	time.Sleep(500 * time.Millisecond)
 	kernEvtFilter.connEventList = connEventList
+	time.Sleep(500 * time.Millisecond)
 	intersetedKernEvents := findInterestedKernEvents(t, kernEventList, kernEvtFilter)
 	assert.Equal(t, 1, len(intersetedKernEvents))
 	kernEvent := intersetedKernEvents[0]
@@ -816,6 +816,41 @@ func TestDevHardStartXmit(t *testing.T) {
 		})
 }
 
+func TestTracepointNetifReceiveSkb(t *testing.T) {
+	KernRcvTestWithHTTP(t, []bpf.AttachBpfProgFunction{
+		bpf.AttachSyscallConnectEntry,
+		bpf.AttachSyscallConnectExit,
+		bpf.AttachSyscallRecvfromEntry,
+		bpf.AttachSyscallRecvfromExit,
+		bpf.AttachSyscallReadEntry,
+		bpf.AttachSyscallReadExit,
+		bpf.AttachSyscallWriteEntry,
+		bpf.AttachSyscallWriteExit,
+		bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+		MayBeXdpFunction(nil),
+		bpf.AttachTracepointNetifReceiveSkb,
+	},
+		FindInterestedKernEventOptions{
+			findDataLenGtZeroEvent: true,
+			findByDirect:           true,
+			direct:                 bpf.AgentTrafficDirectionTKIngress,
+			findByFuncName:         true,
+			funcName:               "netif_receive_skb",
+		}, KernDataEventAssertConditions{
+
+			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
+			pid:               uint64(os.Getpid()),
+			funcName:          "netif_receive_skb",
+			seq:               1,
+			step:              bpf.AgentStepTDEV_IN,
+			ignoreDataLen:     true,
+			dataLenAssertFunc: func(u uint32) bool { return u > 10 },
+			tsAssertFunction:  func(u uint64) bool { return u > 0 },
+		})
+	time.Sleep(1 * time.Second)
+}
+
 func TestIpRcvCore(t *testing.T) {
 	KernRcvTestWithHTTP(t, []bpf.AttachBpfProgFunction{
 		bpf.AttachSyscallConnectEntry,
@@ -828,7 +863,7 @@ func TestIpRcvCore(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		bpf.AttachXdp,
+		MayBeXdpFunction(bpf.AttachTracepointNetifReceiveSkb),
 		bpf.AttachKProbIpRcvCoreEntry,
 	},
 		FindInterestedKernEventOptions{
@@ -863,7 +898,7 @@ func TestTcpV4DoRcv(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		bpf.AttachXdp,
+		MayBeXdpFunction(bpf.AttachTracepointNetifReceiveSkb),
 		bpf.AttachKProbeTcpV4DoRcvEntry,
 	},
 		FindInterestedKernEventOptions{
@@ -898,7 +933,7 @@ func TestSkbCopyDatagramIter(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		bpf.AttachXdp,
+		MayBeXdpFunction(bpf.AttachTracepointNetifReceiveSkb),
 		bpf.AttachKProbeSkbCopyDatagramIterEntry,
 	},
 		FindInterestedKernEventOptions{
