@@ -226,7 +226,7 @@ func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
 }
 func kprobe2(func_name string, prog *ebpf.Program) (link.Link, error) {
 	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
-		log.Fatalf("kprobe2 failed: %s, %s", func_name, err)
+		log.Printf("kprobe2 failed: %s, %s, fallbacking..", func_name, err)
 		return nil, err
 	} else {
 		return link, nil
