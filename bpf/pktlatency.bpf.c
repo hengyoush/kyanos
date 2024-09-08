@@ -340,7 +340,6 @@ static void __always_inline report_syscall_evt(void* ctx, uint64_t seq, struct c
 }
 static void __always_inline report_syscall_evt_vecs(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t total_size, enum step_t step, struct data_args *args) {
 	int bytes_sent = 0;
-	bpf_printk("vecs!! originlen:%u,step:%d", total_size,step);
 #pragma unroll
 	for (int i = 0; i < LOOP_LIMIT && i < args->iovlen && bytes_sent < total_size; ++i) {
     	struct iovec iov_cpy;
