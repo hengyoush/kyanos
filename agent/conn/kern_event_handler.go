@@ -83,6 +83,24 @@ func (s *KernEventStream) FindAndRemoveEventsBySeqAndLen(step bpf.AgentStepT, se
 	return result
 }
 
+func (s *KernEventStream) DiscardEventsBySeq(seq uint64, egress bool) {
+	for step, events := range s.kernEvents {
+		if egress && !bpf.IsEgressStep(step) {
+			continue
+		}
+		if !egress && !bpf.IsIngressStep(step) {
+			continue
+		}
+		index, _ := slices.BinarySearchFunc(events, KernEvent{seq: seq}, func(i KernEvent, j KernEvent) int {
+			return cmp.Compare(i.seq, j.seq)
+		})
+		discardIdx := index
+		if discardIdx > 0 {
+			s.kernEvents[step] = events[discardIdx:]
+		}
+	}
+}
+
 type KernEvent struct {
 	seq       uint64
 	len       int
