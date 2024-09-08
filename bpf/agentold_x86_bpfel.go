@@ -106,6 +106,14 @@ type AgentOldKernEvtData struct {
 	_       [4]byte
 }
 
+type AgentOldSockKey struct {
+	Sip    uint32
+	Dip    uint32
+	Sport  uint32
+	Dport  uint32
+	Family uint32
+}
+
 type AgentOldStepT uint32
 
 const (
@@ -249,7 +257,6 @@ type AgentOldMapSpecs struct {
 	Rb                   *ebpf.MapSpec `ebpf:"rb"`
 	ReadArgsMap          *ebpf.MapSpec `ebpf:"read_args_map"`
 	SockKeyConnIdMap     *ebpf.MapSpec `ebpf:"sock_key_conn_id_map"`
-	SockRecmMap          *ebpf.MapSpec `ebpf:"sock_recm_map"`
 	SockXmitMap          *ebpf.MapSpec `ebpf:"sock_xmit_map"`
 	SyscallDataMap       *ebpf.MapSpec `ebpf:"syscall_data_map"`
 	SyscallRb            *ebpf.MapSpec `ebpf:"syscall_rb"`
@@ -288,7 +295,6 @@ type AgentOldMaps struct {
 	Rb                   *ebpf.Map `ebpf:"rb"`
 	ReadArgsMap          *ebpf.Map `ebpf:"read_args_map"`
 	SockKeyConnIdMap     *ebpf.Map `ebpf:"sock_key_conn_id_map"`
-	SockRecmMap          *ebpf.Map `ebpf:"sock_recm_map"`
 	SockXmitMap          *ebpf.Map `ebpf:"sock_xmit_map"`
 	SyscallDataMap       *ebpf.Map `ebpf:"syscall_data_map"`
 	SyscallRb            *ebpf.Map `ebpf:"syscall_rb"`
@@ -310,7 +316,6 @@ func (m *AgentOldMaps) Close() error {
 		m.Rb,
 		m.ReadArgsMap,
 		m.SockKeyConnIdMap,
-		m.SockRecmMap,
 		m.SockXmitMap,
 		m.SyscallDataMap,
 		m.SyscallRb,

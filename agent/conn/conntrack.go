@@ -224,6 +224,23 @@ func (c *Connection4) submitRecord(record protocol.Record) {
 	}
 }
 
+func (c *Connection4) extractSockKeys() (bpf.AgentSockKey, bpf.AgentSockKey) {
+	var key bpf.AgentSockKey
+	key.Dip = common.BytesToInt[uint32](c.RemoteIp)
+	key.Sip = common.BytesToInt[uint32](c.LocalIp)
+	key.Dport = uint32(c.RemotePort)
+	key.Sport = uint32(c.LocalPort)
+	key.Family = uint32(common.AF_INET) // TODO @ipv6
+
+	var revKey bpf.AgentSockKey
+	key.Sip = common.BytesToInt[uint32](c.RemoteIp)
+	key.Dip = common.BytesToInt[uint32](c.LocalIp)
+	key.Sport = uint32(c.RemotePort)
+	key.Dport = uint32(c.LocalPort)
+	key.Family = uint32(common.AF_INET)
+	return key, revKey
+}
+
 func (c *Connection4) OnClose(needClearBpfMap bool) {
 	OnCloseRecordFunc(c)
 	c.Status = Closed
@@ -232,6 +249,23 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 		err := connInfoMap.Delete(c.TgidFd)
 		if err != nil {
 			log.Debugf("clean conn_info_map failed: %v", err)
+		}
+		key, revKey := c.extractSockKeys()
+		sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
+		err = sockKeyConnIdMap.Delete(&key)
+		if err != nil {
+			log.Debugf("clean sock_key_conn_id_map key failed: %v", err)
+		}
+		err = sockKeyConnIdMap.Delete(&revKey)
+		if err != nil {
+			log.Debugf("clean sock_key_conn_id_map revkey failed: %v", err)
+		}
+		sockXmitMap := bpf.GetMap("SockXmitMap")
+		n, err := sockXmitMap.BatchDelete([]bpf.AgentSockKey{key, revKey}, nil)
+		if err == nil {
+			log.Debugf("clean sockXmitMap deleted: %v", n)
+		} else {
+			log.Debugf("clean sockXmitMap failed: %v", err)
 		}
 	}
 	monitor.UnregisterMetricExporter(c.StreamEvents)

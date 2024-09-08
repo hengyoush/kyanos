@@ -50,6 +50,7 @@ struct {													\
 
 const struct kern_evt *kern_evt_unused __attribute__((unused));
 const struct conn_evt_t *conn_evt_t_unused __attribute__((unused));
+const struct sock_key *sock_key_unused __attribute__((unused));
 const struct kern_evt_data *kern_evt_data_unused __attribute__((unused));
 const struct conn_info_t *conn_info_t_unused __attribute__((unused));
 const enum conn_type_t *conn_type_t_unused __attribute__((unused));
@@ -94,14 +95,6 @@ struct {
 	__uint(max_entries, 65535);
 	__uint(map_flags, 0);
 } sock_xmit_map SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(key_size, sizeof(struct sock_key));
-	__uint(value_size, sizeof(int));
-	__uint(max_entries, 65535);
-	__uint(map_flags, 0);
-} sock_recm_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -559,7 +552,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 					}
 					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 					if (found == NULL) {
-						if (step == DEV_IN && enabledXDP() != 1) {
+						if (step == DEV_IN && enabledXDP() != 1 && should_trace_sock_key(&key)) {
 							inital_seq = bpf_ntohl(_(tcp->seq));
 							bpf_map_update_elem(&sock_xmit_map, &key, &inital_seq, BPF_NOEXIST);
 						} else {
@@ -778,7 +771,6 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 	key.sport = bpf_ntohs(BPF_CORE_READ(inet, inet_sport));
 	int err;
 	err = bpf_map_delete_elem(&sock_xmit_map, &key);
-	bpf_map_delete_elem(&sock_recm_map, &key);
 	struct conn_id_s_t *conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, &key);
 	uint64_t tgid_fd;
 	if (conn_id_s != NULL) {

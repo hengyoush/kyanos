@@ -38,7 +38,7 @@ func IntToBytes[T KInt](n T) []byte {
 }
 
 func BytesToInt[T KInt](byteArray []byte) T {
-	// 假设bytes是以BigEndian方式编码的64位整数
+	// 假设bytes是以LittleEndian方式编码的64位整数
 	var n T
 	buf := bytes.NewReader(byteArray)
 	err := binary.Read(buf, binary.LittleEndian, &n)
