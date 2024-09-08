@@ -91,6 +91,7 @@ enum control_value_index_t {
   // * Support efficient lookup inside bpf to minimize overhead.
   kTargetTGIDIndex = 0,
   kStirlingTGIDIndex,
+  kEnabledXdpIndex,
   kNumControlValues,
 };
 

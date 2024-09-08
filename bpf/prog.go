@@ -154,7 +154,7 @@ func AttachRawTracepointTcpDestroySockEntry(programs interface{}) link.Link {
 }
 
 func AttachKProbeIpQueueXmitEntry(programs interface{}) link.Link {
-	return kprobe("ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
+	return kprobe("__ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
 }
 func AttachKProbeDevQueueXmitEntry(programs interface{}) link.Link {
 	return kprobe("dev_queue_xmit", GetProgram(programs, "DevQueueXmit"))
@@ -171,6 +171,10 @@ func AttachKProbIpRcvCoreEntry(programs interface{}) link.Link {
 }
 func AttachKProbeTcpV4DoRcvEntry(programs interface{}) link.Link {
 	return kprobe("tcp_v4_do_rcv", GetProgram(programs, "TcpV4DoRcv"))
+}
+
+func AttachTracepointNetifReceiveSkb(programs interface{}) link.Link {
+	return tracepoint("net", "netif_receive_skb", GetProgram(programs, "TracepointNetifReceiveSkb"))
 }
 func AttachKProbeSkbCopyDatagramIterEntry(programs interface{}) link.Link {
 	return kprobe("__skb_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))

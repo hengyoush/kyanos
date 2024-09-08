@@ -71,7 +71,8 @@ type AgentControlValueIndexT uint32
 const (
 	AgentControlValueIndexTKTargetTGIDIndex   AgentControlValueIndexT = 0
 	AgentControlValueIndexTKStirlingTGIDIndex AgentControlValueIndexT = 1
-	AgentControlValueIndexTKNumControlValues  AgentControlValueIndexT = 2
+	AgentControlValueIndexTKEnabledXdpIndex   AgentControlValueIndexT = 2
+	AgentControlValueIndexTKNumControlValues  AgentControlValueIndexT = 3
 )
 
 type AgentEndpointRoleT uint32
@@ -215,6 +216,7 @@ type AgentProgramSpecs struct {
 	TcpRcvEstablished                 *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                        *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                          *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
+	TracepointNetifReceiveSkb         *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSyscallsSysEnterSendto  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
 	TracepointSyscallsSysExitClose    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_close"`
 	TracepointSyscallsSysExitConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_connect"`
@@ -343,6 +345,7 @@ type AgentPrograms struct {
 	TcpRcvEstablished                 *ebpf.Program `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                        *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                          *ebpf.Program `ebpf:"tcp_v4_rcv"`
+	TracepointNetifReceiveSkb         *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSyscallsSysEnterSendto  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
 	TracepointSyscallsSysExitClose    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_close"`
 	TracepointSyscallsSysExitConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_connect"`
@@ -383,6 +386,7 @@ func (p *AgentPrograms) Close() error {
 		p.TcpRcvEstablished,
 		p.TcpV4DoRcv,
 		p.TcpV4Rcv,
+		p.TracepointNetifReceiveSkb,
 		p.TracepointSyscallsSysEnterSendto,
 		p.TracepointSyscallsSysExitClose,
 		p.TracepointSyscallsSysExitConnect,

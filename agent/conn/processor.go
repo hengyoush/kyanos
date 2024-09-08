@@ -215,9 +215,9 @@ func (p *Processor) run() {
 
 			} else {
 				if viper.GetBool(common.VerboseVarName) {
-					log.Debugf("[data no conn][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, common.StepCNNames[event.Step],
-						conn.ToString(), event.Seq, event.Len,
-						common.DisplayTcpFlags(event.Flags))
+					// log.Debugf("[data no conn][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, common.StepCNNames[event.Step],
+					// 	conn.ToString(), event.Seq, event.Len,
+					// 	common.DisplayTcpFlags(event.Flags))
 				}
 			}
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {

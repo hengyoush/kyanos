@@ -22,7 +22,6 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 #define PROTOCOL_VEC_LIMIT 3
 #define LOOP_LIMIT 10
 
-volatile const uint32_t agent_pid;
 
 #define MY_BPF_HASH(name, key_type, value_type) \
 struct {													\
@@ -87,7 +86,6 @@ static __always_inline u8 get_ip_header_len(u8 h)
 	u8 len = (h & 0x0F) * 4;
 	return len > IP_H_LEN ? len: IP_H_LEN;
 }
-const __u32 target_port = 6379;
 const __u32 bytes_interval = 5;
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -301,8 +299,8 @@ static __always_inline void  report_kern_evt(void* ctx, u32 seq, struct sock_key
 	bpf_ringbuf_submit(evt, 0);
 #endif
 }
-static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn) {
-	uint32_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
+static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn) {
+	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
 		return;
 	}
@@ -337,7 +335,8 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	}
 	evt->buf_size = amount_copied;
 #ifdef OLD_KERNEL 
-	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied);
+	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied;
+	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
 #else
 	bpf_ringbuf_output(&syscall_rb, evt, sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied, 0);
 #endif
@@ -463,6 +462,20 @@ static bool __always_inline should_trace_sock_key(struct sock_key *key) {
 	}
 	return should_trace_conn(conn_info);
 }
+
+static __always_inline int enabledXDP() {
+	uint32_t idx = kEnabledXdpIndex;
+	int64_t* enabled = bpf_map_lookup_elem(&control_values, &idx);
+	if (enabled == NULL) {
+		return 1;
+	}
+	if (*enabled == 1) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_name, bool sk_not_ready, enum step_t step) {
 	struct sock* sk = _(skb->sk);
 	struct sock_common sk_cm = _C(sk, __sk_common);
@@ -484,7 +497,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 	u16 mac_header = _C(skb, mac_header);
 	u16 trans_header = _C(skb, transport_header);
 	
-	// bpf_printk("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
+	bpf_printk("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
 	// bpf_printk("%s, mac_header: %d", func_name,mac_header);
 	// bpf_printk("%s, network_header: %d", func_name,network_header);
 	// bpf_printk("%s, trans_header: %d", func_name,trans_header);
@@ -510,7 +523,8 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 			l3_proto = ETH_P_IP;
 			goto __l3;
 		}
-		// bpf_printk("%s, is_ip: %d", func_name,0);
+				
+		bpf_printk("%s, is_ip: %d", func_name,0);
 		goto err;
 	}
 	__l2: if (mac_header != network_header) {
@@ -537,7 +551,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 				if (!inital_seq) {
 					// 在这里补充sk
 					parse_sk_l3l4(&key, ipv4, tcp);
-					// bpf_printk("%s, dport12: %d",func_name, key.dport);
 					// if (key.dport != target_port && key.sport != target_port) {
 					// 	goto err;
 					// }
@@ -546,10 +559,17 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 					}
 					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 					if (found == NULL) {
-						goto err;
+						if (step == DEV_IN && enabledXDP() != 1) {
+							inital_seq = bpf_ntohl(_(tcp->seq));
+							bpf_map_update_elem(&sock_xmit_map, &key, &inital_seq, BPF_NOEXIST);
+						} else {
+							goto err;
+						}
+					} else {
+						bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 					}
-					bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
-				}
+				} 
+					
 				report_kern_evt(ctx, inital_seq, &key, tcp, len - ip_hdr_len, func_name, step);
 				return 1;
 			} else {
@@ -559,8 +579,13 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 	}
 	err:return BPF_OK;
 }
+
+
 SEC("xdp")
 int xdp_proxy(struct xdp_md *ctx){
+#ifdef OLD_KERNEL
+return XDP_PASS; 
+#else
 	// bpf_printk("xdp");
 	void *data = (void *)(long)ctx->data;
 	void *data_end = (void *)(long)ctx->data_end;
@@ -617,6 +642,7 @@ int xdp_proxy(struct xdp_md *ctx){
 	report_kern_evt(ctx, inital_seq, &key, th, len, "xdp", NIC_IN);
 	// KERN_EVENT_HANDLE(&evt, "xdp");
 	return XDP_PASS;
+#endif
 }
 
 SEC("kprobe/__skb_datagram_iter")
@@ -651,6 +677,12 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 	return BPF_OK;
 }
 
+SEC("tracepoint/net/netif_receive_skb")
+int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx) {
+	struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
+	parse_skb(ctx, skb, "netif_receive_skb", 1, DEV_IN);
+	return 0;
+}
 SEC("kprobe/tcp_queue_rcv")
 int BPF_KPROBE(tcp_queue_rcv, struct sock *sk, struct sk_buff *skb) {
 	// parse_skb(skb, "tcp_queue_rcv", 0, kTcpIn);
@@ -707,7 +739,7 @@ int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
 	return 0;
 }
 
-SEC("kprobe/ip_queue_xmit")
+SEC("kprobe/__ip_queue_xmit")
 int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
 {
 	struct sock_key key = {0};
@@ -842,8 +874,12 @@ static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 		check_file = _(socket->file);
 		sk = (struct tcp_sock *)_(socket->sk);
 	}
-	if ((socket_type == SOCK_STREAM || socket_type == SOCK_DGRAM) &&
-	    check_file == file /*&& __socket.state == SS_CONNECTED */) {
+	if ((socket_type == SOCK_STREAM || socket_type == SOCK_DGRAM) 
+#ifdef OLD_KERNEL
+#else
+	   && check_file == file /*&& __socket.state == SS_CONNECTED */
+#endif
+		) {
 		return sk;
 	}
 	return NULL;
@@ -975,10 +1011,6 @@ static __always_inline void process_syscall_connect(void* ctx, int  ret_val, str
 	if (args->fd < 0) {
 		return;
 	}
-
-	if (tgid == agent_pid) {
-		return;
-	}
 	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
 		return;
 	}
@@ -990,9 +1022,6 @@ static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct a
 	int  ret_fd = PT_REGS_RC_CORE(ctx);
 	if (ret_fd < 0) {
 		// bpf_printk("process_syscall_accept, ret_fd: %d, socket:%d", -ret_fd,args->sock_alloc_socket);
-		return;
-	}
-	if (tgid == agent_pid) {
 		return;
 	}
 

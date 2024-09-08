@@ -179,6 +179,10 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	tcpInEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTTCP_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
 
 	hasNicInEvents := len(nicIngressEvents) > 0
+	if !hasNicInEvents {
+		nicIngressEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
+		hasNicInEvents = len(nicIngressEvents) > 0
+	}
 	hasDevOutEvents := len(devOutSyscallEvents) > 0
 	hasReadSyscallEvents := len(readSyscallEvents) > 0
 	hasWriteSyscallEvents := len(writeSyscallEvents) > 0
@@ -233,8 +237,8 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		log.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
 			Nano: false,
 			MetricTypeSet: MetricTypeSet{
-				ResponseSize:                 true,
-				RequestSize:                  true,
+				ResponseSize:                 false,
+				RequestSize:                  false,
 				ReadFromSocketBufferDuration: true,
 				BlackBoxDuration:             true,
 				TotalDuration:                true,

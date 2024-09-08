@@ -14,6 +14,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/jefurry/logrus"
+	"github.com/spf13/viper"
 	"github.com/zcalusic/sysinfo"
 )
 
@@ -210,4 +211,13 @@ func TruncateString(s string, maxBytes int) string {
 	} else {
 		return fmt.Sprintf("%s...(truncated, total: %dbytes)", s[:maxBytes], len(s))
 	}
+}
+
+func EnabledXdp() bool {
+	return !NeedsRunningInCompatibleMode()
+}
+
+func NeedsRunningInCompatibleMode() bool {
+	kernel58, _ := version.NewVersion("5.8")
+	return viper.GetBool("compatible") || GetKernelVersion().LessThan(kernel58)
 }

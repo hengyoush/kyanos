@@ -20,8 +20,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/hashicorp/go-version"
-
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
@@ -117,7 +115,7 @@ func SetupAgent(options AgentOptions) {
 	var objs any
 	var spec *ebpf.CollectionSpec
 	var err error
-	if needsRunningInCompatibleMode() {
+	if common.NeedsRunningInCompatibleMode() {
 		objs = &bpf.AgentOldObjects{}
 		spec, err = bpf.LoadAgentOld()
 		if err != nil {
@@ -148,7 +146,7 @@ func SetupAgent(options AgentOptions) {
 
 	defer func() {
 		var closer io.Closer
-		if needsRunningInCompatibleMode() {
+		if common.NeedsRunningInCompatibleMode() {
 			agentOldObjects := objs.(*bpf.AgentOldObjects)
 			closer = agentOldObjects
 		} else {
@@ -159,13 +157,18 @@ func SetupAgent(options AgentOptions) {
 		closer.Close()
 	}()
 	var validateResult bool
-	if needsRunningInCompatibleMode() {
+	if common.NeedsRunningInCompatibleMode() {
 		agentOldObjects := objs.(*bpf.AgentOldObjects)
 		validateResult = setAndValidateParameters(agentOldObjects.AgentOldMaps)
 		if options.LoadBpfProgramFunction != nil {
 			links = options.LoadBpfProgramFunction(agentOldObjects.AgentOldPrograms)
 		} else {
 			links = attachBpfProgs(agentOldObjects.AgentOldPrograms)
+		}
+		if !common.EnabledXdp() {
+			enabledXdp := bpf.AgentControlValueIndexTKEnabledXdpIndex
+			var enableXdpValue int64 = 0
+			agentOldObjects.ControlValues.Update(&enabledXdp, &enableXdpValue, ebpf.UpdateAny)
 		}
 	} else {
 		agentObjects := objs.(*bpf.AgentObjects)
@@ -199,7 +202,7 @@ func SetupAgent(options AgentOptions) {
 	// Close the reader when the process receives a signal, which will exit
 	// the read loop.
 	stop := false
-	if needsRunningInCompatibleMode() {
+	if common.NeedsRunningInCompatibleMode() {
 		oldMaps := objs.(*bpf.AgentOldObjects).AgentOldMaps
 		syscallDataReader, err := perf.NewReader(oldMaps.SyscallRb, perfEventDataBufferSize)
 		if err != nil {
@@ -406,16 +409,13 @@ func SetupAgent(options AgentOptions) {
 	log.Infoln("Kyanos Stopped")
 	return
 }
-func needsRunningInCompatibleMode() bool {
-	kernel58, _ := version.NewVersion("5.8")
-	return viper.GetBool("compatible") || common.GetKernelVersion().LessThan(kernel58)
-}
+
 func setAndValidateParameters(maps any) bool {
 	var controlValues *ebpf.Map
 	var enabledRemotePortMap *ebpf.Map
 	var enabledRemoteIpv4Map *ebpf.Map
 	var enabledLocalPortMap *ebpf.Map
-	if needsRunningInCompatibleMode() {
+	if common.NeedsRunningInCompatibleMode() {
 		oldMaps := maps.(bpf.AgentOldMaps)
 		controlValues = oldMaps.ControlValues
 		enabledRemotePortMap = oldMaps.EnabledRemotePortMap
@@ -608,6 +608,7 @@ func attachBpfProgs(programs any) *list.List {
 	linkList.PushBack(bpf.AttachKProbIpRcvCoreEntry(programs))
 	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(programs))
 	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(programs))
+	linkList.PushBack(bpf.AttachTracepointNetifReceiveSkb(programs))
 	linkList.PushBack(bpf.AttachXdp(programs))
 	// ifname := "eth0" // TODO
 
