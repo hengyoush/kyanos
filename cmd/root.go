@@ -36,6 +36,7 @@ var RemotePorts []string
 var LocalPorts []string
 var RemoteIps []string
 var LocalIps []string
+var IfName string
 
 func init() {
 	// rootCmd.PersistentFlags().StringVar(&LogDir, "log-dir", "", "log file dir")
@@ -47,6 +48,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&Compatible, "compatible", false, "run in compatibility mode")
 	rootCmd.PersistentFlags().BoolVarP(&Debug, "debug", "d", false, "print more logs helpful to debug")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "print verbose message")
+	rootCmd.PersistentFlags().StringVar(&IfName, "ifname", "eth0", "--ifname eth0")
 	rootCmd.Flags().MarkHidden("compatible")
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false

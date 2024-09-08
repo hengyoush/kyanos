@@ -5,6 +5,7 @@ import (
 	"kyanos/agent"
 	"kyanos/agent/protocol"
 	"kyanos/common"
+	"net"
 
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
@@ -50,6 +51,12 @@ func startAgent(options agent.AgentOptions) {
 		options.AnalysisOptions = analysisOptions
 		options.Side = side
 	}
+	_, err = net.InterfaceByName(IfName)
+	if err != nil {
+		logger.Errorf("Start Kyanos failed: %v", err)
+		return
+	}
+	options.IfName = IfName
 
 	initLog()
 	logger.Infoln("Kyanos starting...")

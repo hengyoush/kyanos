@@ -53,6 +53,7 @@ type AgentOptions struct {
 	MessageFilter          protocol.ProtocolFilter
 	LatencyFilter          protocol.LatencyFilter
 	TraceSide              common.SideEnum
+	IfName                 string
 	protocol.SizeFilter
 	AnalysisEnable bool
 	analysis.AnalysisOptions
@@ -163,7 +164,7 @@ func SetupAgent(options AgentOptions) {
 		if options.LoadBpfProgramFunction != nil {
 			links = options.LoadBpfProgramFunction(agentOldObjects.AgentOldPrograms)
 		} else {
-			links = attachBpfProgs(agentOldObjects.AgentOldPrograms)
+			links = attachBpfProgs(agentOldObjects.AgentOldPrograms, options.IfName)
 		}
 		if !common.EnabledXdp() {
 			enabledXdp := bpf.AgentControlValueIndexTKEnabledXdpIndex
@@ -177,7 +178,7 @@ func SetupAgent(options AgentOptions) {
 		if options.LoadBpfProgramFunction != nil {
 			links = options.LoadBpfProgramFunction(agentObjects.AgentPrograms)
 		} else {
-			links = attachBpfProgs(agentObjects.AgentPrograms)
+			links = attachBpfProgs(agentObjects.AgentPrograms, options.IfName)
 		}
 	}
 	if !validateResult {
@@ -559,7 +560,7 @@ func handleKernEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, 
 	return nil
 }
 
-func attachBpfProgs(programs any) *list.List {
+func attachBpfProgs(programs any, ifName string) *list.List {
 	linkList := list.New()
 
 	linkList.PushBack(bpf.AttachSyscallAcceptEntry(programs))
@@ -610,7 +611,7 @@ func attachBpfProgs(programs any) *list.List {
 	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(programs))
 	linkList.PushBack(bpf.AttachTracepointNetifReceiveSkb(programs))
 	if common.EnabledXdp() {
-		linkList.PushBack(bpf.AttachXdp(programs))
+		linkList.PushBack(bpf.AttachXdpWithSpecifiedIfName(programs, ifName))
 	}
 	return linkList
 }

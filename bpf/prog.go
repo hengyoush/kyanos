@@ -179,9 +179,8 @@ func AttachTracepointNetifReceiveSkb(programs interface{}) link.Link {
 func AttachKProbeSkbCopyDatagramIterEntry(programs interface{}) link.Link {
 	return kprobe("__skb_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))
 }
+func AttachXdpWithSpecifiedIfName(programs interface{}, ifname string) link.Link {
 
-func AttachXdp(programs interface{}) link.Link {
-	ifname := "eth0"
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
 		log.Fatalf("Getting interface %s: %s", ifname, err)
@@ -196,6 +195,9 @@ func AttachXdp(programs interface{}) link.Link {
 		log.Fatal("Attaching XDP:", err)
 	}
 	return l
+}
+func AttachXdp(programs interface{}) link.Link {
+	return AttachXdpWithSpecifiedIfName(programs, "eth0")
 }
 
 func kprobe(func_name string, prog *ebpf.Program) link.Link {
