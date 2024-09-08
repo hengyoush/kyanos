@@ -848,6 +848,7 @@ func TestIpRcvCore(t *testing.T) {
 			dataLenAssertFunc: func(u uint32) bool { return u > 10 },
 			tsAssertFunction:  func(u uint64) bool { return u > 0 },
 		})
+	time.Sleep(1 * time.Second)
 }
 
 func TestTcpV4DoRcv(t *testing.T) {
@@ -882,6 +883,7 @@ func TestTcpV4DoRcv(t *testing.T) {
 			dataLenAssertFunc: func(u uint32) bool { return u > 10 },
 			tsAssertFunction:  func(u uint64) bool { return u > 0 },
 		})
+	time.Sleep(1 * time.Second)
 }
 
 func TestSkbCopyDatagramIter(t *testing.T) {
@@ -916,4 +918,5 @@ func TestSkbCopyDatagramIter(t *testing.T) {
 			dataLenAssertFunc: func(u uint32) bool { return u > 10 },
 			tsAssertFunction:  func(u uint64) bool { return u > 0 },
 		})
+	time.Sleep(1 * time.Second)
 }
