@@ -312,8 +312,8 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 		evt->ke.ts = bpf_ktime_get_ns();
 	}
 	char *func_name = "syscall";
-	my_strcpy(evt->ke.func_name, func_name, FUNC_NAME_LIMIT);
-	evt->buf_size = _len;
+	bpf_probe_read_kernel(evt->ke.func_name, 8, func_name);
+	evt->buf_size = _len; 
 
 	size_t len_minus_1 = _len - 1;
 	asm volatile("" : "+r"(len_minus_1) :);
@@ -326,12 +326,12 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 		bpf_probe_read(evt->msg, MAX_MSG_SIZE, buf);
 		amount_copied = MAX_MSG_SIZE;
 	}
-	evt->buf_size = amount_copied;
-#ifdef OLD_KERNEL 
+	evt->buf_size = amount_copied; 
 	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied;
+#ifdef OLD_KERNEL
 	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
 #else
-	bpf_ringbuf_output(&syscall_rb, evt, sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied, 0);
+	bpf_ringbuf_output(&syscall_rb, evt, __len, 0);
 #endif
 }
 static void __always_inline report_syscall_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args) {
