@@ -219,5 +219,6 @@ func EnabledXdp() bool {
 
 func NeedsRunningInCompatibleMode() bool {
 	kernel58, _ := version.NewVersion("5.8")
-	return viper.GetBool("compatible") || GetKernelVersion().LessThan(kernel58)
+	curKernelVersion := GetKernelVersion()
+	return viper.GetBool("compatible") || curKernelVersion == nil || curKernelVersion.LessThan(kernel58)
 }
