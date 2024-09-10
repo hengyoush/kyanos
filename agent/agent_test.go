@@ -809,13 +809,14 @@ func TestDevHardStartXmit(t *testing.T) {
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
 			direct:                 bpf.AgentTrafficDirectionTKEgress,
-			findByFuncName:         true,
-			funcName:               "dev_hard_start",
+			findByStep:             true,
+			step:                   bpf.AgentStepTDEV_OUT,
 		}, KernDataEventAssertConditions{
 
 			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
 			pid:              uint64(os.Getpid()),
 			funcName:         "dev_hard_start",
+			ignoreFuncName:   true,
 			seq:              1,
 			step:             bpf.AgentStepTDEV_OUT,
 			tsAssertFunction: func(u uint64) bool { return u > 0 },

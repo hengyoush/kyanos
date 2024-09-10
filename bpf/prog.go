@@ -7,6 +7,10 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/hashicorp/go-version"
+	"github.com/jefurry/logrus"
+	"github.com/spf13/viper"
+	"github.com/zcalusic/sysinfo"
 )
 
 var Objs any
@@ -165,7 +169,11 @@ func AttachKProbeDevQueueXmitEntry(programs interface{}) link.Link {
 	return kprobe("dev_queue_xmit", GetProgram(programs, "DevQueueXmit"))
 }
 func AttachKProbeDevHardStartXmitEntry(programs interface{}) link.Link {
-	return kprobe("dev_hard_start_xmit", GetProgram(programs, "DevHardStartXmit"))
+	if needsRunningInCompatibleMode() {
+		return tracepoint("net", "net_dev_xmit", GetProgram(programs, "DevHardStartXmit"))
+	} else {
+		return kprobe("dev_hard_start_xmit", GetProgram(programs, "DevHardStartXmit"))
+	}
 }
 func AttachKProbIpRcvCoreEntry(programs interface{}) link.Link {
 	l, err := kprobe2("ip_rcv_core", GetProgram(programs, "IpRcvCore"))
@@ -249,4 +257,20 @@ func kprobe2(func_name string, prog *ebpf.Program) (link.Link, error) {
 	} else {
 		return link, nil
 	}
+}
+
+func needsRunningInCompatibleMode() bool {
+	kernel58, _ := version.NewVersion("5.8")
+	curKernelVersion := GetKernelVersion()
+	return viper.GetBool("compatible") || curKernelVersion == nil || curKernelVersion.LessThan(kernel58)
+}
+func GetKernelVersion() *version.Version {
+	var si sysinfo.SysInfo
+	si.GetSysInfo()
+	release := si.Kernel.Release
+	version, err := version.NewVersion(release)
+	if err != nil {
+		logrus.Warningf("Parse kernel version failed: %v, using the compatible mode...", err)
+	}
+	return version
 }

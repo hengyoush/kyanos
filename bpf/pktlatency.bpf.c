@@ -756,13 +756,23 @@ int BPF_KPROBE(ip_rcv_core, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 1, IP_IN);
 	return BPF_OK;
 } 
-
+// #ifdef KERNEL_VERSION_BELOW_58
+// SEC("tracepoint/net/net_dev_xmit")
+// int dev_hard_start_xmit(struct trace_event_raw_net_dev_template  *ctx) {
+// 	void *p = (void*)ctx + sizeof(struct trace_entry);
+// 	struct sk_buff *skb;
+// 	bpf_probe_read_kernel(&skb, sizeof(struct sk_buff *), p);
+// 	// struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
+// 	parse_skb(ctx, skb, 1, DEV_OUT);
+// 	return 0;
+// }
+// #else
 // 出队之后，发送到设备
 SEC("kprobe/dev_hard_start_xmit")
 int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 	struct sk_buff *skb = first;
 #pragma unroll
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 3; i++) {
 		int ret = parse_skb(ctx, skb, 0, DEV_OUT);
 		// if (ret) bpf_printk("dev_hard_start_xmit, final: %d", i);
 		skb = _C(skb,next);
@@ -774,15 +784,21 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 	
 	return 0;
 }
+// #endif
+
 // 进入qdisc之前
 SEC("kprobe/dev_queue_xmit")
 int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 0, QDISC_OUT);
 	return 0;
 }
-
+#ifdef KERNEL_VERSION_BELOW_58
+SEC("kprobe/ip_queue_xmit")
+int BPF_KPROBE(ip_queue_xmit, struct sk_buff *skb)
+#else
 SEC("kprobe/__ip_queue_xmit")
-int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
+int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
+#endif
 {
 	struct sock_key key = {0};
 	parse_sock_key(skb, &key);
@@ -790,7 +806,6 @@ int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 	if (found == NULL && !should_trace_sock_key(&key)) {
 		// bpf_printk("kp, lip: %d, dip:%d", key.sip, key.dip);
-		// bpf_printk("ip_queue_xmit, lport: %d, dport:%d", key.sport, key.dport);
 		return 0;
 	}
 	u32 inital_seq;
@@ -818,6 +833,8 @@ int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
 	// KERN_EVENT_HANDLE(&evt, "ip_queue_xmit");
 	return 0;
 }
+
+
 #ifndef KERNEL_VERSION_BELOW_58
 SEC("raw_tp/tcp_destroy_sock")
 int BPF_PROG(tcp_destroy_sock, struct sock *sk)
