@@ -29,7 +29,7 @@ func GetProgram(programs any, fieldName string) *ebpf.Program {
 
 /* accept pair */
 func AttachSyscallAcceptEntry(programs interface{}) link.Link {
-	return kprobe("__sys_accept4", GetProgram(programs, "Accept4Entry"))
+	return tracepoint("syscalls", "sys_enter_accept4", GetProgram(programs, "TracepointSyscallsSysEnterAccept4"))
 }
 
 func AttachSyscallAcceptExit(programs interface{}) link.Link {
@@ -43,7 +43,7 @@ func AttachSyscallSockAllocExit(programs interface{}) link.Link {
 
 /* connect pair */
 func AttachSyscallConnectEntry(programs interface{}) link.Link {
-	return kprobe("__sys_connect", GetProgram(programs, "ConnectEntry"))
+	return tracepoint("syscalls", "sys_enter_connect", GetProgram(programs, "TracepointSyscallsSysEnterConnect"))
 }
 
 func AttachSyscallConnectExit(programs interface{}) link.Link {

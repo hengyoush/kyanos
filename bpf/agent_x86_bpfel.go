@@ -201,8 +201,6 @@ type AgentSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type AgentProgramSpecs struct {
-	Accept4Entry                      *ebpf.ProgramSpec `ebpf:"accept4_entry"`
-	ConnectEntry                      *ebpf.ProgramSpec `ebpf:"connect_entry"`
 	DevHardStartXmit                  *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                      *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                       *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
@@ -220,7 +218,9 @@ type AgentProgramSpecs struct {
 	TcpV4DoRcv                        *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                          *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
 	TracepointNetifReceiveSkb         *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
+	TracepointSyscallsSysEnterAccept4 *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_close"`
+	TracepointSyscallsSysEnterConnect *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_connect"`
 	TracepointSyscallsSysEnterRead    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_read"`
 	TracepointSyscallsSysEnterRecvmsg *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvmsg"`
 	TracepointSyscallsSysEnterSendmsg *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
@@ -327,8 +327,6 @@ func (m *AgentMaps) Close() error {
 //
 // It can be passed to LoadAgentObjects or ebpf.CollectionSpec.LoadAndAssign.
 type AgentPrograms struct {
-	Accept4Entry                      *ebpf.Program `ebpf:"accept4_entry"`
-	ConnectEntry                      *ebpf.Program `ebpf:"connect_entry"`
 	DevHardStartXmit                  *ebpf.Program `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                      *ebpf.Program `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                       *ebpf.Program `ebpf:"ip_queue_xmit"`
@@ -346,7 +344,9 @@ type AgentPrograms struct {
 	TcpV4DoRcv                        *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                          *ebpf.Program `ebpf:"tcp_v4_rcv"`
 	TracepointNetifReceiveSkb         *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
+	TracepointSyscallsSysEnterAccept4 *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_close"`
+	TracepointSyscallsSysEnterConnect *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_connect"`
 	TracepointSyscallsSysEnterRead    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_read"`
 	TracepointSyscallsSysEnterRecvmsg *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvmsg"`
 	TracepointSyscallsSysEnterSendmsg *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
@@ -368,8 +368,6 @@ type AgentPrograms struct {
 
 func (p *AgentPrograms) Close() error {
 	return _AgentClose(
-		p.Accept4Entry,
-		p.ConnectEntry,
 		p.DevHardStartXmit,
 		p.DevQueueXmit,
 		p.IpQueueXmit,
@@ -387,7 +385,9 @@ func (p *AgentPrograms) Close() error {
 		p.TcpV4DoRcv,
 		p.TcpV4Rcv,
 		p.TracepointNetifReceiveSkb,
+		p.TracepointSyscallsSysEnterAccept4,
 		p.TracepointSyscallsSysEnterClose,
+		p.TracepointSyscallsSysEnterConnect,
 		p.TracepointSyscallsSysEnterRead,
 		p.TracepointSyscallsSysEnterRecvmsg,
 		p.TracepointSyscallsSysEnterSendmsg,

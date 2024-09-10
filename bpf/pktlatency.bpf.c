@@ -1529,17 +1529,20 @@ int tracepoint__syscalls__sys_exit_close(struct trace_event_raw_sys_exit *ctx)
 
 
 //int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-SEC("kprobe/__sys_connect")
-int BPF_KPROBE(connect_entry, int sockfd, const struct sockaddr* addr) {
+// SEC("kprobe/__sys_connect")
+// int BPF_KPROBE(connect_entry, int sockfd, const struct sockaddr* addr) {
+SEC("tracepoint/syscalls/sys_enter_connect")
+int tracepoint__syscalls__sys_enter_connect(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct connect_args args = {0};
-	args.fd = sockfd;
-	args.addr = addr;
+	TP_ARGS(&args.fd, 0, ctx)
+	TP_ARGS(&args.addr, 1, ctx)
 	args.start_ts = bpf_ktime_get_ns();
 	bpf_map_update_elem(&connect_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
+
 SEC("tracepoint/syscalls/sys_exit_connect")
 int tracepoint__syscalls__sys_exit_connect(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
@@ -1555,12 +1558,15 @@ int tracepoint__syscalls__sys_exit_connect(struct trace_event_raw_sys_exit *ctx)
 }
 
 
-SEC("kprobe/accept4")
-int BPF_KPROBE(accept4_entry, int sockfd, struct sockaddr* addr) {
+// SEC("kprobe/accept4")
+// int BPF_KPROBE(accept4_entry, int sockfd, struct sockaddr* addr) {
+
+SEC("tracepoint/syscalls/sys_enter_accept4")
+int tracepoint__syscalls__sys_enter_accept4(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct accept_args args = {0};
-	args.addr = addr;
+	TP_ARGS(&args.addr, 1, ctx)
 	bpf_map_update_elem(&accept_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
