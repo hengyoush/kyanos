@@ -1059,10 +1059,9 @@ static __always_inline void process_syscall_connect(void* ctx, int  ret_val, str
 	// bpf_printk("process_syscall_connect, tgid:%lu, fd: %d", tgid, args->fd);
 	submit_new_conn(ctx, tgid, args->fd, args->addr, NULL, kRoleClient , args->start_ts);
 }
-static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct accept_args *args, uint64_t id) {
+static __always_inline void process_syscall_accept(void* ctx, long int ret, struct accept_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
-	int  ret_fd = _PT_REGS_RC(ctx);
-	if (ret_fd < 0) {
+	if (ret < 0) {
 		// bpf_printk("process_syscall_accept, ret_fd: %d, socket:%d", -ret_fd,args->sock_alloc_socket);
 		return;
 	}
@@ -1071,7 +1070,7 @@ static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct a
 		return;
 	}
 	// bpf_printk("process_syscall_accept, tgid:%lu, ret_fd: %d, socket:%d", tgid,ret_fd,args->sock_alloc_socket);
-	submit_new_conn(ctx, tgid, ret_fd, args->addr, args->sock_alloc_socket, kRoleServer , 0);
+	submit_new_conn(ctx, tgid, ret, args->addr, args->sock_alloc_socket, kRoleServer , 0);
 }
 
 static __always_inline void process_syscall_data_vecs(void* ctx, struct data_args *args, uint64_t id, enum traffic_direction_t direct,
@@ -1581,14 +1580,28 @@ int BPF_KRETPROBE(sock_alloc_ret)
 	return 0;
 }
 
-SEC("kretprobe/__sys_accept4")
-int BPF_KRETPROBE(sys_accept4_ret)
-{
+// SEC("kretprobe/__sys_accept4")
+// int BPF_KRETPROBE(sys_accept4_ret)
+// {
+// 	uint64_t id = bpf_get_current_pid_tgid();
+// 	struct accept_args *args = bpf_map_lookup_elem(&accept_args_map, &id);
+// 	if (args != NULL) {
+// 		process_syscall_accept(ctx, args, id);
+// 	}	
+// 	bpf_map_delete_elem(&accept_args_map, &id);
+// 	return 0;
+// }
+
+SEC("tracepoint/syscalls/sys_exit_accept4")
+int tracepoint__syscalls__sys_exit_accept4(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct accept_args *args = bpf_map_lookup_elem(&accept_args_map, &id);
+
 	if (args != NULL) {
-		process_syscall_accept(ctx, args, id);
-	}	
+		long int ret;
+		TP_RET(&ret, ctx);
+		process_syscall_accept(ctx, ret, args, id);
+	} 
 	bpf_map_delete_elem(&accept_args_map, &id);
 	return 0;
 }

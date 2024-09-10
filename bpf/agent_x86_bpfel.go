@@ -214,7 +214,6 @@ type AgentProgramSpecs struct {
 	SecuritySocketSendmsgEnter        *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIter               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                      *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
-	SysAccept4Ret                     *ebpf.ProgramSpec `ebpf:"sys_accept4_ret"`
 	TcpDestroySock                    *ebpf.ProgramSpec `ebpf:"tcp_destroy_sock"`
 	TcpQueueRcv                       *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
 	TcpRcvEstablished                 *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
@@ -227,6 +226,7 @@ type AgentProgramSpecs struct {
 	TracepointSyscallsSysEnterSendmsg *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
 	TracepointSyscallsSysEnterSendto  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
 	TracepointSyscallsSysEnterWrite   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_write"`
+	TracepointSyscallsSysExitAccept4  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_accept4"`
 	TracepointSyscallsSysExitClose    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_close"`
 	TracepointSyscallsSysExitConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_connect"`
 	TracepointSyscallsSysExitRead     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_read"`
@@ -340,7 +340,6 @@ type AgentPrograms struct {
 	SecuritySocketSendmsgEnter        *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIter               *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                      *ebpf.Program `ebpf:"sock_alloc_ret"`
-	SysAccept4Ret                     *ebpf.Program `ebpf:"sys_accept4_ret"`
 	TcpDestroySock                    *ebpf.Program `ebpf:"tcp_destroy_sock"`
 	TcpQueueRcv                       *ebpf.Program `ebpf:"tcp_queue_rcv"`
 	TcpRcvEstablished                 *ebpf.Program `ebpf:"tcp_rcv_established"`
@@ -353,6 +352,7 @@ type AgentPrograms struct {
 	TracepointSyscallsSysEnterSendmsg *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
 	TracepointSyscallsSysEnterSendto  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
 	TracepointSyscallsSysEnterWrite   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_write"`
+	TracepointSyscallsSysExitAccept4  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_accept4"`
 	TracepointSyscallsSysExitClose    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_close"`
 	TracepointSyscallsSysExitConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_connect"`
 	TracepointSyscallsSysExitRead     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_read"`
@@ -381,7 +381,6 @@ func (p *AgentPrograms) Close() error {
 		p.SecuritySocketSendmsgEnter,
 		p.SkbCopyDatagramIter,
 		p.SockAllocRet,
-		p.SysAccept4Ret,
 		p.TcpDestroySock,
 		p.TcpQueueRcv,
 		p.TcpRcvEstablished,
@@ -394,6 +393,7 @@ func (p *AgentPrograms) Close() error {
 		p.TracepointSyscallsSysEnterSendmsg,
 		p.TracepointSyscallsSysEnterSendto,
 		p.TracepointSyscallsSysEnterWrite,
+		p.TracepointSyscallsSysExitAccept4,
 		p.TracepointSyscallsSysExitClose,
 		p.TracepointSyscallsSysExitConnect,
 		p.TracepointSyscallsSysExitRead,

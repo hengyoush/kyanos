@@ -214,7 +214,6 @@ type AgentOldProgramSpecs struct {
 	SecuritySocketSendmsgEnter        *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIter               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                      *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
-	SysAccept4Ret                     *ebpf.ProgramSpec `ebpf:"sys_accept4_ret"`
 	TcpQueueRcv                       *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
 	TcpRcvEstablished                 *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                        *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
@@ -226,6 +225,7 @@ type AgentOldProgramSpecs struct {
 	TracepointSyscallsSysEnterSendmsg *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
 	TracepointSyscallsSysEnterSendto  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
 	TracepointSyscallsSysEnterWrite   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_write"`
+	TracepointSyscallsSysExitAccept4  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_accept4"`
 	TracepointSyscallsSysExitClose    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_close"`
 	TracepointSyscallsSysExitConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_connect"`
 	TracepointSyscallsSysExitRead     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_read"`
@@ -236,7 +236,6 @@ type AgentOldProgramSpecs struct {
 	TracepointSyscallsSysExitWrite    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_write"`
 	WritevEnter                       *ebpf.ProgramSpec `ebpf:"writev_enter"`
 	WritevReturn                      *ebpf.ProgramSpec `ebpf:"writev_return"`
-	XdpProxy                          *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
 }
 
 // AgentOldMapSpecs contains maps before they are loaded into the kernel.
@@ -339,7 +338,6 @@ type AgentOldPrograms struct {
 	SecuritySocketSendmsgEnter        *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIter               *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                      *ebpf.Program `ebpf:"sock_alloc_ret"`
-	SysAccept4Ret                     *ebpf.Program `ebpf:"sys_accept4_ret"`
 	TcpQueueRcv                       *ebpf.Program `ebpf:"tcp_queue_rcv"`
 	TcpRcvEstablished                 *ebpf.Program `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                        *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
@@ -351,6 +349,7 @@ type AgentOldPrograms struct {
 	TracepointSyscallsSysEnterSendmsg *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
 	TracepointSyscallsSysEnterSendto  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
 	TracepointSyscallsSysEnterWrite   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_write"`
+	TracepointSyscallsSysExitAccept4  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_accept4"`
 	TracepointSyscallsSysExitClose    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_close"`
 	TracepointSyscallsSysExitConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_connect"`
 	TracepointSyscallsSysExitRead     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_read"`
@@ -361,7 +360,6 @@ type AgentOldPrograms struct {
 	TracepointSyscallsSysExitWrite    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_write"`
 	WritevEnter                       *ebpf.Program `ebpf:"writev_enter"`
 	WritevReturn                      *ebpf.Program `ebpf:"writev_return"`
-	XdpProxy                          *ebpf.Program `ebpf:"xdp_proxy"`
 }
 
 func (p *AgentOldPrograms) Close() error {
@@ -379,7 +377,6 @@ func (p *AgentOldPrograms) Close() error {
 		p.SecuritySocketSendmsgEnter,
 		p.SkbCopyDatagramIter,
 		p.SockAllocRet,
-		p.SysAccept4Ret,
 		p.TcpQueueRcv,
 		p.TcpRcvEstablished,
 		p.TcpV4DoRcv,
@@ -391,6 +388,7 @@ func (p *AgentOldPrograms) Close() error {
 		p.TracepointSyscallsSysEnterSendmsg,
 		p.TracepointSyscallsSysEnterSendto,
 		p.TracepointSyscallsSysEnterWrite,
+		p.TracepointSyscallsSysExitAccept4,
 		p.TracepointSyscallsSysExitClose,
 		p.TracepointSyscallsSysExitConnect,
 		p.TracepointSyscallsSysExitRead,
@@ -401,7 +399,6 @@ func (p *AgentOldPrograms) Close() error {
 		p.TracepointSyscallsSysExitWrite,
 		p.WritevEnter,
 		p.WritevReturn,
-		p.XdpProxy,
 	)
 }
 

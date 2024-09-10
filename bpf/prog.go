@@ -33,7 +33,7 @@ func AttachSyscallAcceptEntry(programs interface{}) link.Link {
 }
 
 func AttachSyscallAcceptExit(programs interface{}) link.Link {
-	return kretprobe("__sys_accept4", GetProgram(programs, "SysAccept4Ret"))
+	return tracepoint("syscalls", "sys_exit_accept4", GetProgram(programs, "TracepointSyscallsSysExitAccept4"))
 }
 
 /* sock_alloc */
