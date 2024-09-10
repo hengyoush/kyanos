@@ -39,8 +39,8 @@ type ConnManagerInitHook func(*conn.ConnManager)
 
 var log *logrus.Logger = common.Log
 
-const perfEventDataBufferSize = 100 * 1024 * 1024
-const perfEventControlBufferSize = 10 * 1024 * 1024
+const perfEventDataBufferSize = 30 * 1024 * 1024
+const perfEventControlBufferSize = 2 * 1024 * 1024
 
 type AgentOptions struct {
 	Stopper                chan os.Signal
