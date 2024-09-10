@@ -1279,14 +1279,19 @@ int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
 	bpf_map_delete_elem(&read_args_map, &id);
 	return 0;
 }
-
+struct my_user_msghdr {
+	void *msg_name;
+	int msg_namelen;
+	struct iovec *msg_iov;
+	__kernel_size_t msg_iovlen;
+};
 
 SEC("tracepoint/syscalls/sys_enter_recvmsg")
 int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ctx) {
 // SEC("kprobe/__x64_sys_recvmsg")
 // int BPF_KSYSCALL(recvmsg_enter,  int sockfd, struct user_msghdr* msghdr) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	struct user_msghdr* msghdr;
+	struct my_user_msghdr* msghdr;
 	TP_ARGS(&msghdr, 1, ctx)
 	int sockfd ; 
 	TP_ARGS(&sockfd, 0, ctx)
@@ -1425,7 +1430,7 @@ SEC("tracepoint/syscalls/sys_enter_sendmsg")
 // int BPF_KSYSCALL(sendmsg_enter, int sockfd, const struct user_msghdr* msghdr) {
 int tracepoint__syscalls__sys_enter_sendmsg(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	struct user_msghdr* msghdr;
+	struct my_user_msghdr* msghdr;
 	TP_ARGS(&msghdr, 1, ctx)
 	int sockfd ; 
 	TP_ARGS(&sockfd, 0, ctx)
