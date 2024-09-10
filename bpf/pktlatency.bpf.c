@@ -476,21 +476,21 @@ static __always_inline int enabledXDP() {
 }
 
 static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not_ready, enum step_t step) {
-	struct sock* sk = _C(skb,sk);
-	struct sock_common sk_cm = _C(sk, __sk_common);
+	// struct sock* sk = _C(skb,sk);
+	// struct sock_common sk_cm = _C(sk, __sk_common);
 	u32 inital_seq = 0;
 	struct sock_key key = {0};
-	if (sk && sk_cm.skc_addrpair && !sk_not_ready) {
-		parse_sock_key(skb, &key);
-		int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
-		if (found == NULL) { 
-			return 0;
-		}
-		if (!should_trace_sock_key(&key)) {
-			return 0;
-		}
-		bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
-	} 
+	// if (sk && sk_cm.skc_addrpair && !sk_not_ready) {
+	// 	parse_sock_key(skb, &key);
+	// 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
+	// 	if (found == NULL) { 
+	// 		return 0;
+	// 	}
+	// 	if (!should_trace_sock_key(&key)) {
+	// 		return 0;
+	// 	}
+	// 	bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
+	// } 
 
 	u16 network_header = _C(skb, network_header);
 	u16 mac_header = _C(skb, mac_header);
