@@ -596,12 +596,9 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 	err:return BPF_OK;
 }
 
-
+#ifndef KERNEL_VERSION_BELOW_58
 SEC("xdp")
 int xdp_proxy(struct xdp_md *ctx){
-#ifdef KERNEL_VERSION_BELOW_58
-return XDP_PASS; 
-#else
 	// bpf_printk("xdp");
 	void *data = (void *)(long)ctx->data;
 	void *data_end = (void *)(long)ctx->data_end;
@@ -666,8 +663,9 @@ return XDP_PASS;
 	report_kern_evt(&body);
 	// KERN_EVENT_HANDLE(&evt, "xdp");
 	return XDP_PASS; 
-#endif
 }
+#else
+#endif
 SEC("kprobe/__skb_datagram_iter")
 int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct iov_iter *to, int len) {
 	struct sock_key key = {0};
