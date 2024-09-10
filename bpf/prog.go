@@ -88,11 +88,11 @@ func AttachSyscallRecvMsgExit(programs interface{}) link.Link {
 
 /* writev pair */
 func AttachSyscallWritevEntry(programs interface{}) link.Link {
-	return kprobe("do_writev", GetProgram(programs, "WritevEnter"))
+	return tracepoint("syscalls", "sys_enter_writev", GetProgram(programs, "TracepointSyscallsSysEnterWritev"))
 }
 
 func AttachSyscallWritevExit(programs interface{}) link.Link {
-	return kretprobe("do_writev", GetProgram(programs, "WritevReturn"))
+	return tracepoint("syscalls", "sys_exit_writev", GetProgram(programs, "TracepointSyscallsSysExitWritev"))
 }
 
 /* sendto pair */
@@ -115,16 +115,16 @@ func AttachSyscallReadExit(programs interface{}) link.Link {
 
 /* readv pair */
 func AttachSyscallReadvEntry(programs interface{}) link.Link {
-	return kprobe("do_readv", GetProgram(programs, "ReadvEnter"))
+	return tracepoint("syscalls", "sys_enter_readv", GetProgram(programs, "TracepointSyscallsSysEnterReadv"))
 }
 
 func AttachSyscallReadvExit(programs interface{}) link.Link {
-	return kretprobe("do_readv", GetProgram(programs, "ReadvReturn"))
+	return tracepoint("syscalls", "sys_exit_readv", GetProgram(programs, "TracepointSyscallsSysExitReadv"))
 }
 
 /* recvfrom pair */
 func AttachSyscallRecvfromEntry(programs interface{}) link.Link {
-	return kprobe("__sys_recvfrom", GetProgram(programs, "RecvfromEnter"))
+	return tracepoint("syscalls", "sys_enter_recvfrom", GetProgram(programs, "TracepointSyscallsSysEnterRecvfrom"))
 }
 
 func AttachSyscallRecvfromExit(programs interface{}) link.Link {
