@@ -283,13 +283,13 @@ struct parse_kern_evt_body {
   struct tcphdr* tcp;
 };
 
-const char SYSCALL_FUNC_NAME[] = "syscall";
-const char XDP_FUNC_NAME[] = "xdp";
-const char SKB_COPY_FUNC_NAME[] = "skb_copy_datagram_iter";
-const char NET_RECEIVE_SKB_FUNC_NAME[] = "netif_receive_skb";
-const char TCP_RCV_FUNC_NAME[] = "tcp_v4_do_rcv";
-const char IP_RCV_FUNC_NAME[] = "ip_rcv_core";
-const char DEV_HARD_XMIT_FUNC_NAME[] = "dev_hard_start_xmit";
-const char DEV_QUEUE_XMIT_FUNC_NAME[] = "dev_queue_xmit";
-const char IP_QUEUE_XMIT_FUNC_NAME[] = "ip_queue_xmit";
+// const char SYSCALL_FUNC_NAME[] = "syscall";
+// const char XDP_FUNC_NAME[] = "xdp";
+// const char SKB_COPY_FUNC_NAME[] = "skb_copy_datagram_iter";
+// const char NET_RECEIVE_SKB_FUNC_NAME[] = "netif_receive_skb";
+// const char TCP_RCV_FUNC_NAME[] = "tcp_v4_do_rcv";
+// const char IP_RCV_FUNC_NAME[] = "ip_rcv_core";
+// const char DEV_HARD_XMIT_FUNC_NAME[] = "dev_hard_start_xmit";
+// const char DEV_QUEUE_XMIT_FUNC_NAME[] = "dev_queue_xmit";
+// const char IP_QUEUE_XMIT_FUNC_NAME[] = "ip_queue_xmit";
 #endif		

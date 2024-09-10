@@ -121,7 +121,6 @@ static __always_inline u8 get_ip_header_len(u8 h)
 	u8 len = (h & 0x0F) * 4;
 	return len > IP_H_LEN ? len: IP_H_LEN;
 }
-const __u32 bytes_interval = 5;
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(key_size, sizeof(struct sock_key));
@@ -318,8 +317,8 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	} else {
 		evt->ke.ts = bpf_ktime_get_ns();
 	}
-	const char *func_name = SYSCALL_FUNC_NAME;
-	bpf_probe_read_kernel(evt->ke.func_name, 8, func_name);
+	// const char *func_name = SYSCALL_FUNC_NAME;
+	// bpf_probe_read_kernel(evt->ke.func_name, 8, func_name);
 	evt->buf_size = _len; 
 
 	size_t len_minus_1 = _len - 1;
@@ -476,7 +475,7 @@ static __always_inline int enabledXDP() {
 	}
 }
 
-static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, const char* func_name, bool sk_not_ready, enum step_t step) {
+static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not_ready, enum step_t step) {
 	struct sock* sk = _C(skb,sk);
 	struct sock_common sk_cm = _C(sk, __sk_common);
 	u32 inital_seq = 0;
@@ -575,7 +574,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, const char*
 				body.key = &key;
 				body.tcp = tcp;
 				body.len = len - ip_hdr_len;
-				body.func_name = func_name;
+				// body.func_name = func_name;
 				body.step = step;	
 				report_kern_evt(&body);
 				return 1;
@@ -652,7 +651,7 @@ return XDP_PASS;
 	body.key = &key;
 	body.tcp = th;
 	body.len = len;
-	body.func_name = XDP_FUNC_NAME;
+	// body.func_name = XDP_FUNC_NAME;
 	body.step = NIC_IN;	
 	report_kern_evt(&body);
 	// KERN_EVENT_HANDLE(&evt, "xdp");
@@ -687,7 +686,7 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 	body.key = &key;
 	body.cur_seq = seq - inital_seq;
 	body.len = len;
-	body.func_name = SKB_COPY_FUNC_NAME;
+	// body.func_name = SKB_COPY_FUNC_NAME;
 	body.step = USER_COPY;
 	// bpf_printk("skb_copy_datagram_iter, seq: %u, off: %u, len: %u", cb->seq, offset, len);
 	parse_kern_evt_body(&body);
@@ -702,7 +701,7 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 SEC("tracepoint/net/netif_receive_skb")
 int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx) {
 	struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
-	parse_skb(ctx, skb, NET_RECEIVE_SKB_FUNC_NAME, 1, DEV_IN);
+	parse_skb(ctx, skb, 1, DEV_IN);
 	return 0;
 }
 SEC("kprobe/tcp_queue_rcv")
@@ -719,7 +718,7 @@ int BPF_KPROBE(tcp_rcv_established, struct sock *sk, struct sk_buff *skb) {
   
 SEC("kprobe/tcp_v4_do_rcv")
 int BPF_KPROBE(tcp_v4_do_rcv, struct sock *sk, struct sk_buff *skb) { 
-	parse_skb(ctx, skb, TCP_RCV_FUNC_NAME, 1, TCP_IN);
+	parse_skb(ctx, skb, 1, TCP_IN);
 	return BPF_OK;
 }
  
@@ -735,7 +734,7 @@ SEC("kprobe/ip_rcv_core.isra.0")
 SEC("kprobe/ip_rcv_core")
 #endif 
 int BPF_KPROBE(ip_rcv_core, struct sk_buff *skb) {
-	parse_skb(ctx, skb, IP_RCV_FUNC_NAME, 1, IP_IN);
+	parse_skb(ctx, skb, 1, IP_IN);
 	return BPF_OK;
 } 
 // 出队之后，发送到设备
@@ -744,7 +743,7 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 	struct sk_buff *skb = first;
 #pragma unroll
 	for (int i = 0; i < 1; i++) {
-		int ret = parse_skb(ctx, skb, DEV_HARD_XMIT_FUNC_NAME, 0, DEV_OUT);
+		int ret = parse_skb(ctx, skb, 0, DEV_OUT);
 		// if (ret) bpf_printk("dev_hard_start_xmit, final: %d", i);
 		skb = _C(skb,next);
 		if (!skb) {
@@ -758,7 +757,7 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 // 进入qdisc之前
 SEC("kprobe/dev_queue_xmit")
 int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
-	parse_skb(ctx, skb, DEV_QUEUE_XMIT_FUNC_NAME, 0, QDISC_OUT);
+	parse_skb(ctx, skb, 0, QDISC_OUT);
 	return 0;
 }
 
@@ -793,7 +792,7 @@ int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
 	body.key = &key;
 	body.tcp = tcp;
 	body.len = _C(skb, len);
-	body.func_name = IP_QUEUE_XMIT_FUNC_NAME;
+	// body.func_name = "";
 	body.step = IP_OUT;	
 	report_kern_evt(&body);
 	// KERN_EVENT_HANDLE(&evt, "ip_queue_xmit");

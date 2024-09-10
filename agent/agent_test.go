@@ -756,6 +756,7 @@ func TestIpXmit(t *testing.T) {
 			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
 			pid:              uint64(os.Getpid()),
 			funcName:         "ip_queue_xmit",
+			ignoreFuncName:   true,
 			seq:              1,
 			step:             bpf.AgentStepTIP_OUT,
 			tsAssertFunction: func(u uint64) bool { return u > 0 },
