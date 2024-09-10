@@ -60,7 +60,7 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 #define IP_H_LEN	(sizeof(struct iphdr))
 #define PROTOCOL_VEC_LIMIT 3
-#define LOOP_LIMIT 10
+#define LOOP_LIMIT 2
 
 
 #define MY_BPF_HASH(name, key_type, value_type) \
