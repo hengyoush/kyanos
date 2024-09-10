@@ -7,6 +7,10 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/hashicorp/go-version"
+	"github.com/jefurry/logrus"
+	"github.com/spf13/viper"
+	"github.com/zcalusic/sysinfo"
 )
 
 var Objs any
@@ -29,11 +33,11 @@ func GetProgram(programs any, fieldName string) *ebpf.Program {
 
 /* accept pair */
 func AttachSyscallAcceptEntry(programs interface{}) link.Link {
-	return kprobe("__sys_accept4", GetProgram(programs, "Accept4Entry"))
+	return tracepoint("syscalls", "sys_enter_accept4", GetProgram(programs, "TracepointSyscallsSysEnterAccept4"))
 }
 
 func AttachSyscallAcceptExit(programs interface{}) link.Link {
-	return kretprobe("__sys_accept4", GetProgram(programs, "SysAccept4Ret"))
+	return tracepoint("syscalls", "sys_exit_accept4", GetProgram(programs, "TracepointSyscallsSysExitAccept4"))
 }
 
 /* sock_alloc */
@@ -43,7 +47,7 @@ func AttachSyscallSockAllocExit(programs interface{}) link.Link {
 
 /* connect pair */
 func AttachSyscallConnectEntry(programs interface{}) link.Link {
-	return kprobe("__sys_connect", GetProgram(programs, "ConnectEntry"))
+	return tracepoint("syscalls", "sys_enter_connect", GetProgram(programs, "TracepointSyscallsSysEnterConnect"))
 }
 
 func AttachSyscallConnectExit(programs interface{}) link.Link {
@@ -52,7 +56,7 @@ func AttachSyscallConnectExit(programs interface{}) link.Link {
 
 /* close pair */
 func AttachSyscallCloseEntry(programs interface{}) link.Link {
-	return kprobe("sys_close", GetProgram(programs, "CloseEntry"))
+	return tracepoint("syscalls", "sys_enter_close", GetProgram(programs, "TracepointSyscallsSysEnterClose"))
 }
 
 func AttachSyscallCloseExit(programs interface{}) link.Link {
@@ -61,7 +65,7 @@ func AttachSyscallCloseExit(programs interface{}) link.Link {
 
 /* write pair */
 func AttachSyscallWriteEntry(programs interface{}) link.Link {
-	return kprobe("sys_write", GetProgram(programs, "WriteEnter"))
+	return tracepoint("syscalls", "sys_enter_write", GetProgram(programs, "TracepointSyscallsSysEnterWrite"))
 }
 
 func AttachSyscallWriteExit(programs interface{}) link.Link {
@@ -70,7 +74,7 @@ func AttachSyscallWriteExit(programs interface{}) link.Link {
 
 /* sendmsg pair */
 func AttachSyscallSendMsgEntry(programs interface{}) link.Link {
-	return kprobe("sys_sendmsg", GetProgram(programs, "SendmsgEnter"))
+	return tracepoint("syscalls", "sys_enter_sendmsg", GetProgram(programs, "TracepointSyscallsSysEnterSendmsg"))
 }
 
 func AttachSyscallSendMsgExit(programs interface{}) link.Link {
@@ -79,7 +83,7 @@ func AttachSyscallSendMsgExit(programs interface{}) link.Link {
 
 /* recvmsg pair */
 func AttachSyscallRecvMsgEntry(programs interface{}) link.Link {
-	return kprobe("sys_recvmsg", GetProgram(programs, "RecvmsgEnter"))
+	return tracepoint("syscalls", "sys_enter_recvmsg", GetProgram(programs, "TracepointSyscallsSysEnterRecvmsg"))
 }
 
 func AttachSyscallRecvMsgExit(programs interface{}) link.Link {
@@ -88,11 +92,11 @@ func AttachSyscallRecvMsgExit(programs interface{}) link.Link {
 
 /* writev pair */
 func AttachSyscallWritevEntry(programs interface{}) link.Link {
-	return kprobe("do_writev", GetProgram(programs, "WritevEnter"))
+	return tracepoint("syscalls", "sys_enter_writev", GetProgram(programs, "TracepointSyscallsSysEnterWritev"))
 }
 
 func AttachSyscallWritevExit(programs interface{}) link.Link {
-	return kretprobe("do_writev", GetProgram(programs, "WritevReturn"))
+	return tracepoint("syscalls", "sys_exit_writev", GetProgram(programs, "TracepointSyscallsSysExitWritev"))
 }
 
 /* sendto pair */
@@ -106,7 +110,7 @@ func AttachSyscallSendtoExit(programs interface{}) link.Link {
 
 /* read pair */
 func AttachSyscallReadEntry(programs interface{}) link.Link {
-	return kprobe("sys_read", GetProgram(programs, "ReadEnter"))
+	return tracepoint("syscalls", "sys_enter_read", GetProgram(programs, "TracepointSyscallsSysEnterRead"))
 }
 
 func AttachSyscallReadExit(programs interface{}) link.Link {
@@ -115,16 +119,16 @@ func AttachSyscallReadExit(programs interface{}) link.Link {
 
 /* readv pair */
 func AttachSyscallReadvEntry(programs interface{}) link.Link {
-	return kprobe("do_readv", GetProgram(programs, "ReadvEnter"))
+	return tracepoint("syscalls", "sys_enter_readv", GetProgram(programs, "TracepointSyscallsSysEnterReadv"))
 }
 
 func AttachSyscallReadvExit(programs interface{}) link.Link {
-	return kretprobe("do_readv", GetProgram(programs, "ReadvReturn"))
+	return tracepoint("syscalls", "sys_exit_readv", GetProgram(programs, "TracepointSyscallsSysExitReadv"))
 }
 
 /* recvfrom pair */
 func AttachSyscallRecvfromEntry(programs interface{}) link.Link {
-	return kprobe("__sys_recvfrom", GetProgram(programs, "RecvfromEnter"))
+	return tracepoint("syscalls", "sys_enter_recvfrom", GetProgram(programs, "TracepointSyscallsSysEnterRecvfrom"))
 }
 
 func AttachSyscallRecvfromExit(programs interface{}) link.Link {
@@ -154,7 +158,12 @@ func AttachRawTracepointTcpDestroySockEntry(programs interface{}) link.Link {
 }
 
 func AttachKProbeIpQueueXmitEntry(programs interface{}) link.Link {
-	return kprobe("__ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
+	link, err := kprobe2("__ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
+	if err != nil {
+		return kprobe("ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
+	} else {
+		return link
+	}
 }
 func AttachKProbeDevQueueXmitEntry(programs interface{}) link.Link {
 	return kprobe("dev_queue_xmit", GetProgram(programs, "DevQueueXmit"))
@@ -165,7 +174,13 @@ func AttachKProbeDevHardStartXmitEntry(programs interface{}) link.Link {
 func AttachKProbIpRcvCoreEntry(programs interface{}) link.Link {
 	l, err := kprobe2("ip_rcv_core", GetProgram(programs, "IpRcvCore"))
 	if err != nil {
-		l = kprobe("ip_rcv_core.isra.0", GetProgram(programs, "IpRcvCore"))
+		l, err = kprobe2("ip_rcv_core.isra.0", GetProgram(programs, "IpRcvCore"))
+		if err != nil {
+			l, err = kprobe2("ip_rcv_finish", GetProgram(programs, "IpRcvCore"))
+			if err != nil {
+				return kprobe("ip_rcv", GetProgram(programs, "IpRcvCore"))
+			}
+		}
 	}
 	return l
 }
@@ -177,7 +192,12 @@ func AttachTracepointNetifReceiveSkb(programs interface{}) link.Link {
 	return tracepoint("net", "netif_receive_skb", GetProgram(programs, "TracepointNetifReceiveSkb"))
 }
 func AttachKProbeSkbCopyDatagramIterEntry(programs interface{}) link.Link {
-	return kprobe("__skb_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))
+	l, err := kprobe2("__skb_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))
+	if err != nil {
+		return kprobe("skb_copy_datagram_iovec", GetProgram(programs, "SkbCopyDatagramIter"))
+	} else {
+		return l
+	}
 }
 func AttachXdpWithSpecifiedIfName(programs interface{}, ifname string) link.Link {
 
@@ -228,9 +248,25 @@ func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
 }
 func kprobe2(func_name string, prog *ebpf.Program) (link.Link, error) {
 	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
-		log.Printf("kprobe2 failed: %s, %s, fallbacking..", func_name, err)
+		// log.Printf("kprobe2 failed: %s, %s, fallbacking..", func_name, err)
 		return nil, err
 	} else {
 		return link, nil
 	}
+}
+
+func needsRunningInCompatibleMode() bool {
+	kernel58, _ := version.NewVersion("5.8")
+	curKernelVersion := GetKernelVersion()
+	return viper.GetBool("compatible") || curKernelVersion == nil || curKernelVersion.LessThan(kernel58)
+}
+func GetKernelVersion() *version.Version {
+	var si sysinfo.SysInfo
+	si.GetSysInfo()
+	release := si.Kernel.Release
+	version, err := version.NewVersion(release)
+	if err != nil {
+		logrus.Debugf("Parse kernel version failed: %v, using the compatible mode...", err)
+	}
+	return version
 }

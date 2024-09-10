@@ -37,6 +37,7 @@ var LocalPorts []string
 var RemoteIps []string
 var LocalIps []string
 var IfName string
+var BTFFilePath string
 
 func init() {
 	// rootCmd.PersistentFlags().StringVar(&LogDir, "log-dir", "", "log file dir")
@@ -50,6 +51,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "print verbose message")
 	rootCmd.PersistentFlags().StringVar(&IfName, "ifname", "eth0", "--ifname eth0")
 	rootCmd.PersistentFlags().MarkHidden("compatible")
+	rootCmd.PersistentFlags().StringVar(&BTFFilePath, "btf", "", "btf file path")
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false
 	viper.BindPFlags(rootCmd.Flags())

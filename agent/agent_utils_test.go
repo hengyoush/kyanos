@@ -274,6 +274,8 @@ type FindInterestedKernEventOptions struct {
 	findByFuncName         bool
 	funcName               string
 	throw                  bool
+	findByStep             bool
+	step                   bpf.AgentStepT
 
 	connEventList []bpf.AgentConnEvtT
 }
@@ -362,6 +364,9 @@ func findInterestedKernEvents(t *testing.T, kernEventList []bpf.AgentKernEvt, op
 		}
 		eventFuncName := common.Int8ToStr(each.FuncName[:])
 		if options.findByFuncName && commonPrefixLength(eventFuncName, options.funcName) < len(options.funcName)-2 {
+			continue
+		}
+		if options.findByStep && each.Step != options.step {
 			continue
 		}
 
@@ -625,7 +630,7 @@ func MayBeXdpFunction(defaultFunc bpf.AttachBpfProgFunction) bpf.AttachBpfProgFu
 	}
 }
 
-var compatilbeMode bool = true
+var compatilbeMode bool = false
 
 func SetCompatibleMode(b bool) {
 	compatilbeMode = b
