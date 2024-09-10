@@ -476,115 +476,115 @@ static __always_inline int enabledXDP() {
 }
 
 static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not_ready, enum step_t step) {
-	return BPF_OK;
-// 	struct sock* sk = _C(skb,sk);
-// 	struct sock_common sk_cm = _C(sk, __sk_common);
-// 	u32 inital_seq = 0;
-// 	struct sock_key key = {0};
-// 	if (sk && sk_cm.skc_addrpair && !sk_not_ready) {
-// 		parse_sock_key(skb, &key);
-// 		int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
-// 		if (found == NULL) { 
-// 			return 0;
-// 		}
-// 		if (!should_trace_sock_key(&key)) {
-// 			return 0;
-// 		}
-// 		bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
-// 	} 
+	// return BPF_OK;
+	struct sock* sk = _C(skb,sk);
+	struct sock_common sk_cm = _C(sk, __sk_common);
+	u32 inital_seq = 0;
+	struct sock_key key = {0};
+	if (sk && sk_cm.skc_addrpair && !sk_not_ready) {
+		parse_sock_key(skb, &key);
+		int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
+		if (found == NULL) { 
+			return 0;
+		}
+		if (!should_trace_sock_key(&key)) {
+			return 0;
+		}
+		bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
+	} 
 
-// 	u16 network_header = _C(skb, network_header);
-// 	u16 mac_header = _C(skb, mac_header);
-// 	u16 trans_header = _C(skb, transport_header);
+	u16 network_header = _C(skb, network_header);
+	u16 mac_header = _C(skb, mac_header);
+	u16 trans_header = _C(skb, transport_header);
 	
-// 	// pr_bpf_debug("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
-// 	// pr_bpf_debug("%s, mac_header: %d", func_name,mac_header);
-// 	// pr_bpf_debug("%s, network_header: %d", func_name,network_header);
-// 	// pr_bpf_debug("%s, trans_header: %d", func_name,trans_header);
-// 	// pr_bpf_debug("data:%d,end: %d, tail: %d",_C(skb,data) - _C(skb,head), _C(skb,end), _C(skb,tail));
+	// pr_bpf_debug("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
+	// pr_bpf_debug("%s, mac_header: %d", func_name,mac_header);
+	// pr_bpf_debug("%s, network_header: %d", func_name,network_header);
+	// pr_bpf_debug("%s, trans_header: %d", func_name,trans_header);
+	// pr_bpf_debug("data:%d,end: %d, tail: %d",_C(skb,data) - _C(skb,head), _C(skb,end), _C(skb,tail));
 
-// 	bool is_l2 = !skb_l2_check(mac_header);
-// 	// pr_bpf_debug("%s, skb_l2_check: %d", func_name, is_l2);
-// 	void* data = _C(skb, head);
-// 	void* ip = data + network_header;
-// 	void *l3;
-// 	void* l4 = NULL;
-// 	if (is_l2) {
-// 		goto __l2;
-// 	} else {
-// 		u16 l3_proto = bpf_ntohs(_C(skb, protocol));
-// 		// bpf_printk("%s, l3_proto: %x", func_name, l3_proto);
-// 		if (l3_proto == ETH_P_IP) {
-// 			// bpf_printk("%s, is_ip: %d", func_name, 1);
-// 			l3 = data + network_header;
-// 			goto __l3;
-// 		} else if (mac_header == network_header) {
-// 			l3 = data + network_header;
-// 			l3_proto = ETH_P_IP;
-// 			goto __l3;
-// 		}
+	bool is_l2 = !skb_l2_check(mac_header);
+	// pr_bpf_debug("%s, skb_l2_check: %d", func_name, is_l2);
+	void* data = _C(skb, head);
+	void* ip = data + network_header;
+	void *l3;
+	void* l4 = NULL;
+	if (is_l2) {
+		goto __l2;
+	} else {
+		u16 l3_proto = bpf_ntohs(_C(skb, protocol));
+		// bpf_printk("%s, l3_proto: %x", func_name, l3_proto);
+		if (l3_proto == ETH_P_IP) {
+			// bpf_printk("%s, is_ip: %d", func_name, 1);
+			l3 = data + network_header;
+			goto __l3;
+		} else if (mac_header == network_header) {
+			l3 = data + network_header;
+			l3_proto = ETH_P_IP;
+			goto __l3;
+		}
 				
-// 		// pr_bpf_debug("%s, is_ip: %d", func_name,0);
-// 		goto err;
-// 	}
-// 	__l2: if (mac_header != network_header) {
-// 		struct ethhdr *eth = data + mac_header;
-// 		l3 = (void *)eth + ETH_HLEN;
-// 		u16 l3_proto = bpf_ntohs(_(eth->h_proto));
-// 		// bpf_printk("%s, l3_proto: %x",func_name, l3_proto);
-// 		if (l3_proto == ETH_P_IP) {
-// 	__l3:	
-// 			if (!skb_l4_check(trans_header, network_header)) {
-// 				// 存在l4
-// 				// bpf_printk("%s, skb_l4_check: %d",func_name, 0);
-// 				l4 = data + trans_header;
-// 			}
-// 			struct iphdr *ipv4 = ip;
-// 			u32 len  = bpf_ntohs(_C(ipv4, tot_len));
-// 			u8 ip_hdr_len = get_ip_header_len(_(((u8 *)ip)[0])); 
-// 			// bpf_printk("%s, ip_hdr_len: %d, tot_len: %d",func_name, ip_hdr_len, len);
-// 			l4 = l4 ? l4 : ip + ip_hdr_len;
-// 			u8 proto_l4 = _C(ipv4,protocol);
-// 			// bpf_printk("%s, l4p: %d",func_name, proto_l4);
-// 			if (proto_l4 == IPPROTO_TCP) {
-// 				struct tcphdr *tcp = l4;
-// 				if (!inital_seq) {
-// 					// 在这里补充sk
-// 					parse_sk_l3l4(&key, ipv4, tcp);
-// 					// if (key.dport != target_port && key.sport != target_port) {
-// 					// 	goto err;
-// 					// }
-// 					if (!should_trace_sock_key(&key)) {
-// 						goto err;
-// 					}
-// 					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
-// 					if (found == NULL) {
-// 						if (step == DEV_IN && enabledXDP() != 1 && should_trace_sock_key(&key)) {
-// 							inital_seq = bpf_ntohl(_C(tcp,seq));
-// 							bpf_map_update_elem(&sock_xmit_map, &key, &inital_seq, BPF_NOEXIST);
-// 						} else {
-// 							goto err;
-// 						}
-// 					} else {
-// 						bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
-// 					}
-// 				} 
-// 				struct parse_kern_evt_body body = {0};
-// 				body.ctx = ctx;
-// 				body.inital_seq = inital_seq;
-// 				body.key = &key;
-// 				body.tcp = tcp;
-// 				body.len = len - ip_hdr_len;
-// 				// body.func_name = func_name;
-// 				body.step = step;	
-// 				report_kern_evt(&body);
-// 				return 1;
-// 			} else {
-// 				// bpf_printk("%s, not match: %d", func_name, _C(ipv4,saddr));
-// 			}
-// 		}
-// 	}
-// 	err:return BPF_OK;
+		// pr_bpf_debug("%s, is_ip: %d", func_name,0);
+		goto err;
+	}
+	__l2: if (mac_header != network_header) {
+		struct ethhdr *eth = data + mac_header;
+		l3 = (void *)eth + ETH_HLEN;
+		u16 l3_proto = bpf_ntohs(_(eth->h_proto));
+		// bpf_printk("%s, l3_proto: %x",func_name, l3_proto);
+		if (l3_proto == ETH_P_IP) {
+	__l3:	
+			if (!skb_l4_check(trans_header, network_header)) {
+				// 存在l4
+				// bpf_printk("%s, skb_l4_check: %d",func_name, 0);
+				l4 = data + trans_header;
+			}
+			struct iphdr *ipv4 = ip;
+			u32 len  = bpf_ntohs(_C(ipv4, tot_len));
+			u8 ip_hdr_len = get_ip_header_len(_(((u8 *)ip)[0])); 
+			// bpf_printk("%s, ip_hdr_len: %d, tot_len: %d",func_name, ip_hdr_len, len);
+			l4 = l4 ? l4 : ip + ip_hdr_len;
+			u8 proto_l4 = _C(ipv4,protocol);
+			// bpf_printk("%s, l4p: %d",func_name, proto_l4);
+			if (proto_l4 == IPPROTO_TCP) {
+				struct tcphdr *tcp = l4;
+				if (!inital_seq) {
+					// 在这里补充sk
+					parse_sk_l3l4(&key, ipv4, tcp);
+					// if (key.dport != target_port && key.sport != target_port) {
+					// 	goto err;
+					// }
+					if (!should_trace_sock_key(&key)) {
+						goto err;
+					}
+					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
+					if (found == NULL) {
+						if (step == DEV_IN && enabledXDP() != 1 && should_trace_sock_key(&key)) {
+							inital_seq = bpf_ntohl(_C(tcp,seq));
+							bpf_map_update_elem(&sock_xmit_map, &key, &inital_seq, BPF_NOEXIST);
+						} else {
+							goto err;
+						}
+					} else {
+						bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
+					}
+				} 
+				struct parse_kern_evt_body body = {0};
+				body.ctx = ctx;
+				body.inital_seq = inital_seq;
+				body.key = &key;
+				body.tcp = tcp;
+				body.len = len - ip_hdr_len;
+				// body.func_name = func_name;
+				body.step = step;	
+				report_kern_evt(&body);
+				return 1;
+			} else {
+				// bpf_printk("%s, not match: %d", func_name, _C(ipv4,saddr));
+			}
+		}
+	}
+	err:return BPF_OK;
 }
 
 
@@ -701,7 +701,10 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 
 SEC("tracepoint/net/netif_receive_skb")
 int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx) {
-	struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
+	void *p = (void*)ctx + sizeof(struct trace_entry);
+	struct sk_buff *skb;
+	bpf_probe_read_kernel(&skb, sizeof(struct sk_buff *), p);
+	// struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
 	parse_skb(ctx, skb, 1, DEV_IN);
 	return 0;
 }
