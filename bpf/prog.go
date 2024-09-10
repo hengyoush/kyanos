@@ -169,11 +169,12 @@ func AttachKProbeDevQueueXmitEntry(programs interface{}) link.Link {
 	return kprobe("dev_queue_xmit", GetProgram(programs, "DevQueueXmit"))
 }
 func AttachKProbeDevHardStartXmitEntry(programs interface{}) link.Link {
-	if needsRunningInCompatibleMode() {
-		return tracepoint("net", "net_dev_xmit", GetProgram(programs, "DevHardStartXmit"))
-	} else {
-		return kprobe("dev_hard_start_xmit", GetProgram(programs, "DevHardStartXmit"))
-	}
+	// if needsRunningInCompatibleMode() {
+	// 	return tracepoint("net", "net_dev_xmit", GetProgram(programs, "DevHardStartXmit"))
+	// } else {
+
+	// }
+	return kprobe("dev_hard_start_xmit", GetProgram(programs, "DevHardStartXmit"))
 }
 func AttachKProbIpRcvCoreEntry(programs interface{}) link.Link {
 	l, err := kprobe2("ip_rcv_core", GetProgram(programs, "IpRcvCore"))
