@@ -19,50 +19,8 @@ ARCH ?= $(shell uname -m | sed 's/x86_64/x86/' \
 CLANG_BPF_SYS_INCLUDES ?= $(shell $(CLANG) -v -E - </dev/null 2>&1 \
 	| sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }')
 APPS = kyanos
-CFLAGS := -O2
+CFLAGS := -O2 -Wall 
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
-ROOT		:= $(abspath .)
-
-include $(ROOT)/makefiles/arch.mk
-
-HEADERS		:= $(if $(KERNEL),$(KERNEL),/lib/modules/$(shell uname -r)/build/)
-NOSTDINC_FLAGS	+= -nostdinc -isystem $(shell $(CC) -print-file-name=include)
-USERINCLUDE	:= \
-		-I$(HEADERS)/arch/$(SRCARCH)/include/uapi \
-		-I$(HEADERS)/arch/$(SRCARCH)/include/generated/uapi \
-		-I$(HEADERS)/include/uapi \
-		-I$(HEADERS)/include/generated/uapi \
-		-include $(HEADERS)/include/linux/kconfig.h \
-		-I/usr/include/
-
-LINUXINCLUDE	:= \
-		-I$(HEADERS)/arch/$(SRCARCH)/include \
-		-I$(HEADERS)/arch/$(SRCARCH)/include/generated \
-		-I$(HEADERS)/include \
-		$(USERINCLUDE)
-
-KERNEL_CFLAGS	+= $(NOSTDINC_FLAGS) $(LINUXINCLUDE) \
-		-D__KERNEL__ -DKBUILD_MODNAME='\"bpftrace\"' -Wno-unused-value -Wno-pointer-sign \
-		-Wno-compare-distinct-pointer-types \
-		-Wno-gnu-variable-sized-type-not-at-end \
-		-Wno-address-of-packed-member -Wno-tautological-compare \
-		-Wno-unknown-warning-option -Wno-frame-address
-
-ifdef COMPAT 
-ifeq ($(wildcard $(HEADERS)),)
-$(error kernel headers not exist in COMPAT mode, please install it)
-endif
-	kheaders_cmd	:= rm -f bpf/kheaders.h && cd bpf && ln -s ../vmlinux_header.h kheaders.h && cd ..
-	CFLAGS		+= -DCOMPAT
-	CFLAGS += $(KERNEL_CFLAGS)
-	CFLAGS += -I./
-	VMLINUX := -I./
-	VMLINUX += $(LINUXINCLUDE)
-	
-else
-	kheaders_cmd	:= rm -f bpf/kheaders.h && cd bpf && ln -s ../vmlinux/x86/vmlinux.h kheaders.h && cd ..
-	VMLINUX := ""
-endif
 
 ifeq ($(V),1)
 	Q =
@@ -85,7 +43,7 @@ all: $(APPS)
 
 clean:
 	$(call msg,CLEAN)
-	$(Q)rm -rf $(OUTPUT) $(APPS) kyanos kyanos.log bpf/kheaders.h
+	$(Q)rm -rf $(OUTPUT) $(APPS) kyanos kyanos.log
 
 $(OUTPUT) $(OUTPUT)/libbpf $(BPFTOOL_OUTPUT):
 	$(call msg,MKDIR,$@)
@@ -99,18 +57,18 @@ $(LIBBPF_OBJ): $(wildcard $(LIBBPF_SRC)/*.[ch] $(LIBBPF_SRC)/Makefile) | $(OUTPU
 		    INCLUDEDIR= LIBDIR= UAPIDIR=			      \
 		    install
 
-GO_FILES := $(shell find $(SRC_DIR) -type f -name '*.go' | sort)  
-bpf/kheaders.h: FORCE
-	$(call kheaders_cmd)
+# Build bpftool
+$(BPFTOOL): | $(BPFTOOL_OUTPUT)
+	$(call msg,BPFTOOL,$@)
+	$(Q)$(MAKE) ARCH= CROSS_COMPILE= OUTPUT=$(BPFTOOL_OUTPUT)/ -C $(BPFTOOL_SRC) bootstrap
 
-FORCE:
+GO_FILES := $(shell find $(SRC_DIR) -type f -name '*.go' | sort)  
 
 kyanos: $(LIBBPF_OBJ) $(GO_FILES) $(wildcard bpf/*.[ch]) | $(OUTPUT)
 	$(call msg,BINARY,$@)
-	./build.sh "$(CFLAGS)" "$(VMLINUX)"
-	rm -f bpf/kheaders.h
+	./build.sh
 # delete failed targets
-.DELETE_ON_ERROR: bpf/kheaders.h
+.DELETE_ON_ERROR:
 
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
