@@ -52,7 +52,7 @@ func AttachSyscallConnectExit(programs interface{}) link.Link {
 
 /* close pair */
 func AttachSyscallCloseEntry(programs interface{}) link.Link {
-	return kprobe("sys_close", GetProgram(programs, "CloseEntry"))
+	return tracepoint("syscalls", "sys_enter_close", GetProgram(programs, "TracepointSyscallsSysEnterClose"))
 }
 
 func AttachSyscallCloseExit(programs interface{}) link.Link {
@@ -61,7 +61,7 @@ func AttachSyscallCloseExit(programs interface{}) link.Link {
 
 /* write pair */
 func AttachSyscallWriteEntry(programs interface{}) link.Link {
-	return kprobe("sys_write", GetProgram(programs, "WriteEnter"))
+	return tracepoint("syscalls", "sys_enter_write", GetProgram(programs, "TracepointSyscallsSysEnterWrite"))
 }
 
 func AttachSyscallWriteExit(programs interface{}) link.Link {
@@ -70,7 +70,7 @@ func AttachSyscallWriteExit(programs interface{}) link.Link {
 
 /* sendmsg pair */
 func AttachSyscallSendMsgEntry(programs interface{}) link.Link {
-	return kprobe("sys_sendmsg", GetProgram(programs, "SendmsgEnter"))
+	return tracepoint("syscalls", "sys_enter_sendmsg", GetProgram(programs, "TracepointSyscallsSysEnterSendmsg"))
 }
 
 func AttachSyscallSendMsgExit(programs interface{}) link.Link {
@@ -79,7 +79,7 @@ func AttachSyscallSendMsgExit(programs interface{}) link.Link {
 
 /* recvmsg pair */
 func AttachSyscallRecvMsgEntry(programs interface{}) link.Link {
-	return kprobe("sys_recvmsg", GetProgram(programs, "RecvmsgEnter"))
+	return tracepoint("syscalls", "sys_enter_recvmsg", GetProgram(programs, "TracepointSyscallsSysEnterRecvmsg"))
 }
 
 func AttachSyscallRecvMsgExit(programs interface{}) link.Link {
@@ -106,7 +106,7 @@ func AttachSyscallSendtoExit(programs interface{}) link.Link {
 
 /* read pair */
 func AttachSyscallReadEntry(programs interface{}) link.Link {
-	return kprobe("sys_read", GetProgram(programs, "ReadEnter"))
+	return tracepoint("syscalls", "sys_enter_read", GetProgram(programs, "TracepointSyscallsSysEnterRead"))
 }
 
 func AttachSyscallReadExit(programs interface{}) link.Link {
