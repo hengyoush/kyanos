@@ -63,6 +63,15 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 #define LOOP_LIMIT 2
 
 
+#define TP_ARGS(dst, idx, ctx) \
+{void *__p = (void*)ctx + sizeof(struct trace_entry) + sizeof(long int) + idx * (sizeof(long unsigned int)); \
+bpf_probe_read_kernel(dst, sizeof(*dst), __p);}
+
+#define TP_RET(dst, ctx) \
+{void *__p = (void*)ctx + sizeof(struct trace_entry) + sizeof(long int); \
+bpf_probe_read_kernel(dst, sizeof(*dst), __p); }
+
+
 #define MY_BPF_HASH(name, key_type, value_type) \
 struct {													\
 	__uint(type, BPF_MAP_TYPE_HASH); \
@@ -1229,7 +1238,8 @@ int BPF_KPROBE(recvfrom_enter,  uint32_t fd, char* buf) {
 SEC("tracepoint/syscalls/sys_exit_recvfrom")
 int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count = ctx->ret;
+	ssize_t bytes_count ;
+	TP_RET(&bytes_count, ctx)
 
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL) {
@@ -1248,8 +1258,8 @@ int tracepoint__syscalls__sys_enter_read(struct trace_event_raw_sys_enter *ctx) 
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct data_args args = {0};
-	args.fd = (int32_t) ctx->args[0];
-	args.buf = (char*) ctx->args[1];
+	TP_ARGS(&args.fd, 0, ctx)
+	TP_ARGS(&args.buf, 1, ctx)
 	args.source_fn = kSyscallRead;
 	bpf_map_update_elem(&read_args_map, &id, &args, BPF_ANY);
 	return 0;
@@ -1258,7 +1268,8 @@ int tracepoint__syscalls__sys_enter_read(struct trace_event_raw_sys_enter *ctx) 
 SEC("tracepoint/syscalls/sys_exit_read")
 int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count = ctx->ret;
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->ts = bpf_ktime_get_ns();
@@ -1275,8 +1286,10 @@ int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ct
 // SEC("kprobe/__x64_sys_recvmsg")
 // int BPF_KSYSCALL(recvmsg_enter,  int sockfd, struct user_msghdr* msghdr) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	struct user_msghdr* msghdr = (struct user_msghdr*)ctx->args[1];
-	int sockfd = (int)ctx->args[0];
+	struct user_msghdr* msghdr;
+	TP_ARGS(&msghdr, 1, ctx)
+	int sockfd ; 
+	TP_ARGS(&sockfd, 0, ctx)
 	if (msghdr != NULL) {
 		// Stash arguments.
 		void *msg_name = _U(msghdr, msg_name);
@@ -1301,7 +1314,8 @@ int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ct
 SEC("tracepoint/syscalls/sys_exit_recvmsg")
 int tracepoint__syscalls__sys_exit_recvmsg(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count = ctx->ret;
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
 
 	// Unstash arguments, and process syscall.
 	const struct connect_args* connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
@@ -1354,8 +1368,8 @@ int tracepoint__syscalls__sys_enter_sendto(struct trace_event_raw_sys_enter *ctx
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct data_args args = {0};
-	args.fd = (int32_t) ctx->args[0];
-	args.buf = (char*) ctx->args[1];
+	TP_ARGS(&args.fd, 0, ctx)
+	TP_ARGS(&args.buf, 1, ctx)
 	args.source_fn = kSyscallSendTo;
 	args.ts = bpf_ktime_get_ns();
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
@@ -1365,7 +1379,8 @@ int tracepoint__syscalls__sys_enter_sendto(struct trace_event_raw_sys_enter *ctx
 SEC("tracepoint/syscalls/sys_exit_sendto")
 int tracepoint__syscalls__sys_exit_sendto(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count = ctx->ret;
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL ) {
@@ -1383,8 +1398,8 @@ int tracepoint__syscalls__sys_enter_write(struct trace_event_raw_sys_enter *ctx)
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct data_args args = {0};
-	args.fd = (int32_t) ctx->args[0];
-	args.buf = (char*) ctx->args[1];
+	TP_ARGS(&args.fd, 0, ctx)
+	TP_ARGS(&args.buf, 1, ctx)
 	args.source_fn = kSyscallWrite;
 	args.ts = bpf_ktime_get_ns();
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
@@ -1394,7 +1409,8 @@ int tracepoint__syscalls__sys_enter_write(struct trace_event_raw_sys_enter *ctx)
 SEC("tracepoint/syscalls/sys_exit_write")
 int tracepoint__syscalls__sys_exit_write(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count = ctx->ret;
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL && args->sock_event) {
@@ -1409,8 +1425,10 @@ SEC("tracepoint/syscalls/sys_enter_sendmsg")
 // int BPF_KSYSCALL(sendmsg_enter, int sockfd, const struct user_msghdr* msghdr) {
 int tracepoint__syscalls__sys_enter_sendmsg(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	struct user_msghdr* msghdr = (struct user_msghdr*)ctx->args[1];
-	int sockfd = (int)ctx->args[0];
+	struct user_msghdr* msghdr;
+	TP_ARGS(&msghdr, 1, ctx)
+	int sockfd ; 
+	TP_ARGS(&sockfd, 0, ctx)
 	if (msghdr != NULL) {
 		void *msg_name = _U(msghdr, msg_name);
 		if (msg_name != NULL) {
@@ -1435,7 +1453,8 @@ int tracepoint__syscalls__sys_enter_sendmsg(struct trace_event_raw_sys_enter *ct
 SEC("tracepoint/syscalls/sys_exit_sendmsg")
 int tracepoint__syscalls__sys_exit_sendmsg(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count = ctx->ret;
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
 
 	const struct connect_args* _connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
 	if (_connect_args != NULL && bytes_count > 0) {
@@ -1487,8 +1506,7 @@ int tracepoint__syscalls__sys_enter_close(struct trace_event_raw_sys_enter *ctx)
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct close_args args = {0};
-	void *p = (void*)ctx + sizeof(struct trace_entry) + sizeof(long int);
-	bpf_probe_read_kernel(&args.fd, sizeof(uint32_t), p);
+	TP_ARGS(&args.fd, 0, ctx)
 	bpf_map_update_elem(&close_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
@@ -1499,7 +1517,9 @@ int tracepoint__syscalls__sys_exit_close(struct trace_event_raw_sys_exit *ctx)
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct close_args *args = bpf_map_lookup_elem(&close_args_map, &id);
 	if (args != NULL) {
-		process_syscall_close(ctx, ctx->ret, args, id);
+		long int ret;
+		TP_RET(&ret, ctx);
+		process_syscall_close(ctx, ret, args, id);
 	}	
 	bpf_map_delete_elem(&close_args_map, &id);
 	return 0;
@@ -1518,13 +1538,15 @@ int BPF_KPROBE(connect_entry, int sockfd, const struct sockaddr* addr) {
 	bpf_map_update_elem(&connect_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
-
 SEC("tracepoint/syscalls/sys_exit_connect")
 int tracepoint__syscalls__sys_exit_connect(struct trace_event_raw_sys_exit *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct connect_args *args = bpf_map_lookup_elem(&connect_args_map, &id);
+
 	if (args != NULL) {
-		process_syscall_connect(ctx, ctx->ret, args, id);
+		long int ret;
+		TP_RET(&ret, ctx);
+		process_syscall_connect(ctx, ret, args, id);
 	} 
 	bpf_map_delete_elem(&connect_args_map, &id);
 	return 0;
