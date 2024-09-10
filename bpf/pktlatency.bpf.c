@@ -214,7 +214,7 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 	struct sock_key *key = param->key;
 	u32 cur_seq = param->cur_seq;
 	u32 len = param->len;
-	char *func_name = param->func_name;
+	const char *func_name = param->func_name;
 	enum step_t step = param->step;
 #ifdef KERNEL_VERSION_BELOW_58 
 	struct kern_evt _evt = {0};
@@ -242,7 +242,8 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 	evt->len = br_bdr - bl_bdr; 
 	evt->ts = bpf_ktime_get_ns();
 	evt->step = step;
-	my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
+	bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
+	// my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
 #ifdef KERNEL_VERSION_BELOW_58
 	bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(_evt));
 #else
@@ -256,7 +257,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	struct sock_key *key = param->key;
 	struct tcphdr* tcp = param->tcp;
 	int len = param->len;
-	char *func_name = param->func_name;
+	const char *func_name = param->func_name;
 	enum step_t step = param->step;
 #ifdef KERNEL_VERSION_BELOW_58 
 	struct kern_evt _evt = {0};
@@ -288,7 +289,8 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	evt->ts = bpf_ktime_get_ns();
 	evt->step = step;
 	evt->flags = _(((u8 *)tcp)[13]);
-	my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
+	bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
+	// my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
 
 #ifdef KERNEL_VERSION_BELOW_58
 	bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt));
@@ -316,7 +318,7 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	} else {
 		evt->ke.ts = bpf_ktime_get_ns();
 	}
-	char *func_name = "syscall";
+	const char *func_name = SYSCALL_FUNC_NAME;
 	bpf_probe_read_kernel(evt->ke.func_name, 8, func_name);
 	evt->buf_size = _len; 
 
@@ -382,7 +384,7 @@ static bool __always_inline report_conn_evt(void* ctx, struct conn_info_t *conn_
 	return 1;
 }
 
-static void __always_inline debug_evt(struct kern_evt* evt, char* func_name) {
+static void __always_inline debug_evt(struct kern_evt* evt, const char* func_name) {
 	// bpf_printk("KPROBE ENTRY, func: %s, lip: %d, dip:%d",func_name, evt.key->sip, evt.key->dip);
 	// bpf_printk("KPROBE ENTRY, lport: %d, dport:%d, seq: %u", evt.key->sport, evt.key->dport, evt->tcp_seq);
 	// bpf_printk("KPROBE ENTRY init_seq = %u, cur_seq: %u, len: %d\n",evt->init_seq, evt->cur_seq,evt->data_len);
@@ -404,9 +406,9 @@ static void __always_inline parse_sock_key_rcv(struct sk_buff *skb, struct sock_
 	parse_sock_key_rcv_sk(sk, key);
 }
 static void __always_inline print_sock_key(struct sock_key* key) {
-	pr_bpf_debug("print_sock_key port: sport:%u, dport:%u", key->sport, key->dport);
-	pr_bpf_debug("print_sock_key addr: saddr:%u, daddr:%u", key->sip, key->dip);
-	pr_bpf_debug("print_sock_key family: family:%u", key->family);
+	// pr_bpf_debug("print_sock_key port: sport:%u, dport:%u", key->sport, key->dport);
+	// pr_bpf_debug("print_sock_key addr: saddr:%u, daddr:%u", key->sip, key->dip);
+	// pr_bpf_debug("print_sock_key family: family:%u", key->family);
 }
 static void __always_inline parse_sock_key_sk(struct sock* sk, struct sock_key* key) {
 	key->dip = _C(sk, __sk_common.skc_daddr);
@@ -474,7 +476,7 @@ static __always_inline int enabledXDP() {
 	}
 }
 
-static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_name, bool sk_not_ready, enum step_t step) {
+static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, const char* func_name, bool sk_not_ready, enum step_t step) {
 	struct sock* sk = _C(skb,sk);
 	struct sock_common sk_cm = _C(sk, __sk_common);
 	u32 inital_seq = 0;
@@ -495,14 +497,14 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 	u16 mac_header = _C(skb, mac_header);
 	u16 trans_header = _C(skb, transport_header);
 	
-	pr_bpf_debug("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
-	pr_bpf_debug("%s, mac_header: %d", func_name,mac_header);
-	pr_bpf_debug("%s, network_header: %d", func_name,network_header);
-	pr_bpf_debug("%s, trans_header: %d", func_name,trans_header);
-	pr_bpf_debug("data:%d,end: %d, tail: %d",_C(skb,data) - _C(skb,head), _C(skb,end), _C(skb,tail));
+	// pr_bpf_debug("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
+	// pr_bpf_debug("%s, mac_header: %d", func_name,mac_header);
+	// pr_bpf_debug("%s, network_header: %d", func_name,network_header);
+	// pr_bpf_debug("%s, trans_header: %d", func_name,trans_header);
+	// pr_bpf_debug("data:%d,end: %d, tail: %d",_C(skb,data) - _C(skb,head), _C(skb,end), _C(skb,tail));
 
 	bool is_l2 = !skb_l2_check(mac_header);
-	pr_bpf_debug("%s, skb_l2_check: %d", func_name, is_l2);
+	// pr_bpf_debug("%s, skb_l2_check: %d", func_name, is_l2);
 	void* data = _C(skb, head);
 	void* ip = data + network_header;
 	void *l3;
@@ -522,7 +524,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 			goto __l3;
 		}
 				
-		pr_bpf_debug("%s, is_ip: %d", func_name,0);
+		// pr_bpf_debug("%s, is_ip: %d", func_name,0);
 		goto err;
 	}
 	__l2: if (mac_header != network_header) {
@@ -597,7 +599,7 @@ return XDP_PASS;
 
 	struct ethhdr *eth = data;
 	if (data + sizeof(struct ethhdr) > data_end) {
-		pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) > data_end");
+		// pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) > data_end");
 		return XDP_PASS;
 	}
 	u16 l3_proto = _C(eth, h_proto);
@@ -605,7 +607,7 @@ return XDP_PASS;
 	struct iphdr *iph = data + sizeof(struct ethhdr);
 	if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
 	{
-		pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end");
+		// pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end");
 		return XDP_ABORTED;
 	}
 	if (iph->protocol != IPPROTO_TCP)
@@ -615,7 +617,7 @@ return XDP_PASS;
 	}
 	struct tcphdr* th = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
 	if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr) > data_end) {
-		pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr) > data_end");
+		// pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr) > data_end");
 		return XDP_ABORTED;
 	}
 	
@@ -628,7 +630,7 @@ return XDP_PASS;
 	// bpf_printk("xdp, not found!, sport:%d, dport:%d, family:%d", key.sport, key.dport,key.family);
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 	if (found == NULL && !should_trace_sock_key(&key)) {
-		pr_bpf_debug("xdp key.dport != target_port, %u,%u,should_trace_sock_key:%d", key.dport, key.sport,should_trace_sock_key(&key));
+		// pr_bpf_debug("xdp key.dport != target_port, %u,%u,should_trace_sock_key:%d", key.dport, key.sport,should_trace_sock_key(&key));
 		return XDP_PASS;
 	}
 	u32 inital_seq;
@@ -650,7 +652,7 @@ return XDP_PASS;
 	body.key = &key;
 	body.tcp = th;
 	body.len = len;
-	body.func_name = "xdp";
+	body.func_name = XDP_FUNC_NAME;
 	body.step = NIC_IN;	
 	report_kern_evt(&body);
 	// KERN_EVENT_HANDLE(&evt, "xdp");
@@ -685,7 +687,7 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 	body.key = &key;
 	body.cur_seq = seq - inital_seq;
 	body.len = len;
-	body.func_name = "skb_copy_datagram_iter";
+	body.func_name = SKB_COPY_FUNC_NAME;
 	body.step = USER_COPY;
 	// bpf_printk("skb_copy_datagram_iter, seq: %u, off: %u, len: %u", cb->seq, offset, len);
 	parse_kern_evt_body(&body);
@@ -700,7 +702,7 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 SEC("tracepoint/net/netif_receive_skb")
 int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx) {
 	struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
-	parse_skb(ctx, skb, "netif_receive_skb", 1, DEV_IN);
+	parse_skb(ctx, skb, NET_RECEIVE_SKB_FUNC_NAME, 1, DEV_IN);
 	return 0;
 }
 SEC("kprobe/tcp_queue_rcv")
@@ -717,7 +719,7 @@ int BPF_KPROBE(tcp_rcv_established, struct sock *sk, struct sk_buff *skb) {
   
 SEC("kprobe/tcp_v4_do_rcv")
 int BPF_KPROBE(tcp_v4_do_rcv, struct sock *sk, struct sk_buff *skb) { 
-	parse_skb(ctx, skb, "tcp_v4_do_rcv", 1, TCP_IN);
+	parse_skb(ctx, skb, TCP_RCV_FUNC_NAME, 1, TCP_IN);
 	return BPF_OK;
 }
  
@@ -733,7 +735,7 @@ SEC("kprobe/ip_rcv_core.isra.0")
 SEC("kprobe/ip_rcv_core")
 #endif 
 int BPF_KPROBE(ip_rcv_core, struct sk_buff *skb) {
-	parse_skb(ctx, skb, "ip_rcv_core", 1, IP_IN);
+	parse_skb(ctx, skb, IP_RCV_FUNC_NAME, 1, IP_IN);
 	return BPF_OK;
 } 
 // 出队之后，发送到设备
@@ -742,7 +744,7 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 	struct sk_buff *skb = first;
 #pragma unroll
 	for (int i = 0; i < 1; i++) {
-		int ret = parse_skb(ctx, skb, "dev_hard_start_xmit", 0, DEV_OUT);
+		int ret = parse_skb(ctx, skb, DEV_HARD_XMIT_FUNC_NAME, 0, DEV_OUT);
 		// if (ret) bpf_printk("dev_hard_start_xmit, final: %d", i);
 		skb = _C(skb,next);
 		if (!skb) {
@@ -756,7 +758,7 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 // 进入qdisc之前
 SEC("kprobe/dev_queue_xmit")
 int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
-	parse_skb(ctx, skb, "dev_queue_xmit", 0, QDISC_OUT);
+	parse_skb(ctx, skb, DEV_QUEUE_XMIT_FUNC_NAME, 0, QDISC_OUT);
 	return 0;
 }
 
@@ -791,7 +793,7 @@ int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
 	body.key = &key;
 	body.tcp = tcp;
 	body.len = _C(skb, len);
-	body.func_name = "ip_queue_xmit";
+	body.func_name = IP_QUEUE_XMIT_FUNC_NAME;
 	body.step = IP_OUT;	
 	report_kern_evt(&body);
 	// KERN_EVENT_HANDLE(&evt, "ip_queue_xmit");
@@ -812,7 +814,7 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 	uint64_t tgid_fd;
 	if (conn_id_s != NULL) {
 		tgid_fd = conn_id_s->tgid_fd;
-		pr_bpf_debug("tcp_destroy_sock found, tgid:%d", tgid_fd>>32);
+		// pr_bpf_debug("tcp_destroy_sock found, tgid:%d", tgid_fd>>32);
 		struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 		if (conn_info != NULL) {
 			report_conn_evt(ctx, conn_info, kClose, 0);
@@ -823,7 +825,7 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 		bpf_map_delete_elem(&sock_key_conn_id_map, &rev_key);
 	} 
 	if (!err) {
-		pr_bpf_debug("tcp_destroy_sock, sock destory, %d, %d", key.sport, key.dport);
+		// pr_bpf_debug("tcp_destroy_sock, sock destory, %d, %d", key.sport, key.dport);
 	}
 	return BPF_OK;
 }
@@ -930,7 +932,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		conn_info.raddr.in4.sin_port = bpf_ntohs(conn_info.raddr.in4.sin_port);
 		// conn_info.raddr = *((union sockaddr_t*)addr);
 	} else {
-		pr_bpf_debug("raddr: null");
+		// pr_bpf_debug("raddr: null");
 	}
 	struct tcp_sock * tcp_sk = get_socket_from_fd(fd);
 	// s => d
@@ -981,7 +983,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 
 	conn_info.role = role;
 	if (should_trace_conn(&conn_info)) {
-		bpf_printk("submit_new_conn  dport: %u, tgid:%d,fd:%d", conn_info.raddr.in4.sin_port,tgid ,fd);
+		// bpf_printk("submit_new_conn  dport: %u, tgid:%d,fd:%d", conn_info.raddr.in4.sin_port,tgid ,fd);
 		bpf_map_update_elem(&conn_info_map, &tgid_fd, &conn_info, BPF_ANY);
 		struct conn_id_s_t conn_id_s = {};
 		conn_id_s.direct = role == kRoleClient ? kEgress : kIngress;
@@ -1002,11 +1004,11 @@ enum endpoint_role_t role, uint64_t start_ts) {
 static __always_inline void process_syscall_close(void* ctx, int ret_val, struct close_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
 	if (args->fd < 0) {
-		bpf_printk("close syscall args->fd:%d,tgid:%u", args->fd, tgid);
+		// bpf_printk("close syscall args->fd:%d,tgid:%u", args->fd, tgid);
 		return;
 	}
 	if (ret_val < 0) {
-		bpf_printk("close syscall ret_val:%d,tgid:%u", ret_val, tgid);
+		// bpf_printk("close syscall ret_val:%d,tgid:%u", ret_val, tgid);
 		return;
 	}
 	uint64_t tgid_fd = gen_tgid_fd(tgid, args->fd);
@@ -1017,7 +1019,7 @@ static __always_inline void process_syscall_close(void* ctx, int ret_val, struct
 	}
 	
 	bool reported = report_conn_evt(ctx, conn_info, kClose, 0);
-	bpf_printk("reported  close syscall event tgid:%u , reported: %d", tgid, reported);
+	// bpf_printk("reported  close syscall event tgid:%u , reported: %d", tgid, reported);
 
 	bpf_map_delete_elem(&conn_info_map, &tgid_fd);
 	
@@ -1043,7 +1045,7 @@ static __always_inline void process_syscall_connect(void* ctx, int  ret_val, str
 	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
 		return;
 	}
-	bpf_printk("process_syscall_connect, tgid:%lu, fd: %d", tgid, args->fd);
+	// bpf_printk("process_syscall_connect, tgid:%lu, fd: %d", tgid, args->fd);
 	submit_new_conn(ctx, tgid, args->fd, args->addr, NULL, kRoleClient , args->start_ts);
 }
 static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct accept_args *args, uint64_t id) {
@@ -1057,7 +1059,7 @@ static __always_inline void process_syscall_accept(struct pt_regs* ctx, struct a
 	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
 		return;
 	}
-	bpf_printk("process_syscall_accept, tgid:%lu, ret_fd: %d, socket:%d", tgid,ret_fd,args->sock_alloc_socket);
+	// bpf_printk("process_syscall_accept, tgid:%lu, ret_fd: %d, socket:%d", tgid,ret_fd,args->sock_alloc_socket);
 	submit_new_conn(ctx, tgid, ret_fd, args->addr, args->sock_alloc_socket, kRoleServer , 0);
 }
 
@@ -1136,11 +1138,11 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	} 
 	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
 		enum traffic_protocol_t before_infer = conn_info->protocol;
-		bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
+		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
 		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
 		// conn_info->protocol = protocol_message.protocol;
 		if (before_infer != conn_info->protocol) {
-			bpf_printk("[protocol infer]: %d", conn_info->protocol);
+			// bpf_printk("[protocol infer]: %d", conn_info->protocol);
 			report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
 		}
 	}
