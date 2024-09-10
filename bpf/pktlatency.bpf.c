@@ -703,6 +703,7 @@ int BPF_KPROBE(ip_rcv_core, struct sk_buff *skb) {
 SEC("kprobe/dev_hard_start_xmit")
 int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 	struct sk_buff *skb = first;
+#pragma unroll
 	for (int i = 0; i < 16; i++) {
 		int ret = parse_skb(ctx, skb, "dev_hard_start_xmit", 0, DEV_OUT);
 		// if (ret) bpf_printk("dev_hard_start_xmit, final: %d", i);
