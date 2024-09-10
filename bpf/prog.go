@@ -169,11 +169,6 @@ func AttachKProbeDevQueueXmitEntry(programs interface{}) link.Link {
 	return kprobe("dev_queue_xmit", GetProgram(programs, "DevQueueXmit"))
 }
 func AttachKProbeDevHardStartXmitEntry(programs interface{}) link.Link {
-	// if needsRunningInCompatibleMode() {
-	// 	return tracepoint("net", "net_dev_xmit", GetProgram(programs, "DevHardStartXmit"))
-	// } else {
-
-	// }
 	return kprobe("dev_hard_start_xmit", GetProgram(programs, "DevHardStartXmit"))
 }
 func AttachKProbIpRcvCoreEntry(programs interface{}) link.Link {
@@ -253,7 +248,7 @@ func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
 }
 func kprobe2(func_name string, prog *ebpf.Program) (link.Link, error) {
 	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
-		log.Printf("kprobe2 failed: %s, %s, fallbacking..", func_name, err)
+		// log.Printf("kprobe2 failed: %s, %s, fallbacking..", func_name, err)
 		return nil, err
 	} else {
 		return link, nil
@@ -271,7 +266,7 @@ func GetKernelVersion() *version.Version {
 	release := si.Kernel.Release
 	version, err := version.NewVersion(release)
 	if err != nil {
-		logrus.Warningf("Parse kernel version failed: %v, using the compatible mode...", err)
+		logrus.Debugf("Parse kernel version failed: %v, using the compatible mode...", err)
 	}
 	return version
 }
