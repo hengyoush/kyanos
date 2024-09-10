@@ -630,7 +630,7 @@ func MayBeXdpFunction(defaultFunc bpf.AttachBpfProgFunction) bpf.AttachBpfProgFu
 	}
 }
 
-var compatilbeMode bool = true
+var compatilbeMode bool = false
 
 func SetCompatibleMode(b bool) {
 	compatilbeMode = b
