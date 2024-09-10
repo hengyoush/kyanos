@@ -798,7 +798,7 @@ int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
 	// KERN_EVENT_HANDLE(&evt, "ip_queue_xmit");
 	return 0;
 }
-
+#ifndef KERNEL_VERSION_BELOW_58
 SEC("raw_tp/tcp_destroy_sock")
 int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 {
@@ -828,6 +828,7 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 	}
 	return BPF_OK;
 }
+#endif
 
 MY_BPF_HASH(accept_args_map, uint64_t, struct accept_args)
 MY_BPF_HASH(connect_args_map, uint64_t, struct connect_args)

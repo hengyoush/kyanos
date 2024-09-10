@@ -616,8 +616,10 @@ func attachBpfProgs(programs any, ifName string) *list.List {
 
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry(programs))
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry(programs))
+	if !common.NeedsRunningInCompatibleMode() {
+		linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(programs))
+	}
 
-	linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(programs))
 	linkList.PushBack(bpf.AttachKProbeIpQueueXmitEntry(programs))
 	linkList.PushBack(bpf.AttachKProbeDevQueueXmitEntry(programs))
 	linkList.PushBack(bpf.AttachKProbeDevHardStartXmitEntry(programs))
