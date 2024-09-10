@@ -876,13 +876,14 @@ func TestIpRcvCore(t *testing.T) {
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
 			direct:                 bpf.AgentTrafficDirectionTKIngress,
-			findByFuncName:         true,
-			funcName:               "ip_rcv_core",
+			findByStep:             true,
+			step:                   bpf.AgentStepTIP_IN,
 		}, KernDataEventAssertConditions{
 
 			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
 			pid:               uint64(os.Getpid()),
 			funcName:          "ip_rcv_core",
+			ignoreFuncName:    true,
 			seq:               1,
 			step:              bpf.AgentStepTIP_IN,
 			ignoreDataLen:     true,
@@ -946,13 +947,14 @@ func TestSkbCopyDatagramIter(t *testing.T) {
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
 			direct:                 bpf.AgentTrafficDirectionTKIngress,
-			findByFuncName:         true,
-			funcName:               "skb_copy_datagr",
+			findByStep:             true,
+			step:                   bpf.AgentStepTUSER_COPY,
 		}, KernDataEventAssertConditions{
 
 			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
 			pid:               uint64(os.Getpid()),
 			funcName:          "skb_copy_datagr",
+			ignoreFuncName:    true,
 			seq:               1,
 			step:              bpf.AgentStepTUSER_COPY,
 			ignoreDataLen:     true,

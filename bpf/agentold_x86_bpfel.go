@@ -207,6 +207,7 @@ type AgentOldProgramSpecs struct {
 	IpRcvCore                          *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
 	SecuritySocketRecvmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
+	SkbCopyDatagramIovec               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iovec"`
 	SkbCopyDatagramIter                *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                       *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
 	TcpQueueRcv                        *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
@@ -331,6 +332,7 @@ type AgentOldPrograms struct {
 	IpRcvCore                          *ebpf.Program `ebpf:"ip_rcv_core"`
 	SecuritySocketRecvmsgEnter         *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
+	SkbCopyDatagramIovec               *ebpf.Program `ebpf:"skb_copy_datagram_iovec"`
 	SkbCopyDatagramIter                *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                       *ebpf.Program `ebpf:"sock_alloc_ret"`
 	TcpQueueRcv                        *ebpf.Program `ebpf:"tcp_queue_rcv"`
@@ -370,6 +372,7 @@ func (p *AgentOldPrograms) Close() error {
 		p.IpRcvCore,
 		p.SecuritySocketRecvmsgEnter,
 		p.SecuritySocketSendmsgEnter,
+		p.SkbCopyDatagramIovec,
 		p.SkbCopyDatagramIter,
 		p.SockAllocRet,
 		p.TcpQueueRcv,

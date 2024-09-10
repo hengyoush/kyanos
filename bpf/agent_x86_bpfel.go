@@ -207,6 +207,7 @@ type AgentProgramSpecs struct {
 	IpRcvCore                          *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
 	SecuritySocketRecvmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
+	SkbCopyDatagramIovec               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iovec"`
 	SkbCopyDatagramIter                *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                       *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
 	TcpDestroySock                     *ebpf.ProgramSpec `ebpf:"tcp_destroy_sock"`
@@ -333,6 +334,7 @@ type AgentPrograms struct {
 	IpRcvCore                          *ebpf.Program `ebpf:"ip_rcv_core"`
 	SecuritySocketRecvmsgEnter         *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
+	SkbCopyDatagramIovec               *ebpf.Program `ebpf:"skb_copy_datagram_iovec"`
 	SkbCopyDatagramIter                *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                       *ebpf.Program `ebpf:"sock_alloc_ret"`
 	TcpDestroySock                     *ebpf.Program `ebpf:"tcp_destroy_sock"`
@@ -374,6 +376,7 @@ func (p *AgentPrograms) Close() error {
 		p.IpRcvCore,
 		p.SecuritySocketRecvmsgEnter,
 		p.SecuritySocketSendmsgEnter,
+		p.SkbCopyDatagramIovec,
 		p.SkbCopyDatagramIter,
 		p.SockAllocRet,
 		p.TcpDestroySock,

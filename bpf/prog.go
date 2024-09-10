@@ -188,7 +188,12 @@ func AttachTracepointNetifReceiveSkb(programs interface{}) link.Link {
 	return tracepoint("net", "netif_receive_skb", GetProgram(programs, "TracepointNetifReceiveSkb"))
 }
 func AttachKProbeSkbCopyDatagramIterEntry(programs interface{}) link.Link {
-	return kprobe("__skb_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))
+	l, err := kprobe2("__skb_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))
+	if err != nil {
+		return kprobe("skb_copy_datagram_iovec", GetProgram(programs, "SkbCopyDatagramIter"))
+	} else {
+		return l
+	}
 }
 func AttachXdpWithSpecifiedIfName(programs interface{}, ifname string) link.Link {
 

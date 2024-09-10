@@ -666,8 +666,8 @@ int xdp_proxy(struct xdp_md *ctx){
 }
 #else
 #endif
-SEC("kprobe/__skb_datagram_iter")
-int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct iov_iter *to, int len) {
+
+static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, int offset, struct iov_iter *to, int len) {
 	struct sock_key key = {0};
 	parse_sock_key_rcv(skb, &key);
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
@@ -705,6 +705,18 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 	// }
 	return BPF_OK;
 }
+
+
+SEC("kprobe/__skb_datagram_iter")
+int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct iov_iter *to, int len) {
+	return handle_skb_data_copy(ctx, skb, offset, to, len);
+}
+
+SEC("kprobe/skb_copy_datagram_iovec")
+int BPF_KPROBE(skb_copy_datagram_iovec, struct sk_buff *skb, int offset, struct iov_iter *to, int len) {
+	return handle_skb_data_copy(ctx, skb, offset, to, len);
+}
+
 
 SEC("tracepoint/net/netif_receive_skb")
 int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx) {
