@@ -154,7 +154,12 @@ func AttachRawTracepointTcpDestroySockEntry(programs interface{}) link.Link {
 }
 
 func AttachKProbeIpQueueXmitEntry(programs interface{}) link.Link {
-	return kprobe("__ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
+	link, err := kprobe2("__ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
+	if err != nil {
+		return kprobe("ip_queue_xmit", GetProgram(programs, "IpQueueXmit"))
+	} else {
+		return link
+	}
 }
 func AttachKProbeDevQueueXmitEntry(programs interface{}) link.Link {
 	return kprobe("dev_queue_xmit", GetProgram(programs, "DevQueueXmit"))
