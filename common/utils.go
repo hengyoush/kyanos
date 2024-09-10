@@ -198,7 +198,6 @@ func GetKernelVersion() *version.Version {
 		Log.Warningf("Parse kernel version failed: %v, using the compatible mode...", err)
 	}
 	return version
-
 }
 
 func NanoToMills[T KInt](x T) float64 {
