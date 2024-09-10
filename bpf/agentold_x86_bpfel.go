@@ -210,6 +210,7 @@ type AgentOldProgramSpecs struct {
 	SkbCopyDatagramIovec               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iovec"`
 	SkbCopyDatagramIter                *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                       *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
+	TcpDestroySock                     *ebpf.ProgramSpec `ebpf:"tcp_destroy_sock"`
 	TcpQueueRcv                        *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
 	TcpRcvEstablished                  *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                         *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
@@ -237,6 +238,7 @@ type AgentOldProgramSpecs struct {
 	TracepointSyscallsSysExitSendto    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
 	TracepointSyscallsSysExitWrite     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_write"`
 	TracepointSyscallsSysExitWritev    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_writev"`
+	XdpProxy                           *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
 }
 
 // AgentOldMapSpecs contains maps before they are loaded into the kernel.
@@ -335,6 +337,7 @@ type AgentOldPrograms struct {
 	SkbCopyDatagramIovec               *ebpf.Program `ebpf:"skb_copy_datagram_iovec"`
 	SkbCopyDatagramIter                *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                       *ebpf.Program `ebpf:"sock_alloc_ret"`
+	TcpDestroySock                     *ebpf.Program `ebpf:"tcp_destroy_sock"`
 	TcpQueueRcv                        *ebpf.Program `ebpf:"tcp_queue_rcv"`
 	TcpRcvEstablished                  *ebpf.Program `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                         *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
@@ -362,6 +365,7 @@ type AgentOldPrograms struct {
 	TracepointSyscallsSysExitSendto    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
 	TracepointSyscallsSysExitWrite     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_write"`
 	TracepointSyscallsSysExitWritev    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_writev"`
+	XdpProxy                           *ebpf.Program `ebpf:"xdp_proxy"`
 }
 
 func (p *AgentOldPrograms) Close() error {
@@ -375,6 +379,7 @@ func (p *AgentOldPrograms) Close() error {
 		p.SkbCopyDatagramIovec,
 		p.SkbCopyDatagramIter,
 		p.SockAllocRet,
+		p.TcpDestroySock,
 		p.TcpQueueRcv,
 		p.TcpRcvEstablished,
 		p.TcpV4DoRcv,
@@ -402,6 +407,7 @@ func (p *AgentOldPrograms) Close() error {
 		p.TracepointSyscallsSysExitSendto,
 		p.TracepointSyscallsSysExitWrite,
 		p.TracepointSyscallsSysExitWritev,
+		p.XdpProxy,
 	)
 }
 

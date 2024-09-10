@@ -5,9 +5,7 @@
 #include "../vmlinux/vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
-#ifndef COMPAT_MODE 
 #include <bpf/bpf_core_read.h> 
-#endif
 #include <bpf/bpf_endian.h>
 #include "pktlatency.h"
 
@@ -26,28 +24,9 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 	tmp;							\
 })
 
-#ifdef COMPAT_MODE
-#define _PT_REGS_RC(ctx) PT_REGS_RC(ctx);
-#else
-#define _PT_REGS_RC(ctx) PT_REGS_RC_CORE(ctx);
 
-#endif
-
-#ifdef COMPAT_MODE
-#define _C(src, a)	_((src)->a)
-#else
 #define _C(src, a, ...)		BPF_CORE_READ(src, a, ##__VA_ARGS__)
-#endif
-#ifdef COMPAT_MODE
-#define _U(src, a)		\
-({						\
-	typeof(src) tmp;	\
-	bpf_probe_read_user(&tmp, sizeof(src), &(src));	\
-	tmp;							\
-})
-#else 
 #define _U(src, a, ...)		BPF_PROBE_READ_USER(src, a, ##__VA_ARGS__)
-#endif
 
 #ifdef BPF_DEBUG
 #define pr_bpf_debug(fmt, args...) {				\
@@ -208,7 +187,7 @@ static __inline enum target_tgid_match_result_t match_trace_tgid(const uint32_t 
 }
 
 static __always_inline struct sock_key reverse_sock_key(struct sock_key* key) {
-	struct sock_key copy; 
+	struct sock_key copy;
 	copy.dip = key->sip;
 	copy.dport = key->sport;
 	copy.sip = key->dip;
@@ -326,8 +305,6 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	} else {
 		evt->ke.ts = bpf_ktime_get_ns();
 	}
-	// const char *func_name = SYSCALL_FUNC_NAME;
-	// bpf_probe_read_kernel(evt->ke.func_name, 8, func_name);
 	evt->buf_size = _len; 
 
 	size_t len_minus_1 = _len - 1;
@@ -723,7 +700,6 @@ int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx)
 	void *p = (void*)ctx + sizeof(struct trace_entry);
 	struct sk_buff *skb;
 	bpf_probe_read_kernel(&skb, sizeof(struct sk_buff *), p);
-	// struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
 	parse_skb(ctx, skb, 1, DEV_IN);
 	return 0;
 }
@@ -756,17 +732,7 @@ int BPF_KPROBE(ip_rcv_core, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 1, IP_IN);
 	return BPF_OK;
 } 
-// #ifdef KERNEL_VERSION_BELOW_58
-// SEC("tracepoint/net/net_dev_xmit")
-// int dev_hard_start_xmit(struct trace_event_raw_net_dev_template  *ctx) {
-// 	void *p = (void*)ctx + sizeof(struct trace_entry);
-// 	struct sk_buff *skb;
-// 	bpf_probe_read_kernel(&skb, sizeof(struct sk_buff *), p);
-// 	// struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
-// 	parse_skb(ctx, skb, 1, DEV_OUT);
-// 	return 0;
-// }
-// #else
+
 // 出队之后，发送到设备
 SEC("kprobe/dev_hard_start_xmit")
 int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
@@ -784,7 +750,6 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 	
 	return 0;
 }
-// #endif
 
 // 进入qdisc之前
 SEC("kprobe/dev_queue_xmit")
@@ -792,7 +757,7 @@ int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 0, QDISC_OUT);
 	return 0;
 }
-#ifdef KERNEL_VERSION_BELOW_58
+#ifdef KERNEL_VERSION_310
 SEC("kprobe/ip_queue_xmit")
 int BPF_KPROBE(ip_queue_xmit, struct sk_buff *skb)
 #else
@@ -1277,8 +1242,6 @@ int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx
 
 SEC("tracepoint/syscalls/sys_enter_read")
 int tracepoint__syscalls__sys_enter_read(struct trace_event_raw_sys_enter *ctx) {
-// SEC("kprobe/__x64_sys_read")
-// int BPF_KSYSCALL(read_enter,  uint32_t fd, char* buf, size_t count) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct data_args args = {0};
@@ -1555,8 +1518,6 @@ int tracepoint__syscalls__sys_exit_close(struct trace_event_raw_sys_exit *ctx)
 
 
 //int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-// SEC("kprobe/__sys_connect")
-// int BPF_KPROBE(connect_entry, int sockfd, const struct sockaddr* addr) {
 SEC("tracepoint/syscalls/sys_enter_connect")
 int tracepoint__syscalls__sys_enter_connect(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
@@ -1583,10 +1544,6 @@ int tracepoint__syscalls__sys_exit_connect(struct trace_event_raw_sys_exit *ctx)
 	return 0;
 }
 
-
-// SEC("kprobe/accept4")
-// int BPF_KPROBE(accept4_entry, int sockfd, struct sockaddr* addr) {
-
 SEC("tracepoint/syscalls/sys_enter_accept4")
 int tracepoint__syscalls__sys_enter_accept4(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
@@ -1606,23 +1563,11 @@ int BPF_KRETPROBE(sock_alloc_ret)
 		return 0;
 	}
 	if (!args->sock_alloc_socket) {
-		args->sock_alloc_socket = (struct socket*) _PT_REGS_RC(ctx);
+		args->sock_alloc_socket = (struct socket*) PT_REGS_RC_CORE(ctx);
 	}
 
 	return 0;
 }
-
-// SEC("kretprobe/__sys_accept4")
-// int BPF_KRETPROBE(sys_accept4_ret)
-// {
-// 	uint64_t id = bpf_get_current_pid_tgid();
-// 	struct accept_args *args = bpf_map_lookup_elem(&accept_args_map, &id);
-// 	if (args != NULL) {
-// 		process_syscall_accept(ctx, args, id);
-// 	}	
-// 	bpf_map_delete_elem(&accept_args_map, &id);
-// 	return 0;
-// }
 
 SEC("tracepoint/syscalls/sys_exit_accept4")
 int tracepoint__syscalls__sys_exit_accept4(struct trace_event_raw_sys_exit *ctx) {
