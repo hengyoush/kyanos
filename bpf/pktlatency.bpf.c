@@ -529,7 +529,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 	__l2: if (mac_header != network_header) {
 		struct ethhdr *eth = data + mac_header;
 		l3 = (void *)eth + ETH_HLEN;
-		u16 l3_proto = bpf_ntohs(_C(eth,h_proto));
+		u16 l3_proto = bpf_ntohs(_(eth->h_proto));
 		// bpf_printk("%s, l3_proto: %x",func_name, l3_proto);
 		if (l3_proto == ETH_P_IP) {
 	__l3:	
@@ -601,7 +601,7 @@ return XDP_PASS;
 		// pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) > data_end");
 		return XDP_PASS;
 	}
-	u16 l3_proto = _C(eth, h_proto);
+	u16 l3_proto = _(eth->h_proto);
 	// bpf_printk("xdp, l3_proto: %x", l3_proto);
 	struct iphdr *iph = data + sizeof(struct ethhdr);
 	if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
@@ -700,7 +700,7 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 
 SEC("tracepoint/net/netif_receive_skb")
 int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx) {
-	struct sk_buff *skb = (struct sk_buff*) _C(ctx,skbaddr);
+	struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
 	parse_skb(ctx, skb, 1, DEV_IN);
 	return 0;
 }
