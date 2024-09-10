@@ -1481,7 +1481,7 @@ int BPF_KRETPROBE(writev_return) {
 SEC("tracepoint/syscalls/sys_enter_close")
 // SEC("kprobe/sys_close")
 int tracepoint__syscalls__sys_enter_close(struct trace_event_raw_sys_enter *ctx) {
-	uint64_t id = bpf_get_current_pid_tgid();
+	uint64_t id = 0;
 
 	struct close_args args = {0};
 	args.fd = (uint32_t) ctx->args[0];
