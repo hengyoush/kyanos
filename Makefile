@@ -105,7 +105,7 @@ bpf/kheaders.h: FORCE
 
 FORCE:
 
-kyanos: $(LIBBPF_OBJ) $(GO_FILES) $(wildcard bpf/*.[ch]) bpf/kheaders.h | $(OUTPUT)
+kyanos: $(LIBBPF_OBJ) $(GO_FILES) $(wildcard bpf/*.[ch]) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	./build.sh "$(CFLAGS)" "$(VMLINUX)"
 	rm -f bpf/kheaders.h

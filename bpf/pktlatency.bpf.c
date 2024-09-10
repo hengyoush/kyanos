@@ -2,7 +2,7 @@
 
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /* Copyright (c) 2021 Sartura */
-#include "kheaders.h"
+#include "../vmlinux/vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #ifndef COMPAT_MODE 

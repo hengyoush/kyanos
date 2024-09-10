@@ -21,6 +21,7 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
@@ -54,6 +55,7 @@ type AgentOptions struct {
 	LatencyFilter          protocol.LatencyFilter
 	TraceSide              common.SideEnum
 	IfName                 string
+	BTFFilePath            string
 	protocol.SizeFilter
 	AnalysisEnable bool
 	analysis.AnalysisOptions
@@ -116,20 +118,34 @@ func SetupAgent(options AgentOptions) {
 	var objs any
 	var spec *ebpf.CollectionSpec
 	var err error
+	var collectionOptions *ebpf.CollectionOptions
+	if options.BTFFilePath != "" {
+		btfPath, err := btf.LoadSpec(options.BTFFilePath)
+		if err != nil {
+			log.Fatalf("can't load btf spec: %v", err)
+		}
+		collectionOptions = &ebpf.CollectionOptions{
+			Programs: ebpf.ProgramOptions{
+				KernelTypes: btfPath,
+			},
+		}
+	} else {
+		collectionOptions = nil
+	}
 	if common.NeedsRunningInCompatibleMode() {
 		objs = &bpf.AgentOldObjects{}
 		spec, err = bpf.LoadAgentOld()
 		if err != nil {
 			log.Fatal("load Agent error:", err)
 		}
-		err = spec.LoadAndAssign(objs, nil)
+		err = spec.LoadAndAssign(objs, collectionOptions)
 	} else {
 		objs = &bpf.AgentObjects{}
 		spec, err = bpf.LoadAgent()
 		if err != nil {
 			log.Fatal("load Agent error:", err)
 		}
-		err = spec.LoadAndAssign(objs, nil)
+		err = spec.LoadAndAssign(objs, collectionOptions)
 	}
 	bpf.Objs = objs
 
