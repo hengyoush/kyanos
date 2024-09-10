@@ -1484,8 +1484,8 @@ int tracepoint__syscalls__sys_enter_close(struct trace_event_raw_sys_enter *ctx)
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct close_args args = {0};
-	args.fd = (uint32_t) ctx->args[0];
-	// bpf_map_update_elem(&close_args_map, &id, &args, BPF_ANY);
+	// args.fd = (uint32_t) ctx->args[0];
+	bpf_map_update_elem(&close_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
 
