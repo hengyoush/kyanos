@@ -272,4 +272,14 @@ struct conn_evt_t {
 };
 
 
+struct parse_kern_evt_body {
+	void* ctx;
+	u32 inital_seq;
+	struct sock_key *key;
+	u32 cur_seq;
+	u32 len;
+	char *func_name;
+	enum step_t step;
+  struct tcphdr* tcp;
+};
 #endif		

@@ -208,7 +208,14 @@ static __always_inline struct sock_key reverse_sock_key(struct sock_key* key) {
 	copy.family = key->family;
 	return copy;
 }
-static void __always_inline parse_kern_evt_body(void* ctx, u32 seq, struct sock_key* key, u32 cur_seq, u32 len, char* func_name, enum step_t step) {
+static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *param) {
+	void* ctx = param->ctx;
+	u32 inital_seq = param->inital_seq;
+	struct sock_key *key = param->key;
+	u32 cur_seq = param->cur_seq;
+	u32 len = param->len;
+	char *func_name = param->func_name;
+	enum step_t step = param->step;
 #ifdef KERNEL_VERSION_BELOW_58 
 	struct kern_evt _evt = {0};
 	struct kern_evt* evt = &_evt;
@@ -242,7 +249,15 @@ static void __always_inline parse_kern_evt_body(void* ctx, u32 seq, struct sock_
 	bpf_ringbuf_submit(evt, 0);
 #endif
 }
-static __always_inline void  report_kern_evt(void* ctx, u32 seq, struct sock_key* key,struct tcphdr* tcp, int size, char* func_name, enum step_t step) {
+// static __always_inline void  report_kern_evt(void* ctx, u32 seq, struct sock_key* key,struct tcphdr* tcp, int len, char* func_name, enum step_t step) {
+static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) {
+	void* ctx = param->ctx;
+	u32 seq = param->inital_seq;
+	struct sock_key *key = param->key;
+	struct tcphdr* tcp = param->tcp;
+	int len = param->len;
+	char *func_name = param->func_name;
+	enum step_t step = param->step;
 #ifdef KERNEL_VERSION_BELOW_58 
 	struct kern_evt _evt = {0};
 	struct kern_evt* evt = &_evt;
@@ -268,7 +283,7 @@ static __always_inline void  report_kern_evt(void* ctx, u32 seq, struct sock_key
 	bpf_probe_read_kernel(&doff, sizeof(doff), (void*)(&(tcp->ack_seq)) + 4);
 	doff = (doff&255) >> 4;
 	u64 hdr_len = doff << 2;
-	u32 br_bdr = bl_bdr + size - hdr_len;
+	u32 br_bdr = bl_bdr + len - hdr_len;
 	evt->len = br_bdr - bl_bdr;
 	evt->ts = bpf_ktime_get_ns();
 	evt->step = step;
@@ -552,8 +567,15 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, char* func_
 						bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 					}
 				} 
-					
-				report_kern_evt(ctx, inital_seq, &key, tcp, len - ip_hdr_len, func_name, step);
+				struct parse_kern_evt_body body = {0};
+				body.ctx = ctx;
+				body.inital_seq = inital_seq;
+				body.key = &key;
+				body.tcp = tcp;
+				body.len = len - ip_hdr_len;
+				body.func_name = func_name;
+				body.step = step;	
+				report_kern_evt(&body);
 				return 1;
 			} else {
 				// bpf_printk("%s, not match: %d", func_name, _C(ipv4,saddr));
@@ -622,12 +644,19 @@ return XDP_PASS;
 	}
 	u32 len = data_end - data - (sizeof(struct ethhdr) + sizeof(struct iphdr));
 	// bpf_printk("xdp, skb: %x", data);
-	report_kern_evt(ctx, inital_seq, &key, th, len, "xdp", NIC_IN);
+	struct parse_kern_evt_body body = {0};
+	body.ctx = ctx;
+	body.inital_seq = inital_seq;
+	body.key = &key;
+	body.tcp = th;
+	body.len = len;
+	body.func_name = "xdp";
+	body.step = NIC_IN;	
+	report_kern_evt(&body);
 	// KERN_EVENT_HANDLE(&evt, "xdp");
 	return XDP_PASS; 
 #endif
 }
-
 SEC("kprobe/__skb_datagram_iter")
 int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct iov_iter *to, int len) {
 	struct sock_key key = {0};
@@ -650,8 +679,16 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 	char* p_cb = _C(skb,cb);
 	struct tcp_skb_cb *cb = (struct tcp_skb_cb *)&p_cb[0];
 	u32 seq = (int)_C(cb,seq) + offset;
+	struct parse_kern_evt_body body = {0};
+	body.ctx = ctx;
+	body.inital_seq = inital_seq;
+	body.key = &key;
+	body.cur_seq = seq - inital_seq;
+	body.len = len;
+	body.func_name = "skb_copy_datagram_iter";
+	body.step = USER_COPY;
 	// bpf_printk("skb_copy_datagram_iter, seq: %u, off: %u, len: %u", cb->seq, offset, len);
-	parse_kern_evt_body(ctx, inital_seq, &key, seq - inital_seq, len, "skb_copy_datagram_iter", USER_COPY);
+	parse_kern_evt_body(&body);
 	// parse_skb(skb, "skb_copy_datagram_iter", 0);
 	// if (_(to->iter_type) == ITER_IOVEC) {
 	// 	struct iovec *iov = _(to->iov);
@@ -747,7 +784,16 @@ int BPF_KPROBE(ip_queue_xmit, struct sock *sk, struct sk_buff *skb)
 	}
 
 	struct tcphdr* tcp = (struct tcphdr*)_C(skb, data);
-	report_kern_evt(ctx, inital_seq, &key, tcp, _C(skb, len), "ip_queue_xmit", IP_OUT);
+
+	struct parse_kern_evt_body body = {0};
+	body.ctx = ctx;
+	body.inital_seq = inital_seq;
+	body.key = &key;
+	body.tcp = tcp;
+	body.len = _C(skb, len);
+	body.func_name = "ip_queue_xmit";
+	body.step = IP_OUT;	
+	report_kern_evt(&body);
 	// KERN_EVENT_HANDLE(&evt, "ip_queue_xmit");
 	return 0;
 }
