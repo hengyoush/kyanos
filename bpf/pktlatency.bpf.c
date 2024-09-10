@@ -739,15 +739,12 @@ int BPF_KPROBE(tcp_v4_rcv, struct sk_buff *skb) {
 	return BPF_OK;
 }
 
-#ifdef FOR_OTHER_MACHINE 
-SEC("kprobe/ip_rcv_core.isra.0") 
-#else
 SEC("kprobe/ip_rcv_core")
-#endif 
 int BPF_KPROBE(ip_rcv_core, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 1, IP_IN);
 	return BPF_OK;
 } 
+
 // 出队之后，发送到设备
 SEC("kprobe/dev_hard_start_xmit")
 int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {

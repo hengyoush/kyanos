@@ -170,7 +170,13 @@ func AttachKProbeDevHardStartXmitEntry(programs interface{}) link.Link {
 func AttachKProbIpRcvCoreEntry(programs interface{}) link.Link {
 	l, err := kprobe2("ip_rcv_core", GetProgram(programs, "IpRcvCore"))
 	if err != nil {
-		l = kprobe("ip_rcv_core.isra.0", GetProgram(programs, "IpRcvCore"))
+		l, err = kprobe2("ip_rcv_core.isra.0", GetProgram(programs, "IpRcvCore"))
+		if err != nil {
+			l, err = kprobe2("ip_rcv_finish", GetProgram(programs, "IpRcvCore"))
+			if err != nil {
+				return kprobe("ip_rcv", GetProgram(programs, "IpRcvCore"))
+			}
+		}
 	}
 	return l
 }
