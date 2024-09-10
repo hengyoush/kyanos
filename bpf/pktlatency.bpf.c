@@ -700,7 +700,7 @@ int BPF_KPROBE(skb_copy_datagram_iter, struct sk_buff *skb, int offset, struct i
 
 SEC("tracepoint/net/netif_receive_skb")
 int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx) {
-	struct sk_buff *skb = (struct sk_buff*) (ctx->skbaddr);
+	struct sk_buff *skb = (struct sk_buff*) _C(ctx,skbaddr);
 	parse_skb(ctx, skb, 1, DEV_IN);
 	return 0;
 }
