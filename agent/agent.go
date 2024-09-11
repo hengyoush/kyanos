@@ -83,6 +83,12 @@ func validateAndRepairOptions(options AgentOptions) AgentOptions {
 	if newOptions.BPFVerifyLogSize <= 0 {
 		newOptions.BPFVerifyLogSize = 1 * 1024 * 1024
 	}
+	if newOptions.PerfEventBufferSizeForData <= 0 {
+		newOptions.PerfEventBufferSizeForData = perfEventDataBufferSize
+	}
+	if newOptions.PerfEventBufferSizeForEvent <= 0 {
+		newOptions.PerfEventBufferSizeForEvent = perfEventControlBufferSize
+	}
 	return newOptions
 }
 
@@ -152,7 +158,6 @@ func SetupAgent(options AgentOptions) {
 		if err != nil {
 			log.Fatal("load Agent error:", err)
 		}
-		log.Warnf("rb type: %d", spec.Maps["rb"].Type)
 	} else {
 		objs = &bpf.AgentObjects{}
 		spec, err = bpf.LoadAgent()
@@ -210,7 +215,6 @@ func SetupAgent(options AgentOptions) {
 			links = attachBpfProgs(agentObjects.AgentPrograms, options.IfName, kernelVersion, options)
 		}
 	}
-
 	if !kernelVersion.SupportCapability(compatible.SupportXDP) {
 		enabledXdp := bpf.AgentControlValueIndexTKEnabledXdpIndex
 		var enableXdpValue int64 = 0
@@ -243,6 +247,7 @@ func SetupAgent(options AgentOptions) {
 		for _, reader := range readers {
 			reader.Close()
 		}
+		log.Warnf("setup event reader err: %v", err)
 		return
 	}
 
@@ -635,8 +640,9 @@ func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelV
 }
 
 var socketFilterSpec = &ebpf.ProgramSpec{
-	Name: "test",
-	Type: ebpf.Kprobe,
+	Name:        "test",
+	Type:        ebpf.Kprobe,
+	SectionName: "kprobe/sys_accept",
 	Instructions: asm.Instructions{
 		asm.LoadImm(asm.R0, 2, asm.DWord),
 		asm.Return(),
