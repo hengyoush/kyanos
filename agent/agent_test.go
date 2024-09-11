@@ -2,6 +2,7 @@ package agent_test
 
 import (
 	"fmt"
+	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
 	"kyanos/bpf"
 	"kyanos/common"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cilium/ebpf/link"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -753,7 +755,9 @@ func TestIpXmit(t *testing.T) {
 		bpf.AttachSyscallWriteEntry,
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
-		bpf.AttachKProbeIpQueueXmitEntry,
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT, p)
+		},
 	}, "GET TestIpXmit\n", Write, Read,
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
@@ -778,8 +782,12 @@ func TestDevQueueXmit(t *testing.T) {
 		bpf.AttachSyscallWriteEntry,
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
-		bpf.AttachKProbeIpQueueXmitEntry,
-		bpf.AttachKProbeDevQueueXmitEntry,
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT, p)
+		},
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTQDISC_OUT, p)
+		},
 	}, "GET DevQueueXmit\n", Write, Read,
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
@@ -806,8 +814,12 @@ func TestDevHardStartXmit(t *testing.T) {
 		bpf.AttachSyscallWriteEntry,
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
-		bpf.AttachKProbeIpQueueXmitEntry,
-		bpf.AttachKProbeDevHardStartXmitEntry,
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT, p)
+		},
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_OUT, p)
+		},
 	}, "GET DevHardStartXmit\n", Write, Read,
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
@@ -828,6 +840,10 @@ func TestDevHardStartXmit(t *testing.T) {
 }
 
 func TestTracepointNetifReceiveSkb(t *testing.T) {
+	curVersion := compatible.GetCurrentKernelVersion()
+	delete(curVersion.Capabilities, compatible.SupportXDP)
+	compatible.KernelVersionsMap.Put(curVersion.Version, curVersion)
+
 	KernRcvTestWithHTTP(t, []bpf.AttachBpfProgFunction{
 		bpf.AttachSyscallConnectEntry,
 		bpf.AttachSyscallConnectExit,
@@ -839,7 +855,9 @@ func TestTracepointNetifReceiveSkb(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		MayBeXdpFunction(nil),
+		// func(p interface{}) link.Link {
+		// 	return ApplyKernelVersionFunctions(t, bpf.AgentStepTNIC_IN, p)
+		// },
 		bpf.AttachTracepointNetifReceiveSkb,
 	},
 		FindInterestedKernEventOptions{
@@ -860,6 +878,9 @@ func TestTracepointNetifReceiveSkb(t *testing.T) {
 			dataLenAssertFunc: func(u uint32) bool { return u > 10 },
 			tsAssertFunction:  func(u uint64) bool { return u > 0 },
 		})
+
+	curVersion.Capabilities[compatible.SupportXDP] = true
+	compatible.KernelVersionsMap.Put(curVersion.Version, curVersion)
 	time.Sleep(1 * time.Second)
 }
 
@@ -875,8 +896,12 @@ func TestIpRcvCore(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		MayBeXdpFunction(bpf.AttachTracepointNetifReceiveSkb),
-		bpf.AttachKProbIpRcvCoreEntry,
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTNIC_IN, p)
+		},
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN, p)
+		},
 	},
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
@@ -911,8 +936,12 @@ func TestTcpV4DoRcv(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		MayBeXdpFunction(bpf.AttachTracepointNetifReceiveSkb),
-		bpf.AttachKProbeTcpV4DoRcvEntry,
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTNIC_IN, p)
+		},
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN, p)
+		},
 	},
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
@@ -947,8 +976,12 @@ func TestSkbCopyDatagramIter(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		MayBeXdpFunction(bpf.AttachTracepointNetifReceiveSkb),
-		bpf.AttachKProbeSkbCopyDatagramIterEntry,
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTNIC_IN, p)
+		},
+		func(p interface{}) link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY, p)
+		},
 	},
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
