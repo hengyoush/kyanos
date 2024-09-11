@@ -56,6 +56,7 @@ type AgentOptions struct {
 	TraceSide              common.SideEnum
 	IfName                 string
 	BTFFilePath            string
+	BPFVerifyLogSize       int
 	protocol.SizeFilter
 	AnalysisEnable bool
 	analysis.AnalysisOptions
@@ -71,6 +72,9 @@ func validateAndRepairOptions(options AgentOptions) AgentOptions {
 	}
 	if newOptions.MessageFilter == nil {
 		newOptions.MessageFilter = protocol.NoopFilter{}
+	}
+	if newOptions.BPFVerifyLogSize <= 0 {
+		newOptions.BPFVerifyLogSize = 1 * 1024 * 1024
 	}
 	return newOptions
 }
@@ -127,6 +131,7 @@ func SetupAgent(options AgentOptions) {
 		collectionOptions = &ebpf.CollectionOptions{
 			Programs: ebpf.ProgramOptions{
 				KernelTypes: btfPath,
+				LogSize:     options.BPFVerifyLogSize,
 			},
 		}
 	} else {

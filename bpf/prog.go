@@ -7,10 +7,6 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
-	"github.com/hashicorp/go-version"
-	"github.com/jefurry/logrus"
-	"github.com/spf13/viper"
-	"github.com/zcalusic/sysinfo"
 )
 
 var Objs any
@@ -176,9 +172,9 @@ func AttachKProbIpRcvCoreEntry(programs interface{}) link.Link {
 	if err != nil {
 		l, err = kprobe2("ip_rcv_core.isra.0", GetProgram(programs, "IpRcvCore"))
 		if err != nil {
-			l, err = kprobe2("ip_rcv_finish", GetProgram(programs, "IpRcvCore"))
+			l, err = kprobe2("ip_rcv", GetProgram(programs, "IpRcvCore"))
 			if err != nil {
-				return kprobe("ip_rcv", GetProgram(programs, "IpRcvCore"))
+				return kprobe("ip_rcv_finish", GetProgram(programs, "IpRcvCore"))
 			}
 		}
 	}
@@ -194,7 +190,12 @@ func AttachTracepointNetifReceiveSkb(programs interface{}) link.Link {
 func AttachKProbeSkbCopyDatagramIterEntry(programs interface{}) link.Link {
 	l, err := kprobe2("__skb_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))
 	if err != nil {
-		return kprobe("skb_copy_datagram_iovec", GetProgram(programs, "SkbCopyDatagramIter"))
+		l, err = kprobe2("skb_copy_datagram_iovec", GetProgram(programs, "SkbCopyDatagramIter"))
+		if err != nil {
+			return kprobe("skb_copy_datagram_iter", GetProgram(programs, "SkbCopyDatagramIter"))
+		} else {
+			return l
+		}
 	} else {
 		return l
 	}
@@ -248,25 +249,9 @@ func tracepoint(group string, name string, prog *ebpf.Program) link.Link {
 }
 func kprobe2(func_name string, prog *ebpf.Program) (link.Link, error) {
 	if link, err := link.Kprobe(func_name, prog, nil); err != nil {
-		// log.Printf("kprobe2 failed: %s, %s, fallbacking..", func_name, err)
+		log.Printf("kprobe2 failed: %s, %s, fallbacking..", func_name, err)
 		return nil, err
 	} else {
 		return link, nil
 	}
-}
-
-func needsRunningInCompatibleMode() bool {
-	kernel58, _ := version.NewVersion("5.8")
-	curKernelVersion := GetKernelVersion()
-	return viper.GetBool("compatible") || curKernelVersion == nil || curKernelVersion.LessThan(kernel58)
-}
-func GetKernelVersion() *version.Version {
-	var si sysinfo.SysInfo
-	si.GetSysInfo()
-	release := si.Kernel.Release
-	version, err := version.NewVersion(release)
-	if err != nil {
-		logrus.Debugf("Parse kernel version failed: %v, using the compatible mode...", err)
-	}
-	return version
 }

@@ -163,7 +163,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		RemoteAddr: connection.RemoteIp,
 		LocalAddr:  connection.LocalIp,
 		LocalPort:  Port(connection.LocalPort),
-		Protocol:   connection.Protocol,
+		Protocol:   uint32(connection.Protocol),
 		Pid:        uint32(connection.TgidFd >> 32),
 		Side:       side,
 	}

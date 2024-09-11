@@ -204,13 +204,13 @@ type AgentOldProgramSpecs struct {
 	DevHardStartXmit                   *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                       *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                        *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
+	IpQueueXmit2                       *ebpf.ProgramSpec `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                          *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
 	SecuritySocketRecvmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIovec               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iovec"`
 	SkbCopyDatagramIter                *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                       *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
-	TcpDestroySock                     *ebpf.ProgramSpec `ebpf:"tcp_destroy_sock"`
 	TcpQueueRcv                        *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
 	TcpRcvEstablished                  *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                         *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
@@ -238,7 +238,6 @@ type AgentOldProgramSpecs struct {
 	TracepointSyscallsSysExitSendto    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
 	TracepointSyscallsSysExitWrite     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_write"`
 	TracepointSyscallsSysExitWritev    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_writev"`
-	XdpProxy                           *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
 }
 
 // AgentOldMapSpecs contains maps before they are loaded into the kernel.
@@ -331,13 +330,13 @@ type AgentOldPrograms struct {
 	DevHardStartXmit                   *ebpf.Program `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                       *ebpf.Program `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                        *ebpf.Program `ebpf:"ip_queue_xmit"`
+	IpQueueXmit2                       *ebpf.Program `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                          *ebpf.Program `ebpf:"ip_rcv_core"`
 	SecuritySocketRecvmsgEnter         *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIovec               *ebpf.Program `ebpf:"skb_copy_datagram_iovec"`
 	SkbCopyDatagramIter                *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
 	SockAllocRet                       *ebpf.Program `ebpf:"sock_alloc_ret"`
-	TcpDestroySock                     *ebpf.Program `ebpf:"tcp_destroy_sock"`
 	TcpQueueRcv                        *ebpf.Program `ebpf:"tcp_queue_rcv"`
 	TcpRcvEstablished                  *ebpf.Program `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                         *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
@@ -365,7 +364,6 @@ type AgentOldPrograms struct {
 	TracepointSyscallsSysExitSendto    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
 	TracepointSyscallsSysExitWrite     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_write"`
 	TracepointSyscallsSysExitWritev    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_writev"`
-	XdpProxy                           *ebpf.Program `ebpf:"xdp_proxy"`
 }
 
 func (p *AgentOldPrograms) Close() error {
@@ -373,13 +371,13 @@ func (p *AgentOldPrograms) Close() error {
 		p.DevHardStartXmit,
 		p.DevQueueXmit,
 		p.IpQueueXmit,
+		p.IpQueueXmit2,
 		p.IpRcvCore,
 		p.SecuritySocketRecvmsgEnter,
 		p.SecuritySocketSendmsgEnter,
 		p.SkbCopyDatagramIovec,
 		p.SkbCopyDatagramIter,
 		p.SockAllocRet,
-		p.TcpDestroySock,
 		p.TcpQueueRcv,
 		p.TcpRcvEstablished,
 		p.TcpV4DoRcv,
@@ -407,7 +405,6 @@ func (p *AgentOldPrograms) Close() error {
 		p.TracepointSyscallsSysExitSendto,
 		p.TracepointSyscallsSysExitWrite,
 		p.TracepointSyscallsSysExitWritev,
-		p.XdpProxy,
 	)
 }
 

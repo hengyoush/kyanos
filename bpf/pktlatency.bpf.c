@@ -26,6 +26,7 @@ char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 
 #define _C(src, a, ...)		BPF_CORE_READ(src, a, ##__VA_ARGS__)
+
 #define _U(src, a, ...)		BPF_PROBE_READ_USER(src, a, ##__VA_ARGS__)
 
 #ifdef BPF_DEBUG
@@ -264,19 +265,23 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	}
 #endif
 	bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
-	evt->seq = (uint64_t)(bpf_ntohl(_C(tcp,seq)) - seq); 
+	u32 tcpseq = 0;
+	BPF_CORE_READ_INTO(&tcpseq, tcp, seq);
+	tcpseq  = bpf_htonl(tcpseq);
+	evt->seq = (uint64_t)(tcpseq - seq); 
 	// evt->tcp_seq = bpf_ntohl(_(tcp->seq));
 	u32 bl_bdr = evt->seq;
-	u32 doff;
-	bpf_probe_read_kernel(&doff, sizeof(doff), (void*)(&(tcp->ack_seq)) + 4);
+	u32 doff = 0;
+	bpf_probe_read_kernel(&doff, sizeof(doff), (void*)tcp + 12);
 	doff = (doff&255) >> 4;
 	u64 hdr_len = doff << 2;
 	u32 br_bdr = bl_bdr + len - hdr_len;
 	evt->len = br_bdr - bl_bdr;
 	evt->ts = bpf_ktime_get_ns();
 	evt->step = step;
-	evt->flags = _(((u8 *)tcp)[13]);
-	bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
+	// evt->flags = _(((u8 *)tcp)[13]);
+	// bpf_probe_read_kernel(&evt->flags, sizeof(((u8 *)tcp)[13]), &(((u8 *)tcp)[13]));
+	// bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
 	// my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
 
 #ifdef KERNEL_VERSION_BELOW_58
@@ -378,16 +383,30 @@ static void __always_inline debug_evt(struct kern_evt* evt, const char* func_nam
 #define DEBUG 0
 static void __always_inline parse_sock_key_rcv_sk(struct sock* sk, struct sock_key* key) {
 
-	key->sip = _C(sk, __sk_common.skc_daddr);
-	key->dip = _C(sk, __sk_common.skc_rcv_saddr);
-	key->dport =  _C(sk, __sk_common.skc_num);
-	key->sport = bpf_ntohs(_C(sk, __sk_common.skc_dport));
-	key->family = _C(sk, __sk_common.skc_family);
+	// key->sip = _C(sk, __sk_common.skc_daddr);
+	// key->dip = _C(sk, __sk_common.skc_rcv_saddr);
+	// key->dport =  _C(sk, __sk_common.skc_num);
+	// key->sport = bpf_ntohs(_C(sk, __sk_common.skc_dport));
+	// key->family = _C(sk, __sk_common.skc_family);
+
+
+	BPF_CORE_READ_INTO(&key->sip,sk,__sk_common.skc_daddr);
+	BPF_CORE_READ_INTO(&key->dip,sk,__sk_common.skc_rcv_saddr);
+	u16 sport = 0;
+	u16 dport = 0;
+	BPF_CORE_READ_INTO(&dport,sk,__sk_common.skc_num);
+	BPF_CORE_READ_INTO(&sport,sk,__sk_common.skc_dport);
+	sport = bpf_ntohs(sport);
+	unsigned short	family = 0;
+	BPF_CORE_READ_INTO(&family,sk,__sk_common.skc_family);
+	key->dport = dport;
+	key->sport = sport;
+	key->family = family;
 	// key->family = 0;
 }
 static void __always_inline parse_sock_key_rcv(struct sk_buff *skb, struct sock_key* key) {
-
-	struct sock* sk = _C(skb,sk);
+	struct sock* sk = {0};
+	BPF_CORE_READ_INTO(&sk, skb, sk);
 	parse_sock_key_rcv_sk(sk, key);
 }
 static void __always_inline print_sock_key(struct sock_key* key) {
@@ -396,31 +415,61 @@ static void __always_inline print_sock_key(struct sock_key* key) {
 	// pr_bpf_debug("print_sock_key family: family:%u", key->family);
 }
 static void __always_inline parse_sock_key_sk(struct sock* sk, struct sock_key* key) {
-	key->dip = _C(sk, __sk_common.skc_daddr);
-	key->sip = _C(sk, __sk_common.skc_rcv_saddr);
-	key->sport =  _C(sk, __sk_common.skc_num);
-	key->dport = bpf_ntohs(_C(sk, __sk_common.skc_dport));
-	key->family = _C(sk, __sk_common.skc_family);
+	BPF_CORE_READ_INTO(&key->dip,sk,__sk_common.skc_daddr);
+	BPF_CORE_READ_INTO(&key->sip,sk,__sk_common.skc_rcv_saddr);
+	u16 sport = 0;
+	u16 dport = 0;
+	BPF_CORE_READ_INTO(&sport,sk,__sk_common.skc_num);
+	BPF_CORE_READ_INTO(&dport,sk,__sk_common.skc_dport);
+	dport = bpf_ntohs(dport);
+	unsigned short	family = 0;
+	BPF_CORE_READ_INTO(&family,sk,__sk_common.skc_family);
+	key->dport = dport;
+	key->sport = sport;
+	key->family = family;
+	// key->dip = _C(sk, __sk_common.skc_daddr);
+	// key->sip = _C(sk, __sk_common.skc_rcv_saddr);
+	// key->sport =  _C(sk, __sk_common.skc_num);
+	// key->dport = bpf_ntohs(_C(sk, __sk_common.skc_dport));
+	// key->family = _C(sk, __sk_common.skc_family);
 	// key->family = 0;
+
 }
 static void __always_inline parse_sock_key(struct sk_buff *skb, struct sock_key* key) {
 
-	struct sock* sk = _C(skb,sk);
-	parse_sock_key_sk(sk, key);
+	struct sock* _sk = {0};
+	BPF_CORE_READ_INTO(&_sk,skb,sk);
+	parse_sock_key_sk(_sk, key);
 }
 
 static void __always_inline parse_sk_l3l4(struct sock_key *key, struct iphdr *ipv4, 
 	struct tcphdr *tcp) {
-	u32 saddr, daddr;
-	saddr = _C(ipv4,saddr);
-	daddr = _C(ipv4,daddr);
-	u16 sport = bpf_htons(_C(tcp,source));
-	u16 dport = bpf_htons(_C(tcp,dest));
+	u32 saddr = 0;
+	u32 daddr = 0;
+	BPF_CORE_READ_INTO(&saddr, ipv4, saddr);
+	BPF_CORE_READ_INTO(&daddr, ipv4, daddr);
+	// saddr = _C(ipv4,saddr);
+	// daddr = _C(ipv4,daddr);
+	u16 sport = 0;
+	u16 dport = 0;
+	BPF_CORE_READ_INTO(&sport, tcp, source);
+	BPF_CORE_READ_INTO(&dport, tcp, dest);
 	key->sip = saddr;
 	key->dip = daddr;
-	key->sport = sport;
-	key->dport = dport;
-	key->family = AF_INET;
+	key->sport = bpf_ntohs(sport);
+	key->dport = bpf_ntohs(dport);
+	key->family = AF_INET; // @ipv6
+
+	// u32 saddr, daddr;
+	// saddr = _C(ipv4,saddr);
+	// daddr = _C(ipv4,daddr);
+	//  sport = bpf_htons(_C(tcp,source));
+	//  dport = bpf_htons(_C(tcp,dest));
+	// key->sip = saddr;
+	// key->dip = daddr;
+	// key->sport = sport;
+	// key->dport = dport;
+	// key->family = AF_INET; // @ipv6
 }
 
 static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
@@ -435,12 +484,15 @@ static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
 	return conn_info->protocol != kProtocolUnknown;
 }
 static bool __always_inline should_trace_sock_key(struct sock_key *key) {
-	struct conn_id_s_t *conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
+	struct conn_id_s_t *conn_id_s = {0};
+	conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
 	if (conn_id_s == NULL) {
 		// 可能还在握手
 		return true;
 	}
-	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &conn_id_s->tgid_fd);
+	struct conn_info_t *conn_info = {0};
+	u64 tgidfd = conn_id_s->tgid_fd;
+	conn_info = bpf_map_lookup_elem(&conn_info_map, &tgidfd);
 	if (conn_info == NULL) {
 		// why?
 		return true;
@@ -463,25 +515,37 @@ static __always_inline int enabledXDP() {
 
 static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not_ready, enum step_t step) {
 	// return BPF_OK;
-	struct sock* sk = _C(skb,sk);
-	struct sock_common sk_cm = _C(sk, __sk_common);
+	if (skb == NULL) {
+		return BPF_OK;
+	}
+	struct sock* sk = {0};
+	BPF_CORE_READ_INTO(&sk, skb, sk);
+	
 	u32 inital_seq = 0;
 	struct sock_key key = {0};
-	if (sk && sk_cm.skc_addrpair && !sk_not_ready) {
-		parse_sock_key(skb, &key);
-		int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
-		if (found == NULL) { 
-			return 0;
-		}
-		if (!should_trace_sock_key(&key)) {
-			return 0;
-		}
-		bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
-	} 
+	if (sk) {
+		struct sock_common sk_cm  = {0};
+		BPF_CORE_READ_INTO(&sk_cm, sk, __sk_common);
+		if (sk_cm.skc_addrpair && !sk_not_ready) {
+			parse_sock_key(skb, &key);
+			int  *found = {0};
+			found = bpf_map_lookup_elem(&sock_xmit_map, &key);
+			if (found == NULL) { 
+				return 0;
+			}
+			if (!should_trace_sock_key(&key)) {
+				return 0;
+			}
+			bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
+		} 	
+	}
 
-	u16 network_header = _C(skb, network_header);
-	u16 mac_header = _C(skb, mac_header);
-	u16 trans_header = _C(skb, transport_header);
+	u16 network_header = 0;
+	BPF_CORE_READ_INTO(&network_header, skb, network_header);
+	u16 mac_header  = 0;
+	BPF_CORE_READ_INTO(&mac_header, skb, mac_header);
+	u16 trans_header = 0;
+	BPF_CORE_READ_INTO(&trans_header, skb, transport_header);
 	
 	// pr_bpf_debug("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
 	// pr_bpf_debug("%s, mac_header: %d", func_name,mac_header);
@@ -491,14 +555,17 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 
 	bool is_l2 = !skb_l2_check(mac_header);
 	// pr_bpf_debug("%s, skb_l2_check: %d", func_name, is_l2);
-	void* data = _C(skb, head);
+	void* data = {0};
+	BPF_CORE_READ_INTO(&data, skb, head);
 	void* ip = data + network_header;
-	void *l3;
+	void *l3 = {0};
 	void* l4 = NULL;
 	if (is_l2) {
 		goto __l2;
 	} else {
-		u16 l3_proto = bpf_ntohs(_C(skb, protocol));
+		u16 _protocol = 0;
+		BPF_CORE_READ_INTO(&_protocol, skb, protocol);
+		u16 l3_proto = bpf_ntohs(_protocol);
 		// bpf_printk("%s, l3_proto: %x", func_name, l3_proto);
 		if (l3_proto == ETH_P_IP) {
 			// bpf_printk("%s, is_ip: %d", func_name, 1);
@@ -516,7 +583,9 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 	__l2: if (mac_header != network_header) {
 		struct ethhdr *eth = data + mac_header;
 		l3 = (void *)eth + ETH_HLEN;
-		u16 l3_proto = bpf_ntohs(_(eth->h_proto));
+		u16 l3_proto = 0;
+		BPF_CORE_READ_INTO(&l3_proto, eth, h_proto);
+		l3_proto = bpf_ntohs(l3_proto);
 		// bpf_printk("%s, l3_proto: %x",func_name, l3_proto);
 		if (l3_proto == ETH_P_IP) {
 	__l3:	
@@ -526,11 +595,16 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 				l4 = data + trans_header;
 			}
 			struct iphdr *ipv4 = ip;
-			u32 len  = bpf_ntohs(_C(ipv4, tot_len));
-			u8 ip_hdr_len = get_ip_header_len(_(((u8 *)ip)[0])); 
+			u16 tot_len16 = 0;
+			BPF_CORE_READ_INTO(&tot_len16, ipv4, tot_len);
+			u32 len  = bpf_ntohs(tot_len16);
+			u8 ip_hdr_len = 0;
+			bpf_probe_read_kernel(&ip_hdr_len, sizeof(((u8 *)ip)[0]), &(((u8 *)ip)[0]));
+			ip_hdr_len = get_ip_header_len(ip_hdr_len); 
 			// bpf_printk("%s, ip_hdr_len: %d, tot_len: %d",func_name, ip_hdr_len, len);
 			l4 = l4 ? l4 : ip + ip_hdr_len;
-			u8 proto_l4 = _C(ipv4,protocol);
+			u8 proto_l4 = 0;
+			BPF_CORE_READ_INTO(&proto_l4, ipv4, protocol);
 			// bpf_printk("%s, l4p: %d",func_name, proto_l4);
 			if (proto_l4 == IPPROTO_TCP) {
 				struct tcphdr *tcp = l4;
@@ -546,7 +620,8 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 					if (found == NULL) {
 						if (step == DEV_IN && enabledXDP() != 1 && should_trace_sock_key(&key)) {
-							inital_seq = bpf_ntohl(_C(tcp,seq));
+							BPF_CORE_READ_INTO(&inital_seq, tcp, seq);
+							inital_seq = bpf_ntohl(inital_seq);
 							bpf_map_update_elem(&sock_xmit_map, &key, &inital_seq, BPF_NOEXIST);
 						} else {
 							goto err;
@@ -656,15 +731,22 @@ static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, 
 	if (!should_trace_sock_key(&key)) {
 		return BPF_OK;
 	}
-	u32 inital_seq;
+	u32 inital_seq = 0;
 	bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 	// bpf_printk("skb_copy_datagram_iter, found!, sip: %u, dip:%u", bpf_ntohl(key.sip), bpf_ntohl(key.dip));
 	// bpf_printk("skb_copy_datagram_iter, found!, sport:%d, dport:%d,family:%d", key.sport, key.dport, key.family);
 	// bpf_printk("skb_copy_datagram_iter, init_seq: %u, iter_type: %d", inital_seq, _(to->iter_type));
 
-	char* p_cb = _C(skb,cb);
-	struct tcp_skb_cb *cb = (struct tcp_skb_cb *)&p_cb[0];
-	u32 seq = (int)_C(cb,seq) + offset;
+	char p_cb[8] = {0};
+	BPF_CORE_READ_INTO(&p_cb, skb, cb);
+	// char *p_cb = _C(skb, cb);
+	struct tcp_skb_cb *cb = (struct tcp_skb_cb *)p_cb;
+	//  struct tcp_skb_cb *cb = {0}; 
+	// bpf_probe_read_kernel(&cb, sizeof(cb), (void*)p_cb);
+	// u32 seq = (int)_C(cb,seq) + offset;
+	u32 seq = 0;
+	BPF_CORE_READ_INTO(&seq, cb, seq);
+	seq += offset;
 	struct parse_kern_evt_body body = {0};
 	body.ctx = ctx;
 	body.inital_seq = inital_seq;
@@ -700,9 +782,10 @@ int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx)
 	void *p = (void*)ctx + sizeof(struct trace_entry);
 	struct sk_buff *skb;
 	bpf_probe_read_kernel(&skb, sizeof(struct sk_buff *), p);
-	parse_skb(ctx, skb, 1, DEV_IN);
-	return 0;
+	parse_skb(ctx, skb, 1, DEV_IN); 
+	return BPF_OK;
 }
+
 SEC("kprobe/tcp_queue_rcv")
 int BPF_KPROBE(tcp_queue_rcv, struct sock *sk, struct sk_buff *skb) {
 	// parse_skb(skb, "tcp_queue_rcv", 0, kTcpIn);
@@ -736,14 +819,18 @@ int BPF_KPROBE(ip_rcv_core, struct sk_buff *skb) {
 // 出队之后，发送到设备
 SEC("kprobe/dev_hard_start_xmit")
 int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
-	struct sk_buff *skb = first;
+	struct sk_buff *skb = {0};
+	BPF_CORE_READ_INTO(&skb, ctx, di);
+	// skb = PT_REGS_PARM1_CORE(ctx);
 #pragma unroll
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 2; i++) {
 		int ret = parse_skb(ctx, skb, 0, DEV_OUT);
 		// if (ret) bpf_printk("dev_hard_start_xmit, final: %d", i);
-		skb = _C(skb,next);
+		// skb = _C(skb,next);
+		struct sk_buff *_skb = {0};
+		BPF_CORE_READ_INTO(&_skb, skb, next);
+		skb = _skb;
 		if (!skb) {
-			
 			return 0;
 		}
 	}
@@ -757,13 +844,8 @@ int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 0, QDISC_OUT);
 	return 0;
 }
-#ifdef KERNEL_VERSION_310
-SEC("kprobe/ip_queue_xmit")
-int BPF_KPROBE(ip_queue_xmit, struct sk_buff *skb)
-#else
-SEC("kprobe/__ip_queue_xmit")
-int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
-#endif
+
+static __always_inline int handle_ip_queue_xmit(void* ctx, struct sk_buff *skb)
 {
 	struct sock_key key = {0};
 	parse_sock_key(skb, &key);
@@ -773,10 +855,14 @@ int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
 		// bpf_printk("kp, lip: %d, dip:%d", key.sip, key.dip);
 		return 0;
 	}
-	u32 inital_seq;
+	u32 inital_seq = 0;
 	if (found == NULL) {
-		struct tcphdr* tcp = (struct tcphdr*)_C(skb, data);
-		inital_seq = bpf_ntohl(_C(tcp,seq)); 
+		struct tcphdr* tcp = {0};
+		// struct tcphdr* tcp = (struct tcphdr*)_C(skb, data);
+		BPF_CORE_READ_INTO(&tcp, skb, data);
+		// inital_seq = bpf_ntohl(_C(tcp,seq)); 
+		BPF_CORE_READ_INTO(&inital_seq, tcp, seq);
+		inital_seq = bpf_ntohl(inital_seq);
 		bpf_map_update_elem(&sock_xmit_map, &key,&inital_seq, BPF_NOEXIST);
 		// bpf_printk("not found!, seq: %u", inital_seq);
 	} else {
@@ -784,14 +870,17 @@ int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
 		// bpf_printk("found!, seq: %u", inital_seq);
 	}
 
-	struct tcphdr* tcp = (struct tcphdr*)_C(skb, data);
+	struct tcphdr* tcp = {0};
+	BPF_CORE_READ_INTO(&tcp, skb, data);
+	// struct tcphdr* tcp = (struct tcphdr*)_C(skb, data);
 
 	struct parse_kern_evt_body body = {0};
 	body.ctx = ctx;
 	body.inital_seq = inital_seq;
 	body.key = &key;
 	body.tcp = tcp;
-	body.len = _C(skb, len);
+	// body.len = _C(skb, len);
+	BPF_CORE_READ_INTO(&body.len, skb, len);
 	// body.func_name = "";
 	body.step = IP_OUT;	
 	report_kern_evt(&body);
@@ -799,6 +888,19 @@ int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
 	return 0;
 }
 
+
+SEC("kprobe/__ip_queue_xmit")
+int BPF_KPROBE(ip_queue_xmit2, struct sk_buff *skb)
+{
+	return handle_ip_queue_xmit(ctx, skb);
+}
+
+
+SEC("kprobe/__ip_queue_xmit")
+int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
+{
+	return handle_ip_queue_xmit(ctx, skb);
+}
 
 #ifndef KERNEL_VERSION_BELOW_58
 SEC("raw_tp/tcp_destroy_sock")
@@ -1563,7 +1665,10 @@ int BPF_KRETPROBE(sock_alloc_ret)
 		return 0;
 	}
 	if (!args->sock_alloc_socket) {
-		args->sock_alloc_socket = (struct socket*) PT_REGS_RC_CORE(ctx);
+		struct socket *sk = {0};
+		BPF_CORE_READ_INTO(&sk, ctx, ax);
+		// args->sock_alloc_socket = (struct socket*) PT_REGS_RC_CORE(ctx);
+		args->sock_alloc_socket = sk;
 	}
 
 	return 0;
