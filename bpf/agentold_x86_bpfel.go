@@ -204,6 +204,7 @@ type AgentOldProgramSpecs struct {
 	DevHardStartXmit                   *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                       *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                        *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
+	IpQueueXmit2                       *ebpf.ProgramSpec `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                          *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
 	SecuritySocketRecvmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
@@ -329,6 +330,7 @@ type AgentOldPrograms struct {
 	DevHardStartXmit                   *ebpf.Program `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                       *ebpf.Program `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                        *ebpf.Program `ebpf:"ip_queue_xmit"`
+	IpQueueXmit2                       *ebpf.Program `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                          *ebpf.Program `ebpf:"ip_rcv_core"`
 	SecuritySocketRecvmsgEnter         *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
@@ -369,6 +371,7 @@ func (p *AgentOldPrograms) Close() error {
 		p.DevHardStartXmit,
 		p.DevQueueXmit,
 		p.IpQueueXmit,
+		p.IpQueueXmit2,
 		p.IpRcvCore,
 		p.SecuritySocketRecvmsgEnter,
 		p.SecuritySocketSendmsgEnter,

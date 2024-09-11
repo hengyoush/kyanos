@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"kyanos/bpf"
 	"net"
 )
 
@@ -26,7 +25,7 @@ type ConnDesc struct {
 	RemoteAddr Addr
 	LocalAddr  Addr
 	Pid        uint32
-	Protocol   bpf.AgentTrafficProtocolT
+	Protocol   uint32
 	Side       SideEnum
 	StreamId   int
 }

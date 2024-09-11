@@ -209,7 +209,7 @@ func (p *Processor) run() {
 			conn := p.connManager.FindConnection4Or(tgidFd, event.Ts+common.LaunchEpochTime)
 			event.Ts += common.LaunchEpochTime
 			if conn != nil {
-				log.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, common.StepCNNames[event.Step],
+				log.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
 					conn.ToString(), event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
 
@@ -224,7 +224,7 @@ func (p *Processor) run() {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					conn.OnKernEvent(event)
 					// log.Debug("[skip] skip due to protocol unset")
-					log.Debugf("[data][protocol-unset][func=%s][%s]%s | %d:%d \n", common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
+					log.Debugf("[data][protocol-unset][func=%s][%s]%s | %d:%d \n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 					flag := conn.OnKernEvent(event)
 					if !flag {
@@ -233,7 +233,7 @@ func (p *Processor) run() {
 				}
 			} else if event.Len > 0 && conn != nil {
 				log.Debug("[skip] skip due to protocol is unknwon")
-				log.Debugf("[data][func=%s][%s]%s | %d:%d\n", common.Int8ToStr(event.FuncName[:]), common.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
+				log.Debugf("[data][func=%s][%s]%s | %d:%d\n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
 			} else if event.Len == 0 && conn != nil {
 				conn.OnKernEvent(event)
 			}

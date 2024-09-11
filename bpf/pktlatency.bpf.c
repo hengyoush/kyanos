@@ -844,13 +844,8 @@ int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 0, QDISC_OUT);
 	return 0;
 }
-#ifdef KERNEL_VERSION_BELOW_58
-SEC("kprobe/ip_queue_xmit")
-int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
-#else
-SEC("kprobe/__ip_queue_xmit")
-int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
-#endif
+
+static __always_inline int handle_ip_queue_xmit(void* ctx, struct sk_buff *skb)
 {
 	struct sock_key key = {0};
 	parse_sock_key(skb, &key);
@@ -893,6 +888,19 @@ int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
 	return 0;
 }
 
+
+SEC("kprobe/__ip_queue_xmit")
+int BPF_KPROBE(ip_queue_xmit2, struct sk_buff *skb)
+{
+	return handle_ip_queue_xmit(ctx, skb);
+}
+
+
+SEC("kprobe/__ip_queue_xmit")
+int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
+{
+	return handle_ip_queue_xmit(ctx, skb);
+}
 
 #ifndef KERNEL_VERSION_BELOW_58
 SEC("raw_tp/tcp_destroy_sock")

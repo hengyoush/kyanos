@@ -7,10 +7,6 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
-	"github.com/hashicorp/go-version"
-	"github.com/jefurry/logrus"
-	"github.com/spf13/viper"
-	"github.com/zcalusic/sysinfo"
 )
 
 var Objs any
@@ -258,20 +254,4 @@ func kprobe2(func_name string, prog *ebpf.Program) (link.Link, error) {
 	} else {
 		return link, nil
 	}
-}
-
-func needsRunningInCompatibleMode() bool {
-	kernel58, _ := version.NewVersion("5.8")
-	curKernelVersion := GetKernelVersion()
-	return viper.GetBool("compatible") || curKernelVersion == nil || curKernelVersion.LessThan(kernel58)
-}
-func GetKernelVersion() *version.Version {
-	var si sysinfo.SysInfo
-	si.GetSysInfo()
-	release := si.Kernel.Release
-	version, err := version.NewVersion(release)
-	if err != nil {
-		logrus.Debugf("Parse kernel version failed: %v, using the compatible mode...", err)
-	}
-	return version
 }

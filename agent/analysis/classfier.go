@@ -3,7 +3,7 @@ package analysis
 import (
 	"fmt"
 	"kyanos/agent/protocol"
-	"kyanos/common"
+	"kyanos/bpf"
 )
 
 type ClassfierType int
@@ -62,7 +62,7 @@ func init() {
 	}
 
 	classIdHumanReadableMap[Protocol] = func(ar *AnnotatedRecord) string {
-		return common.ProtocolNamesMap[ar.Protocol]
+		return bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(ar.Protocol)]
 	}
 }
 
