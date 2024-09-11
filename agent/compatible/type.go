@@ -76,7 +76,9 @@ var KernelVersionsMap *treemap.Map
 
 func GetCurrentKernelVersion() KernelVersion {
 	version := common.GetKernelVersion()
-	return GetBestMatchedKernelVersion(version.Core().String())
+	v := GetBestMatchedKernelVersion(version.Core().String())
+	log.Warnf("find version: %v", v)
+	return v
 }
 
 func GetBestMatchedKernelVersion(version string) KernelVersion {
@@ -129,9 +131,7 @@ func init() {
 	KernelVersionsMap.Put(v5d4.Version, v5d4)
 
 	v4d14 := copyKernelVersion(v5d4)
-	v4d14.Version = "4.4.0"
-	v4d14.InstrumentFunctions[bpf.AgentStepTIP_OUT] =
-		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "ip_queue_xmit2"}}
+	v4d14.Version = "4.14.0"
 	v4d14.InstrumentFunctions[bpf.AgentStepTIP_IN] =
 		[]InstrumentFunction{{"kprobe/ip_rcv", "IpRcvCore"}}
 	v4d14.InstrumentFunctions[bpf.AgentStepTUSER_COPY] =
@@ -142,7 +142,7 @@ func init() {
 	v310 := copyKernelVersion(v5d4)
 	v310.Version = "3.10.0"
 	v310.InstrumentFunctions[bpf.AgentStepTIP_OUT] =
-		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "ip_queue_xmit2"}}
+		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "IpQueueXmit2"}}
 	v310.InstrumentFunctions[bpf.AgentStepTUSER_COPY] =
 		[]InstrumentFunction{{"kprobe/skb_copy_datagram_iovec", "SkbCopyDatagramIter"}}
 	v310.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"ip_rcv", "IpRcvCore"})

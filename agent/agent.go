@@ -152,6 +152,7 @@ func SetupAgent(options AgentOptions) {
 		if err != nil {
 			log.Fatal("load Agent error:", err)
 		}
+		log.Warnf("rb type: %d", spec.Maps["rb"].Type)
 	} else {
 		objs = &bpf.AgentObjects{}
 		spec, err = bpf.LoadAgent()

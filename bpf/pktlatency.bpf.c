@@ -620,7 +620,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 					if (found == NULL) {
 						if (step == DEV_IN && enabledXDP() != 1 && should_trace_sock_key(&key)) {
-							bpf_printk("1");
 							BPF_CORE_READ_INTO(&inital_seq, tcp, seq);
 							inital_seq = bpf_ntohl(inital_seq);
 							bpf_map_update_elem(&sock_xmit_map, &key, &inital_seq, BPF_NOEXIST);
