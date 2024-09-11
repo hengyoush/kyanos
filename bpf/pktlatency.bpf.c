@@ -620,6 +620,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 					if (found == NULL) {
 						if (step == DEV_IN && enabledXDP() != 1 && should_trace_sock_key(&key)) {
+							bpf_printk("1");
 							BPF_CORE_READ_INTO(&inital_seq, tcp, seq);
 							inital_seq = bpf_ntohl(inital_seq);
 							bpf_map_update_elem(&sock_xmit_map, &key, &inital_seq, BPF_NOEXIST);
@@ -648,7 +649,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 	err:return BPF_OK;
 }
 
-#ifndef KERNEL_VERSION_BELOW_58
+// #ifndef KERNEL_VERSION_BELOW_58
 SEC("xdp")
 int xdp_proxy(struct xdp_md *ctx){
 	// bpf_printk("xdp");
@@ -716,8 +717,8 @@ int xdp_proxy(struct xdp_md *ctx){
 	// KERN_EVENT_HANDLE(&evt, "xdp");
 	return XDP_PASS; 
 }
-#else
-#endif
+// #else
+// #endif
 
 static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, int offset, struct iov_iter *to, int len) {
 	struct sock_key key = {0};
@@ -902,7 +903,7 @@ int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
 	return handle_ip_queue_xmit(ctx, skb);
 }
 
-#ifndef KERNEL_VERSION_BELOW_58
+// #ifndef KERNEL_VERSION_BELOW_58
 SEC("raw_tp/tcp_destroy_sock")
 int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 {
@@ -932,7 +933,7 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 	}
 	return BPF_OK;
 }
-#endif
+// #endif
 
 MY_BPF_HASH(accept_args_map, uint64_t, struct accept_args)
 MY_BPF_HASH(connect_args_map, uint64_t, struct connect_args)

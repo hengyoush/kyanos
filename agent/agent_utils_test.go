@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"kyanos/agent"
+	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
 	"kyanos/bpf"
 	"kyanos/cmd"
 	"kyanos/common"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -21,6 +23,7 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/cilium/ebpf/link"
 	"github.com/jefurry/logrus"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
@@ -39,7 +42,6 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 		cmd.Verbose = true
 		cmd.Debug = true
 		common.Log.SetLevel(logrus.DebugLevel)
-		cmd.Compatible = compatilbeMode
 		agent.SetupAgent(agent.AgentOptions{
 			Stopper: agentStopper,
 			LoadBpfProgramFunction: func(objs interface{}) *list.List {
@@ -622,16 +624,59 @@ func min(a, b int) int {
 	return b
 }
 
-func MayBeXdpFunction(defaultFunc bpf.AttachBpfProgFunction) bpf.AttachBpfProgFunction {
-	if !compatilbeMode {
-		return bpf.AttachXdp
-	} else {
-		return defaultFunc
+// func MayBeXdpFunction(defaultFunc bpf.AttachBpfProgFunction) bpf.AttachBpfProgFunction {
+// 	if !compatilbeMode {
+// 		return bpf.AttachXdp
+// 	} else {
+// 		return defaultFunc
+// 	}
+// }
+
+// var compatilbeMode bool = false
+
+// func SetCompatibleMode(b bool) {
+// 	compatilbeMode = b
+// }
+
+func ApplyKernelVersionFunctions(t *testing.T, step bpf.AgentStepT, programs any) link.Link {
+	v := compatible.GetCurrentKernelVersion()
+	if step == bpf.AgentStepTNIC_IN {
+		if v.SupportCapability(compatible.SupportXDP) {
+			l, err := bpf.AttachXdp(programs)
+			if err != nil {
+				t.Fatal(err)
+			} else {
+				return l
+			}
+		} else {
+			t.FailNow()
+		}
 	}
-}
-
-var compatilbeMode bool = false
-
-func SetCompatibleMode(b bool) {
-	compatilbeMode = b
+	functions, ok := v.InstrumentFunctions[step]
+	if !ok {
+		t.FailNow()
+	}
+	for idx, function := range functions {
+		var err error
+		var l link.Link
+		if function.IsKprobe() {
+			l, err = bpf.Kprobe(function.GetKprobeName(), bpf.GetProgram(programs, function.BPFGoProgName))
+		} else if function.IsTracepoint() {
+			l, err = bpf.Tracepoint(function.GetTracepointGroupName(), function.GetTracepointName(),
+				bpf.GetProgram(programs, function.BPFGoProgName))
+		} else if function.IsKRetprobe() {
+			l, err = bpf.Kretprobe(function.GetKprobeName(), bpf.GetProgram(programs, function.BPFGoProgName))
+		} else {
+			panic(fmt.Sprintf("invalid program type: %v", function))
+		}
+		if err != nil {
+			if idx == len(functions)-1 {
+				log.Fatalf("Attach failed: %v, functions: %v", err, functions)
+			}
+		} else {
+			return l
+		}
+	}
+	t.FailNow()
+	return nil
 }

@@ -14,7 +14,6 @@ import (
 
 	"github.com/hashicorp/go-version"
 	"github.com/jefurry/logrus"
-	"github.com/spf13/viper"
 	"github.com/zcalusic/sysinfo"
 )
 
@@ -193,11 +192,18 @@ func GetKernelVersion() *version.Version {
 	var si sysinfo.SysInfo
 	si.GetSysInfo()
 	release := si.Kernel.Release
-	version, err := version.NewVersion(release)
+	v, err := version.NewVersion(release)
 	if err != nil {
-		Log.Debugf("Parse kernel version failed: %v, using the compatible mode...", err)
+		Log.Debugf("Parse kernel version failed: %v, may be centos version, adjust and retry", err)
+		release = release[:strings.Index(release, "-")]
+		v, err = version.NewVersion(release)
+		if err != nil {
+			Log.Fatalf("Can't parse kernel version: %v, may be a bug, please submit a issue on http://github.com/hengyoush/kyanos", err)
+		} else {
+			return v
+		}
 	}
-	return version
+	return v
 }
 
 func NanoToMills[T KInt](x T) float64 {
@@ -212,12 +218,12 @@ func TruncateString(s string, maxBytes int) string {
 	}
 }
 
-func EnabledXdp() bool {
-	return !NeedsRunningInCompatibleMode()
-}
+// func EnabledXdp() bool {
+// 	return !NeedsRunningInCompatibleMode()
+// }
 
-func NeedsRunningInCompatibleMode() bool {
-	kernel58, _ := version.NewVersion("5.8")
-	curKernelVersion := GetKernelVersion()
-	return viper.GetBool("compatible") || curKernelVersion == nil || curKernelVersion.LessThan(kernel58)
-}
+// func NeedsRunningInCompatibleMode() bool {
+// 	kernel58, _ := version.NewVersion("5.8")
+// 	curKernelVersion := GetKernelVersion()
+// 	return viper.GetBool("compatible") || curKernelVersion == nil || curKernelVersion.LessThan(kernel58)
+// }

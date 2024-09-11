@@ -5,8 +5,10 @@ import (
 	"container/list"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"kyanos/agent/analysis"
+	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
 	"kyanos/agent/render"
@@ -15,12 +17,15 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
@@ -60,6 +65,8 @@ type AgentOptions struct {
 	protocol.SizeFilter
 	AnalysisEnable bool
 	analysis.AnalysisOptions
+	PerfEventBufferSizeForData  int
+	PerfEventBufferSizeForEvent int
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -117,6 +124,8 @@ func SetupAgent(options AgentOptions) {
 		log.Fatal("Remove memlock:", err)
 	}
 
+	kernelVersion := compatible.GetCurrentKernelVersion()
+
 	var links *list.List
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs any
@@ -137,22 +146,29 @@ func SetupAgent(options AgentOptions) {
 	} else {
 		collectionOptions = nil
 	}
-	if common.NeedsRunningInCompatibleMode() {
+	if !kernelVersion.SupportCapability(compatible.SupportRingBuffer) {
 		objs = &bpf.AgentOldObjects{}
 		spec, err = bpf.LoadAgentOld()
 		if err != nil {
 			log.Fatal("load Agent error:", err)
 		}
-		err = spec.LoadAndAssign(objs, collectionOptions)
 	} else {
 		objs = &bpf.AgentObjects{}
 		spec, err = bpf.LoadAgent()
 		if err != nil {
 			log.Fatal("load Agent error:", err)
 		}
-		err = spec.LoadAndAssign(objs, collectionOptions)
 	}
 	bpf.Objs = objs
+
+	filterFunctions(spec, kernelVersion)
+	err = spec.LoadAndAssign(objs, collectionOptions)
+
+	agentOldObjects, ok := objs.(*bpf.AgentOldObjects)
+	agentObjects, ok := objs.(*bpf.AgentObjects)
+	if ok {
+
+	}
 
 	if err != nil {
 		err = errors.Unwrap(errors.Unwrap(err))
@@ -168,7 +184,7 @@ func SetupAgent(options AgentOptions) {
 
 	defer func() {
 		var closer io.Closer
-		if common.NeedsRunningInCompatibleMode() {
+		if !kernelVersion.SupportCapability(compatible.SupportRingBuffer) {
 			agentOldObjects := objs.(*bpf.AgentOldObjects)
 			closer = agentOldObjects
 		} else {
@@ -178,29 +194,26 @@ func SetupAgent(options AgentOptions) {
 
 		closer.Close()
 	}()
-	var validateResult bool
-	if common.NeedsRunningInCompatibleMode() {
-		agentOldObjects := objs.(*bpf.AgentOldObjects)
-		validateResult = setAndValidateParameters(agentOldObjects.AgentOldMaps)
+	var validateResult = setAndValidateParameters()
+	if !kernelVersion.SupportCapability(compatible.SupportRingBuffer) {
 		if options.LoadBpfProgramFunction != nil {
 			links = options.LoadBpfProgramFunction(agentOldObjects.AgentOldPrograms)
 		} else {
-			links = attachBpfProgs(agentOldObjects.AgentOldPrograms, options.IfName)
-		}
-		if !common.EnabledXdp() {
-			enabledXdp := bpf.AgentControlValueIndexTKEnabledXdpIndex
-			var enableXdpValue int64 = 0
-			agentOldObjects.ControlValues.Update(&enabledXdp, &enableXdpValue, ebpf.UpdateAny)
+			links = attachBpfProgs(agentOldObjects.AgentOldPrograms, options.IfName, kernelVersion, options)
 		}
 	} else {
-		agentObjects := objs.(*bpf.AgentObjects)
-		validateResult = setAndValidateParameters(agentObjects.AgentMaps)
 
 		if options.LoadBpfProgramFunction != nil {
 			links = options.LoadBpfProgramFunction(agentObjects.AgentPrograms)
 		} else {
-			links = attachBpfProgs(agentObjects.AgentPrograms, options.IfName)
+			links = attachBpfProgs(agentObjects.AgentPrograms, options.IfName, kernelVersion, options)
 		}
+	}
+
+	if !kernelVersion.SupportCapability(compatible.SupportXDP) {
+		enabledXdp := bpf.AgentControlValueIndexTKEnabledXdpIndex
+		var enableXdpValue int64 = 0
+		bpf.GetMap("ControlValues").Update(&enabledXdp, &enableXdpValue, ebpf.UpdateAny)
 	}
 	if !validateResult {
 		return
@@ -224,203 +237,30 @@ func SetupAgent(options AgentOptions) {
 	// Close the reader when the process receives a signal, which will exit
 	// the read loop.
 	stop := false
-	if common.NeedsRunningInCompatibleMode() {
-		oldMaps := objs.(*bpf.AgentOldObjects).AgentOldMaps
-		syscallDataReader, err := perf.NewReader(oldMaps.SyscallRb, perfEventDataBufferSize)
-		if err != nil {
-			log.Fatal("new syscall data reader perf err:", err)
-			return
+	readers, err := setupReaders(options, kernelVersion, objs)
+	if err != nil {
+		for _, reader := range readers {
+			reader.Close()
 		}
-		defer syscallDataReader.Close()
-
-		dataReader, err := perf.NewReader(oldMaps.Rb, perfEventControlBufferSize)
-		if err != nil {
-			log.Fatal("new dataReader perf err:", err)
-			return
-		}
-		defer dataReader.Close()
-
-		connEvtReader, err := perf.NewReader(oldMaps.ConnEvtRb, perfEventControlBufferSize)
-		if err != nil {
-			log.Fatal("new connEvtReader perf err:", err)
-			return
-		}
-		defer connEvtReader.Close()
-
-		go func() {
-			<-stopper
-			common.SendStopSignal()
-			log.Debugln("stop!")
-			if err := dataReader.Close(); err != nil {
-				log.Fatalf("closing dataReader error: %s", err)
-			}
-			if err := connEvtReader.Close(); err != nil {
-				log.Fatalf("closing connEvtReader error: %s", err)
-			}
-			if err := syscallDataReader.Close(); err != nil {
-				log.Fatalf("closing syscallDataReader error: %s", err)
-			}
-			pm.StopAll()
-			stop = true
-		}()
-
-		log.Info("Waiting for events..")
-
-		go func() {
-			for {
-				record, err := dataReader.Read()
-				if err != nil {
-					if errors.Is(err, perf.ErrClosed) {
-						log.Debug("[dataReader] Received signal, exiting..")
-						return
-					}
-					log.Debugf("[dataReader] reading from reader: %s\n", err)
-					continue
-				}
-
-				if err := handleKernEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook); err != nil {
-					log.Errorf("[dataReader] handleKernEvt err: %s\n", err)
-					continue
-				}
-
-			}
-		}()
-
-		go func() {
-			for {
-				record, err := syscallDataReader.Read()
-				if err != nil {
-					if errors.Is(err, perf.ErrClosed) {
-						log.Debugf("[syscallDataReader] Received signal, exiting..")
-						return
-					}
-					log.Debugf("[syscallDataReader] reading from reader: %s\n", err)
-					continue
-				}
-				if err := handleSyscallEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook); err != nil {
-					log.Errorf("[syscallDataReader] handleSyscallEvt err: %s\n", err)
-					continue
-				}
-			}
-		}()
-
-		go func() {
-			for {
-				record, err := connEvtReader.Read()
-				if err != nil {
-					if errors.Is(err, perf.ErrClosed) {
-						log.Debugln("[connEvtReader] Received signal, exiting..")
-						return
-					}
-					log.Debugf("[connEvtReader] reading from reader: %s\n", err)
-					continue
-				}
-				if err := handleConnEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook); err != nil {
-					log.Errorf("[connEvtReader] handleKernEvt err: %s\n", err)
-					continue
-				}
-			}
-		}()
-	} else {
-		maps := objs.(*bpf.AgentObjects).AgentMaps
-		// kernel >= 5.8
-		syscallDataReader, err := ringbuf.NewReader(maps.SyscallRb)
-		if err != nil {
-			log.Fatal("new syscall data reader ringbuffer err:", err)
-			return
-		}
-		defer syscallDataReader.Close()
-
-		dataReader, err := ringbuf.NewReader(maps.Rb)
-		if err != nil {
-			log.Error("new dataReader ringbuffer err:", err)
-			return
-		}
-		defer dataReader.Close()
-
-		connEvtReader, err := ringbuf.NewReader(maps.ConnEvtRb)
-		if err != nil {
-			log.Error("new connEvtReader ringbuffer err:", err)
-			return
-		}
-		defer connEvtReader.Close()
-
-		go func() {
-			<-stopper
-			common.SendStopSignal()
-			log.Debugln("stop!")
-			if err := dataReader.Close(); err != nil {
-				log.Fatalf("closing dataReader error: %s", err)
-			}
-			if err := connEvtReader.Close(); err != nil {
-				log.Fatalf("closing connEvtReader error: %s", err)
-			}
-			if err := syscallDataReader.Close(); err != nil {
-				log.Fatalf("closing syscallDataReader error: %s", err)
-			}
-			pm.StopAll()
-			stop = true
-		}()
-
-		log.Info("Waiting for events..")
-
-		// https://github.com/cilium/ebpf/blob/main/examples/ringbuffer/ringbuffer.c
-		go func() {
-			for {
-				record, err := dataReader.Read()
-				if err != nil {
-					if errors.Is(err, ringbuf.ErrClosed) {
-						log.Debug("[dataReader] Received signal, exiting..")
-						return
-					}
-					log.Debugf("[dataReader] reading from reader: %s\n", err)
-					continue
-				}
-
-				if err := handleKernEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook); err != nil {
-					log.Errorf("[dataReader] handleKernEvt err: %s\n", err)
-					continue
-				}
-
-			}
-		}()
-
-		go func() {
-			for {
-				record, err := syscallDataReader.Read()
-				if err != nil {
-					if errors.Is(err, ringbuf.ErrClosed) {
-						log.Debugf("[syscallDataReader] Received signal, exiting..")
-						return
-					}
-					log.Debugf("[syscallDataReader] reading from reader: %s\n", err)
-					continue
-				}
-				if err := handleSyscallEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook); err != nil {
-					log.Errorf("[syscallDataReader] handleSyscallEvt err: %s\n", err)
-					continue
-				}
-			}
-		}()
-
-		go func() {
-			for {
-				record, err := connEvtReader.Read()
-				if err != nil {
-					if errors.Is(err, ringbuf.ErrClosed) {
-						log.Debugln("[connEvtReader] Received signal, exiting..")
-						return
-					}
-					log.Debugf("[connEvtReader] reading from reader: %s\n", err)
-					continue
-				}
-				if err := handleConnEvt(record.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook); err != nil {
-					log.Errorf("[connEvtReader] handleKernEvt err: %s\n", err)
-					continue
-				}
-			}
-		}()
+		return
 	}
+
+	go func() {
+		<-stopper
+		common.SendStopSignal()
+		log.Debugln("stop!")
+		for _, reader := range readers {
+			if err := reader.Close(); err != nil {
+				log.Fatalf("closing reader(%v) error: %s", reader, err)
+			}
+		}
+		pm.StopAll()
+		stop = true
+	}()
+
+	log.Info("Waiting for events..")
+
+	startReaders(options, kernelVersion, pm, readers)
 
 	if options.InitCompletedHook != nil {
 		options.InitCompletedHook()
@@ -432,24 +272,114 @@ func SetupAgent(options AgentOptions) {
 	return
 }
 
-func setAndValidateParameters(maps any) bool {
-	var controlValues *ebpf.Map
-	var enabledRemotePortMap *ebpf.Map
-	var enabledRemoteIpv4Map *ebpf.Map
-	var enabledLocalPortMap *ebpf.Map
-	if common.NeedsRunningInCompatibleMode() {
-		oldMaps := maps.(bpf.AgentOldMaps)
-		controlValues = oldMaps.ControlValues
-		enabledRemotePortMap = oldMaps.EnabledRemotePortMap
-		enabledRemoteIpv4Map = oldMaps.EnabledRemoteIpv4Map
-		enabledLocalPortMap = oldMaps.EnabledLocalPortMap
+func startReaders(options AgentOptions, kernel compatible.KernelVersion, pm *conn.ProcessorManager, readers []io.Closer) {
+	if kernel.SupportCapability(compatible.SupportRingBuffer) {
+		// syscall
+		startRingbufferReader(readers[0], func(r ringbuf.Record) error {
+			return handleSyscallEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
+		})
+		// kernel event
+		startRingbufferReader(readers[1], func(r ringbuf.Record) error {
+			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
+		})
+		// conn event
+		startRingbufferReader(readers[2], func(r ringbuf.Record) error {
+			return handleConnEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook)
+		})
 	} else {
-		newMaps := maps.(bpf.AgentMaps)
-		controlValues = newMaps.ControlValues
-		enabledRemotePortMap = newMaps.EnabledRemotePortMap
-		enabledRemoteIpv4Map = newMaps.EnabledRemoteIpv4Map
-		enabledLocalPortMap = newMaps.EnabledLocalPortMap
+		startPerfeventReader(readers[0], func(r perf.Record) error {
+			return handleSyscallEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
+		})
+		startPerfeventReader(readers[1], func(r perf.Record) error {
+			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
+		})
+		startPerfeventReader(readers[2], func(r perf.Record) error {
+			return handleConnEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook)
+		})
 	}
+}
+
+func setupReaders(options AgentOptions, kernel compatible.KernelVersion, objs any) ([]io.Closer, error) {
+	closers := make([]io.Closer, 0)
+	syscallDataReader, err := setupReader(options, kernel, objs, "SyscallRb", true)
+	if err != nil {
+		return nil, err
+	}
+	closers = append(closers, syscallDataReader)
+
+	kernEventReader, err := setupReader(options, kernel, objs, "Rb", false)
+	if err != nil {
+		return closers, err
+	}
+	closers = append(closers, kernEventReader)
+
+	connEvtReader, err := setupReader(options, kernel, objs, "ConnEvtRb", false)
+	if err != nil {
+		return closers, err
+	}
+	closers = append(closers, connEvtReader)
+	return closers, nil
+}
+
+func setupReader(options AgentOptions, kernel compatible.KernelVersion, objs any, mapName string, isDataBuffer bool) (io.Closer, error) {
+	if kernel.SupportCapability(compatible.SupportRingBuffer) {
+		return ringbuf.NewReader(bpf.GetMapByObjs(mapName, objs))
+	} else {
+		if isDataBuffer {
+			return perf.NewReader(bpf.GetMapByObjs(mapName, objs), options.PerfEventBufferSizeForData)
+		} else {
+			return perf.NewReader(bpf.GetMapByObjs(mapName, objs), options.PerfEventBufferSizeForEvent)
+		}
+	}
+}
+
+func startRingbufferReader(reader io.Closer, consumeFunction func(ringbuf.Record) error) {
+	ringbuffer := reader.(*ringbuf.Reader)
+	go func() {
+		for {
+			record, err := ringbuffer.Read()
+			if err != nil {
+				if errors.Is(err, perf.ErrClosed) {
+					log.Debug("[dataReader] Received signal, exiting..")
+					return
+				}
+				log.Debugf("[dataReader] reading from reader: %s\n", err)
+				continue
+			}
+			if err := consumeFunction(record); err != nil {
+				log.Errorf("[dataReader] handleKernEvt err: %s\n", err)
+				continue
+			}
+		}
+	}()
+}
+
+func startPerfeventReader(reader io.Closer, consumeFunction func(perf.Record) error) {
+	perfReader := reader.(*perf.Reader)
+	go func() {
+		for {
+			record, err := perfReader.Read()
+			if err != nil {
+				if errors.Is(err, perf.ErrClosed) {
+					log.Debug("[dataReader] Received signal, exiting..")
+					return
+				}
+				log.Debugf("[dataReader] reading from reader: %s\n", err)
+				continue
+			}
+			if err := consumeFunction(record); err != nil {
+				log.Errorf("[dataReader] handleKernEvt err: %s\n", err)
+				continue
+			}
+		}
+	}()
+}
+
+func setAndValidateParameters() bool {
+	var controlValues *ebpf.Map = bpf.GetMap("ControlValues")
+	var enabledRemotePortMap *ebpf.Map = bpf.GetMap("EnabledRemotePortMap")
+	var enabledRemoteIpv4Map *ebpf.Map = bpf.GetMap("EnabledRemoteIpv4Map")
+	var enabledLocalPortMap *ebpf.Map = bpf.GetMap("EnabledLocalPortMap")
 
 	if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
 		log.Infoln("filter for pid: ", targetPid)
@@ -581,8 +511,50 @@ func handleKernEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, 
 	return nil
 }
 
-func attachBpfProgs(programs any, ifName string) *list.List {
+func attachBpfProgs(programs any, ifName string, kernelVersion compatible.KernelVersion, options AgentOptions) *list.List {
 	linkList := list.New()
+
+	if kernelVersion.SupportCapability(compatible.SupportXDP) {
+		l, err := bpf.AttachXdpWithSpecifiedIfName(programs, options.IfName)
+		if err != nil {
+			log.Warnf("Attach XDP program failed, fallbacking...")
+		} else {
+			linkList.PushBack(l)
+		}
+	}
+
+	if kernelVersion.SupportCapability(compatible.SupportRawTracepoint) {
+		l, err := bpf.AttachRawTracepointTcpDestroySockEntry(programs)
+		if err != nil {
+			log.Warnf("Attach TCP destroy raw tracepoint failed, fallbacking...")
+		} else {
+			linkList.PushBack(l)
+		}
+	}
+
+	for _, functions := range kernelVersion.InstrumentFunctions {
+		for idx, function := range functions {
+			var err error
+			var l link.Link
+			if function.IsKprobe() {
+				l, err = bpf.Kprobe(function.GetKprobeName(), bpf.GetProgram(programs, function.BPFGoProgName))
+			} else if function.IsTracepoint() {
+				l, err = bpf.Tracepoint(function.GetTracepointGroupName(), function.GetTracepointName(),
+					bpf.GetProgram(programs, function.BPFGoProgName))
+			} else if function.IsKRetprobe() {
+				l, err = bpf.Kretprobe(function.GetKprobeName(), bpf.GetProgram(programs, function.BPFGoProgName))
+			} else {
+				panic(fmt.Sprintf("invalid program type: %v", function))
+			}
+			if err != nil {
+				if idx == len(functions)-1 {
+					log.Fatalf("Attach failed: %v, functions: %v", err, functions)
+				}
+			} else {
+				linkList.PushBack(l)
+			}
+		}
+	}
 
 	linkList.PushBack(bpf.AttachSyscallAcceptEntry(programs))
 	linkList.PushBack(bpf.AttachSyscallAcceptExit(programs))
@@ -621,20 +593,52 @@ func attachBpfProgs(programs any, ifName string) *list.List {
 
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry(programs))
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry(programs))
-	if !common.NeedsRunningInCompatibleMode() {
-		linkList.PushBack(bpf.AttachRawTracepointTcpDestroySockEntry(programs))
-	}
 
-	linkList.PushBack(bpf.AttachKProbeIpQueueXmitEntry(programs))
-	linkList.PushBack(bpf.AttachKProbeDevQueueXmitEntry(programs))
-	linkList.PushBack(bpf.AttachKProbeDevHardStartXmitEntry(programs))
-
-	linkList.PushBack(bpf.AttachKProbIpRcvCoreEntry(programs))
-	linkList.PushBack(bpf.AttachKProbeTcpV4DoRcvEntry(programs))
-	linkList.PushBack(bpf.AttachKProbeSkbCopyDatagramIterEntry(programs))
-	linkList.PushBack(bpf.AttachTracepointNetifReceiveSkb(programs))
-	if common.EnabledXdp() {
-		linkList.PushBack(bpf.AttachXdpWithSpecifiedIfName(programs, ifName))
-	}
 	return linkList
+}
+
+func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelVersion) {
+	finalCProgNames := make([]string, 0)
+
+	if kernelVersion.SupportCapability(compatible.SupportXDP) {
+		finalCProgNames = append(finalCProgNames, bpf.XDPProgramName)
+	}
+	if kernelVersion.SupportCapability(compatible.SupportRawTracepoint) {
+		finalCProgNames = append(finalCProgNames, bpf.TcpDestroySocketProgName)
+	}
+	for step := bpf.AgentStepTStart; step < bpf.AgentStepTEnd; step++ {
+		functions, ok := kernelVersion.InstrumentFunctions[step]
+		if ok {
+			for _, function := range functions {
+				finalCProgNames = append(finalCProgNames, bpf.GoProgName2CProgName[function.BPFGoProgName])
+			}
+		}
+	}
+
+	finalCProgNames = append(finalCProgNames, bpf.SyscallExtraProgNames...)
+	for name := range coll.Programs {
+		if strings.HasPrefix(name, "tracepoint__syscalls") {
+			finalCProgNames = append(finalCProgNames, name)
+		}
+	}
+
+	needsDelete := make([]string, 0)
+	for cProgName, _ := range coll.Programs {
+		if slices.Index(finalCProgNames, cProgName) == -1 {
+			needsDelete = append(needsDelete, cProgName)
+		}
+	}
+	for _, each := range needsDelete {
+		coll.Programs[each] = socketFilterSpec
+	}
+}
+
+var socketFilterSpec = &ebpf.ProgramSpec{
+	Name: "test",
+	Type: ebpf.Kprobe,
+	Instructions: asm.Instructions{
+		asm.LoadImm(asm.R0, 2, asm.DWord),
+		asm.Return(),
+	},
+	License: "MIT",
 }
