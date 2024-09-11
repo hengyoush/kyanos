@@ -77,7 +77,6 @@ var KernelVersionsMap *treemap.Map
 func GetCurrentKernelVersion() KernelVersion {
 	version := common.GetKernelVersion()
 	v := GetBestMatchedKernelVersion(version.Core().String())
-	log.Warnf("find version: %v", v)
 	return v
 }
 
@@ -127,16 +126,18 @@ func init() {
 	v5d4 := copyKernelVersion(v5d15)
 	v5d4.Version = "5.4.0"
 	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"kprobe/ip_rcv_core.isra.0", "IpRcvCore"})
-	v5d4.removeCapability(SupportRingBuffer)
+	v5d4.removeCapability(SupportRingBuffer).removeCapability(SupportXDP)
 	KernelVersionsMap.Put(v5d4.Version, v5d4)
 
 	v4d14 := copyKernelVersion(v5d4)
 	v4d14.Version = "4.14.0"
+	v4d14.InstrumentFunctions[bpf.AgentStepTIP_OUT] =
+		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "IpQueueXmit"}}
 	v4d14.InstrumentFunctions[bpf.AgentStepTIP_IN] =
 		[]InstrumentFunction{{"kprobe/ip_rcv", "IpRcvCore"}}
 	v4d14.InstrumentFunctions[bpf.AgentStepTUSER_COPY] =
 		[]InstrumentFunction{{"kprobe/skb_copy_datagram_iter", "SkbCopyDatagramIter"}}
-	v4d14.removeCapability(SupportConstants).removeCapability(SupportRawTracepoint).removeCapability(SupportBTF)
+	v4d14.removeCapability(SupportConstants).removeCapability(SupportRawTracepoint).removeCapability(SupportBTF).removeCapability(SupportXDP)
 	KernelVersionsMap.Put(v4d14.Version, v4d14)
 
 	v310 := copyKernelVersion(v5d4)
@@ -145,7 +146,7 @@ func init() {
 		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "IpQueueXmit2"}}
 	v310.InstrumentFunctions[bpf.AgentStepTUSER_COPY] =
 		[]InstrumentFunction{{"kprobe/skb_copy_datagram_iovec", "SkbCopyDatagramIter"}}
-	v310.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"ip_rcv", "IpRcvCore"})
+	v310.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"kprobe/ip_rcv", "IpRcvCore"})
 	v310.removeCapability(SupportConstants).
 		removeCapability(SupportRawTracepoint).
 		removeCapability(SupportXDP).
