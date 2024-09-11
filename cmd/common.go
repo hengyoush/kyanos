@@ -58,6 +58,7 @@ func startAgent(options agent.AgentOptions) {
 	}
 	options.IfName = IfName
 	options.BTFFilePath = BTFFilePath
+	options.BPFVerifyLogSize = BPFVerifyLogSize
 
 	initLog()
 	logger.Infoln("Kyanos starting...")

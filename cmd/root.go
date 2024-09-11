@@ -38,6 +38,7 @@ var RemoteIps []string
 var LocalIps []string
 var IfName string
 var BTFFilePath string
+var BPFVerifyLogSize int
 
 func init() {
 	// rootCmd.PersistentFlags().StringVar(&LogDir, "log-dir", "", "log file dir")
@@ -52,6 +53,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&IfName, "ifname", "eth0", "--ifname eth0")
 	rootCmd.PersistentFlags().MarkHidden("compatible")
 	rootCmd.PersistentFlags().StringVar(&BTFFilePath, "btf", "", "btf file path")
+	rootCmd.PersistentFlags().IntVar(&BPFVerifyLogSize, "bpf-verify-log-size", 1*1024*1024, "--bpf-verify-log-size 1024")
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false
 	viper.BindPFlags(rootCmd.Flags())
