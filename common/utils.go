@@ -195,7 +195,7 @@ func GetKernelVersion() *version.Version {
 	release := si.Kernel.Release
 	version, err := version.NewVersion(release)
 	if err != nil {
-		Log.Warningf("Parse kernel version failed: %v, using the compatible mode...", err)
+		Log.Debugf("Parse kernel version failed: %v, using the compatible mode...", err)
 	}
 	return version
 }
