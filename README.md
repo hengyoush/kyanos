@@ -44,14 +44,14 @@ kyanos正是为了快速排查这类问题诞生的，它是一个**面向程序
 
 ## ❗ Requirements
 
-Kyanos当前支持5.4及其以上版本内核，更低版本内核未经过测试。
+Kyanos当前支持3.10及4.14以上版本内核(4.7版本到4.14版本之间的后续计划支持)。
 > 通过`uname -r`查看内核版本
 
 
 ## 🎯 How to get kyanos 
 执行如下脚本获取kyanos可执行文件
 ```bash
-wget -O kyanos.zip https://github.com/hengyoush/kyanos/releases/download/v1.0.0/kyanos.zip
+wget -O kyanos.zip [https://github.com/hengyoush/kyanos/releases/download/v1.0.0/kyanos.zi](https://github.com/hengyoush/kyanos/releases/download/v1.1.0/kyanos.zip)p
 unzip kyanos.zip
 chmod a+x kyanos
 sudo kyanos
