@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"kyanos/agent/analysis"
 	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
@@ -16,6 +17,7 @@ import (
 	"kyanos/common"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
@@ -31,8 +33,10 @@ import (
 	"github.com/cilium/ebpf/perf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/cilium/ebpf/rlimit"
+	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/jefurry/logrus"
 	"github.com/spf13/viper"
+	"github.com/zcalusic/sysinfo"
 )
 
 type LoadBpfProgramFunction func(programs interface{}) *list.List
@@ -131,7 +135,6 @@ func SetupAgent(options AgentOptions) {
 	}
 
 	kernelVersion := compatible.GetCurrentKernelVersion()
-
 	var links *list.List
 	// Load the compiled eBPF ELF and load it into the kernel.
 	var objs any
@@ -150,7 +153,39 @@ func SetupAgent(options AgentOptions) {
 			},
 		}
 	} else {
-		collectionOptions = nil
+		fileBytes, err := getBestMatchedBTFFile()
+		if err != nil {
+			log.Fatalln(err)
+			return
+		}
+		needGenerateBTF := fileBytes != nil
+
+		if needGenerateBTF {
+			btfFilePath, err := writeToFile(fileBytes, ".kyanos.btf")
+			if err != nil {
+				log.Fatalln(err)
+				return
+			}
+			defer os.Remove(btfFilePath)
+
+			btfPath, err := btf.LoadSpec(btfFilePath)
+			if err != nil {
+				log.Fatalf("can't load btf spec: %v", err)
+			}
+			collectionOptions = &ebpf.CollectionOptions{
+				Programs: ebpf.ProgramOptions{
+					KernelTypes: btfPath,
+					LogSize:     options.BPFVerifyLogSize,
+				},
+			}
+		} else {
+			collectionOptions = &ebpf.CollectionOptions{
+				Programs: ebpf.ProgramOptions{
+					LogSize: options.BPFVerifyLogSize,
+				},
+			}
+		}
+
 	}
 	if !kernelVersion.SupportCapability(compatible.SupportRingBuffer) {
 		objs = &bpf.AgentOldObjects{}
@@ -648,4 +683,102 @@ var socketFilterSpec = &ebpf.ProgramSpec{
 		asm.Return(),
 	},
 	License: "MIT",
+}
+
+func getBestMatchedBTFFile() ([]uint8, error) {
+	if bpf.IsKernelSupportHasBTF() {
+		return nil, nil
+	}
+
+	var si sysinfo.SysInfo
+	si.GetSysInfo()
+	log.Debugf("[sys info] vendor: %s, os_arch: %s, kernel_arch: %s", si.OS.Vendor, si.OS.Architecture, si.Kernel.Architecture)
+
+	if si.OS.Vendor != "ubuntu" && si.OS.Vendor != "centos" {
+		panic("Current only support centos and ubuntu")
+	}
+	if si.OS.Architecture != "amd64" {
+		panic("Current only support amd64")
+	}
+	if si.Kernel.Architecture != "x86_64" {
+		panic("Current only support x86_64")
+	}
+
+	var btfFileDir string
+	btfFileDir += "custom-archive"
+	btfFileDir += "/" + si.OS.Vendor
+	if si.OS.Vendor == "centos" {
+		btfFileDir += "/" + si.OS.Release[:1]
+	} else {
+		btfFileDir += "/" + si.OS.Release[:5]
+	}
+	btfFileDir += "/" + si.Kernel.Architecture
+	dir, err := bpf.BtfFiles.ReadDir(btfFileDir)
+	if err != nil {
+		log.Warnf("btf file not exists, path: %s", btfFileDir)
+		return nil, err
+	}
+	btfFileNames := treemap.NewWithStringComparator()
+	for _, entry := range dir {
+		btfFileName := entry.Name()
+		if idx := strings.Index(btfFileName, ".btf"); idx != -1 {
+			btfFileName = btfFileName[:idx]
+			btfFileNames.Put(btfFileName, entry)
+		}
+	}
+
+	release := si.Kernel.Release
+	if value, found := btfFileNames.Get(release); found {
+		log.Debug("find btf file exactly!")
+		dirEntry := value.(fs.DirEntry)
+		fileName := dirEntry.Name()
+		file, err := bpf.BtfFiles.ReadFile(btfFileDir + "/" + fileName)
+		if err == nil {
+			return file, nil
+		}
+	} else {
+		log.Debug("find btf file exactly failed, try to find a lower version btf file...")
+	}
+
+	key, value := btfFileNames.Floor(release)
+	if key != nil {
+		dirEntry := value.(fs.DirEntry)
+		fileName := dirEntry.Name()
+		log.Debugf("find a lower version btf file success: %s", fileName)
+		file, err := bpf.BtfFiles.ReadFile(btfFileDir + "/" + fileName)
+		if err == nil {
+			return file, nil
+		}
+	}
+	return nil, errors.New("no btf file found to load")
+}
+
+// writeToFile writes the []uint8 slice to a specified file in the system's temp directory.
+// If the temp directory does not exist, it creates a ".kyanos" directory in the current directory.
+func writeToFile(data []uint8, filename string) (string, error) {
+	// Get the system's temp directory
+	tempDir := os.TempDir()
+
+	// Check if the temp directory exists
+	if _, err := os.Stat(tempDir); os.IsNotExist(err) {
+		// Create a ".kyanos" directory in the current directory
+		tempDir = "."
+	}
+
+	// Create the file path
+	filePath := filepath.Join(tempDir, filename)
+
+	// Write the byte slice to the file
+	err := os.WriteFile(filePath, data, 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to write file: %v", err)
+	}
+
+	// Return the absolute path of the file
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get absolute path: %v", err)
+	}
+
+	return absPath, nil
 }

@@ -1,6 +1,8 @@
 package main
 
-import "kyanos/cmd"
+import (
+	"kyanos/cmd"
+)
 
 func main() {
 	cmd.Execute()
