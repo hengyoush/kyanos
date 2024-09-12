@@ -5,9 +5,9 @@ name: kyanos-build
 
 on:
   push:
-    branches: [ "feature/netanalysis" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "feature/netanalysis" ]
+    branches: [ "main" ]
 
 jobs:
 
