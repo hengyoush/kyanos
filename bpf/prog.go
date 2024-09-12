@@ -174,11 +174,19 @@ func AttachXdpWithSpecifiedIfName(programs interface{}, ifname string) (link.Lin
 		return nil, err
 	}
 
-	return link.AttachXDP(link.XDPOptions{
+	l, err := link.AttachXDP(link.XDPOptions{
 		Program:   GetProgram(programs, "XdpProxy"),
 		Interface: iface.Index,
 		Flags:     link.XDPDriverMode,
 	})
+	if err != nil {
+		l, err = link.AttachXDP(link.XDPOptions{
+			Program:   GetProgram(programs, "XdpProxy"),
+			Interface: iface.Index,
+			Flags:     link.XDPGenericMode,
+		})
+	}
+	return l, err
 }
 func AttachXdp(programs interface{}) (link.Link, error) {
 	return AttachXdpWithSpecifiedIfName(programs, "eth0")

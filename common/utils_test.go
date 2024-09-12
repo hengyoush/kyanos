@@ -1,9 +1,13 @@
 package common_test
 
 import (
+	"fmt"
 	"kyanos/common"
+	"os"
 	"reflect"
 	"testing"
+
+	"github.com/zcalusic/sysinfo"
 )
 
 func TestBytesToInt8(t *testing.T) {
@@ -48,4 +52,15 @@ func TestBytesToInt16(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVersion(t *testing.T) {
+	var si sysinfo.SysInfo
+	si.GetSysInfo()
+	fmt.Println(si)
+}
+
+func TestTempDir(t *testing.T) {
+	TempDir := os.TempDir()
+	fmt.Println(TempDir)
 }
