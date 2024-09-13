@@ -1031,14 +1031,16 @@ static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn
 	uint16_t one = 1;
 	uint8_t* enable_local_port_filter = bpf_map_lookup_elem(&enabled_local_port_map, &one);
 	if (enable_local_port_filter != NULL) {
-		uint8_t* enabled_local_port = bpf_map_lookup_elem(&enabled_local_port_map, &conn_info->laddr.in4.sin_port);
+		u16 port = conn_info->laddr.in4.sin_port;
+		uint8_t* enabled_local_port = bpf_map_lookup_elem(&enabled_local_port_map, &port);
 		if (enabled_local_port == NULL) {
 			return false;
 		}
 	}
 	uint8_t* enable_remote_port_filter = bpf_map_lookup_elem(&enabled_remote_port_map, &one);
 	if (enable_remote_port_filter != NULL) {
-		uint8_t* enabled_remote_port = bpf_map_lookup_elem(&enabled_remote_port_map, &conn_info->raddr.in4.sin_port);
+		u16 port = conn_info->raddr.in4.sin_port;
+		uint8_t* enabled_remote_port = bpf_map_lookup_elem(&enabled_remote_port_map, &port);
 		if (enabled_remote_port == NULL) {
 			return false;
 		}
@@ -1047,7 +1049,8 @@ static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn
 	if (conn_info->raddr.in4.sin_family == AF_INET) {
 		uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &one32);
 		if (enable_remote_ipv4_filter != NULL) {
-			uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &conn_info->raddr.in4.sin_addr.s_addr);
+			u32 addr = conn_info->raddr.in4.sin_addr.s_addr;
+			uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &addr);
 			if (enabled_remote_ipv4 == NULL || conn_info->raddr.in4.sin_addr.s_addr == 0) {
 				return false;
 			}
@@ -1238,12 +1241,12 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 	if (!conn_info) {
 		tcp_sk = get_socket_from_fd(args->fd);
 		if (tcp_sk) {
-			struct sock_key key;
 			int zero = 0;
-			struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			// struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			struct conn_info_t _new_conn_info = {};
+			struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
-				parse_sock_key_sk((struct sock*)tcp_sk, &key);
 				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info);
 				if (created) {
 					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
@@ -1317,12 +1320,12 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	if (!conn_info) {
 		tcp_sk = get_socket_from_fd(args->fd);
 		if (tcp_sk) {
-			struct sock_key key;
 			int zero = 0;
-			struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			// struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			struct conn_info_t _new_conn_info = {};
+			struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
-				parse_sock_key_sk((struct sock*)tcp_sk, &key);
 				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info);
 				if (created) {
 					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
@@ -1336,8 +1339,8 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
 		enum traffic_protocol_t before_infer = conn_info->protocol;
 		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
-		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
 		// conn_info->protocol = protocol_message.protocol;
+		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
 		if (before_infer != protocol_message.protocol) {
 			conn_info->protocol = protocol_message.protocol;
 			// bpf_printk("[protocol infer]: %d", conn_info->protocol);

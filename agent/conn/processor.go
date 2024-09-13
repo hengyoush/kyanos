@@ -151,6 +151,7 @@ func (p *Processor) run() {
 			} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
 				// 协议推断
 				conn = p.connManager.FindConnection4Or(TgidFd, event.Ts+common.LaunchEpochTime)
+				// previousProtocol := conn.Protocol
 				if conn != nil && conn.Status != Closed {
 					conn.Protocol = event.ConnInfo.Protocol
 				} else {

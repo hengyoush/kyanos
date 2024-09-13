@@ -251,21 +251,33 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 		err := connInfoMap.Delete(c.TgidFd)
 		if err != nil {
 			log.Debugf("clean conn_info_map failed: %v", err)
+		} else {
+			log.Debugf("clean conn_info_map deleted")
 		}
 		key, revKey := c.extractSockKeys()
 		sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
-		err = sockKeyConnIdMap.Delete(&key)
+		err = sockKeyConnIdMap.Delete(key)
 		if err != nil {
 			log.Debugf("clean sock_key_conn_id_map key failed: %v", err)
+		} else {
+			log.Debugf("clean sockKeyConnIdMap deleted key")
 		}
-		err = sockKeyConnIdMap.Delete(&revKey)
+		err = sockKeyConnIdMap.Delete(revKey)
 		if err != nil {
 			log.Debugf("clean sock_key_conn_id_map revkey failed: %v", err)
+		} else {
+			log.Debugf("clean sockKeyConnIdMap deleted revkey")
 		}
 		sockXmitMap := bpf.GetMap("SockXmitMap")
-		n, err := sockXmitMap.BatchDelete([]bpf.AgentSockKey{key, revKey}, nil)
+		err = sockXmitMap.Delete(key)
 		if err == nil {
-			log.Debugf("clean sockXmitMap deleted: %v", n)
+			log.Debugf("clean sockXmitMap deleted key")
+		} else {
+			log.Debugf("clean sockXmitMap failed: %v", err)
+		}
+		err = sockXmitMap.Delete(revKey)
+		if err == nil {
+			log.Debugf("clean sockXmitMap deleted revkey")
 		} else {
 			log.Debugf("clean sockXmitMap failed: %v", err)
 		}
@@ -283,7 +295,7 @@ func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
 	connInfo := bpf.AgentConnInfoT{}
 	err := connInfoMap.Lookup(c.TgidFd, &connInfo)
 	if err == nil {
-		connInfo.NoTrace = traceable
+		connInfo.NoTrace = !traceable
 		connInfoMap.Update(c.TgidFd, &connInfo, ebpf.UpdateExist)
 	} else {
 		log.Debugf("try to update %s conn_info_map to no_trace, but no entry in map found!", c.ToString())
@@ -294,7 +306,7 @@ func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m
 	var connIds bpf.AgentConnIdS_t
 	err := m.Lookup(&key, &connIds)
 	if err == nil {
-		connIds.NoTrace = traceable
+		connIds.NoTrace = !traceable
 		m.Update(&key, &connIds, ebpf.UpdateExist)
 	} else {
 		log.Debugf("try to update %s conn_id_map to no_trace, but no entry in map found! key: %v", c.ToString(), key)
