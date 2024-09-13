@@ -273,28 +273,28 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 	monitor.UnregisterMetricExporter(c.StreamEvents)
 }
 
-func (c *Connection4) UpdateEBPFMapToNoTrace() {
+func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
 	key, revKey := c.extractSockKeys()
 	sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
-	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap)
-	c.doUpdateConnIdMapProtocolToUnknwon(revKey, sockKeyConnIdMap)
+	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap, traceable)
+	c.doUpdateConnIdMapProtocolToUnknwon(revKey, sockKeyConnIdMap, traceable)
 
 	connInfoMap := bpf.GetMap("ConnInfoMap")
 	connInfo := bpf.AgentConnInfoT{}
 	err := connInfoMap.Lookup(c.TgidFd, &connInfo)
 	if err == nil {
-		connInfo.NoTrace = true
+		connInfo.NoTrace = traceable
 		connInfoMap.Update(c.TgidFd, &connInfo, ebpf.UpdateExist)
 	} else {
 		log.Debugf("try to update %s conn_info_map to no_trace, but no entry in map found!", c.ToString())
 	}
 }
 
-func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m *ebpf.Map) {
+func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m *ebpf.Map, traceable bool) {
 	var connIds bpf.AgentConnIdS_t
 	err := m.Lookup(&key, &connIds)
 	if err == nil {
-		connIds.NoTrace = true
+		connIds.NoTrace = traceable
 		m.Update(&key, &connIds, ebpf.UpdateExist)
 	} else {
 		log.Debugf("try to update %s conn_id_map to no_trace, but no entry in map found! key: %v", c.ToString(), key)

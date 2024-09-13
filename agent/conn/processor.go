@@ -132,7 +132,7 @@ func (p *Processor) run() {
 				conn.StreamEvents = NewKernEventStream(conn, 300)
 				if p.side != common.AllSide && p.side != conn.Side() {
 					// conn.OnClose(true)
-					conn.UpdateEBPFMapToNoTrace()
+					conn.UpdateConnectionTraceable(false)
 					continue
 				}
 				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
@@ -170,12 +170,13 @@ func (p *Processor) run() {
 							log.Debugf("%s process temp syscall events before infer\n", conn.ToString())
 							conn.OnSyscallEvent(sysEvent.Buf, sysEvent)
 						}
+						conn.UpdateConnectionTraceable(true)
 					}
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
 					conn.TempConnEvents = conn.TempConnEvents[0:0]
 				} else {
 					log.Debugf("%s discarded due to not interested", conn.ToString())
-					conn.UpdateEBPFMapToNoTrace()
+					conn.UpdateConnectionTraceable(false)
 					// conn.OnClose(true)
 				}
 			}
