@@ -937,7 +937,7 @@ func TestTcpV4DoRcv(t *testing.T) {
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
 		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTNIC_IN, p)
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN, p)
 		},
 		func(p interface{}) link.Link {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN, p)
@@ -977,7 +977,7 @@ func TestSkbCopyDatagramIter(t *testing.T) {
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
 		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTNIC_IN, p)
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN, p)
 		},
 		func(p interface{}) link.Link {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY, p)

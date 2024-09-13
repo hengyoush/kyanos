@@ -75,6 +75,7 @@ const struct kern_evt *kern_evt_unused __attribute__((unused));
 const struct conn_evt_t *conn_evt_t_unused __attribute__((unused));
 const struct sock_key *sock_key_unused __attribute__((unused));
 const struct kern_evt_data *kern_evt_data_unused __attribute__((unused));
+const struct conn_id_s_t *conn_id_s_t_unused __attribute__((unused));
 const struct conn_info_t *conn_info_t_unused __attribute__((unused));
 const enum conn_type_t *conn_type_t_unused __attribute__((unused));
 const enum endpoint_role_t *endpoint_role_unused  __attribute__((unused));
@@ -128,6 +129,7 @@ struct {
 
 MY_BPF_HASH(conn_info_map, uint64_t, struct conn_info_t);
 MY_BPF_ARRAY_PERCPU(syscall_data_map, struct kern_evt_data)
+MY_BPF_ARRAY_PERCPU(conn_info_t_map, struct conn_info_t)
 
 #ifdef KERNEL_VERSION_BELOW_58 
 struct {
@@ -188,12 +190,12 @@ static __inline enum target_tgid_match_result_t match_trace_tgid(const uint32_t 
 }
 
 static __always_inline struct sock_key reverse_sock_key(struct sock_key* key) {
-	struct sock_key copy;
-	copy.dip = key->sip;
-	copy.dport = key->sport;
-	copy.sip = key->dip;
-	copy.sport = key->dport;
-	copy.family = key->family;
+	struct sock_key copy = {0};
+	copy.dip = _(key->sip);
+	copy.dport = _(key->sport);
+	copy.sip = _(key->dip);
+	copy.sport = _(key->dport);
+	copy.family = _(key->family);
 	return copy;
 }
 static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *param) {
@@ -214,13 +216,14 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 		return;
 	}
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
-#ifdef KERNEL_VERSION_BELOW_58 
-#else
-	if (conn_id_s == NULL) {
+ 
+	if (conn_id_s == NULL || conn_id_s->no_trace) {
+#ifndef KERNEL_VERSION_BELOW_58
 		bpf_ringbuf_discard(evt, 0);
+#endif
 		return;
 	}
-#endif
+
 	bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
 	evt->seq = cur_seq; 
 	u32 bl_bdr = evt->seq;
@@ -257,13 +260,14 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	}
 #endif
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
-#ifdef KERNEL_VERSION_BELOW_58 
-#else
-	if (conn_id_s == NULL) {
+ 
+	if (conn_id_s == NULL || conn_id_s->no_trace) {
+#ifndef KERNEL_VERSION_BELOW_58
 		bpf_ringbuf_discard(evt, 0);
+#endif
 		return;
 	}
-#endif
+
 	bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
 	u32 tcpseq = 0;
 	BPF_CORE_READ_INTO(&tcpseq, tcp, seq);
@@ -280,7 +284,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	evt->ts = bpf_ktime_get_ns();
 	evt->step = step;
 	// evt->flags = _(((u8 *)tcp)[13]);
-	// bpf_probe_read_kernel(&evt->flags, sizeof(((u8 *)tcp)[13]), &(((u8 *)tcp)[13]));
+	bpf_probe_read_kernel(&evt->flags, sizeof(uint8_t), &(((u8 *)tcp)[13]));
 	// bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
 	// my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
 
@@ -359,7 +363,8 @@ static bool __always_inline report_conn_evt(void* ctx, struct conn_info_t *conn_
 	if (!evt) {
 		return 0;
 	}
-	evt->conn_info = *conn_info;
+	// evt->conn_info = *conn_info;
+	bpf_probe_read_kernel(&evt->conn_info, sizeof(struct conn_info_t), conn_info);
 	evt->conn_type = type;
 	if (ts != 0) {
 		evt->ts = ts;
@@ -410,9 +415,9 @@ static void __always_inline parse_sock_key_rcv(struct sk_buff *skb, struct sock_
 	parse_sock_key_rcv_sk(sk, key);
 }
 static void __always_inline print_sock_key(struct sock_key* key) {
-	// pr_bpf_debug("print_sock_key port: sport:%u, dport:%u", key->sport, key->dport);
-	// pr_bpf_debug("print_sock_key addr: saddr:%u, daddr:%u", key->sip, key->dip);
-	// pr_bpf_debug("print_sock_key family: family:%u", key->family);
+	// bpf_printk("print_sock_key port: sport:%u, dport:%u", key->sport, key->dport);
+	// bpf_printk("print_sock_key addr: saddr:%u, daddr:%u", key->sip, key->dip);
+	// bpf_printk("print_sock_key family: family:%u", key->family);
 }
 static void __always_inline parse_sock_key_sk(struct sock* sk, struct sock_key* key) {
 	BPF_CORE_READ_INTO(&key->dip,sk,__sk_common.skc_daddr);
@@ -481,7 +486,7 @@ static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
 	// 		return true;
 	// }
 
-	return conn_info->protocol != kProtocolUnknown;
+	return conn_info->protocol != kProtocolUnknown && !conn_info->no_trace;
 }
 static bool __always_inline should_trace_sock_key(struct sock_key *key) {
 	struct conn_id_s_t *conn_id_s = {0};
@@ -869,7 +874,8 @@ static __always_inline int handle_ip_queue_xmit(void* ctx, struct sk_buff *skb)
 		bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 		// bpf_printk("found!, seq: %u", inital_seq);
 	}
-
+	// print_sock_key(&key);
+	// bpf_printk("[handle_ip_queue_xmit] seq: %u", inital_seq);
 	struct tcphdr* tcp = {0};
 	BPF_CORE_READ_INTO(&tcp, skb, data);
 	// struct tcphdr* tcp = (struct tcphdr*)_C(skb, data);
@@ -1020,6 +1026,54 @@ static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 	return NULL;
 }
 
+static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn_info, uint64_t tgid_fd, struct sock_key *key, enum endpoint_role_t role, uint64_t start_ts) {
+	
+	uint16_t one = 1;
+	uint8_t* enable_local_port_filter = bpf_map_lookup_elem(&enabled_local_port_map, &one);
+	if (enable_local_port_filter != NULL) {
+		uint8_t* enabled_local_port = bpf_map_lookup_elem(&enabled_local_port_map, &conn_info->laddr.in4.sin_port);
+		if (enabled_local_port == NULL) {
+			return false;
+		}
+	}
+	uint8_t* enable_remote_port_filter = bpf_map_lookup_elem(&enabled_remote_port_map, &one);
+	if (enable_remote_port_filter != NULL) {
+		uint8_t* enabled_remote_port = bpf_map_lookup_elem(&enabled_remote_port_map, &conn_info->raddr.in4.sin_port);
+		if (enabled_remote_port == NULL) {
+			return false;
+		}
+	}
+	uint32_t one32 = 1;
+	if (conn_info->raddr.in4.sin_family == AF_INET) {
+		uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &one32);
+		if (enable_remote_ipv4_filter != NULL) {
+			uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &conn_info->raddr.in4.sin_addr.s_addr);
+			if (enabled_remote_ipv4 == NULL || conn_info->raddr.in4.sin_addr.s_addr == 0) {
+				return false;
+			}
+		}
+	}
+	
+	if (should_trace_conn(conn_info)) {
+		
+		bpf_map_update_elem(&conn_info_map, &tgid_fd, conn_info, BPF_ANY);
+		struct conn_id_s_t conn_id_s = {};
+		conn_id_s.direct = role == kRoleClient ? kEgress : kIngress;
+		conn_id_s.tgid_fd = tgid_fd;
+		bpf_map_update_elem(&sock_key_conn_id_map, key, &conn_id_s, BPF_NOEXIST);
+		struct sock_key rev = reverse_sock_key(key);
+		// d => s
+		struct conn_id_s_t conn_id_s_rev = {};
+		conn_id_s_rev.direct = role == kRoleClient ? kIngress : kEgress;
+		conn_id_s_rev.tgid_fd = tgid_fd;
+		bpf_map_update_elem(&sock_key_conn_id_map, &rev, &conn_id_s_rev, BPF_NOEXIST);
+		report_conn_evt(ctx, conn_info, kConnect, start_ts);
+		return true;
+	} else {
+		return false;
+	}
+}
+
 static __always_inline void submit_new_conn(void* ctx, uint32_t tgid, int32_t fd,
 const struct sockaddr* addr, const struct socket* socket,
 enum endpoint_role_t role, uint64_t start_ts) {
@@ -1047,7 +1101,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
 	}
 	
-	print_sock_key(&key);
+	// print_sock_key(&key);
 	if (socket == NULL) {
 		conn_info.laddr.in4.sin_addr.s_addr = role == kRoleClient ? key.sip : key.dip;
 		conn_info.laddr.in4.sin_port = role == kRoleClient ? key.sport : key.dport;
@@ -1057,51 +1111,11 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		conn_info.raddr.in4.sin_family = key.family;
 	}
 
-	uint16_t one = 1;
-	uint8_t* enable_local_port_filter = bpf_map_lookup_elem(&enabled_local_port_map, &one);
-	if (enable_local_port_filter != NULL) {
-		uint8_t* enabled_local_port = bpf_map_lookup_elem(&enabled_local_port_map, &conn_info.laddr.in4.sin_port);
-		if (enabled_local_port == NULL) {
-			return;
-		}
-	}
-	uint8_t* enable_remote_port_filter = bpf_map_lookup_elem(&enabled_remote_port_map, &one);
-	if (enable_remote_port_filter != NULL) {
-		uint8_t* enabled_remote_port = bpf_map_lookup_elem(&enabled_remote_port_map, &conn_info.raddr.in4.sin_port);
-		if (enabled_remote_port == NULL) {
-			return;
-		}
-	}
-	uint32_t one32 = 1;
-	if (conn_info.raddr.in4.sin_family == AF_INET) {
-		uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &one32);
-		if (enable_remote_ipv4_filter != NULL) {
-			uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &conn_info.raddr.in4.sin_addr.s_addr);
-			if (enabled_remote_ipv4 == NULL || conn_info.raddr.in4.sin_addr.s_addr == 0) {
-				return;
-			}
-		}
-	}
 	// bpf_printk("submit_new_conn laddr: port:%u", conn_info.laddr.in4.sin_port);
 	// bpf_printk("submit_new_conn raddr: port:%u", conn_info.raddr.in4.sin_port);
 
 	conn_info.role = role;
-	if (should_trace_conn(&conn_info)) {
-		// bpf_printk("submit_new_conn  dport: %u, tgid:%d,fd:%d", conn_info.raddr.in4.sin_port,tgid ,fd);
-		bpf_map_update_elem(&conn_info_map, &tgid_fd, &conn_info, BPF_ANY);
-		struct conn_id_s_t conn_id_s = {};
-		conn_id_s.direct = role == kRoleClient ? kEgress : kIngress;
-		conn_id_s.tgid_fd = tgid_fd;
-		bpf_map_update_elem(&sock_key_conn_id_map, &key, &conn_id_s, BPF_NOEXIST);
-		struct sock_key rev = reverse_sock_key(&key);
-		// d => s
-		struct conn_id_s_t conn_id_s_rev = {};
-		conn_id_s_rev.direct = role == kRoleClient ? kIngress : kEgress;
-		conn_id_s_rev.tgid_fd = tgid_fd;
-		bpf_map_update_elem(&sock_key_conn_id_map, &rev, &conn_id_s_rev, BPF_NOEXIST);
-		report_conn_evt(ctx, &conn_info, kConnect, start_ts);
-	}
-
+	create_conn_info(ctx, &conn_info, tgid_fd, &key, role, start_ts);
 }
 
 
@@ -1166,6 +1180,40 @@ static __always_inline void process_syscall_accept(void* ctx, long int ret, stru
 	submit_new_conn(ctx, tgid, ret, args->addr, args->sock_alloc_socket, kRoleServer , 0);
 }
 
+
+
+static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct tcp_sock* tcp_sk,uint64_t tgid_fd, enum traffic_direction_t direct,ssize_t bytes_count,
+			struct conn_info_t* new_conn_info) {
+		struct sock_key key;
+		parse_sock_key_sk((struct sock*)tcp_sk, &key);
+		
+		init_conn_info(tgid_fd>>32, (uint32_t)tgid_fd, new_conn_info);
+		new_conn_info->laddr.in4.sin_addr.s_addr =  key.sip;
+		new_conn_info->laddr.in4.sin_port = key.sport;
+		new_conn_info->raddr.in4.sin_addr.s_addr =  key.dip ;
+		new_conn_info->raddr.in4.sin_port =  key.dport;
+		new_conn_info->laddr.in4.sin_family = key.family;
+		new_conn_info->raddr.in4.sin_family = key.family;
+		bool created = create_conn_info(ctx, new_conn_info, tgid_fd, &key, kRoleUnknown, bpf_ktime_get_ns());
+		if (!created) {
+			return false;
+		}
+		
+		u32 initial_seq = 0;
+		if (direct == kEgress) {
+			u32 snd_nxt = _C(tcp_sk,snd_nxt);
+			initial_seq = snd_nxt - bytes_count - 1;
+			// bpf_printk("send initial_seq: %u", initial_seq);
+		} else {
+			parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
+			u32 copied_seq = _C(tcp_sk, copied_seq);
+			initial_seq = copied_seq - bytes_count - 1;
+			// bpf_printk("recv initial_seq: %u", initial_seq);
+		}
+		bpf_map_update_elem(&sock_xmit_map, &key, &initial_seq, BPF_NOEXIST);
+		return true;
+}
+
 static __always_inline void process_syscall_data_vecs(void* ctx, struct data_args *args, uint64_t id, enum traffic_direction_t direct,
 	ssize_t bytes_count) {
 		
@@ -1186,6 +1234,23 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 	}
 	uint64_t tgid_fd = gen_tgid_fd(tgid, args->fd);
 	struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+	struct tcp_sock* tcp_sk = NULL;
+	if (!conn_info) {
+		tcp_sk = get_socket_from_fd(args->fd);
+		if (tcp_sk) {
+			struct sock_key key;
+			int zero = 0;
+			struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			if (new_conn_info) {
+				new_conn_info->protocol = kProtocolUnset;
+				parse_sock_key_sk((struct sock*)tcp_sk, &key);
+				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info);
+				if (created) {
+					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+				}
+			}
+		}
+	} 
 	if (!conn_info) {
 		return;
 	}
@@ -1201,7 +1266,16 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 			if (buf_size != 0) {
 				enum traffic_protocol_t before_infer = conn_info->protocol;
 				struct protocol_message_t protocol_message = infer_protocol(iov_cpy.iov_base, buf_size, conn_info);
-				if (conn_info->protocol != before_infer) {
+				
+				if (before_infer != protocol_message.protocol) {
+					conn_info->protocol = protocol_message.protocol;
+					// bpf_printk("[protocol infer]: %d", conn_info->protocol);
+					
+					if (conn_info->role == kRoleUnknown && protocol_message.type != kUnknown) {
+						conn_info->role = ((direct == kEgress) ^ (protocol_message.type == kResponse))
+											? kRoleClient
+											: kRoleServer;
+					}
 					report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
 				}
 				break;
@@ -1234,18 +1308,45 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 		return;
 	}
 	uint32_t tgid = id >> 32;
+	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
+		return;
+	}
 	uint64_t tgid_fd = gen_tgid_fd(tgid, args->fd);
 	struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+	struct tcp_sock* tcp_sk = NULL;
+	if (!conn_info) {
+		tcp_sk = get_socket_from_fd(args->fd);
+		if (tcp_sk) {
+			struct sock_key key;
+			int zero = 0;
+			struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			if (new_conn_info) {
+				new_conn_info->protocol = kProtocolUnset;
+				parse_sock_key_sk((struct sock*)tcp_sk, &key);
+				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info);
+				if (created) {
+					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+				}
+			}
+		}
+	} 
 	if (!conn_info) {
 		return;
-	} 
+	}
 	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
 		enum traffic_protocol_t before_infer = conn_info->protocol;
 		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
 		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
 		// conn_info->protocol = protocol_message.protocol;
-		if (before_infer != conn_info->protocol) {
+		if (before_infer != protocol_message.protocol) {
+			conn_info->protocol = protocol_message.protocol;
 			// bpf_printk("[protocol infer]: %d", conn_info->protocol);
+			
+			if (conn_info->role == kRoleUnknown && protocol_message.type != kUnknown) {
+				conn_info->role = ((direct == kEgress) ^ (protocol_message.type == kResponse))
+									? kRoleClient
+									: kRoleServer;
+			}
 			report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
 		}
 	}

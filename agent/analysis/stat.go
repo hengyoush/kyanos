@@ -28,9 +28,9 @@ type AnnotatedRecord struct {
 	endTs                        uint64
 	reqSize                      int
 	respSize                     int
-	totalDuration                int
-	blackBoxDuration             int
-	readFromSocketBufferDuration int
+	totalDuration                float64
+	blackBoxDuration             float64
+	readFromSocketBufferDuration float64
 	reqSyscallEventDetails       []SyscallEventDetail
 	respSyscallEventDetails      []SyscallEventDetail
 	reqNicEventDetails           []NicEventDetail
@@ -78,17 +78,17 @@ func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string 
 	result += r.Record.String(options.RecordToStringOptions)
 	result += "\n"
 	if _, ok := options.MetricTypeSet[TotalDuration]; ok {
-		result += fmt.Sprintf("[total duration] = %d(%s)(start=%s, end=%s)\n", common.ConvertDurationToMillisecondsIfNeeded(int64(r.totalDuration), nano), timeUnitName(nano),
+		result += fmt.Sprintf("[total duration] = %.3f(%s)(start=%s, end=%s)\n", common.ConvertDurationToMillisecondsIfNeeded(float64(r.totalDuration), nano), timeUnitName(nano),
 			common.FormatTimestampWithPrecision(r.startTs, nano),
 			common.FormatTimestampWithPrecision(r.endTs, nano))
 	}
 	if _, ok := options.MetricTypeSet[ReadFromSocketBufferDuration]; ok {
-		result += fmt.Sprintf("[read from sockbuf]=%d(%s)\n", common.ConvertDurationToMillisecondsIfNeeded(int64(r.readFromSocketBufferDuration), nano),
+		result += fmt.Sprintf("[read from sockbuf]=%.3f(%s)\n", common.ConvertDurationToMillisecondsIfNeeded(float64(r.readFromSocketBufferDuration), nano),
 			timeUnitName(nano))
 	}
 	if _, ok := options.MetricTypeSet[BlackBoxDuration]; ok {
-		result += fmt.Sprintf("[%s]=%d(%s)\n", r.blackboxName(),
-			common.ConvertDurationToMillisecondsIfNeeded(int64(r.blackBoxDuration), nano),
+		result += fmt.Sprintf("[%s]=%.3f(%s)\n", r.blackboxName(),
+			common.ConvertDurationToMillisecondsIfNeeded(float64(r.blackBoxDuration), nano),
 			timeUnitName(nano))
 	}
 	if _, ok := options.MetricTypeSet[RequestSize]; ok {
@@ -198,13 +198,13 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.reqSize = ingressMessage.ByteSize()
 		annotatedRecord.respSize = egressMessage.ByteSize()
 		if hasNicInEvents && hasDevOutEvents {
-			annotatedRecord.totalDuration = int(annotatedRecord.endTs) - int(annotatedRecord.startTs)
+			annotatedRecord.totalDuration = float64(annotatedRecord.endTs) - float64(annotatedRecord.startTs)
 		}
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
-			annotatedRecord.blackBoxDuration = int(writeSyscallEvents[len(writeSyscallEvents)-1].GetTimestamp()) - int(readSyscallEvents[0].GetTimestamp())
+			annotatedRecord.blackBoxDuration = float64(writeSyscallEvents[len(writeSyscallEvents)-1].GetTimestamp()) - float64(readSyscallEvents[0].GetTimestamp())
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
-			annotatedRecord.readFromSocketBufferDuration = int(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - int(tcpInEvents[0].GetTimestamp())
+			annotatedRecord.readFromSocketBufferDuration = float64(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - float64(tcpInEvents[0].GetTimestamp())
 		}
 		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](readSyscallEvents)
 		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](writeSyscallEvents)
@@ -220,13 +220,13 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.reqSize = egressMessage.ByteSize()
 		annotatedRecord.respSize = ingressMessage.ByteSize()
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
-			annotatedRecord.totalDuration = int(annotatedRecord.endTs) - int(annotatedRecord.startTs)
+			annotatedRecord.totalDuration = float64(annotatedRecord.endTs) - float64(annotatedRecord.startTs)
 		}
 		if hasNicInEvents && hasDevOutEvents {
-			annotatedRecord.blackBoxDuration = int(nicIngressEvents[len(nicIngressEvents)-1].GetTimestamp()) - int(devOutSyscallEvents[0].GetTimestamp())
+			annotatedRecord.blackBoxDuration = float64(nicIngressEvents[len(nicIngressEvents)-1].GetTimestamp()) - float64(devOutSyscallEvents[0].GetTimestamp())
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
-			annotatedRecord.readFromSocketBufferDuration = int(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - int(tcpInEvents[0].GetTimestamp())
+			annotatedRecord.readFromSocketBufferDuration = float64(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - float64(tcpInEvents[0].GetTimestamp())
 		}
 		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](writeSyscallEvents)
 		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](readSyscallEvents)

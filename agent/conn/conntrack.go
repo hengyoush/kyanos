@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/cilium/ebpf"
 )
 
 // var RecordFunc func(protocol.Record, *Connection4) error
@@ -233,11 +235,11 @@ func (c *Connection4) extractSockKeys() (bpf.AgentSockKey, bpf.AgentSockKey) {
 	key.Family = uint32(common.AF_INET) // TODO @ipv6
 
 	var revKey bpf.AgentSockKey
-	key.Sip = common.BytesToInt[uint32](c.RemoteIp)
-	key.Dip = common.BytesToInt[uint32](c.LocalIp)
-	key.Sport = uint32(c.RemotePort)
-	key.Dport = uint32(c.LocalPort)
-	key.Family = uint32(common.AF_INET)
+	revKey.Sip = common.BytesToInt[uint32](c.RemoteIp)
+	revKey.Dip = common.BytesToInt[uint32](c.LocalIp)
+	revKey.Sport = uint32(c.RemotePort)
+	revKey.Dport = uint32(c.LocalPort)
+	revKey.Family = uint32(common.AF_INET)
 	return key, revKey
 }
 
@@ -271,14 +273,42 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 	monitor.UnregisterMetricExporter(c.StreamEvents)
 }
 
-func (c *Connection4) OnCloseWithoutClearBpfMap() {
-	c.OnClose(false)
+func (c *Connection4) UpdateEBPFMapToNoTrace() {
+	key, revKey := c.extractSockKeys()
+	sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
+	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap)
+	c.doUpdateConnIdMapProtocolToUnknwon(revKey, sockKeyConnIdMap)
+
+	connInfoMap := bpf.GetMap("ConnInfoMap")
+	connInfo := bpf.AgentConnInfoT{}
+	err := connInfoMap.Lookup(c.TgidFd, &connInfo)
+	if err == nil {
+		connInfo.NoTrace = true
+		connInfoMap.Update(c.TgidFd, &connInfo, ebpf.UpdateExist)
+	} else {
+		log.Debugf("try to update %s conn_info_map to no_trace, but no entry in map found!", c.ToString())
+	}
 }
+
+func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m *ebpf.Map) {
+	var connIds bpf.AgentConnIdS_t
+	err := m.Lookup(&key, &connIds)
+	if err == nil {
+		connIds.NoTrace = true
+		m.Update(&key, &connIds, ebpf.UpdateExist)
+	} else {
+		log.Debugf("try to update %s conn_id_map to no_trace, but no entry in map found! key: %v", c.ToString(), key)
+	}
+}
+
+//	func (c *Connection4) OnCloseWithoutClearBpfMap() {
+//		c.OnClose(false)
+//	}
 func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
-	isReq := isReq(c, event)
+	isReq, ok := isReq(c, event)
 	if event.Len > 0 {
 		c.StreamEvents.AddKernEvent(event)
-	} else {
+	} else if ok {
 		if (event.Flags&uint8(common.TCP_FLAGS_SYN) != 0) && !isReq && event.Step == bpf.AgentStepTIP_IN {
 			// 接收到Server给的Syn包
 			if c.ServerSynReceived {
@@ -298,16 +328,15 @@ func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 	return true
 }
 func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
-	isReq := isReq(c, &event.SyscallEvent.Ke)
+	isReq, _ := isReq(c, &event.SyscallEvent.Ke)
 	if isReq {
-
 		c.reqStreamBuffer.Add(event.SyscallEvent.Ke.Seq, data, event.SyscallEvent.Ke.Ts)
 	} else {
 		c.respStreamBuffer.Add(event.SyscallEvent.Ke.Seq, data, event.SyscallEvent.Ke.Ts)
 	}
 
-	c.parseStreamBuffer(c.reqStreamBuffer, protocol.Request, &c.ReqQueue)
-	c.parseStreamBuffer(c.respStreamBuffer, protocol.Response, &c.RespQueue)
+	c.parseStreamBuffer(c.reqStreamBuffer, protocol.Request, &c.ReqQueue, event.SyscallEvent.Ke.Step)
+	c.parseStreamBuffer(c.respStreamBuffer, protocol.Response, &c.RespQueue, event.SyscallEvent.Ke.Step)
 	c.StreamEvents.AddSyscallEvent(event)
 
 	parser := c.GetProtocolParser(c.Protocol)
@@ -321,7 +350,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData) {
 	}
 }
 
-func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage) {
+func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, step bpf.AgentStepT) {
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
 		streamBuffer.Clear()
@@ -341,8 +370,19 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		parseResult := parser.ParseStream(streamBuffer, messageType)
 		switch parseResult.ParseState {
 		case protocol.Success:
-			*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
-			streamBuffer.RemovePrefix(parseResult.ReadBytes)
+			if c.Role == bpf.AgentEndpointRoleTKRoleUnknown && len(parseResult.ParsedMessages) > 0 {
+				parsedMessage := parseResult.ParsedMessages[0]
+				if (step == bpf.AgentStepTSYSCALL_IN && parsedMessage.IsReq()) || (step == bpf.AgentStepTSYSCALL_OUT && !parsedMessage.IsReq()) {
+					c.Role = bpf.AgentEndpointRoleTKRoleServer
+				} else {
+					c.Role = bpf.AgentEndpointRoleTKRoleClient
+				}
+				log.Debugf("Update %s role", c.ToString())
+				c.resetParseProgress()
+			} else {
+				*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
+				streamBuffer.RemovePrefix(parseResult.ReadBytes)
+			}
 		case protocol.Invalid:
 			pos := parser.FindBoundary(streamBuffer, messageType, 1)
 			if pos != -1 {
@@ -363,14 +403,17 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 
 }
 
-func isReq(conn *Connection4, event *bpf.AgentKernEvt) bool {
+func isReq(conn *Connection4, event *bpf.AgentKernEvt) (bool, bool) {
+	if conn.Role == bpf.AgentEndpointRoleTKRoleUnknown {
+		return false, false
+	}
 	var isReq bool
 	if !conn.IsServerSide() {
 		isReq = event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKEgress
 	} else {
 		isReq = event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress
 	}
-	return isReq
+	return isReq, true
 }
 
 func (c *Connection4) IsServerSide() bool {
@@ -399,8 +442,12 @@ func (c *Connection4) Identity() string {
 }
 func (c *Connection4) ToString() string {
 	direct := "=>"
-	if c.Role != bpf.AgentEndpointRoleTKRoleClient {
+	if c.Role == bpf.AgentEndpointRoleTKRoleServer {
 		direct = "<="
+	} else if c.Role == bpf.AgentEndpointRoleTKRoleClient {
+		direct = "=>"
+	} else {
+		direct = "<unknown>"
 	}
 	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d][%s] *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, c.StatusString(), c.LocalIp.String(), c.LocalPort, direct, c.RemoteIp.String(), c.RemotePort)
 }
@@ -421,4 +468,11 @@ func (c *Connection4) GetProtocolParser(p bpf.AgentTrafficProtocolT) protocol.Pr
 		c.protocolParsers[p] = parser
 		return parser
 	}
+}
+
+func (c *Connection4) resetParseProgress() {
+	c.reqStreamBuffer.Clear()
+	c.respStreamBuffer.Clear()
+	c.ReqQueue = c.ReqQueue[:]
+	c.RespQueue = c.RespQueue[:]
 }

@@ -86,6 +86,7 @@ type MessageType int
 const (
 	Request MessageType = iota
 	Response
+	Unknown
 )
 
 const (
