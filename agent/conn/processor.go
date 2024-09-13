@@ -131,7 +131,8 @@ func (p *Processor) run() {
 				}
 				conn.StreamEvents = NewKernEventStream(conn, 300)
 				if p.side != common.AllSide && p.side != conn.Side() {
-					conn.OnClose(true)
+					// conn.OnClose(true)
+					conn.UpdateConnectionTraceable(false)
 					continue
 				}
 				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
@@ -145,30 +146,39 @@ func (p *Processor) run() {
 				}
 				go func(c *Connection4) {
 					time.Sleep(1 * time.Second)
-					c.OnCloseWithoutClearBpfMap()
+					c.OnClose(true)
 				}(conn)
 			} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
 				// 协议推断
 				conn = p.connManager.FindConnection4Or(TgidFd, event.Ts+common.LaunchEpochTime)
+				// previousProtocol := conn.Protocol
 				if conn != nil && conn.Status != Closed {
 					conn.Protocol = event.ConnInfo.Protocol
 				} else {
 					continue
 				}
-				isProtocolInterested := conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown ||
+
+				if conn.Role == bpf.AgentEndpointRoleTKRoleUnknown && event.ConnInfo.Role != bpf.AgentEndpointRoleTKRoleUnknown {
+					conn.Role = event.ConnInfo.Role
+				}
+
+				isProtocolInterested := conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset ||
 					conn.MessageFilter.FilterByProtocol(conn.Protocol)
+
 				if isProtocolInterested {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
 							log.Debugf("%s process temp syscall events before infer\n", conn.ToString())
 							conn.OnSyscallEvent(sysEvent.Buf, sysEvent)
 						}
+						conn.UpdateConnectionTraceable(true)
 					}
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
 					conn.TempConnEvents = conn.TempConnEvents[0:0]
 				} else {
 					log.Debugf("%s discarded due to not interested", conn.ToString())
-					conn.OnClose(true)
+					conn.UpdateConnectionTraceable(false)
+					// conn.OnClose(true)
 				}
 			}
 			eventType := "connect"

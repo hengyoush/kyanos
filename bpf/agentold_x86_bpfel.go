@@ -19,6 +19,13 @@ type AgentOldConnEvtT struct {
 	Ts       uint64
 }
 
+type AgentOldConnIdS_t struct {
+	TgidFd  uint64
+	Direct  AgentOldTrafficDirectionT
+	NoTrace bool
+	_       [3]byte
+}
+
 type AgentOldConnInfoT struct {
 	ConnId struct {
 		Upid struct {
@@ -55,7 +62,8 @@ type AgentOldConnInfoT struct {
 	PrevCount           uint64
 	PrevBuf             [4]int8
 	PrependLengthHeader bool
-	_                   [3]byte
+	NoTrace             bool
+	_                   [2]byte
 }
 
 type AgentOldConnTypeT uint32
@@ -90,11 +98,7 @@ type AgentOldKernEvt struct {
 	Len      uint32
 	Flags    uint8
 	_        [3]byte
-	ConnIdS  struct {
-		TgidFd uint64
-		Direct AgentOldTrafficDirectionT
-		_      [4]byte
-	}
+	ConnIdS  AgentOldConnIdS_t
 	IsSample int32
 	Step     AgentOldStepT
 }
@@ -250,6 +254,7 @@ type AgentOldMapSpecs struct {
 	CloseArgsMap         *ebpf.MapSpec `ebpf:"close_args_map"`
 	ConnEvtRb            *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap          *ebpf.MapSpec `ebpf:"conn_info_map"`
+	ConnInfoT_map        *ebpf.MapSpec `ebpf:"conn_info_t_map"`
 	ConnectArgsMap       *ebpf.MapSpec `ebpf:"connect_args_map"`
 	ControlValues        *ebpf.MapSpec `ebpf:"control_values"`
 	EnabledLocalIpv4Map  *ebpf.MapSpec `ebpf:"enabled_local_ipv4_map"`
@@ -288,6 +293,7 @@ type AgentOldMaps struct {
 	CloseArgsMap         *ebpf.Map `ebpf:"close_args_map"`
 	ConnEvtRb            *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap          *ebpf.Map `ebpf:"conn_info_map"`
+	ConnInfoT_map        *ebpf.Map `ebpf:"conn_info_t_map"`
 	ConnectArgsMap       *ebpf.Map `ebpf:"connect_args_map"`
 	ControlValues        *ebpf.Map `ebpf:"control_values"`
 	EnabledLocalIpv4Map  *ebpf.Map `ebpf:"enabled_local_ipv4_map"`
@@ -309,6 +315,7 @@ func (m *AgentOldMaps) Close() error {
 		m.CloseArgsMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
+		m.ConnInfoT_map,
 		m.ConnectArgsMap,
 		m.ControlValues,
 		m.EnabledLocalIpv4Map,

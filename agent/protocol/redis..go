@@ -442,6 +442,7 @@ func ParseArray(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMes
 
 	ret := &RedisMessage{
 		FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), uint64(decoder.readBytes)),
+		isReq:     true,
 	}
 	cmd, payload := getCmdAndArgs(msgSlice)
 	ret.command = cmd
@@ -470,6 +471,9 @@ func getCmdAndArgs(payloads []ParsedMessage) (string, string) {
 				finalPayload += " "
 			}
 		}
+	}
+	if len(payloads) == 0 {
+		return "", ""
 	}
 	firstMessage := convertParsedMessageToRedisMessage(payloads[0])
 	candidateCmd := strings.ToUpper(firstMessage.payload)
@@ -505,6 +509,7 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   str,
 			status:    SuccessStatus,
+			isReq:     false,
 		}, nil
 	case kBulkStringsMarker:
 		str, err := ParseBulkString(decoder, timestamp, seq)
@@ -515,6 +520,7 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   str,
 			status:    SuccessStatus,
+			isReq:     false,
 		}, nil
 	case kErrorMarker:
 		str, err := decoder.ExtractStringUntil(kTerminalSequence)
@@ -525,6 +531,7 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   "-" + str,
 			status:    FailStatus,
+			isReq:     false,
 		}, nil
 	case kIntegerMarker:
 		str, err := decoder.ExtractStringUntil(kTerminalSequence)
@@ -535,6 +542,7 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
 			payload:   str,
 			status:    SuccessStatus,
+			isReq:     false,
 		}, nil
 	case kArrayMarker:
 		return ParseArray(decoder, timestamp, seq)
@@ -563,7 +571,7 @@ func (r *RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 			result.ParseState = Success
 		}
 
-		redisMessage.(*RedisMessage).isReq = messageType == Request
+		// redisMessage.(*RedisMessage).isReq = messageType == Request
 		redisMessage.(*RedisMessage).seq = seq
 		result.ReadBytes = redisMessage.ByteSize()
 		result.ParsedMessages = []ParsedMessage{redisMessage}

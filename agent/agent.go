@@ -82,7 +82,7 @@ func validateAndRepairOptions(options AgentOptions) AgentOptions {
 		newOptions.ProcessorsNum = runtime.NumCPU()
 	}
 	if newOptions.MessageFilter == nil {
-		newOptions.MessageFilter = protocol.NoopFilter{}
+		newOptions.MessageFilter = protocol.BaseFilter{}
 	}
 	if newOptions.BPFVerifyLogSize <= 0 {
 		newOptions.BPFVerifyLogSize = 1 * 1024 * 1024

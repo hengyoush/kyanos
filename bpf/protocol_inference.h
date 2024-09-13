@@ -31,7 +31,7 @@ static __always_inline int is_mysql_protocol(const char *old_buf, size_t count, 
   // MySQL packets start with a 3-byte packet length and a 1-byte packet number.
   // The 5th byte on a request contains a command that tells the type.
   if (count < 5) {
-    return 0;
+    return kUnknown;
   }
 
   // Convert 3-byte length to uint32_t. But since the 4th byte is supposed to be \x00, directly
@@ -47,28 +47,28 @@ static __always_inline int is_mysql_protocol(const char *old_buf, size_t count, 
 
   // The packet number of a request should always be 0.
   if (seq != 0) {
-    return 0;
+    return kUnknown;
   }
 
   // No such thing as a zero-length request in MySQL protocol.
   if (len == 0) {
-    return 0;
+    return kUnknown;
   }
 
   // Assuming that the length of a request is less than 10k characters to avoid false
   // positive flagging as MySQL, which statistically happens frequently for a single-byte
   // check.
   if (len > 10000) {
-    return 0;
+    return kUnknown;
   }
 
   // TODO(oazizi): Consider adding more commands (0x00 to 0x1f).
   // Be careful, though: trade-off is higher rates of false positives.
   if (com == kComConnect || com == kComQuery || com == kComStmtPrepare || com == kComStmtExecute ||
       com == kComStmtClose) {
-    return 1;
+    return kRequest;
   }
-  return 0;
+  return kUnknown;
 }
 
 static __always_inline int is_redis_protocol(const char *old_buf, size_t count) {
@@ -91,39 +91,50 @@ static __always_inline int is_redis_protocol(const char *old_buf, size_t count) 
       first_byte != '*') {
     return false;
   }
+
+  char last_buf[2] = {};
+  bpf_probe_read_user(last_buf, 2, old_buf + count - 2);
+  if (last_buf[0] != '\r') {
+    return false;
+  }
+  if (last_buf[1] != '\n') {
+    return false;
+  }
   return true;
 }
 
-static __always_inline int is_http_protocol(const char *old_buf, size_t count) {
+static __always_inline enum message_type_t is_http_protocol(const char *old_buf, size_t count) {
   if (count < 5) {
     return 0;
   }
   char buf[4] = {};
   bpf_probe_read_user(buf, 4, old_buf);
+  if (buf[0] == 'H' && buf[1] == 'T' && buf[2] == 'T' && buf[3] == 'P') {
+    return kResponse;
+  }
   if (buf[0] == 'G' && buf[1] == 'E' && buf[2] == 'T') {
-    return 1;
+    return kRequest;
   }
   if (buf[0] == 'H' && buf[1] == 'E' && buf[2] == 'A' && buf[3] == 'D') {
-    return 1;
+    return kRequest;
   }
   if (buf[0] == 'P' && buf[1] == 'O' && buf[2] == 'S' && buf[3] == 'T') {
-    return 1;
+    return kRequest;
   }
-  return 0;
+  return kUnknown;
 }
 
 static __always_inline struct protocol_message_t infer_protocol(const char *buf, size_t count, struct conn_info_t *conn_info) {
   struct protocol_message_t protocol_message;
   protocol_message.protocol = kProtocolUnknown;
   protocol_message.type = kUnknown;
-  if (is_http_protocol(buf, count)) {
+  if ((protocol_message.type = is_http_protocol(buf, count)) != kUnknown) {
     protocol_message.protocol = kProtocolHTTP;
-  } else if (is_mysql_protocol(buf, count, conn_info))  {
+  } else if ((protocol_message.type = is_mysql_protocol(buf, count, conn_info)) != kUnknown)  {
     protocol_message.protocol = kProtocolMySQL;
   } else if (is_redis_protocol(buf, count)) {
     protocol_message.protocol = kProtocolRedis;
   }
-  conn_info->protocol = protocol_message.protocol;
   conn_info->prev_count = count;
   if (count == 4) {
     bpf_probe_read_user(conn_info->prev_buf, 4, buf);
