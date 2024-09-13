@@ -471,6 +471,9 @@ func getCmdAndArgs(payloads []ParsedMessage) (string, string) {
 			}
 		}
 	}
+	if len(payloads) == 0 {
+		return "", ""
+	}
 	firstMessage := convertParsedMessageToRedisMessage(payloads[0])
 	candidateCmd := strings.ToUpper(firstMessage.payload)
 	_, ok := redisCommandsMap[candidateCmd]
