@@ -131,7 +131,7 @@ func SetupAgent(options AgentOptions) {
 
 	// Remove resource limits for kernels <5.11.
 	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatal("Remove memlock:", err)
+		log.Warn("Remove memlock:", err)
 	}
 
 	kernelVersion := compatible.GetCurrentKernelVersion()
