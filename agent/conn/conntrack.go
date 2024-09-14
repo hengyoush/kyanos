@@ -35,11 +35,13 @@ type Connection4 struct {
 	Status            ConnStatus
 	TCPHandshakeStatus
 
-	reqStreamBuffer  *buffer.StreamBuffer
-	respStreamBuffer *buffer.StreamBuffer
-	ReqQueue         []protocol.ParsedMessage
-	RespQueue        []protocol.ParsedMessage
-	StreamEvents     *KernEventStream
+	reqStreamBuffer          *buffer.StreamBuffer
+	respStreamBuffer         *buffer.StreamBuffer
+	ReqQueue                 []protocol.ParsedMessage
+	lastReqMadeProgressTime  int64
+	lastRespMadeProgressTime int64
+	RespQueue                []protocol.ParsedMessage
+	StreamEvents             *KernEventStream
 
 	MessageFilter protocol.ProtocolFilter
 	LatencyFilter protocol.LatencyFilter
@@ -343,8 +345,11 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		startPos = 0
 	}
 	streamBuffer.RemovePrefix(startPos)
+	originPos := streamBuffer.Position0()
+	// var parseState protocol.ParseState
 	for !stop && !streamBuffer.IsEmpty() {
 		parseResult := parser.ParseStream(streamBuffer, messageType)
+		// parseState = parseResult.ParseState
 		switch parseResult.ParseState {
 		case protocol.Success:
 			if c.Role == bpf.AgentEndpointRoleTKRoleUnknown && len(parseResult.ParsedMessages) > 0 {
@@ -357,8 +362,12 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 				log.Debugf("Update %s role", c.ToString())
 				c.resetParseProgress()
 			} else {
-				*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
-				streamBuffer.RemovePrefix(parseResult.ReadBytes)
+				if len(parseResult.ParsedMessages) > 0 && parseResult.ParsedMessages[0].IsReq() != (messageType == protocol.Request) {
+					streamBuffer.RemovePrefix(parseResult.ReadBytes)
+				} else {
+					*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
+					streamBuffer.RemovePrefix(parseResult.ReadBytes)
+				}
 			}
 		case protocol.Invalid:
 			pos := parser.FindBoundary(streamBuffer, messageType, 1)
@@ -366,10 +375,22 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 				streamBuffer.RemovePrefix(pos)
 				stop = false
 			} else {
-				stop = true
+				removed := c.checkProgress(streamBuffer)
+				if removed {
+					log.Debugf("Invalid, %s Removed streambuffer head due to stuck", c.ToString())
+					stop = false
+				} else {
+					stop = true
+				}
 			}
 		case protocol.NeedsMoreData:
-			stop = true
+			removed := c.checkProgress(streamBuffer)
+			if removed {
+				log.Debugf("Needs more data, %s Removed streambuffer head due to stuck", c.ToString())
+				stop = false
+			} else {
+				stop = true
+			}
 		case protocol.Ignore:
 			stop = false
 			streamBuffer.RemovePrefix(parseResult.ReadBytes)
@@ -377,7 +398,39 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			panic("invalid parse state!")
 		}
 	}
-
+	curProgress := streamBuffer.Position0()
+	if streamBuffer.IsEmpty() || curProgress != int(originPos) {
+		c.updateProgressTime(streamBuffer)
+	}
+	// if parseState == protocol.Invalid {
+	// 	streamBuffer.Clear()
+	// }
+}
+func (c *Connection4) updateProgressTime(sb *buffer.StreamBuffer) {
+	if c.reqStreamBuffer == sb {
+		c.lastReqMadeProgressTime = time.Now().UnixMilli()
+	} else {
+		c.lastRespMadeProgressTime = time.Now().UnixMilli()
+	}
+}
+func (c *Connection4) getLastProgressTime(sb *buffer.StreamBuffer) int64 {
+	if c.reqStreamBuffer == sb {
+		return c.lastReqMadeProgressTime
+	} else {
+		return c.lastRespMadeProgressTime
+	}
+}
+func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
+	if c.getLastProgressTime(sb) == 0 {
+		c.updateProgressTime(sb)
+		return false
+	}
+	if time.Now().UnixMilli()-c.getLastProgressTime(sb) > 1000 {
+		sb.RemoveHead()
+		return true
+	} else {
+		return false
+	}
 }
 
 func isReq(conn *Connection4, event *bpf.AgentKernEvt) (bool, bool) {
