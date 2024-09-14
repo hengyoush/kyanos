@@ -855,9 +855,6 @@ func TestTracepointNetifReceiveSkb(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		// func(p interface{}) link.Link {
-		// 	return ApplyKernelVersionFunctions(t, bpf.AgentStepTNIC_IN, p)
-		// },
 		bpf.AttachTracepointNetifReceiveSkb,
 	},
 		FindInterestedKernEventOptions{
@@ -897,7 +894,7 @@ func TestIpRcvCore(t *testing.T) {
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
 		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTNIC_IN, p)
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN, p)
 		},
 		func(p interface{}) link.Link {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN, p)

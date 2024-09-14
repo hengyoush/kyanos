@@ -1202,18 +1202,22 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 			return false;
 		}
 		
-		u32 initial_seq = 0;
+		u32 send_initial_seq = 0;
+		u32 rcv_initial_seq = 0;
+		u32 write_seq = _C(tcp_sk,write_seq);
+		u32 copied_seq = _C(tcp_sk, copied_seq);
 		if (direct == kEgress) {
-			u32 snd_nxt = _C(tcp_sk,snd_nxt);
-			initial_seq = snd_nxt - bytes_count - 1;
-			// bpf_printk("send initial_seq: %u", initial_seq);
+			send_initial_seq = write_seq - bytes_count - 1;
+			rcv_initial_seq = copied_seq - 1;
+			// bpf_printk("send initial_seq: %u", initial_seq); x-28 [27] x
 		} else {
-			parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
-			u32 copied_seq = _C(tcp_sk, copied_seq);
-			initial_seq = copied_seq - bytes_count - 1;
+			send_initial_seq = write_seq - 1;
+			rcv_initial_seq = copied_seq - bytes_count - 1;
 			// bpf_printk("recv initial_seq: %u", initial_seq);
 		}
-		bpf_map_update_elem(&sock_xmit_map, &key, &initial_seq, BPF_NOEXIST);
+		bpf_map_update_elem(&sock_xmit_map, &key, &send_initial_seq, BPF_ANY);
+		parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
+		bpf_map_update_elem(&sock_xmit_map, &key, &rcv_initial_seq, BPF_ANY);
 		return true;
 }
 
