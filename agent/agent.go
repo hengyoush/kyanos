@@ -432,7 +432,7 @@ func setAndValidateParameters() bool {
 	zeroValue := uint8(0)
 	if len(remotePorts) > 0 {
 		log.Infoln("filter for remote ports: ", remotePorts)
-		err := enabledRemotePortMap.Update(&oneKey, &zeroValue, ebpf.UpdateAny)
+		err := enabledRemotePortMap.Update(oneKey, zeroValue, ebpf.UpdateAny)
 		if err != nil {
 			log.Errorln("Update EnabledRemotePortMap failed: ", err)
 		}
@@ -443,7 +443,7 @@ func setAndValidateParameters() bool {
 				return false
 			}
 			portNumber := uint16(portInt)
-			err = enabledRemotePortMap.Update(&portNumber, &zeroValue, ebpf.UpdateAny)
+			err = enabledRemotePortMap.Update(portNumber, zeroValue, ebpf.UpdateAny)
 			if err != nil {
 				log.Errorln("Update EnabledRemotePortMap failed: ", err)
 			}
@@ -476,7 +476,7 @@ func setAndValidateParameters() bool {
 	localPorts := viper.GetStringSlice(common.LocalPortsVarName)
 	if len(localPorts) > 0 {
 		log.Infoln("filter for local ports: ", localPorts)
-		err := enabledLocalPortMap.Update(&oneKey, &oneKey, ebpf.UpdateAny)
+		err := enabledLocalPortMap.Update(oneKey, uint8(oneKey), ebpf.UpdateAny)
 		if err != nil {
 			log.Errorln("Update EnabledLocalPortMap failed: ", err)
 		}
@@ -487,7 +487,7 @@ func setAndValidateParameters() bool {
 				return false
 			}
 			portNumber := uint16(portInt)
-			err = enabledLocalPortMap.Update(&portNumber, &zeroValue, ebpf.UpdateAny)
+			err = enabledLocalPortMap.Update(portNumber, zeroValue, ebpf.UpdateAny)
 			if err != nil {
 				log.Errorln("Update EnabledLocalPortMap failed: ", err)
 			}
