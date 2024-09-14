@@ -64,7 +64,8 @@ type Processor struct {
 	messageFilter protocol.ProtocolFilter
 	latencyFilter protocol.LatencyFilter
 	protocol.SizeFilter
-	side common.SideEnum
+	side            common.SideEnum
+	recordProcessor *RecordsProcessor
 }
 
 func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter protocol.ProtocolFilter,
@@ -81,6 +82,9 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.latencyFilter = latencyFilter
 	p.SizeFilter = sizeFilter
 	p.side = side
+	p.recordProcessor = &RecordsProcessor{
+		records: make([]RecordWithConn, 0),
+	}
 	return p
 }
 
@@ -96,6 +100,8 @@ func (p *Processor) AddKernEvent(record *bpf.AgentKernEvt) {
 	p.kernEvents <- record
 }
 func (p *Processor) run() {
+	recordChannel := make(chan RecordWithConn)
+	go p.recordProcessor.Run(recordChannel, time.NewTicker(1*time.Second))
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -169,7 +175,7 @@ func (p *Processor) run() {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
 							log.Debugf("%s process temp syscall events before infer\n", conn.ToString())
-							conn.OnSyscallEvent(sysEvent.Buf, sysEvent)
+							conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 						}
 						conn.UpdateConnectionTraceable(true)
 					}
@@ -207,7 +213,7 @@ func (p *Processor) run() {
 			if conn != nil && conn.ProtocolInferred() {
 				log.Debugf("[syscall][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 
-				conn.OnSyscallEvent(event.Buf, event)
+				conn.OnSyscallEvent(event.Buf, event, recordChannel)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
 				log.Debugf("[syscall][protocol unset][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
