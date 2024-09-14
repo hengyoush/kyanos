@@ -750,16 +750,10 @@ static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, 
 	// bpf_printk("skb_copy_datagram_iter, found!, sport:%d, dport:%d,family:%d", key.sport, key.dport, key.family);
 	// bpf_printk("skb_copy_datagram_iter, init_seq: %u, iter_type: %d", inital_seq, _(to->iter_type));
 
-	char p_cb[8] = {0};
-	BPF_CORE_READ_INTO(&p_cb, skb, cb);
-	// char *p_cb = _C(skb, cb);
-	struct tcp_skb_cb *cb = (struct tcp_skb_cb *)p_cb;
-	//  struct tcp_skb_cb *cb = {0}; 
-	// bpf_probe_read_kernel(&cb, sizeof(cb), (void*)p_cb);
-	// u32 seq = (int)_C(cb,seq) + offset;
-	u32 seq = 0;
-	BPF_CORE_READ_INTO(&seq, cb, seq);
-	seq += offset;
+	char* p_cb = _C(skb,cb);
+	struct tcp_skb_cb *cb = (struct tcp_skb_cb *)&p_cb[0];
+	u32 seq = _C(cb,seq) + offset;
+
 	struct parse_kern_evt_body body = {0};
 	body.ctx = ctx;
 	body.inital_seq = inital_seq;
@@ -1234,15 +1228,14 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		
 		u32 send_initial_seq = 0;
 		u32 rcv_initial_seq = 0;
-		u32 write_seq = _C(tcp_sk,write_seq);
+		u32 write_seq = _C(tcp_sk, write_seq);
 		u32 copied_seq = _C(tcp_sk, copied_seq);
 		if (direct == kEgress) {
 			send_initial_seq = write_seq - bytes_count - 1;
 			rcv_initial_seq = copied_seq - 1;
 			// bpf_printk("send initial_seq: %u", initial_seq); x-28 [27] x
 		} else {
-			u64 bytes_sent = _C(tcp_sk, bytes_sent);
-			send_initial_seq = bytes_sent == 0 ? write_seq : write_seq - 1;
+			send_initial_seq = write_seq - 1;
 			rcv_initial_seq = copied_seq - bytes_count - 1;
 			// bpf_printk("recv initial_seq: %u", initial_seq);
 		}
