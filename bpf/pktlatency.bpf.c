@@ -13,6 +13,8 @@
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
+#define COND key.dport == 6379||key.sport==6379
+#define COND_P key->dport == 6379||key->sport==6379
 
 #define ETH_P_IP	0x0800
 #define ETH_HLEN	14		/* Total octets in header.	 */
@@ -627,10 +629,16 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 						if (step == DEV_IN && enabledXDP() != 1 && should_trace_sock_key(&key)) {
 							BPF_CORE_READ_INTO(&inital_seq, tcp, seq);
 							inital_seq = bpf_ntohl(inital_seq);
+							uint8_t flag = 0;
+							bpf_probe_read_kernel(&flag, sizeof(uint8_t), &(((u8 *)tcp)[13]));
+							if ((flag & (1 << 1)) == 0) {
+								inital_seq--;
+							}
 							bpf_map_update_elem(&sock_xmit_map, &key, &inital_seq, BPF_NOEXIST);
 						} else {
 							goto err;
 						}
+						// goto err;
 					} else {
 						bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 					}
@@ -742,16 +750,10 @@ static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, 
 	// bpf_printk("skb_copy_datagram_iter, found!, sport:%d, dport:%d,family:%d", key.sport, key.dport, key.family);
 	// bpf_printk("skb_copy_datagram_iter, init_seq: %u, iter_type: %d", inital_seq, _(to->iter_type));
 
-	char p_cb[8] = {0};
-	BPF_CORE_READ_INTO(&p_cb, skb, cb);
-	// char *p_cb = _C(skb, cb);
-	struct tcp_skb_cb *cb = (struct tcp_skb_cb *)p_cb;
-	//  struct tcp_skb_cb *cb = {0}; 
-	// bpf_probe_read_kernel(&cb, sizeof(cb), (void*)p_cb);
-	// u32 seq = (int)_C(cb,seq) + offset;
-	u32 seq = 0;
-	BPF_CORE_READ_INTO(&seq, cb, seq);
-	seq += offset;
+	char* p_cb = _C(skb,cb);
+	struct tcp_skb_cb *cb = (struct tcp_skb_cb *)&p_cb[0];
+	u32 seq = _C(cb,seq) + offset;
+
 	struct parse_kern_evt_body body = {0};
 	body.ctx = ctx;
 	body.inital_seq = inital_seq;
@@ -849,7 +851,6 @@ int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 0, QDISC_OUT);
 	return 0;
 }
-
 static __always_inline int handle_ip_queue_xmit(void* ctx, struct sk_buff *skb)
 {
 	struct sock_key key = {0};
@@ -858,26 +859,25 @@ static __always_inline int handle_ip_queue_xmit(void* ctx, struct sk_buff *skb)
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 	if (found == NULL && !should_trace_sock_key(&key)) {
 		// bpf_printk("kp, lip: %d, dip:%d", key.sip, key.dip);
+		
 		return 0;
 	}
 	u32 inital_seq = 0;
+	struct tcphdr* tcp = {0};
+	BPF_CORE_READ_INTO(&tcp, skb, data);
 	if (found == NULL) {
-		struct tcphdr* tcp = {0};
 		// struct tcphdr* tcp = (struct tcphdr*)_C(skb, data);
-		BPF_CORE_READ_INTO(&tcp, skb, data);
 		// inital_seq = bpf_ntohl(_C(tcp,seq)); 
-		BPF_CORE_READ_INTO(&inital_seq, tcp, seq);
-		inital_seq = bpf_ntohl(inital_seq);
-		bpf_map_update_elem(&sock_xmit_map, &key,&inital_seq, BPF_NOEXIST);
-		// bpf_printk("not found!, seq: %u", inital_seq);
+		// BPF_CORE_READ_INTO(&inital_seq, tcp, seq);
+		// inital_seq = bpf_ntohl(inital_seq);
+		// bpf_map_update_elem(&sock_xmit_map, &key,&inital_seq, BPF_NOEXIST);
+		return 0;
 	} else {
 		bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 		// bpf_printk("found!, seq: %u", inital_seq);
 	}
 	// print_sock_key(&key);
 	// bpf_printk("[handle_ip_queue_xmit] seq: %u", inital_seq);
-	struct tcphdr* tcp = {0};
-	BPF_CORE_READ_INTO(&tcp, skb, data);
 	// struct tcphdr* tcp = (struct tcphdr*)_C(skb, data);
 
 	struct parse_kern_evt_body body = {0};
@@ -1025,9 +1025,7 @@ static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 	}
 	return NULL;
 }
-
-static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn_info, uint64_t tgid_fd, struct sock_key *key, enum endpoint_role_t role, uint64_t start_ts) {
-	
+static  __always_inline bool filter_conn_info(struct conn_info_t *conn_info) {
 	uint16_t one = 1;
 	uint8_t* enable_local_port_filter = bpf_map_lookup_elem(&enabled_local_port_map, &one);
 	if (enable_local_port_filter != NULL) {
@@ -1056,8 +1054,10 @@ static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn
 			}
 		}
 	}
-	
-	if (should_trace_conn(conn_info)) {
+	return true;
+}
+static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn_info, uint64_t tgid_fd, struct sock_key *key, enum endpoint_role_t role, uint64_t start_ts) {
+	if (should_trace_conn(conn_info) && filter_conn_info(conn_info)) {
 		
 		bpf_map_update_elem(&conn_info_map, &tgid_fd, conn_info, BPF_ANY);
 		struct conn_id_s_t conn_id_s = {};
@@ -1097,7 +1097,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 	}
 	struct tcp_sock * tcp_sk = get_socket_from_fd(fd);
 	// s => d
-	struct sock_key key;
+	struct sock_key key = {0};
 	if (role == kRoleClient) {
 		parse_sock_key_sk((struct sock*)tcp_sk, &key);
 	} else {
@@ -1118,7 +1118,31 @@ enum endpoint_role_t role, uint64_t start_ts) {
 	// bpf_printk("submit_new_conn raddr: port:%u", conn_info.raddr.in4.sin_port);
 
 	conn_info.role = role;
-	create_conn_info(ctx, &conn_info, tgid_fd, &key, role, start_ts);
+
+	// if (conn_info.raddr.in4.sin_port == 6379||conn_info.laddr.in4.sin_port == 6379) {
+	// 	bpf_printk("seqsubmit_new_conn raddr: port:%u", conn_info.raddr.in4.sin_port);
+		
+	// 	u32 write_seq = _C(tcp_sk,write_seq);
+	// 	u32 copied_seq = _C(tcp_sk, copied_seq);
+
+	// 	u32 rcv_nxt = _C(tcp_sk, rcv_nxt);
+	// 	bpf_printk("seq write_sq:%u, copied_seq:%u,rcv_nxt:%u", write_seq,rcv_nxt);
+	// }
+	bool created = create_conn_info(ctx, &conn_info, tgid_fd, &key, role, start_ts);
+	if (created && tcp_sk) {
+		parse_sock_key_sk((struct sock*)tcp_sk, &key);
+		u32 write_seq = _C(tcp_sk,write_seq);
+		u32 copied_seq = _C(tcp_sk, copied_seq);
+		if (write_seq != 0) {
+			write_seq--;
+			bpf_map_update_elem(&sock_xmit_map, &key, &write_seq, BPF_ANY);
+		}
+		parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
+		if (copied_seq != 0) {
+			copied_seq--;
+			bpf_map_update_elem(&sock_xmit_map, &key, &copied_seq, BPF_ANY);
+		}
+	}
 }
 
 
@@ -1204,7 +1228,7 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		
 		u32 send_initial_seq = 0;
 		u32 rcv_initial_seq = 0;
-		u32 write_seq = _C(tcp_sk,write_seq);
+		u32 write_seq = _C(tcp_sk, write_seq);
 		u32 copied_seq = _C(tcp_sk, copied_seq);
 		if (direct == kEgress) {
 			send_initial_seq = write_seq - bytes_count - 1;

@@ -411,6 +411,8 @@ func startPerfeventReader(reader io.Closer, consumeFunction func(perf.Record) er
 			if err := consumeFunction(record); err != nil {
 				log.Errorf("[dataReader] handleKernEvt err: %s\n", err)
 				continue
+			} else if record.LostSamples > 0 {
+				log.Warnf("[dataReader] lost sample: %d", record.LostSamples)
 			}
 		}
 	}()

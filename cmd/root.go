@@ -38,6 +38,8 @@ var LocalIps []string
 var IfName string
 var BTFFilePath string
 var BPFVerifyLogSize int
+var KernEvtPerfEventBufferSize int
+var DataEvtPerfEventBufferSize int
 
 func init() {
 	// rootCmd.PersistentFlags().StringVar(&LogDir, "log-dir", "", "log file dir")
@@ -52,6 +54,8 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("compatible")
 	rootCmd.PersistentFlags().StringVar(&BTFFilePath, "btf", "", "btf file path")
 	rootCmd.PersistentFlags().IntVar(&BPFVerifyLogSize, "bpf-verify-log-size", 1*1024*1024, "--bpf-verify-log-size 1024")
+	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "kern-perf-event-buffer-size", 1*1024*1024, "--kern-perf-event-buffer-size 1024")
+	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "data-perf-event-buffer-size", 30*1024*1024, "--data-perf-event-buffer-size 1024")
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false
 	viper.BindPFlags(rootCmd.Flags())

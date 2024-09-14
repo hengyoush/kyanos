@@ -48,6 +48,9 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 			timestamp: event.Ts,
 			step:      event.Step,
 		})
+		if len(kernEvtSlice) > s.maxLen {
+			log.Debugf("kern event stream size: %d exceed maxLen", len(kernEvtSlice))
+		}
 		for len(kernEvtSlice) > s.maxLen {
 			kernEvtSlice = kernEvtSlice[1:]
 		}
