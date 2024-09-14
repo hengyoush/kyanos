@@ -41,14 +41,14 @@ func (sb *StreamBuffer) Buffers() []*Buffer {
 	return sb.buffers
 }
 
-func (sb *StreamBuffer) position0() int {
+func (sb *StreamBuffer) Position0() int {
 	if sb.IsEmpty() {
 		return 0
 	}
 	return int(sb.buffers[0].seq)
 }
 
-func (sb *StreamBuffer) positionN() int {
+func (sb *StreamBuffer) PositionN() int {
 	if sb.IsEmpty() {
 		return 0
 	}
@@ -79,6 +79,12 @@ func (sb *StreamBuffer) RemovePrefix(length int) {
 		}
 	}
 }
+func (sb *StreamBuffer) RemoveHead() {
+	sb.RemovePrefix(sb.Head().Len())
+}
+func (sb *StreamBuffer) IsContinugous() bool {
+	return len(sb.buffers) == 1
+}
 func (sb *StreamBuffer) shrinkHeadBuffer() {
 	if sb.IsEmpty() {
 		return
@@ -90,7 +96,7 @@ func (sb *StreamBuffer) shrinkHeadBuffer() {
 }
 func (sb *StreamBuffer) shrinkBufferUntilSizeBelowCapacity() {
 	var lastDelete *Buffer
-	for !sb.IsEmpty() && sb.positionN()-sb.position0() > sb.capacity {
+	for !sb.IsEmpty() && sb.PositionN()-sb.Position0() > sb.capacity {
 		lastDelete = sb.buffers[0]
 		sb.buffers = sb.buffers[1:]
 	}
@@ -133,10 +139,10 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
 		sb.buffers = append(sb.buffers, newBuffer)
 		return
 	}
-	if sb.position0()-int(seq) >= maxBytesGap {
+	if sb.Position0()-int(seq) >= maxBytesGap {
 		return
 	}
-	if int(seq)-sb.positionN() >= maxBytesGap {
+	if int(seq)-sb.PositionN() >= maxBytesGap {
 		sb.Clear()
 		sb.buffers = append(sb.buffers, newBuffer)
 		sb.updateTimestamp(seq, timestamp)
