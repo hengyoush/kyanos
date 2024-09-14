@@ -470,6 +470,7 @@ func getCmdAndArgs(payloads []ParsedMessage) (string, string) {
 				finalPayload += convertParsedMessageToRedisMessage(each).payload
 				finalPayload += " "
 			}
+			return cmd, finalPayload
 		}
 	}
 	if len(payloads) == 0 {
