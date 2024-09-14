@@ -202,6 +202,8 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		}
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
 			annotatedRecord.blackBoxDuration = float64(writeSyscallEvents[len(writeSyscallEvents)-1].GetTimestamp()) - float64(readSyscallEvents[0].GetTimestamp())
+		} else {
+			annotatedRecord.blackBoxDuration = float64(egressMessage.TimestampNs()) - float64(ingressMessage.TimestampNs())
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
 			annotatedRecord.readFromSocketBufferDuration = float64(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - float64(tcpInEvents[0].GetTimestamp())
@@ -213,14 +215,20 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	} else {
 		if hasWriteSyscallEvents {
 			annotatedRecord.startTs = writeSyscallEvents[0].GetTimestamp()
+		} else {
+			annotatedRecord.startTs = egressMessage.TimestampNs()
 		}
 		if hasReadSyscallEvents {
 			annotatedRecord.endTs = readSyscallEvents[len(readSyscallEvents)-1].GetTimestamp()
+		} else {
+			annotatedRecord.endTs = ingressMessage.TimestampNs()
 		}
 		annotatedRecord.reqSize = egressMessage.ByteSize()
 		annotatedRecord.respSize = ingressMessage.ByteSize()
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
 			annotatedRecord.totalDuration = float64(annotatedRecord.endTs) - float64(annotatedRecord.startTs)
+		} else {
+			annotatedRecord.totalDuration = float64(ingressMessage.TimestampNs()) - float64(egressMessage.TimestampNs())
 		}
 		if hasNicInEvents && hasDevOutEvents {
 			annotatedRecord.blackBoxDuration = float64(nicIngressEvents[len(nicIngressEvents)-1].GetTimestamp()) - float64(devOutSyscallEvents[0].GetTimestamp())
