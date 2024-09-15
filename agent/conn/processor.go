@@ -212,8 +212,10 @@ func (p *Processor) run() {
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
 				common.BPFEventLog.Debugf("[syscall][protocol unset][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
+				common.BPFEventLog.Debugf("[syscall][protocol unknown][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 			} else {
-				common.BPFEventLog.Debugf("[syscall][lost][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
