@@ -157,8 +157,6 @@ struct conn_id_t {
 
 struct conn_id_s_t {
 	uint64_t tgid_fd;
-	// 0-入向 1-出向
-	enum traffic_direction_t direct;
   bool no_trace;
 };
 

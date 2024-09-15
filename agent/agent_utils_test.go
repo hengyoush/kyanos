@@ -41,6 +41,7 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 		cmd.FilterPid = int64(pid)
 		cmd.DefaultLogLevel = int32(logrus.DebugLevel)
 		cmd.Debug = true
+		cmd.InitLog()
 		agent.SetupAgent(agent.AgentOptions{
 			Stopper: agentStopper,
 			LoadBpfProgramFunction: func(objs interface{}) *list.List {
@@ -165,7 +166,7 @@ func AssertConnEvent(t *testing.T, connectEvent bpf.AgentConnEvtT, assert ConnEv
 
 type KernDataEventAssertConditions struct {
 	ignoreConnIdDirect bool
-	connIdDirect       bpf.AgentTrafficDirectionT
+	direct             int
 	ignorePid          bool
 	pid                uint64
 	ignoreFd           bool
@@ -190,9 +191,8 @@ type SyscallDataEventAssertConditions struct {
 
 func AssertKernEvent(t *testing.T, kernEvt *bpf.AgentKernEvt, conditions KernDataEventAssertConditions) {
 	connId := kernEvt.ConnIdS
-	direct := connId.Direct
 	if !conditions.ignoreConnIdDirect {
-		assert.Equal(t, conditions.connIdDirect, direct)
+		assert.Equal(t, conditions.direct == Egress, kernEvt.Step <= bpf.AgentStepTNIC_IN)
 	}
 	pid := connId.TgidFd >> 32
 	if !conditions.ignorePid {
@@ -264,6 +264,9 @@ type FindInterestedSyscallEventOptions struct {
 	connEventList []bpf.AgentConnEvtT
 }
 
+var Egress int = 0
+var Ingress int = 1
+
 type FindInterestedKernEventOptions struct {
 	findByRemotePort       bool
 	remotePort             uint16
@@ -271,7 +274,7 @@ type FindInterestedKernEventOptions struct {
 	localPort              uint16
 	findDataLenGtZeroEvent bool
 	findByDirect           bool
-	direct                 bpf.AgentTrafficDirectionT
+	direct                 int // 0-出 1-入
 	findByFuncName         bool
 	funcName               string
 	throw                  bool
@@ -360,7 +363,7 @@ func findInterestedKernEvents(t *testing.T, kernEventList []bpf.AgentKernEvt, op
 		if options.findDataLenGtZeroEvent && each.Len == 0 {
 			continue
 		}
-		if options.findByDirect && options.direct != each.ConnIdS.Direct {
+		if options.findByDirect && (options.direct == 0) != (each.Step <= bpf.AgentStepTNIC_OUT) {
 			continue
 		}
 		eventFuncName := common.Int8ToStr(each.FuncName[:])

@@ -169,8 +169,8 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	}
 
 	var writeSyscallEvents, readSyscallEvents, devOutSyscallEvents, nicIngressEvents, userCopyEvents, tcpInEvents []conn.KernEvent
-	egressMessage := getParsedMessageBySide(r, connection.IsServerSide(), bpf.AgentTrafficDirectionTKEgress)
-	ingressMessage := getParsedMessageBySide(r, connection.IsServerSide(), bpf.AgentTrafficDirectionTKIngress)
+	egressMessage := getParsedMessageBySide(r, connection.IsServerSide(), DirectEgress)
+	ingressMessage := getParsedMessageBySide(r, connection.IsServerSide(), DirectIngress)
 	writeSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_OUT, egressMessage.Seq(), egressMessage.ByteSize())
 	readSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
 	devOutSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_OUT, egressMessage.Seq(), egressMessage.ByteSize())
@@ -279,15 +279,15 @@ func KernEventsToEventDetails[k PacketEventDetail | SyscallEventDetail | NicEven
 	return result
 }
 
-func getParsedMessageBySide(r protocol.Record, IsServerSide bool, direct bpf.AgentTrafficDirectionT) protocol.ParsedMessage {
+func getParsedMessageBySide(r protocol.Record, IsServerSide bool, direct DirectEnum) protocol.ParsedMessage {
 	if !IsServerSide {
-		if direct == bpf.AgentTrafficDirectionTKEgress {
+		if direct == DirectEgress {
 			return r.Request()
 		} else {
 			return r.Response()
 		}
 	} else {
-		if direct == bpf.AgentTrafficDirectionTKEgress {
+		if direct == DirectEgress {
 			return r.Response()
 		} else {
 			return r.Request()

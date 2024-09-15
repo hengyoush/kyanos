@@ -439,9 +439,9 @@ func isReq(conn *Connection4, event *bpf.AgentKernEvt) (bool, bool) {
 	}
 	var isReq bool
 	if !conn.IsServerSide() {
-		isReq = event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKEgress
+		isReq = event.Step <= bpf.AgentStepTNIC_OUT
 	} else {
-		isReq = event.ConnIdS.Direct == bpf.AgentTrafficDirectionTKIngress
+		isReq = event.Step >= bpf.AgentStepTNIC_IN
 	}
 	return isReq, true
 }

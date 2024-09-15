@@ -63,7 +63,7 @@ func startAgent(options agent.AgentOptions) {
 	options.PerfEventBufferSizeForEvent = KernEvtPerfEventBufferSize
 	options.PerfEventBufferSizeForData = DataEvtPerfEventBufferSize
 
-	initLog()
+	InitLog()
 	common.AgentLog.Infoln("Kyanos starting...")
 	if viper.GetBool(common.DaemonVarName) {
 		cntxt := &daemon.Context{
@@ -119,7 +119,7 @@ func initSizeFilter(cmd *cobra.Command) protocol.SizeFilter {
 	return sizeFilter
 }
 
-func initLog() {
+func InitLog() {
 	if viper.GetBool("debug") {
 		DefaultLogLevel = int32(logrus.DebugLevel)
 	}

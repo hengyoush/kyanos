@@ -206,7 +206,7 @@ func TestRead(t *testing.T) {
 	conn := connManager.FindConnection4Exactly(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 		KernDataEventAssertConditions: KernDataEventAssertConditions{
-			connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
+			direct:           Ingress,
 			pid:              uint64(os.Getpid()),
 			fd:               uint32(conn.TgidFd),
 			funcName:         "syscall",
@@ -267,7 +267,7 @@ func TestRecvFrom(t *testing.T) {
 	conn := connManager.FindConnection4Exactly(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 		KernDataEventAssertConditions: KernDataEventAssertConditions{
-			connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
+			direct:           Ingress,
 			pid:              uint64(os.Getpid()),
 			fd:               uint32(conn.TgidFd),
 			funcName:         "syscall",
@@ -332,7 +332,7 @@ func TestReadv(t *testing.T) {
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 			KernDataEventAssertConditions: KernDataEventAssertConditions{
-				connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
+				direct:           Ingress,
 				pid:              uint64(os.Getpid()),
 				fd:               uint32(conn.TgidFd),
 				funcName:         "syscall",
@@ -399,7 +399,7 @@ func TestRecvmsg(t *testing.T) {
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 			KernDataEventAssertConditions: KernDataEventAssertConditions{
-				connIdDirect:     bpf.AgentTrafficDirectionTKIngress,
+				direct:           Ingress,
 				pid:              uint64(os.Getpid()),
 				fd:               uint32(conn.TgidFd),
 				ignoreFuncName:   true,
@@ -462,7 +462,7 @@ func TestWrite(t *testing.T) {
 	conn := connManager.FindConnection4Exactly(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 		KernDataEventAssertConditions: KernDataEventAssertConditions{
-			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			direct:           Egress,
 			pid:              uint64(os.Getpid()),
 			fd:               uint32(conn.TgidFd),
 			funcName:         "syscall",
@@ -523,7 +523,7 @@ func TestSendto(t *testing.T) {
 	conn := connManager.FindConnection4Exactly(syscallEvent.SyscallEvent.Ke.ConnIdS.TgidFd)
 	AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 		KernDataEventAssertConditions: KernDataEventAssertConditions{
-			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			direct:           Egress,
 			pid:              uint64(os.Getpid()),
 			fd:               uint32(conn.TgidFd),
 			funcName:         "syscall",
@@ -586,7 +586,7 @@ func TestWritev(t *testing.T) {
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
 			KernDataEventAssertConditions: KernDataEventAssertConditions{
-				connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+				direct:           Egress,
 				pid:              uint64(os.Getpid()),
 				fd:               uint32(conn.TgidFd),
 				funcName:         "syscall",
@@ -650,7 +650,7 @@ func TestSendMsg(t *testing.T) {
 	seq := uint64(1)
 	for index, syscallEvent := range syscallEvents {
 		AssertSyscallEventData(t, syscallEvent, SyscallDataEventAssertConditions{
-			KernDataEventAssertConditions: KernDataEventAssertConditions{connIdDirect: bpf.AgentTrafficDirectionTKEgress,
+			KernDataEventAssertConditions: KernDataEventAssertConditions{direct: Egress,
 				pid:              uint64(os.Getpid()),
 				fd:               uint32(conn.TgidFd),
 				ignoreFuncName:   true,
@@ -762,10 +762,10 @@ func TestIpXmit(t *testing.T) {
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
-			direct:                 bpf.AgentTrafficDirectionTKEgress,
+			direct:                 Egress,
 		}, KernDataEventAssertConditions{
 
-			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			direct:           Egress,
 			pid:              uint64(os.Getpid()),
 			funcName:         "ip_queue_xmit",
 			ignoreFuncName:   true,
@@ -792,12 +792,12 @@ func TestDevQueueXmit(t *testing.T) {
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
-			direct:                 bpf.AgentTrafficDirectionTKEgress,
+			direct:                 Egress,
 			findByStep:             true,
 			step:                   bpf.AgentStepTQDISC_OUT,
 		}, KernDataEventAssertConditions{
 
-			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			direct:           Egress,
 			pid:              uint64(os.Getpid()),
 			funcName:         "dev_queue_xmit",
 			ignoreFuncName:   true,
@@ -824,12 +824,12 @@ func TestDevHardStartXmit(t *testing.T) {
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
-			direct:                 bpf.AgentTrafficDirectionTKEgress,
+			direct:                 Egress,
 			findByStep:             true,
 			step:                   bpf.AgentStepTDEV_OUT,
 		}, KernDataEventAssertConditions{
 
-			connIdDirect:     bpf.AgentTrafficDirectionTKEgress,
+			direct:           Egress,
 			pid:              uint64(os.Getpid()),
 			funcName:         "dev_hard_start",
 			ignoreFuncName:   true,
@@ -860,12 +860,12 @@ func TestTracepointNetifReceiveSkb(t *testing.T) {
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
-			direct:                 bpf.AgentTrafficDirectionTKIngress,
+			direct:                 Ingress,
 			findByStep:             true,
 			step:                   bpf.AgentStepTDEV_IN,
 		}, KernDataEventAssertConditions{
 
-			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
+			direct:            Ingress,
 			pid:               uint64(os.Getpid()),
 			funcName:          "netif_receive_skb",
 			ignoreFuncName:    true,
@@ -903,12 +903,12 @@ func TestIpRcvCore(t *testing.T) {
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
-			direct:                 bpf.AgentTrafficDirectionTKIngress,
+			direct:                 Ingress,
 			findByStep:             true,
 			step:                   bpf.AgentStepTIP_IN,
 		}, KernDataEventAssertConditions{
 
-			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
+			direct:            Ingress,
 			pid:               uint64(os.Getpid()),
 			funcName:          "ip_rcv_core",
 			ignoreFuncName:    true,
@@ -943,12 +943,12 @@ func TestTcpV4DoRcv(t *testing.T) {
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
-			direct:                 bpf.AgentTrafficDirectionTKIngress,
+			direct:                 Ingress,
 			findByStep:             true,
 			step:                   bpf.AgentStepTTCP_IN,
 		}, KernDataEventAssertConditions{
 
-			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
+			direct:            Ingress,
 			pid:               uint64(os.Getpid()),
 			funcName:          "tcp_v4_do_rcv",
 			ignoreFuncName:    true,
@@ -983,12 +983,12 @@ func TestSkbCopyDatagramIter(t *testing.T) {
 		FindInterestedKernEventOptions{
 			findDataLenGtZeroEvent: true,
 			findByDirect:           true,
-			direct:                 bpf.AgentTrafficDirectionTKIngress,
+			direct:                 Ingress,
 			findByStep:             true,
 			step:                   bpf.AgentStepTUSER_COPY,
 		}, KernDataEventAssertConditions{
 
-			connIdDirect:      bpf.AgentTrafficDirectionTKIngress,
+			direct:            Ingress,
 			pid:               uint64(os.Getpid()),
 			funcName:          "skb_copy_datagr",
 			ignoreFuncName:    true,

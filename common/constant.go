@@ -25,3 +25,8 @@ type SideEnum int8
 const AllSide SideEnum = 0
 const ServerSide SideEnum = 1
 const ClientSide SideEnum = 2
+
+type DirectEnum int
+
+const DirectEgress DirectEnum = 0
+const DirectIngress DirectEnum = 1
