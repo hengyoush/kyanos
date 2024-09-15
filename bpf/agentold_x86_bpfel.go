@@ -21,9 +21,8 @@ type AgentOldConnEvtT struct {
 
 type AgentOldConnIdS_t struct {
 	TgidFd  uint64
-	Direct  AgentOldTrafficDirectionT
 	NoTrace bool
-	_       [3]byte
+	_       [7]byte
 }
 
 type AgentOldConnInfoT struct {

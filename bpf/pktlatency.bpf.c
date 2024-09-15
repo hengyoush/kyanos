@@ -200,6 +200,14 @@ static __always_inline struct sock_key reverse_sock_key(struct sock_key* key) {
 	copy.family = _(key->family);
 	return copy;
 }
+static __always_inline void reverse_sock_key_no_copy(struct sock_key* key) {
+	key->sip = key->sip ^ key->dip;
+	key->dip = key->sip ^ key->dip;
+	key->sip = key->sip ^ key->dip;
+	key->sport = key->sport ^ key->dport;
+	key->dport = key->sport ^ key->dport;
+	key->sport = key->sport ^ key->dport;
+}
 static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *param) {
 	void* ctx = param->ctx;
 	u32 inital_seq = param->inital_seq;
@@ -651,6 +659,9 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 				body.len = len - ip_hdr_len;
 				// body.func_name = func_name;
 				body.step = step;	
+				if (step >= NIC_IN){
+					reverse_sock_key_no_copy(&key);
+				}
 				report_kern_evt(&body);
 				return 1;
 			} else {
@@ -664,70 +675,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 // #ifndef KERNEL_VERSION_BELOW_58
 SEC("xdp")
 int xdp_proxy(struct xdp_md *ctx){
-	// bpf_printk("xdp");
-	void *data = (void *)(long)ctx->data;
-	void *data_end = (void *)(long)ctx->data_end;
-
-	struct ethhdr *eth = data;
-	if (data + sizeof(struct ethhdr) > data_end) {
-		// pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) > data_end");
-		return XDP_PASS;
-	}
-	u16 l3_proto = _(eth->h_proto);
-	// bpf_printk("xdp, l3_proto: %x", l3_proto);
-	struct iphdr *iph = data + sizeof(struct ethhdr);
-	if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end)
-	{
-		// pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) + sizeof(struct iphdr) > data_end");
-		return XDP_ABORTED;
-	}
-	if (iph->protocol != IPPROTO_TCP)
-	{
-		// bpf_printk("xdp2 iph->protocol != IPPROTO_TCP, %x", iph->protocol);
-		return XDP_PASS;
-	}
-	struct tcphdr* th = data + sizeof(struct ethhdr) + sizeof(struct iphdr);
-	if (data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr) > data_end) {
-		// pr_bpf_debug("xdp2 data + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr) > data_end");
-		return XDP_ABORTED;
-	}
-	
-	struct sock_key key = {0};
-	key.sip = _C(iph,saddr);
-	key.dip = _C(iph,daddr);
-	key.sport = bpf_ntohs(_C(th,source));
-	key.dport = bpf_ntohs(_C(th,dest));
-	key.family = AF_INET;
-	// bpf_printk("xdp, not found!, sport:%d, dport:%d, family:%d", key.sport, key.dport,key.family);
-	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
-	if (found == NULL && !should_trace_sock_key(&key)) {
-		// pr_bpf_debug("xdp key.dport != target_port, %u,%u,should_trace_sock_key:%d", key.dport, key.sport,should_trace_sock_key(&key));
-		return XDP_PASS;
-	}
-	u32 inital_seq;
-	if (found == NULL) {
-		inital_seq = bpf_ntohl(th->seq);
-		bpf_map_update_elem(&sock_xmit_map, &key,&inital_seq, BPF_NOEXIST);
-		// bpf_printk("xdp not found!, seq: %u", inital_seq);
-		// bpf_printk("xdp, not found!, sip: %u, dip:%u", bpf_ntohl(key.sip), bpf_ntohl(key.dip));
-		// bpf_printk("xdp, not found!, sport:%d, dport:%d, family:%d", key.sport, key.dport,key.family);
-	} else {
-		bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
-		// bpf_printk("xdp found!, seq: %u", inital_seq);
-	}
-	u32 len = data_end - data - (sizeof(struct ethhdr) + sizeof(struct iphdr));
-	// bpf_printk("xdp, skb: %x", data);
-	struct parse_kern_evt_body body = {0};
-	body.ctx = ctx;
-	body.inital_seq = inital_seq;
-	body.key = &key;
-	body.tcp = th;
-	body.len = len;
-	// body.func_name = XDP_FUNC_NAME;
-	body.step = NIC_IN;	
-	report_kern_evt(&body);
-	// KERN_EVENT_HANDLE(&evt, "xdp");
-	return XDP_PASS; 
+	return XDP_PASS;
 }
 // #else
 // #endif
@@ -753,6 +701,8 @@ static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, 
 	char* p_cb = _C(skb,cb);
 	struct tcp_skb_cb *cb = (struct tcp_skb_cb *)&p_cb[0];
 	u32 seq = _C(cb,seq) + offset;
+
+	reverse_sock_key_no_copy(&key);
 
 	struct parse_kern_evt_body body = {0};
 	body.ctx = ctx;
@@ -930,8 +880,8 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 		}
 		bpf_map_delete_elem(&conn_info_map, &tgid_fd);
 		bpf_map_delete_elem(&sock_key_conn_id_map, &key);
-		struct sock_key rev_key = reverse_sock_key(&key);
-		bpf_map_delete_elem(&sock_key_conn_id_map, &rev_key);
+		// struct sock_key rev_key = reverse_sock_key(&key);
+		// bpf_map_delete_elem(&sock_key_conn_id_map, &rev_key);
 	} 
 	if (!err) {
 		// pr_bpf_debug("tcp_destroy_sock, sock destory, %d, %d", key.sport, key.dport);
@@ -1061,15 +1011,16 @@ static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn
 		
 		bpf_map_update_elem(&conn_info_map, &tgid_fd, conn_info, BPF_ANY);
 		struct conn_id_s_t conn_id_s = {};
-		conn_id_s.direct = role == kRoleClient ? kEgress : kIngress;
+		// conn_id_s.direct = role == kRoleClient ? kEgress : kIngress;
+		// conn_id_s.direct = role == kEgress;
 		conn_id_s.tgid_fd = tgid_fd;
 		bpf_map_update_elem(&sock_key_conn_id_map, key, &conn_id_s, BPF_NOEXIST);
-		struct sock_key rev = reverse_sock_key(key);
-		// d => s
-		struct conn_id_s_t conn_id_s_rev = {};
-		conn_id_s_rev.direct = role == kRoleClient ? kIngress : kEgress;
-		conn_id_s_rev.tgid_fd = tgid_fd;
-		bpf_map_update_elem(&sock_key_conn_id_map, &rev, &conn_id_s_rev, BPF_NOEXIST);
+		// struct sock_key rev = reverse_sock_key(key);
+		// // d => s
+		// struct conn_id_s_t conn_id_s_rev = {};
+		// conn_id_s_rev.direct = role == kRoleClient ? kIngress : kEgress;
+		// conn_id_s_rev.tgid_fd = tgid_fd;
+		// bpf_map_update_elem(&sock_key_conn_id_map, &rev, &conn_id_s_rev, BPF_NOEXIST);
 		report_conn_evt(ctx, conn_info, kConnect, start_ts);
 		return true;
 	} else {
@@ -1098,18 +1049,25 @@ enum endpoint_role_t role, uint64_t start_ts) {
 	struct tcp_sock * tcp_sk = get_socket_from_fd(fd);
 	// s => d
 	struct sock_key key = {0};
-	if (role == kRoleClient) {
-		parse_sock_key_sk((struct sock*)tcp_sk, &key);
-	} else {
-		parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
-	}
+	parse_sock_key_sk((struct sock*)tcp_sk, &key);
+	// if (role == kRoleClient) {
+	// 	parse_sock_key_sk((struct sock*)tcp_sk, &key);
+	// } else {
+	// 	parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
+	// }
 	
 	// print_sock_key(&key);
 	if (socket == NULL) {
-		conn_info.laddr.in4.sin_addr.s_addr = role == kRoleClient ? key.sip : key.dip;
-		conn_info.laddr.in4.sin_port = role == kRoleClient ? key.sport : key.dport;
-		conn_info.raddr.in4.sin_addr.s_addr = role == kRoleClient ? key.dip : key.sip;
-		conn_info.raddr.in4.sin_port = role == kRoleClient ? key.dport : key.sport;
+		// conn_info.laddr.in4.sin_addr.s_addr = role == kRoleClient ? key.sip : key.dip;
+		// conn_info.laddr.in4.sin_port = role == kRoleClient ? key.sport : key.dport;
+		// conn_info.raddr.in4.sin_addr.s_addr = role == kRoleClient ? key.dip : key.sip;
+		// conn_info.raddr.in4.sin_port = role == kRoleClient ? key.dport : key.sport;
+		// conn_info.laddr.in4.sin_family = key.family;
+		// conn_info.raddr.in4.sin_family = key.family;
+		conn_info.laddr.in4.sin_addr.s_addr = key.sip ;
+		conn_info.laddr.in4.sin_port =  key.sport ;
+		conn_info.raddr.in4.sin_addr.s_addr = key.dip;
+		conn_info.raddr.in4.sin_port = key.dport;
 		conn_info.laddr.in4.sin_family = key.family;
 		conn_info.raddr.in4.sin_family = key.family;
 	}
@@ -1319,7 +1277,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 	struct conn_id_s_t conn_id_s;
 	conn_id_s.tgid_fd = tgid_fd;
-	conn_id_s.direct = direct;
+	// conn_id_s.direct = direct;
 	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 	if (should_trace_conn(conn_info)) {
 		report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args);
@@ -1386,7 +1344,7 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 	struct conn_id_s_t conn_id_s;
 	conn_id_s.tgid_fd = tgid_fd;
-	conn_id_s.direct = direct;
+	// conn_id_s.direct = direct;
 	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 	if (should_trace_conn(conn_info)) {
 		report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
