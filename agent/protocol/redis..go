@@ -605,7 +605,7 @@ func extractKeyFromPayLoad(redisMessage *RedisMessage) string {
 func (r RedisFilter) Filter(req ParsedMessage, resp ParsedMessage) bool {
 	redisReq, ok := req.(*RedisMessage)
 	if !ok {
-		log.Warnf("[RedisFilter] cast to RedisMessage failed: %v\n", req)
+		common.ProtocolParserLog.Warnf("[RedisFilter] cast to RedisMessage failed: %v\n", req)
 		return false
 	}
 	pass := true

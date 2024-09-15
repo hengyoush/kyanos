@@ -11,7 +11,7 @@ import (
 	"github.com/jefurry/logrus"
 )
 
-var log *logrus.Logger = common.Log
+var outputLog *logrus.Logger = logrus.New()
 
 type StatRecorder struct {
 }
@@ -244,7 +244,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	streamEvents.DiscardEventsBySeq(egressMessage.Seq()+uint64(egressMessage.ByteSize()), true)
 	streamEvents.DiscardEventsBySeq(ingressMessage.Seq()+uint64(ingressMessage.ByteSize()), false)
 	if recordsChannel == nil {
-		log.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
+		outputLog.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
 			Nano: false,
 			MetricTypeSet: MetricTypeSet{
 				ResponseSize:                 false,

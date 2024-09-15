@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"kyanos/bpf"
+	"kyanos/common"
 	"kyanos/monitor"
 	"slices"
 )
@@ -49,7 +50,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 			step:      event.Step,
 		})
 		if len(kernEvtSlice) > s.maxLen {
-			log.Debugf("kern event stream size: %d exceed maxLen", len(kernEvtSlice))
+			common.ConntrackLog.Debugf("kern event stream size: %d exceed maxLen", len(kernEvtSlice))
 		}
 		for len(kernEvtSlice) > s.maxLen {
 			kernEvtSlice = kernEvtSlice[1:]

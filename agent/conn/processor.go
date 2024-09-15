@@ -9,12 +9,7 @@ import (
 	"kyanos/common"
 	"sync"
 	"time"
-
-	"github.com/jefurry/logrus"
-	"github.com/spf13/viper"
 )
-
-var log *logrus.Logger = common.Log
 
 type ProcessorManager struct {
 	processors  []*Processor
@@ -49,7 +44,7 @@ func (pm *ProcessorManager) GetProcessor(i int) *Processor {
 func (pm *ProcessorManager) StopAll() error {
 	pm.cancel()
 	pm.wg.Wait()
-	log.Debugln("All Processor Stopped!")
+	common.DefaultLog.Debugln("All Processor Stopped!")
 	return nil
 }
 
@@ -105,7 +100,7 @@ func (p *Processor) run() {
 	for {
 		select {
 		case <-p.ctx.Done():
-			common.Log.Debugf("[%s] stopped", p.name)
+			common.DefaultLog.Debugf("[%s] stopped", p.name)
 			p.wg.Done()
 			return
 		case event := <-p.connEvents:
@@ -174,7 +169,7 @@ func (p *Processor) run() {
 				if isProtocolInterested {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
-							log.Debugf("%s process temp syscall events before infer\n", conn.ToString())
+							common.BPFEventLog.Debugf("%s process temp syscall events before infer\n", conn.ToString())
 							conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 						}
 						conn.UpdateConnectionTraceable(true)
@@ -182,7 +177,7 @@ func (p *Processor) run() {
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
 					conn.TempConnEvents = conn.TempConnEvents[0:0]
 				} else {
-					log.Debugf("%s discarded due to not interested", conn.ToString())
+					common.BPFEventLog.Debugf("%s discarded due to not interested", conn.ToString())
 					conn.UpdateConnectionTraceable(false)
 					// conn.OnClose(true)
 				}
@@ -199,9 +194,9 @@ func (p *Processor) run() {
 			}
 
 			if event.ConnType == bpf.AgentConnTypeTKProtocolInfer && conn.ProtocolInferred() {
-				log.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
+				common.BPFEventLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
 			} else {
-				log.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
+				common.BPFEventLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
 			}
 		case event := <-p.syscallEvents:
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
@@ -211,45 +206,42 @@ func (p *Processor) run() {
 				continue
 			}
 			if conn != nil && conn.ProtocolInferred() {
-				log.Debugf("[syscall][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 
 				conn.OnSyscallEvent(event.Buf, event, recordChannel)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
-				log.Debugf("[syscall][protocol unset][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][protocol unset][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 			} else {
-				log.Debugf("[syscall][lost][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][lost][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.Ts+common.LaunchEpochTime)
 			event.Ts += common.LaunchEpochTime
 			if conn != nil {
-				log.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
+				common.BPFEventLog.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
 					conn.ToString(), event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
-
 			} else {
-				if viper.GetBool(common.VerboseVarName) {
-					// log.Debugf("[data no conn][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, common.StepCNNames[event.Step],
-					// 	conn.ToString(), event.Seq, event.Len,
-					// 	common.DisplayTcpFlags(event.Flags))
-				}
+				common.BPFEventLog.Debugf("[data no conn][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
+					conn.ToString(), event.Seq, event.Len,
+					common.DisplayTcpFlags(event.Flags))
 			}
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					conn.OnKernEvent(event)
 					// log.Debug("[skip] skip due to protocol unset")
-					log.Debugf("[data][protocol-unset][func=%s][%s]%s | %d:%d \n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
+					common.BPFEventLog.Debugf("[data][protocol-unset][func=%s][%s]%s | %d:%d \n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 					flag := conn.OnKernEvent(event)
 					if !flag {
-						log.Debug("[skip] skip due to cur req/resp is nil ?(maybe bug)")
+						common.BPFEventLog.Debug("[skip] skip due to cur req/resp is nil ?(maybe bug)")
 					}
 				}
 			} else if event.Len > 0 && conn != nil {
-				log.Debug("[skip] skip due to protocol is unknwon")
-				log.Debugf("[data][func=%s][%s]%s | %d:%d\n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
+				common.BPFEventLog.Debug("[skip] skip due to protocol is unknwon")
+				common.BPFEventLog.Debugf("[data][func=%s][%s]%s | %d:%d\n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
 			} else if event.Len == 0 && conn != nil {
 				conn.OnKernEvent(event)
 			}

@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"cmp"
+	ac "kyanos/agent/common"
 	"kyanos/agent/protocol"
 	"kyanos/common"
 	"math"
@@ -124,7 +125,7 @@ type Analyzer struct {
 
 func CreateAnalyzer(recordsChannel <-chan *AnnotatedRecord, showOption *AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int) *Analyzer {
 	stopper := make(chan int)
-	common.AddToFastStopper(stopper)
+	ac.AddToFastStopper(stopper)
 	analyzer := &Analyzer{
 		Classfier:       getClassfier(showOption.ClassfierType),
 		recordsChannel:  recordsChannel,
@@ -190,6 +191,6 @@ func (a *Analyzer) analyze(record *AnnotatedRecord) {
 		}
 		aggregator.receive(record)
 	} else {
-		log.Errorf("classify error: %v\n", err)
+		common.DefaultLog.Warnf("classify error: %v\n", err)
 	}
 }

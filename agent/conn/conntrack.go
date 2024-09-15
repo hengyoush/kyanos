@@ -215,36 +215,36 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 		connInfoMap := bpf.GetMap("ConnInfoMap")
 		err := connInfoMap.Delete(c.TgidFd)
 		if err != nil {
-			log.Debugf("clean conn_info_map failed: %v", err)
+			common.ConntrackLog.Debugf("clean conn_info_map failed: %v", err)
 		} else {
-			log.Debugf("clean conn_info_map deleted")
+			common.ConntrackLog.Debugf("clean conn_info_map deleted")
 		}
 		key, revKey := c.extractSockKeys()
 		sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
 		err = sockKeyConnIdMap.Delete(key)
 		if err != nil {
-			log.Debugf("clean sock_key_conn_id_map key failed: %v", err)
+			common.ConntrackLog.Debugf("clean sock_key_conn_id_map key failed: %v", err)
 		} else {
-			log.Debugf("clean sockKeyConnIdMap deleted key")
+			common.ConntrackLog.Debugf("clean sockKeyConnIdMap deleted key")
 		}
 		err = sockKeyConnIdMap.Delete(revKey)
 		if err != nil {
-			log.Debugf("clean sock_key_conn_id_map revkey failed: %v", err)
+			common.ConntrackLog.Debugf("clean sock_key_conn_id_map revkey failed: %v", err)
 		} else {
-			log.Debugf("clean sockKeyConnIdMap deleted revkey")
+			common.ConntrackLog.Debugf("clean sockKeyConnIdMap deleted revkey")
 		}
 		sockXmitMap := bpf.GetMap("SockXmitMap")
 		err = sockXmitMap.Delete(key)
 		if err == nil {
-			log.Debugf("clean sockXmitMap deleted key")
+			common.ConntrackLog.Debugf("clean sockXmitMap deleted key")
 		} else {
-			log.Debugf("clean sockXmitMap failed: %v", err)
+			common.ConntrackLog.Debugf("clean sockXmitMap failed: %v", err)
 		}
 		err = sockXmitMap.Delete(revKey)
 		if err == nil {
-			log.Debugf("clean sockXmitMap deleted revkey")
+			common.ConntrackLog.Debugf("clean sockXmitMap deleted revkey")
 		} else {
-			log.Debugf("clean sockXmitMap failed: %v", err)
+			common.ConntrackLog.Debugf("clean sockXmitMap failed: %v", err)
 		}
 	}
 	monitor.UnregisterMetricExporter(c.StreamEvents)
@@ -263,7 +263,7 @@ func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
 		connInfo.NoTrace = !traceable
 		connInfoMap.Update(c.TgidFd, &connInfo, ebpf.UpdateExist)
 	} else {
-		log.Debugf("try to update %s conn_info_map to no_trace, but no entry in map found!", c.ToString())
+		common.ConntrackLog.Debugf("try to update %s conn_info_map to no_trace, but no entry in map found!", c.ToString())
 	}
 }
 
@@ -274,7 +274,7 @@ func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m
 		connIds.NoTrace = !traceable
 		m.Update(&key, &connIds, ebpf.UpdateExist)
 	} else {
-		log.Debugf("try to update %s conn_id_map to no_trace, but no entry in map found! key: %v", c.ToString(), key)
+		common.ConntrackLog.Debugf("try to update %s conn_id_map to no_trace, but no entry in map found! key: %v", c.ToString(), key)
 	}
 }
 
@@ -289,17 +289,17 @@ func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 		if (event.Flags&uint8(common.TCP_FLAGS_SYN) != 0) && !isReq && event.Step == bpf.AgentStepTIP_IN {
 			// 接收到Server给的Syn包
 			if c.ServerSynReceived {
-				log.Debugf("[kern][handshake]%s already received server sync, but now received again!\n", c.ToString())
+				common.ConntrackLog.Debugf("[kern][handshake]%s already received server sync, but now received again!\n", c.ToString())
 			} else {
 				c.ServerSynReceived = true
 				c.ServerSynReceivedTs = event.Ts
-				log.Debugf("[kern][handshake]%s received server sync\n", c.ToString())
+				common.ConntrackLog.Debugf("[kern][handshake]%s received server sync\n", c.ToString())
 			}
 		}
 		if (event.Flags&uint8(common.TCP_FLAGS_ACK) != 0) && isReq && c.ServerSynReceived && !c.ClientAckSent && event.Step == bpf.AgentStepTIP_OUT {
 			c.ClientAckSent = true
 			c.ClientAckSentTs = event.Ts
-			log.Debugf("[kern][handshake]%s sent ack, complete handshake, use time: %d(%d-%d)\n", c.ToString(), c.ClientAckSentTs-c.ConnectStartTs, c.ClientAckSentTs, c.ConnectStartTs)
+			common.ConntrackLog.Debugf("[kern][handshake]%s sent ack, complete handshake, use time: %d(%d-%d)\n", c.ToString(), c.ClientAckSentTs-c.ConnectStartTs, c.ClientAckSentTs, c.ConnectStartTs)
 		}
 	}
 	return true
@@ -359,7 +359,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 				} else {
 					c.Role = bpf.AgentEndpointRoleTKRoleClient
 				}
-				log.Debugf("Update %s role", c.ToString())
+				common.ConntrackLog.Debugf("Update %s role", c.ToString())
 				c.resetParseProgress()
 			} else {
 				if len(parseResult.ParsedMessages) > 0 && parseResult.ParsedMessages[0].IsReq() != (messageType == protocol.Request) {
@@ -377,7 +377,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			} else {
 				removed := c.checkProgress(streamBuffer)
 				if removed {
-					log.Debugf("Invalid, %s Removed streambuffer head due to stuck", c.ToString())
+					common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer head due to stuck", c.ToString())
 					stop = false
 				} else {
 					stop = true
@@ -386,7 +386,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		case protocol.NeedsMoreData:
 			removed := c.checkProgress(streamBuffer)
 			if removed {
-				log.Debugf("Needs more data, %s Removed streambuffer head due to stuck", c.ToString())
+				common.ConntrackLog.Debugf("Needs more data, %s Removed streambuffer head due to stuck", c.ToString())
 				stop = false
 			} else {
 				stop = true

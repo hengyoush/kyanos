@@ -194,11 +194,11 @@ func GetKernelVersion() *version.Version {
 	release := si.Kernel.Release
 	v, err := version.NewVersion(release)
 	if err != nil {
-		Log.Debugf("Parse kernel version failed: %v, may be centos version, adjust and retry", err)
+		DefaultLog.Debugf("Parse kernel version failed: %v, may be centos version, adjust and retry", err)
 		release = release[:strings.Index(release, "-")]
 		v, err = version.NewVersion(release)
 		if err != nil {
-			Log.Fatalf("Can't parse kernel version: %v, may be a bug, please submit a issue on http://github.com/hengyoush/kyanos", err)
+			DefaultLog.Fatalf("Can't parse kernel version: %v, may be a bug, please submit a issue on http://github.com/hengyoush/kyanos", err)
 		} else {
 			return v
 		}
@@ -217,13 +217,3 @@ func TruncateString(s string, maxBytes int) string {
 		return fmt.Sprintf("%s...(truncated, total: %dbytes)", s[:maxBytes], len(s))
 	}
 }
-
-// func EnabledXdp() bool {
-// 	return !NeedsRunningInCompatibleMode()
-// }
-
-// func NeedsRunningInCompatibleMode() bool {
-// 	kernel58, _ := version.NewVersion("5.8")
-// 	curKernelVersion := GetKernelVersion()
-// 	return viper.GetBool("compatible") || curKernelVersion == nil || curKernelVersion.LessThan(kernel58)
-// }

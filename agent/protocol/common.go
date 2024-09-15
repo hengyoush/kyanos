@@ -2,12 +2,7 @@ package protocol
 
 import (
 	"kyanos/agent/buffer"
-	"kyanos/common"
-
-	"github.com/jefurry/logrus"
 )
-
-var log *logrus.Logger = common.Log
 
 func matchByTimestamp(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
 	if len(*reqStream) == 0 || len(*respStream) == 0 {

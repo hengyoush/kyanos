@@ -2,6 +2,7 @@ package compatible
 
 import (
 	"cmp"
+	"fmt"
 	"kyanos/bpf"
 	"kyanos/common"
 	"slices"
@@ -10,7 +11,7 @@ import (
 	"github.com/emirpasic/gods/maps/treemap"
 )
 
-var log = common.Log
+var log = common.DefaultLog
 
 type Capability int
 
@@ -88,7 +89,7 @@ func GetBestMatchedKernelVersion(version string) KernelVersion {
 			log.Debugf("Can't find version: %s, use the smallest version current supported: %s", version, foundKey)
 			return foundValue.(KernelVersion)
 		} else {
-			log.Fatalln("Initialize error!")
+			log.Fatalln(fmt.Sprintf("kernel version: %s is too old, currently not suppport", version))
 			return KernelVersion{}
 		}
 	} else {

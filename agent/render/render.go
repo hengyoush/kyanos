@@ -8,9 +8,11 @@ import (
 	"kyanos/common"
 	"slices"
 	"time"
+
+	"github.com/jefurry/logrus"
 )
 
-var log = common.Log
+var log *logrus.Logger = logrus.New()
 
 type RenderOptions struct {
 }
