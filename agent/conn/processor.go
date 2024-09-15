@@ -226,8 +226,8 @@ func (p *Processor) run() {
 					conn.ToString(), event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
 			} else {
-				common.BPFEventLog.Debugf("[data no conn][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
-					conn.ToString(), event.Seq, event.Len,
+				common.BPFEventLog.Debugf("[data no conn][func=%s][ts=%d][%s] | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
+					event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
 			}
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
