@@ -93,10 +93,10 @@ func (m *MysqlParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMess
 			isLastSeq := len(*reqStream) == 1
 			respLooksHealthy := len(respPacketsView) == len(*respStream)
 			if isLastSeq && respLooksHealthy {
-				common.Log.Debugln("Appears to be an incomplete message. Waiting for more data")
+				common.ProtocolParserLog.Debugln("Appears to be an incomplete message. Waiting for more data")
 				break
 			}
-			common.Log.Debugf("Didn't have enough response packets, but doesn't appear to be partial either. "+
+			common.ProtocolParserLog.Debugf("Didn't have enough response packets, but doesn't appear to be partial either. "+
 				"[cmd=%v, cmd_msg=%s resp_packets=%d]", command, reqPacket.msg[1:], len(respPacketsView))
 		} else if state == Success {
 			records = append(records, record)
@@ -127,7 +127,7 @@ func getRespView(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Pars
 		respPacket := resp.(*MysqlPacket)
 		expectedSeqId := count + 1
 		if respPacket.seqId != byte(expectedSeqId) {
-			common.Log.Infof("Found packet with unexpected sequence ID [expected=%d actual=%d]",
+			common.ProtocolParserLog.Infof("Found packet with unexpected sequence ID [expected=%d actual=%d]",
 				expectedSeqId,
 				respPacket.seqId)
 			break
@@ -218,11 +218,11 @@ func (p *MysqlParser) processPackets(reqPacket *MysqlPacket, respView []ParsedMe
 	case kTableDump:
 		fallthrough
 	case kStatistics:
-		common.Log.Warnf("Unimplemented command %d.\n", command)
+		common.ProtocolParserLog.Warnf("Unimplemented command %d.\n", command)
 		parseState = Ignore
 		return record, parseState
 	default:
-		common.Log.Warnf("Unknown command %d.\n", command)
+		common.ProtocolParserLog.Warnf("Unknown command %d.\n", command)
 		parseState = Ignore
 		return record, parseState
 	}

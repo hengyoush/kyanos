@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var log = common.Log
+var log = common.DefaultLog
 
 var enableMonitor = false
 

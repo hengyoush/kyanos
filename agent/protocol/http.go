@@ -246,7 +246,7 @@ func (filter HttpFilter) FilterByResponse() bool {
 func (filter HttpFilter) Filter(parsedReq ParsedMessage, parsedResp ParsedMessage) bool {
 	req, ok := parsedReq.(*ParsedHttpRequest)
 	if !ok {
-		log.Warnf("[HttpFilter] cast to http.Request failed: %v\n", req)
+		common.ProtocolParserLog.Warnf("[HttpFilter] cast to http.Request failed: %v\n", req)
 		return false
 	}
 

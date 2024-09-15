@@ -39,9 +39,8 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 	wg.Add(1)
 	go func(pid int) {
 		cmd.FilterPid = int64(pid)
-		cmd.Verbose = true
+		cmd.DefaultLogLevel = int32(logrus.DebugLevel)
 		cmd.Debug = true
-		common.Log.SetLevel(logrus.DebugLevel)
 		agent.SetupAgent(agent.AgentOptions{
 			Stopper: agentStopper,
 			LoadBpfProgramFunction: func(objs interface{}) *list.List {

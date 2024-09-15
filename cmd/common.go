@@ -7,6 +7,7 @@ import (
 	"kyanos/common"
 	"net"
 
+	"github.com/jefurry/logrus"
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -63,7 +64,7 @@ func startAgent(options agent.AgentOptions) {
 	options.PerfEventBufferSizeForData = DataEvtPerfEventBufferSize
 
 	initLog()
-	logger.Infoln("Kyanos starting...")
+	common.AgentLog.Infoln("Kyanos starting...")
 	if viper.GetBool(common.DaemonVarName) {
 		cntxt := &daemon.Context{
 			PidFileName: "./kyanos.pid",
@@ -87,7 +88,6 @@ func startAgent(options agent.AgentOptions) {
 		logger.Println("Kyanos started!")
 		agent.SetupAgent(options)
 	} else {
-		initLog()
 		agent.SetupAgent(options)
 	}
 }
@@ -117,4 +117,40 @@ func initSizeFilter(cmd *cobra.Command) protocol.SizeFilter {
 		MinRespSize: respSizeLimit,
 	}
 	return sizeFilter
+}
+
+func initLog() {
+	if viper.GetBool("debug") {
+		DefaultLogLevel = int32(logrus.DebugLevel)
+	}
+	if isValidLogLevel(DefaultLogLevel) {
+		common.DefaultLog.SetLevel(logrus.Level(DefaultLogLevel))
+	} else {
+		common.DefaultLog.SetLevel(logrus.WarnLevel)
+	}
+	common.AgentLog.SetLevel(common.DefaultLog.Level)
+	common.BPFEventLog.SetLevel(common.DefaultLog.Level)
+	common.ConntrackLog.SetLevel(common.DefaultLog.Level)
+	common.ProtocolParserLog.SetLevel(common.DefaultLog.Level)
+
+	// override log level individually
+	if isValidLogLevel(AgentLogLevel) {
+		common.AgentLog.SetLevel(logrus.Level(AgentLogLevel))
+	}
+	if isValidLogLevel(BPFEventLogLevel) {
+		common.BPFEventLog.SetLevel(logrus.Level(BPFEventLogLevel))
+	}
+	if isValidLogLevel(ConntrackLogLevel) {
+		common.ConntrackLog.SetLevel(logrus.Level(ConntrackLogLevel))
+	}
+	if isValidLogLevel(ProtocolLogLevel) {
+		common.ProtocolParserLog.SetLevel(logrus.Level(ProtocolLogLevel))
+	}
+}
+
+func isValidLogLevel(level int32) bool {
+	if level < int32(logrus.FatalLevel) || level > int32(logrus.DebugLevel) {
+		return false
+	}
+	return true
 }

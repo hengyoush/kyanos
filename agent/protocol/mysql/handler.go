@@ -24,7 +24,7 @@ func ProcessQuit(reqPacket *MysqlPacket, respView []ParsedMessage, record *Recor
 		record.Resp = response
 		return Success
 	}
-	common.Log.Warningln("Extra response packet after ComQuit.")
+	common.ProtocolParserLog.Warningln("Extra response packet after ComQuit.")
 	return Invalid
 }
 
@@ -130,7 +130,7 @@ func processRequestWithBasicResponse(reqPacket *MysqlPacket, stringReq bool,
 	}
 
 	if len(respView) > 1 {
-		common.Log.Warnf(
+		common.ProtocolParserLog.Warnf(
 			"Did not expect more than one response packet [cmd=%c, num_extra_packets=%d].\n",
 			reqPacket.msg[0], len(respView)-1)
 		return Invalid
@@ -172,19 +172,19 @@ func HandleResultsetResponse(reqPacket *MysqlPacket, binaryResultset bool, multi
 	numCol, ok := processLengthEncodedInt(firstResp.msg, &paramOffset)
 	if !ok {
 		response.RespStatus = Unknwon
-		common.Log.Warnln("Unable to process header packet of resultset response.")
+		common.ProtocolParserLog.Warnln("Unable to process header packet of resultset response.")
 		return Invalid
 	}
 
 	if paramOffset != len(firstResp.msg) {
 		response.RespStatus = Unknwon
-		common.Log.Warnln("Extra bytes in length-encoded int packet.")
+		common.ProtocolParserLog.Warnln("Extra bytes in length-encoded int packet.")
 		return Invalid
 	}
 
 	if numCol == 0 {
 		response.RespStatus = Unknwon
-		common.Log.Warnln("HandleResultsetResponse(): num columns should never be 0.")
+		common.ProtocolParserLog.Warnln("HandleResultsetResponse(): num columns should never be 0.")
 		return Invalid
 	}
 
@@ -211,7 +211,7 @@ func HandleResultsetResponse(reqPacket *MysqlPacket, binaryResultset bool, multi
 		colDef, ok := ProcessColumnDefPacket(packet)
 		if !ok {
 			response.RespStatus = Unknwon
-			common.Log.Warnln("Expected column definition packet")
+			common.ProtocolParserLog.Warnln("Expected column definition packet")
 			return Invalid
 		}
 
@@ -247,7 +247,7 @@ func HandleResultsetResponse(reqPacket *MysqlPacket, binaryResultset bool, multi
 			break
 		} else {
 			response.RespStatus = Unknwon
-			common.Log.Warnf("Expected resultset row packet [OK=%v ERR=%v EOF=%v]",
+			common.ProtocolParserLog.Warnf("Expected resultset row packet [OK=%v ERR=%v EOF=%v]",
 				isOkPacket(rowPacket), isErrPacket(rowPacket),
 				isEOFPacketAll(rowPacket))
 			return Invalid
@@ -271,7 +271,7 @@ func HandleResultsetResponse(reqPacket *MysqlPacket, binaryResultset bool, multi
 		return HandleResultsetResponse(reqPacket, binaryResultset, true, respView, record)
 	}
 	if len(respView) != 0 {
-		common.Log.Warnf("Found %d extra packets", len(respView))
+		common.ProtocolParserLog.Warnf("Found %d extra packets", len(respView))
 	}
 
 	response.RespStatus = Ok
@@ -293,7 +293,7 @@ func ProcessTextResultsetRowPacket(packet *MysqlPacket, numCol int, record *Reco
 		}
 	}
 	if offset < len(packet.msg) {
-		common.Log.Warnln("Have extra bytes in text resultset row.")
+		common.ProtocolParserLog.Warnln("Have extra bytes in text resultset row.")
 		return false
 	}
 	return true
@@ -305,7 +305,7 @@ func ProcessBinaryResultsetRowPacket(packet *MysqlPacket, columnDefs []ColDefini
 	const kBinaryResultsetRowNullBitmapOffset int = 2
 	const kBinaryResultsetRowNullBitmapByteFiller int = 7
 	if packet.msg[0] != '\x00' {
-		common.Log.Warnln("Binary resultset row header mismatch.")
+		common.ProtocolParserLog.Warnln("Binary resultset row header mismatch.")
 		return false
 	}
 
@@ -314,7 +314,7 @@ func ProcessBinaryResultsetRowPacket(packet *MysqlPacket, columnDefs []ColDefini
 	offset := kBinaryResultsetRowHeaderOffset + nullBitmapLen
 
 	if offset >= len(packet.msg) {
-		common.Log.Warningln("Not enough bytes.")
+		common.ProtocolParserLog.Warningln("Not enough bytes.")
 	}
 
 	nullBitmap := packet.msg[kBinaryResultsetRowHeaderOffset:nullBitmapLen]
@@ -405,14 +405,14 @@ func ProcessBinaryResultsetRowPacket(packet *MysqlPacket, columnDefs []ColDefini
 				return false
 			}
 		default:
-			common.Log.Warningln("Unrecognized result column type.")
+			common.ProtocolParserLog.Warningln("Unrecognized result column type.")
 		}
-		common.Log.Infof("col: %d, val: %v\n", i, val)
+		common.ProtocolParserLog.Infof("col: %d, val: %v\n", i, val)
 	}
 
 	if offset != len(packet.msg) {
 
-		common.Log.Warningln("Extra bytes in binary resultset row.")
+		common.ProtocolParserLog.Warningln("Extra bytes in binary resultset row.")
 		return false
 	}
 	return true
@@ -420,7 +420,7 @@ func ProcessBinaryResultsetRowPacket(packet *MysqlPacket, columnDefs []ColDefini
 
 func HandleStmtCloseRequest(reqPacket *MysqlPacket, prepareMap map[int]PreparedStatement, record *Record) ParseState {
 	if len(reqPacket.msg) < 1+kStmtIDBytes {
-		common.Log.Warnln("Insufficient number of bytes for STMT_CLOSE")
+		common.ProtocolParserLog.Warnln("Insufficient number of bytes for STMT_CLOSE")
 		return Invalid
 	}
 
@@ -433,14 +433,14 @@ func HandleStmtCloseRequest(reqPacket *MysqlPacket, prepareMap map[int]PreparedS
 	if ok {
 		delete(prepareMap, int(stmt_id))
 	} else {
-		common.Log.Warnf("Could not find prepare statement for this close command [stmt_id=%d].", stmt_id)
+		common.ProtocolParserLog.Warnf("Could not find prepare statement for this close command [stmt_id=%d].", stmt_id)
 	}
 	return Success
 }
 
 func (p *MysqlParser) HandleStmtExecuteRequest(req *MysqlPacket, record *Record) ParseState {
 	if len(req.msg) < 1+kStmtIDBytes {
-		common.Log.Warnln("Insufficient number of bytes for STMT_EXECUTE")
+		common.ProtocolParserLog.Warnln("Insufficient number of bytes for STMT_EXECUTE")
 		return Invalid
 	}
 	record.Req = &(*req)
@@ -454,14 +454,14 @@ func (p *MysqlParser) HandleStmtExecuteRequest(req *MysqlPacket, record *Record)
 
 		// We can't determine whether the rest of this packet is valid or not, so just return success.
 		// But pass the information up.
-		common.Log.Warnln("Could not find PREPARE statement for this EXECUTE command. Query not decoded. ")
+		common.ProtocolParserLog.Warnln("Could not find PREPARE statement for this EXECUTE command. Query not decoded. ")
 		record.Req.(*MysqlPacket).msg = fmt.Sprintf("Execute stmt_id=%d.", stmt_id)
 		return Success
 	}
 	num_params := stmt.Response.StmtPrepareRespHeader.NumParams
 	offset := kStmtIDStartOffset + kStmtIDBytes + kFlagsBytes + kIterationCountBytes
 	if len(req.msg) < offset {
-		common.Log.Warnln("Not a valid StmtExecuteRequest")
+		common.ProtocolParserLog.Warnln("Not a valid StmtExecuteRequest")
 		return Invalid
 	}
 	// This is copied directly from the MySQL spec.
@@ -517,7 +517,7 @@ func handleOkMessage(respPackets []ParsedMessage, record *Record) ParseState {
 	resp := respPackets[0].(*MysqlPacket)
 	const kMinOKPacketSize int = 7
 	if len(resp.msg) < kMinOKPacketSize {
-		common.Log.Warnln("Insufficient number of bytes for an OK packet.")
+		common.ProtocolParserLog.Warnln("Insufficient number of bytes for an OK packet.")
 		return Invalid
 	}
 	record.Resp = &MysqlResponse{
@@ -525,7 +525,7 @@ func handleOkMessage(respPackets []ParsedMessage, record *Record) ParseState {
 		Msg:       "OK",
 	}
 	if len(respPackets) > 1 {
-		common.Log.Warningf("Did not expect additional packets after OK packet [num_extra_packets=%d].",
+		common.ProtocolParserLog.Warningf("Did not expect additional packets after OK packet [num_extra_packets=%d].",
 			len(respPackets)-1)
 		return Invalid
 	}
@@ -533,7 +533,7 @@ func handleOkMessage(respPackets []ParsedMessage, record *Record) ParseState {
 }
 func handleNoResponse(reqPacket *MysqlPacket, respView []ParsedMessage, record *Record) ParseState {
 	if len(respView) > 0 {
-		common.Log.Warnf("Did not expect any response packets [num_extra_packets=%d].", len(respView))
+		common.ProtocolParserLog.Warnf("Did not expect any response packets [num_extra_packets=%d].", len(respView))
 		return Invalid
 	}
 	record.Resp = &MysqlResponse{
@@ -558,7 +558,7 @@ func handleErrMessage(respPackets []ParsedMessage, record *Record) ParseState {
 	const kErrorCodeSize int = 2
 	const kErrorMessagePos int = 9
 	if len(mysqlResp.msg) < kMinErrPacketSize {
-		common.Log.Warnln("Insufficient number of bytes for an error packet.")
+		common.ProtocolParserLog.Warnln("Insufficient number of bytes for an error packet.")
 		return Invalid
 	}
 	if record.Resp == nil {
@@ -569,7 +569,7 @@ func handleErrMessage(respPackets []ParsedMessage, record *Record) ParseState {
 	record.Resp.(*MysqlResponse).Msg = mysqlResp.msg[kErrorMessagePos:]
 	common.LEndianBytesToKInt[int32]([]byte(mysqlResp.msg[kErrorCodePos:]), kErrorCodeSize)
 	if len(respPackets) > 1 {
-		common.Log.Warnf("Did not expect additional packets after error packet [num_extra_packets=%d].",
+		common.ProtocolParserLog.Warnf("Did not expect additional packets after error packet [num_extra_packets=%d].",
 			len(respPackets)-1)
 		return Invalid
 	}
@@ -585,7 +585,7 @@ func (p *MysqlParser) handleStmtPrepareOKResponse(respPacketsP *[]ParsedMessage,
 	firstResp := respPackets[0].(*MysqlPacket)
 	respPackets = respPackets[1:]
 	if !isStmtPrepareOKPacket(firstResp) {
-		common.Log.Warnln("Expected StmtPrepareOK packet")
+		common.ProtocolParserLog.Warnln("Expected StmtPrepareOK packet")
 		return Invalid
 	}
 	stmt_id, _ := common.LEndianBytesToKInt[int32]([]byte(firstResp.msg[1:]), 4)
@@ -615,7 +615,7 @@ func (p *MysqlParser) handleStmtPrepareOKResponse(respPacketsP *[]ParsedMessage,
 		respPackets = respPackets[1:]
 		colDel, ok := ProcessColumnDefPacket(paramDefPacket)
 		if !ok {
-			common.Log.Warnln("Fail to process param definition packet.")
+			common.ProtocolParserLog.Warnln("Fail to process param definition packet.")
 			return Invalid
 		}
 		paramDefs = append(paramDefs, *colDel)
@@ -642,7 +642,7 @@ func (p *MysqlParser) handleStmtPrepareOKResponse(respPacketsP *[]ParsedMessage,
 		respPackets = respPackets[1:]
 		colDel, ok := ProcessColumnDefPacket(colDefPacket)
 		if !ok {
-			common.Log.Warnln("Fail to process column definition packet.")
+			common.ProtocolParserLog.Warnln("Fail to process column definition packet.")
 			return Invalid
 		}
 		colDefs = append(colDefs, *colDel)
@@ -659,7 +659,7 @@ func (p *MysqlParser) handleStmtPrepareOKResponse(respPacketsP *[]ParsedMessage,
 	}
 
 	if len(respPackets) > 0 {
-		common.Log.Warnln("Extra packets")
+		common.ProtocolParserLog.Warnln("Extra packets")
 	}
 	p.PreparedStatements[int(stmt_id)] = PreparedStatement{
 		Request: record.Req.(*MysqlPacket).msg,
@@ -681,7 +681,7 @@ func ProcessColumnDefPacket(packet *MysqlPacket) (*ColDefinition, bool) {
 		return nil, false
 	}
 	if colDef.Catalog != "def" {
-		common.Log.Warnln("ColumnDef Packet must start with `def`.")
+		common.ProtocolParserLog.Warnln("ColumnDef Packet must start with `def`.")
 		return nil, false
 	}
 	ok = DissectStringParam(packet.msg, &offset, &colDef.Schema)
@@ -708,7 +708,7 @@ func ProcessColumnDefPacket(packet *MysqlPacket) (*ColDefinition, bool) {
 	result, ok := processLengthEncodedInt(packet.msg, &offset)
 	colDef.NextLength = int8(result)
 	if colDef.NextLength != 12 {
-		common.Log.Warnln("ColumnDef Packet's next_length field is always 0x0c.")
+		common.ProtocolParserLog.Warnln("ColumnDef Packet's next_length field is always 0x0c.")
 		return nil, false
 	}
 
@@ -827,7 +827,7 @@ func (p *MysqlParser) HandleStmtExecuteParam(msg string, typeOffset *int, valOff
 		}
 	case kNull:
 	default:
-		common.Log.Fatalf("Unexpected/unhandled column type %d",
+		common.ProtocolParserLog.Fatalf("Unexpected/unhandled column type %d",
 			param.ColType)
 	}
 	return true
