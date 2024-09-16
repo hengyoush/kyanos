@@ -39,22 +39,22 @@ type AgentConnInfoT struct {
 	ReadBytes  uint64
 	WriteBytes uint64
 	Laddr      struct {
-		In4 struct {
-			SinFamily uint16
-			SinPort   uint16
-			SinAddr   struct{ S_addr uint32 }
-			Pad       [8]uint8
+		In6 struct {
+			Sin6Family   uint16
+			Sin6Port     uint16
+			Sin6Flowinfo uint32
+			Sin6Addr     struct{ In6U struct{ U6Addr8 [16]uint8 } }
+			Sin6ScopeId  uint32
 		}
-		_ [12]byte
 	}
 	Raddr struct {
-		In4 struct {
-			SinFamily uint16
-			SinPort   uint16
-			SinAddr   struct{ S_addr uint32 }
-			Pad       [8]uint8
+		In6 struct {
+			Sin6Family   uint16
+			Sin6Port     uint16
+			Sin6Flowinfo uint32
+			Sin6Addr     struct{ In6U struct{ U6Addr8 [16]uint8 } }
+			Sin6ScopeId  uint32
 		}
-		_ [12]byte
 	}
 	Protocol            AgentTrafficProtocolT
 	Role                AgentEndpointRoleT
@@ -110,11 +110,11 @@ type AgentKernEvtData struct {
 }
 
 type AgentSockKey struct {
-	Sip    uint32
-	Dip    uint32
-	Sport  uint32
-	Dport  uint32
-	Family uint32
+	Sip   [2]uint64
+	Dip   [2]uint64
+	Sport uint16
+	Dport uint16
+	_     [4]byte
 }
 
 type AgentStepT uint32

@@ -1,7 +1,6 @@
 package monitor
 
 import (
-	"fmt"
 	"kyanos/bpf"
 	"kyanos/common"
 	"sync"
@@ -88,11 +87,12 @@ func (b *BPFMetricExporter) ExportMetrics() MetricMap {
 }
 
 func connInfoT(value bpf.AgentConnInfoT) string {
-	LocalIp := common.IntToBytes(value.Laddr.In4.SinAddr.S_addr)
-	RemoteIp := common.IntToBytes(value.Raddr.In4.SinAddr.S_addr)
-	LocalPort := common.Port(value.Laddr.In4.SinPort)
-	RemotePort := common.Port(value.Raddr.In4.SinPort)
-	return fmt.Sprintf("%s:%d => %s:%d", LocalIp, LocalPort, RemoteIp, RemotePort)
+	// LocalIp := common.IntToBytes(value.Laddr.In4.SinAddr.S_addr)
+	// RemoteIp := common.IntToBytes(value.Raddr.In4.SinAddr.S_addr)
+	// LocalPort := common.Port(value.Laddr.In4.SinPort)
+	// RemotePort := common.Port(value.Raddr.In4.SinPort)
+	// return fmt.Sprintf("%s:%d => %s:%d", LocalIp, LocalPort, RemoteIp, RemotePort)
+	return "-"
 }
 
 // MetricGroupName implements monitor.MetricExporter.
