@@ -117,7 +117,6 @@ func init() {
 			SupportConstants:     true,
 			SupportRawTracepoint: true,
 			SupportRingBuffer:    true,
-			SupportXDP:           false,
 			SupportBTF:           true,
 		},
 	}

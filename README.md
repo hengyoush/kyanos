@@ -1,4 +1,6 @@
 # kyanos
+![](docs/banner.png)
+
 ![GitHub Release](https://img.shields.io/badge/language-golang-blue) ![GitHub Release](https://img.shields.io/badge/os-linux-239120) [![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) [![Free](https://img.shields.io/badge/free_for_non_commercial_use-brightgreen)](#-license)
 
 ⭐ 觉得kyanos还不错？点个star吧~

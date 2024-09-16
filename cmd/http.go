@@ -36,9 +36,9 @@ var httpCmd *cobra.Command = &cobra.Command{
 }
 
 func init() {
-	httpCmd.Flags().StringSlice("method", []string{}, "--method GET,POST")
-	httpCmd.Flags().String("host", "", "--host www.baidu.com")
-	httpCmd.Flags().String("path", "", "--path /foo/bar")
+	httpCmd.Flags().StringSlice("method", []string{}, "Specify the HTTP method to monitor(GET, POST), seperate by ','")
+	httpCmd.Flags().String("host", "", "Specify the HTTP host to monitor, like: 'ubuntu.com'")
+	httpCmd.Flags().String("path", "", "Specify the HTTP path to monitor, like: '/foo/bar'")
 	httpCmd.Flags().SortFlags = false
 	httpCmd.PersistentFlags().SortFlags = false
 	copy := *httpCmd

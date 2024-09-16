@@ -8,7 +8,7 @@ import (
 )
 
 var mysqlCmd *cobra.Command = &cobra.Command{
-	Use:   "mysql ",
+	Use:   "mysql",
 	Short: "watch MYSQL message",
 	Run: func(cmd *cobra.Command, args []string) {
 		startAgent(agent.AgentOptions{

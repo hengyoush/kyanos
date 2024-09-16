@@ -36,9 +36,9 @@ var redisCmd *cobra.Command = &cobra.Command{
 }
 
 func init() {
-	redisCmd.Flags().StringSlice("command", []string{}, "--command GET,SET")
-	redisCmd.Flags().StringSlice("keys", []string{}, "--keys key1,key2")
-	redisCmd.Flags().String("key-prefix", "", "--key-prefix foo:bar:")
+	redisCmd.Flags().StringSlice("command", []string{}, "Specify the redis command to monitor(GET, SET), seperate by ','")
+	redisCmd.Flags().StringSlice("keys", []string{}, "Specify the redis keys to monitor, seperate by ','")
+	redisCmd.Flags().String("key-prefix", "", "Specify the redis key prefix to monitor")
 	redisCmd.Flags().SortFlags = false
 	redisCmd.PersistentFlags().SortFlags = false
 	copy := *redisCmd

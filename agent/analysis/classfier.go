@@ -58,7 +58,12 @@ func init() {
 		return ar.ConnDesc.String()
 	}
 	classIdHumanReadableMap[HttpPath] = func(ar *AnnotatedRecord) string {
-		return ar.Record.Request().(*protocol.ParsedHttpRequest).Path
+		httpReq, ok := ar.Record.Request().(*protocol.ParsedHttpRequest)
+		if !ok {
+			return "__not_a_http_req__"
+		} else {
+			return httpReq.Path
+		}
 	}
 
 	classIdHumanReadableMap[Protocol] = func(ar *AnnotatedRecord) string {
