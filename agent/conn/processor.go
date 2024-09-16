@@ -106,12 +106,18 @@ func (p *Processor) run() {
 		case event := <-p.connEvents:
 			TgidFd := uint64(event.ConnInfo.ConnId.Upid.Pid)<<32 | uint64(event.ConnInfo.ConnId.Fd)
 			var conn *Connection4
+			isIpv6 := event.ConnInfo.Laddr.In6.Sin6Family == common.AF_INET6
+			if isIpv6 {
+				common.DefaultLog.Warnf("ipv6: %x", event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:])
+			}
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
 				conn = &Connection4{
-					LocalIp:    common.IntToBytes(event.ConnInfo.Laddr.In4.SinAddr.S_addr),
-					RemoteIp:   common.IntToBytes(event.ConnInfo.Raddr.In4.SinAddr.S_addr),
-					LocalPort:  common.Port(event.ConnInfo.Laddr.In4.SinPort),
-					RemotePort: common.Port(event.ConnInfo.Raddr.In4.SinPort),
+					LocalIp: common.BytesToNetIP(event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:], isIpv6),
+					// LocalIp:    common.IntToBytes(event.ConnInfo.Laddr.In4.SinAddr.S_addr),
+					RemoteIp: common.BytesToNetIP(event.ConnInfo.Raddr.In6.Sin6Addr.In6U.U6Addr8[:], isIpv6),
+					// RemoteIp:   common.IntToBytes(event.ConnInfo.Raddr.In4.SinAddr.S_addr),
+					LocalPort:  common.Port(event.ConnInfo.Laddr.In6.Sin6Port),
+					RemotePort: common.Port(event.ConnInfo.Raddr.In6.Sin6Port),
 					Protocol:   event.ConnInfo.Protocol,
 					Role:       event.ConnInfo.Role,
 					TgidFd:     TgidFd,

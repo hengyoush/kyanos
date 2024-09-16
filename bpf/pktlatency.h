@@ -114,11 +114,10 @@ enum conn_type_t {
 };
 
 struct sock_key {
-	uint32_t sip;
-	uint32_t dip;
-	uint32_t sport;
-	uint32_t dport;
-	uint32_t family;
+	uint64_t sip[2];
+	uint64_t dip[2];
+	uint16_t sport;
+	uint16_t dport;
 };
 
 #define FUNC_NAME_LIMIT 16 
@@ -238,8 +237,9 @@ struct accept_args {
 
 
 union sockaddr_t {
-  struct sockaddr_in in4;
   struct sockaddr_in6 in6;
+  struct sockaddr_in in4;
+  struct sockaddr sa;
 };
 struct conn_info_t {
   // Connection identifier (PID, FD, etc.).

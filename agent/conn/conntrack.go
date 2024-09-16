@@ -8,6 +8,7 @@ import (
 	"kyanos/bpf"
 	"kyanos/common"
 	"kyanos/monitor"
+	"net"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -21,8 +22,8 @@ var RecordFunc func(protocol.Record, *Connection4) error
 var OnCloseRecordFunc func(*Connection4) error
 
 type Connection4 struct {
-	LocalIp    common.Addr
-	RemoteIp   common.Addr
+	LocalIp    net.IP
+	RemoteIp   net.IP
 	LocalPort  common.Port
 	RemotePort common.Port
 	Protocol   bpf.AgentTrafficProtocolT
@@ -193,18 +194,17 @@ func (c *Connection4) ProtocolInferred() bool {
 
 func (c *Connection4) extractSockKeys() (bpf.AgentSockKey, bpf.AgentSockKey) {
 	var key bpf.AgentSockKey
-	key.Dip = common.BytesToInt[uint32](c.RemoteIp)
-	key.Sip = common.BytesToInt[uint32](c.LocalIp)
-	key.Dport = uint32(c.RemotePort)
-	key.Sport = uint32(c.LocalPort)
-	key.Family = uint32(common.AF_INET) // TODO @ipv6
+	key.Dip = [2]uint64(common.BytesToSockKey(c.RemoteIp))
+	key.Sip = [2]uint64(common.BytesToSockKey(c.LocalIp))
+	key.Dport = uint16(c.RemotePort)
+	key.Sport = uint16(c.LocalPort)
+	// key.Family = uint32(common.AF_INET) // TODO @ipv6
 
 	var revKey bpf.AgentSockKey
-	revKey.Sip = common.BytesToInt[uint32](c.RemoteIp)
-	revKey.Dip = common.BytesToInt[uint32](c.LocalIp)
-	revKey.Sport = uint32(c.RemotePort)
-	revKey.Dport = uint32(c.LocalPort)
-	revKey.Family = uint32(common.AF_INET)
+	revKey.Sip = [2]uint64(common.BytesToSockKey(c.RemoteIp))
+	revKey.Dip = [2]uint64(common.BytesToSockKey(c.LocalIp))
+	revKey.Sport = uint16(c.RemotePort)
+	revKey.Dport = uint16(c.LocalPort)
 	return key, revKey
 }
 
@@ -412,6 +412,7 @@ func (c *Connection4) updateProgressTime(sb *buffer.StreamBuffer) {
 	} else {
 		c.lastRespMadeProgressTime = time.Now().UnixMilli()
 	}
+	// common.ConntrackLog.Debugf("%s update progress time to %v", c.ToString(), time.Now())
 }
 func (c *Connection4) getLastProgressTime(sb *buffer.StreamBuffer) int64 {
 	if c.reqStreamBuffer == sb {
@@ -425,7 +426,8 @@ func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
 		c.updateProgressTime(sb)
 		return false
 	}
-	if time.Now().UnixMilli()-c.getLastProgressTime(sb) > 1000 {
+	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
+	if !ok || time.Now().UnixMilli()-int64(common.NanoToMills(headTime)) > 1000 {
 		sb.RemoveHead()
 		return true
 	} else {

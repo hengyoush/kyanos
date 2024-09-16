@@ -12,8 +12,8 @@ var LocalPortsVarName string = "local-ports"
 var RemoteIpsVarName string = "remote-ips"
 var LaunchEpochTime uint64
 
-var AF_INET = 2
-var AF_INET6 = 10
+var AF_INET uint16 = 2
+var AF_INET6 uint16 = 10
 
 var TCP_FLAGS_ACK = 1 << 4
 var TCP_FLAGS_PSH = 1 << 3

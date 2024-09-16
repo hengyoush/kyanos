@@ -81,11 +81,11 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 type ConnEventAssertions struct {
 	expectPid                  uint32
 	expectLocalIp              string
-	expectLocalAddrFamily      int
+	expectLocalAddrFamily      uint16
 	expectLocalPort            int
 	expectProtocol             bpf.AgentTrafficProtocolT
 	expectRemoteIp             string
-	expectRemoteFamily         int
+	expectRemoteFamily         uint16
 	expectRemotePort           int
 	expectReadBytes            uint64
 	expectWriteBytes           uint64
@@ -100,17 +100,17 @@ func AssertConnEvent(t *testing.T, connectEvent bpf.AgentConnEvtT, assert ConnEv
 		t.Fatalf("Pid Incorrect: %d !=  %d", connectEvent.ConnInfo.ConnId.Upid.Pid, assert.expectPid)
 	}
 	expectLocalIp := assert.expectLocalIp
-	localIp := common.IntToIP(connectEvent.ConnInfo.Laddr.In4.SinAddr.S_addr)
+	localIp := string(common.BytesToNetIP(connectEvent.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:], false))
 	if expectLocalIp != "" && localIp != expectLocalIp {
 		t.Fatalf("Local IP Incorrect: %s != %s", localIp, expectLocalIp)
 	}
 	localAddr := connectEvent.ConnInfo.Laddr
-	localAddrFamily := localAddr.In4.SinFamily
+	localAddrFamily := localAddr.In6.Sin6Family
 	expectLocalAddrFamily := assert.expectLocalAddrFamily
-	if expectLocalAddrFamily >= 0 && expectLocalAddrFamily != int(localAddrFamily) {
+	if expectLocalAddrFamily >= 0 && expectLocalAddrFamily != uint16(localAddrFamily) {
 		t.Fatalf("LocalAddr Family Incorrect: %d != %d", localAddrFamily, expectLocalAddrFamily)
 	}
-	localPort := localAddr.In4.SinPort
+	localPort := localAddr.In6.Sin6Port
 	expectLocalPort := assert.expectLocalPort
 	if expectLocalPort >= 0 && expectLocalPort != int(localPort) {
 		t.Fatalf("Local Port Incorrect: %d != %d", localPort, expectLocalPort)
@@ -121,17 +121,17 @@ func AssertConnEvent(t *testing.T, connectEvent bpf.AgentConnEvtT, assert ConnEv
 		t.Fatalf("Protocol Incorrect: %d != %d", protocol, expectProtocol)
 	}
 	remoteAddr := connectEvent.ConnInfo.Raddr
-	remoteIp := common.IntToIP(remoteAddr.In4.SinAddr.S_addr)
+	remoteIp := string(common.BytesToNetIP(remoteAddr.In6.Sin6Addr.In6U.U6Addr8[:], false))
 	expectRemoteIp := assert.expectRemoteIp
 	if expectRemoteIp != "" && expectRemoteIp != remoteIp {
 		t.Fatalf("Remote IP Incorrect: %s != %s", remoteIp, expectRemoteIp)
 	}
-	remoteAddrFamily := remoteAddr.In4.SinFamily
+	remoteAddrFamily := remoteAddr.In6.Sin6Family
 	expectRemoteFamily := assert.expectRemoteFamily
-	if expectRemoteFamily >= 0 && expectRemoteFamily != int(remoteAddrFamily) {
+	if expectRemoteFamily >= 0 && expectRemoteFamily != uint16(remoteAddrFamily) {
 		t.Fatalf("RemoteAddr Family Incorrect: %d != %d", remoteAddrFamily, expectRemoteFamily)
 	}
-	remotePort := remoteAddr.In4.SinPort
+	remotePort := remoteAddr.In6.Sin6Port
 	expectRemotePort := assert.expectRemotePort
 	if expectRemotePort >= 0 && expectRemotePort != int(remotePort) {
 		t.Fatalf("Remote Port Incorrect: %d != %d", remotePort, expectRemotePort)
@@ -290,10 +290,10 @@ func findInterestedConnEvent(t *testing.T, connEventList []bpf.AgentConnEvtT, op
 	t.Helper()
 	resultList := make([]bpf.AgentConnEvtT, 0)
 	for _, connEvent := range connEventList {
-		if options.findByRemotePort && options.remotePort != connEvent.ConnInfo.Raddr.In4.SinPort {
+		if options.findByRemotePort && options.remotePort != connEvent.ConnInfo.Raddr.In6.Sin6Port {
 			continue
 		}
-		if options.findByLocalPort && options.localPort != connEvent.ConnInfo.Laddr.In4.SinPort {
+		if options.findByLocalPort && options.localPort != connEvent.ConnInfo.Laddr.In6.Sin6Port {
 			continue
 		}
 		if options.findByConnType && options.connType != connEvent.ConnType {
@@ -325,10 +325,10 @@ func findInterestedSyscallEvents(t *testing.T, syscallEventList []bpf.SyscallEve
 			continue
 		}
 		connectEvent := connectEvents[0]
-		if options.findByRemotePort && connectEvent.ConnInfo.Raddr.In4.SinPort != options.remotePort {
+		if options.findByRemotePort && connectEvent.ConnInfo.Raddr.In6.Sin6Port != options.remotePort {
 			continue
 		}
-		if options.findByLocalPort && connectEvent.ConnInfo.Laddr.In4.SinPort != options.localPort {
+		if options.findByLocalPort && connectEvent.ConnInfo.Laddr.In6.Sin6Port != options.localPort {
 			continue
 		}
 		resultList = append(resultList, each)
@@ -354,10 +354,10 @@ func findInterestedKernEvents(t *testing.T, kernEventList []bpf.AgentKernEvt, op
 			continue
 		}
 		connectEvent := connectEvents[0]
-		if options.findByRemotePort && connectEvent.ConnInfo.Raddr.In4.SinPort != options.remotePort {
+		if options.findByRemotePort && connectEvent.ConnInfo.Raddr.In6.Sin6Port != options.remotePort {
 			continue
 		}
-		if options.findByLocalPort && connectEvent.ConnInfo.Laddr.In4.SinPort != options.localPort {
+		if options.findByLocalPort && connectEvent.ConnInfo.Laddr.In6.Sin6Port != options.localPort {
 			continue
 		}
 		if options.findDataLenGtZeroEvent && each.Len == 0 {

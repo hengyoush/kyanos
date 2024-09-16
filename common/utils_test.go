@@ -5,8 +5,10 @@ import (
 	"kyanos/common"
 	"os"
 	"reflect"
+	"slices"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/zcalusic/sysinfo"
 )
 
@@ -63,4 +65,43 @@ func TestVersion(t *testing.T) {
 func TestTempDir(t *testing.T) {
 	TempDir := os.TempDir()
 	fmt.Println(TempDir)
+}
+
+func TestSockKeyIpToNetIPv6(t *testing.T) {
+	var addr []uint64
+	addr = append(addr, 121312)
+	addr = append(addr, 12131231232)
+	netIp := common.SockKeyIpToNetIP(addr, true)
+	assert.Equal(t, 16, len(netIp))
+	newAddr := common.BytesToSockKey(netIp)
+	assert.True(t, slices.Compare(addr, newAddr) == 0)
+}
+
+func TestSockKeyIpToNetIPv4(t *testing.T) {
+	var addr []uint64
+	addr = append(addr, 121312, 0)
+	netIp := common.SockKeyIpToNetIP(addr, false)
+	assert.Equal(t, 4, len(netIp))
+	newAddr := common.BytesToSockKey(netIp)
+	assert.True(t, slices.Compare(addr, newAddr) == 0)
+}
+
+func TestBytesToIpv4(t *testing.T) {
+	int32_, _ := common.IPv4ToUint32("127.0.0.1")
+	addr := common.IntToBytes(int32_)
+
+	ip := common.BytesToNetIP(addr, false)
+	assert.Equal(t, "127.0.0.1", ip)
+	fmt.Println(ip)
+}
+
+func TestBytesToIpv6(t *testing.T) {
+	ipv6Addr := "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+
+	// Convert IPv6 address to []byte
+	addr, _ := common.IPv6ToBytes(ipv6Addr)
+
+	ip := common.BytesToNetIP(addr, true)
+	addr2, _ := common.IPv6ToBytes(ip.String())
+	assert.Equal(t, addr, addr2)
 }

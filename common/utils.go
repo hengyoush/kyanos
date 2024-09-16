@@ -48,6 +48,48 @@ func BytesToInt[T KInt](byteArray []byte) T {
 	return T(n)
 }
 
+func BytesToNetIP(addr []uint8, isIpv6 bool) net.IP {
+	result := make([]byte, 0)
+	if isIpv6 {
+		for _, a := range addr {
+			result = append(result, byte(a))
+		}
+	} else {
+		for idx := 0; idx < 4; idx++ {
+			result = append(result, byte(addr[idx]))
+		}
+	}
+
+	return net.IP(result)
+}
+
+func SockKeyIpToNetIP(addr []uint64, isIpv6 bool) net.IP {
+	if isIpv6 {
+		result := make([]byte, 0)
+		for _, a := range addr {
+			result = append(result, IntToBytes(a)...)
+		}
+		return net.IP(result)
+	} else {
+		a := uint32(addr[0])
+		return IntToBytes(a)
+	}
+}
+
+func BytesToSockKey(ip net.IP) []uint64 {
+	result := make([]uint64, 0)
+	if len(ip) == 16 {
+		result = append(result, BytesToInt[uint64](ip[0:8]))
+		result = append(result, BytesToInt[uint64](ip[8:]))
+	} else {
+		newIp := make([]uint32, 0)
+		newIp = append(newIp, BytesToInt[uint32](ip))
+		result = append(result, uint64(newIp[0]))
+		result = append(result, 0)
+	}
+	return result
+}
+
 func Int8ToStr(arr []int8) string {
 	str := ""
 	for _, v := range arr {
@@ -162,6 +204,23 @@ func IPv4ToUint32(ipStr string) (uint32, error) {
 	}
 
 	return result, nil
+}
+
+// ipv6ToBytes converts an IPv6 address string to a []byte.
+func IPv6ToBytes(ipv6Addr string) ([]byte, error) {
+	// Parse the IPv6 address
+	ip := net.ParseIP(ipv6Addr)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IPv6 address: %s", ipv6Addr)
+	}
+
+	// Extract the 16-byte representation of the IPv6 address
+	ipv6 := ip.To16()
+	if ipv6 == nil {
+		return nil, fmt.Errorf("not a valid IPv6 address: %s", ipv6Addr)
+	}
+
+	return ipv6, nil
 }
 
 func GetBufioReaderReadIndex(r *bufio.Reader) int {
