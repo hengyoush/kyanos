@@ -56,7 +56,7 @@ At the moment, running Kyanos inside a container requires privileged mode.
 ## 🎯 How to get kyanos 
 To fetch the latest Kyanos executable file, you can use the following script:
 ```bash
-wget -O kyanos.zip https://github.com/hengyoush/kyanos/releases/download/v1.3.0/kyanos.zip
+wget -O kyanos.zip https://github.com/hengyoush/kyanos/releases/download/v1.3.1/kyanos.zip
 unzip kyanos.zip
 chmod a+x kyanos
 
