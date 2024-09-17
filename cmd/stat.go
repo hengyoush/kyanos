@@ -10,8 +10,33 @@ import (
 )
 
 var statCmd = &cobra.Command{
-	Use:              "stat [-m pqtsn] [-s 10] [-g conn|remote-ip|remote-port|local-port|protocol]",
-	Short:            "Analysis connections statistics",
+	Use:   "stat [--metrics pqtsn] [--samples 10] [--group-by conn|remote-ip|remote-port|local-port|protocol] [--sort-by avg|max|p50|p90|p99]",
+	Short: "Analysis connections statistics. Aggregate metrics such as latency and size for request-response pairs.",
+	Example: `
+# Basic Usage, only count HTTP connections, print results when press 'ctlc+c' 
+sudo kyanos stat http
+
+# Print results 5 seconds periodically
+sudo kyanos stat http -i 5
+
+# Find the most slowly remote http server with '/example' api
+sudo kyanos stat http --metrics t --group-by remote-ip --side client --path /example
+
+# Same as above but also prints 3 slowest samples with full body
+sudo kyanos stat http --metrics t --samples 3 --full-body ...
+
+# Specify two metrics total duration & request size
+sudo kyanos stat http --metrics tq --group-by remote-ip
+
+# Sort by p99 of total duration's  (default is 'avg')
+sudo kyanos stat http --metrics t --sort-by p99
+
+# Limit the number of output connection results to 1.
+sudo kyanos stat http --metrics t --limit 1
+
+# In addition to request-response time, also track request-response size.
+sudo kyanos stat http --metrics tqp 
+	`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) { Mode = AnalysisMode },
 	Run: func(cmd *cobra.Command, args []string) {
 		startAgent(agent.AgentOptions{LatencyFilter: initLatencyFilter(cmd), SizeFilter: initSizeFilter(cmd)})
@@ -24,7 +49,7 @@ var groupBy string
 var interval int
 var sortByPar string
 var fullBody bool
-var SUPPORTED_METRICS = []byte{'t', 'q', 'p', 'n', 's'}
+var SUPPORTED_METRICS = []byte{'t', 'q', 'p', 'n', 's', 'i'}
 
 func validateEnabledMetricsString() error {
 	for _, m := range []byte(enabledMetricsString) {
@@ -54,7 +79,7 @@ func createAnalysisOptions() (analysis.AnalysisOptions, error) {
 	if slices.Contains(enabledMetricsBytes, 'p') {
 		options.EnabledMetricTypeSet[analysis.ResponseSize] = true
 	}
-	if slices.Contains(enabledMetricsBytes, 'n') {
+	if slices.Contains(enabledMetricsBytes, 'n') || slices.Contains(enabledMetricsBytes, 'i') {
 		options.EnabledMetricTypeSet[analysis.BlackBoxDuration] = true
 	}
 	if slices.Contains(enabledMetricsBytes, 's') {
@@ -86,7 +111,7 @@ func createAnalysisOptions() (analysis.AnalysisOptions, error) {
 	case "P99":
 		options.SortBy = analysis.P99
 	default:
-		logger.Warnf("unknown --sort flag: %s, use default '%s'", sortByPar, "avg")
+		logger.Warnf("unknown --sort-by flag: %s, use default '%s'", sortByPar, "avg")
 		options.SortBy = analysis.Avg
 	}
 
@@ -95,19 +120,34 @@ func createAnalysisOptions() (analysis.AnalysisOptions, error) {
 	}
 	return options, nil
 }
-
 func init() {
-	statCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metrics", "m", "t", "-m pqtsn")
-	statCmd.PersistentFlags().IntVarP(&sampleCount, "sample", "s", 0, "-s 10")
-	statCmd.PersistentFlags().IntVarP(&displayLimit, "limit", "l", 10, "-l 20")
-	statCmd.PersistentFlags().IntVarP(&interval, "interval", "i", 0, "-i 5")
-	statCmd.PersistentFlags().StringVarP(&groupBy, "group-by", "g", "remote-ip", "-g remote-ip")
-	statCmd.PersistentFlags().Float64("latency", 0, "--latency 100 # millseconds")
-	statCmd.PersistentFlags().Int64("req-size", 0, "--req-size 1024 # bytes")
-	statCmd.PersistentFlags().Int64("resp-size", 0, "--resp-size 1024 # bytes")
-	statCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "--side client|all|server")
-	statCmd.PersistentFlags().StringVar(&sortByPar, "sort", "avg", "--sort avg|max|p50|p90|p99")
-	statCmd.PersistentFlags().BoolVar(&fullBody, "full-body", false, "--full-body")
+	statCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metrics", "m", "t", `Specify the statistical dimensions, including:
+	t:  total time taken for request response,
+	q:  request size,
+	p:  response size,
+	n:  network device latency,
+	i:  internal application latency,
+	s:  time spent reading from the socket buffer
+	You can specify these flags individually or 
+	combine them together like: '-m pq'`)
+	statCmd.PersistentFlags().IntVarP(&sampleCount, "samples", "s", 0,
+		"Specify the number of samples to be attached for each result.\n"+
+			"By default, only a summary  is output.\n"+
+			"refer to the '--full-body' option.")
+	statCmd.PersistentFlags().BoolVar(&fullBody, "full-body", false, "Used with '--samples' option, print content of req-resp when print samples.")
+	statCmd.PersistentFlags().IntVarP(&displayLimit, "limit", "l", 10, "Specify the number of output results.")
+	statCmd.PersistentFlags().IntVarP(&interval, "interval", "i", 0, "Print statistics periodically, or if not specified, statistics will be displayed when stopped with `ctrl+c`.")
+	statCmd.PersistentFlags().StringVarP(&groupBy, "group-by", "g", "remote-ip",
+		"Specify aggregation dimension: \n"+
+			"('conn', 'local-port', 'remote-port', 'remote-ip', 'protocol', 'http-path', 'none')\n"+
+			"note: 'none' is aggregate all req-resp pair together")
+	statCmd.PersistentFlags().StringVar(&sortByPar, "sort-by", "avg", "Specify the sorting method for the output results: ('avg', 'max', 'p50', 'p90', 'p99'")
+
+	// common
+	statCmd.PersistentFlags().Float64("latency", 0, "Filter based on request response time")
+	statCmd.PersistentFlags().Int64("req-size", 0, "Filter based on request bytes size")
+	statCmd.PersistentFlags().Int64("resp-size", 0, "Filter based on response bytes size")
+	statCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "Filter based on connection side. can be: server | client")
 
 	statCmd.Flags().SortFlags = false
 	statCmd.PersistentFlags().SortFlags = false

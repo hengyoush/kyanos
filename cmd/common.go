@@ -5,7 +5,6 @@ import (
 	"kyanos/agent"
 	"kyanos/agent/protocol"
 	"kyanos/common"
-	"net"
 
 	"github.com/jefurry/logrus"
 	"github.com/sevlyar/go-daemon"
@@ -51,11 +50,6 @@ func startAgent(options agent.AgentOptions) {
 		}
 		options.AnalysisOptions = analysisOptions
 		options.Side = side
-	}
-	_, err = net.InterfaceByName(IfName)
-	if err != nil {
-		logger.Errorf("Start Kyanos failed: %v", err)
-		return
 	}
 	options.IfName = IfName
 	options.BTFFilePath = BTFFilePath
