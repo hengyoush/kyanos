@@ -557,7 +557,7 @@ func (r *RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 	seq := streamBuffer.Head().LeftBoundary()
 	ts, ok := streamBuffer.FindTimestampBySeq(seq)
 	decoder := NewBinaryDecoder(head)
-	redisMessage, err := ParseMessage(decoder, ts, seq)
+	parsedMessage, err := ParseMessage(decoder, ts, seq)
 	result := ParseResult{}
 	if err != nil {
 		if errors.Is(err, NotFound) || errors.Is(err, ResourceNotAvailble) {
@@ -572,10 +572,20 @@ func (r *RedisStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 			result.ParseState = Success
 		}
 
-		// redisMessage.(*RedisMessage).isReq = messageType == Request
-		redisMessage.(*RedisMessage).seq = seq
-		result.ReadBytes = redisMessage.ByteSize()
-		result.ParsedMessages = []ParsedMessage{redisMessage}
+		redisMessage := parsedMessage.(*RedisMessage)
+		if messageType != Unknown {
+			redisMessage.isReq = messageType == Request
+		} else if redisMessage.isReq {
+			// first byte is `kArrayMarker`, but not sure is a request, guess it only
+			if redisMessage.command == "" {
+				redisMessage.isReq = false
+			} else {
+				redisMessage.isReq = true
+			}
+		}
+		redisMessage.seq = seq
+		result.ReadBytes = parsedMessage.ByteSize()
+		result.ParsedMessages = []ParsedMessage{parsedMessage}
 	}
 
 	return result

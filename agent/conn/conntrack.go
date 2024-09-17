@@ -311,9 +311,16 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 	} else {
 		c.respStreamBuffer.Add(event.SyscallEvent.Ke.Seq, data, event.SyscallEvent.Ke.Ts)
 	}
-
-	c.parseStreamBuffer(c.reqStreamBuffer, protocol.Request, &c.ReqQueue, event.SyscallEvent.Ke.Step)
-	c.parseStreamBuffer(c.respStreamBuffer, protocol.Response, &c.RespQueue, event.SyscallEvent.Ke.Step)
+	reqSteamMessageType := protocol.Request
+	if c.Role == bpf.AgentEndpointRoleTKRoleUnknown {
+		reqSteamMessageType = protocol.Unknown
+	}
+	respSteamMessageType := protocol.Response
+	if c.Role == bpf.AgentEndpointRoleTKRoleUnknown {
+		respSteamMessageType = protocol.Unknown
+	}
+	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, event.SyscallEvent.Ke.Step)
+	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, event.SyscallEvent.Ke.Step)
 	c.StreamEvents.AddSyscallEvent(event)
 
 	parser := c.GetProtocolParser(c.Protocol)
