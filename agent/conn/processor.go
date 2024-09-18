@@ -108,7 +108,7 @@ func (p *Processor) run() {
 			var conn *Connection4
 			isIpv6 := event.ConnInfo.Laddr.In6.Sin6Family == common.AF_INET6
 			if isIpv6 {
-				common.DefaultLog.Warnf("ipv6: %x", event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:])
+				common.DefaultLog.Debugf("ipv6: %x", event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:])
 			}
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
 				conn = &Connection4{

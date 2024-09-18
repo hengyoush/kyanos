@@ -190,9 +190,9 @@ static __always_inline void reverse_sock_key_no_copy(struct sock_key* key) {
 	key->dport = temp;
 }
 static void __always_inline print_sock_key(struct sock_key* key) {
-	// bpf_printk("print_sock_key port: sport:%u, dport:%u", key->sport, key->dport);
-	// bpf_printk("print_sock_key addr: saddr:%llx, saddr:%llx", key->sip[0], key->sip[1]);
-	// bpf_printk("print_sock_key addr: daddr:%llx, daddr:%llx", key->dip[0], key->dip[1]);
+	// bpf_printk("print_sock_key port: sport:%u, dport:%u\n", key->sport, key->dport);
+	// bpf_printk("print_sock_key addr: saddr:%llx, saddr:%llx\n", key->sip[0], key->sip[1]);
+	// bpf_printk("print_sock_key addr: daddr:%llx, daddr:%llx\n", key->dip[0], key->dip[1]);
 	// bpf_printk("print_sock_key family: family:%u", key->family);
 }
 static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *param) {
@@ -909,7 +909,7 @@ static __inline void read_sockaddr_kernel(struct conn_info_t* conn_info,
 
 	conn_info->laddr.in6.sin6_port = lport;
 	conn_info->raddr.in6.sin6_port = rport;
-  if (family == AF_INET) {
+  if (family == AF_INET || !use_ipv6(sk_common)) {
 	conn_info->laddr.in6.sin6_addr.in6_u.u6_addr32[0] = _C(sk_common, skc_rcv_saddr);
 	conn_info->raddr.in6.sin6_addr.in6_u.u6_addr32[0] = _C(sk_common, skc_daddr);
 	// BPF_CORE_READ_INTO(&conn_info->laddr.in4.sin_addr.s_addr, sk_common, skc_rcv_saddr);
@@ -1037,6 +1037,9 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		// pr_bpf_debug("raddr: null");
 	}
 	struct tcp_sock * tcp_sk = get_socket_from_fd(fd);
+	if (!tcp_sk) {
+		tcp_sk = _C(socket, sk);
+	}
 	// s => d
 	struct sock_key key = {0};
 	parse_sock_key_sk((struct sock*)tcp_sk, &key);
@@ -1047,6 +1050,8 @@ enum endpoint_role_t role, uint64_t start_ts) {
 	// }
 	
 	// print_sock_key(&key);
+	struct sock_common *sk_common = (struct sock_common *) tcp_sk; 
+	bool is_ipv6 = use_ipv6(sk_common);
 	if (socket == NULL) {
 		// conn_info.laddr.in4.sin_addr.s_addr = role == kRoleClient ? key.sip : key.dip;
 		// conn_info.laddr.in4.sin_port = role == kRoleClient ? key.sport : key.dport;
@@ -1057,10 +1062,9 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		conn_info.laddr.in6.sin6_port =  key.sport ;
 		conn_info.raddr.in6.sin6_port = key.dport;
 		uint16_t family = -1;
-		struct sock_common *sk_common = (struct sock_common *) tcp_sk; 
 		BPF_CORE_READ_INTO(&family, sk_common, skc_family);
 	// bpf_printk("AF: %d", family);
-		if (family == AF_INET) {
+		if (family == AF_INET || !is_ipv6) {
 			// conn_info.laddr.in4.sin_addr.s_addr = (u32)key.sip[0] ;
 			// conn_info.raddr.in4.sin_addr.s_addr = (u32)key.dip[0];
 			conn_info.laddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.sip[0];
@@ -1071,6 +1075,10 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		}
 		conn_info.laddr.sa.sa_family = family;
 		conn_info.raddr.sa.sa_family = family;
+	}
+	if (!use_ipv6(sk_common)) {
+		conn_info.laddr.sa.sa_family = AF_INET;
+		conn_info.raddr.sa.sa_family = AF_INET;
 	}
 
 	// bpf_printk("submit_new_conn laddr: port:%u", conn_info.laddr.in4.sin_port);
@@ -1202,11 +1210,6 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		if (!created) {
 			return false;
 		}
-		
-		// if (key.sport==3306) {
-		// 	bpf_printk("update conninfo! fa: %d", family);
-		// 	print_sock_key(&key);
-		// }
 		
 		u32 send_initial_seq = 0;
 		u32 rcv_initial_seq = 0;

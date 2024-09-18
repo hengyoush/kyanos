@@ -120,6 +120,7 @@ func init() {
 			SupportBTF:           true,
 		},
 	}
+	baseVersion.addBackupInstrumentFunction(bpf.AgentStepTDEV_OUT, InstrumentFunction{"kprobe/__dev_queue_xmit", "DevQueueXmit"})
 	v5d15 := copyKernelVersion(baseVersion)
 	KernelVersionsMap.Put(v5d15.Version, v5d15)
 
