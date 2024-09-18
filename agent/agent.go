@@ -590,9 +590,12 @@ func attachBpfProgs(programs any, ifName string, kernelVersion compatible.Kernel
 			if err != nil {
 				if idx == len(functions)-1 {
 					common.AgentLog.Fatalf("Attach failed: %v, functions: %v", err, functions)
+				} else {
+					common.AgentLog.Debugf("Attach failed but has fallback: %v, functions: %v", err, functions)
 				}
 			} else {
 				linkList.PushBack(l)
+				break
 			}
 		}
 	}
