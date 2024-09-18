@@ -56,7 +56,7 @@ Kyanos当前支持3.10及4.14以上版本内核(4.7版本到4.14版本之间的�
 ## 🎯 How to get kyanos 
 执行如下脚本获取最新kyanos可执行文件
 ```bash
-wget -O kyanos.zip https://ghp.ci/github.com/hengyoush/kyanos/releases/download/v1.3.1/kyanos.zip
+wget -O kyanos.zip https://ghp.ci/github.com/hengyoush/kyanos/releases/download/v1.3.2/kyanos.zip
 unzip kyanos.zip
 chmod a+x kyanos
 
