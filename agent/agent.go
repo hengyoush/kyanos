@@ -698,13 +698,13 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 	common.AgentLog.Debugf("[sys info] vendor: %s, os_arch: %s, kernel_arch: %s", si.OS.Vendor, si.OS.Architecture, si.Kernel.Architecture)
 
 	if si.OS.Vendor != "ubuntu" && si.OS.Vendor != "centos" {
-		panic("Current only support centos and ubuntu")
+		common.AgentLog.Fatal("Current only support centos and ubuntu")
 	}
 	if si.OS.Architecture != "amd64" {
-		panic("Current only support amd64")
+		common.AgentLog.Fatal("Current only support amd64")
 	}
 	if si.Kernel.Architecture != "x86_64" {
-		panic("Current only support x86_64")
+		common.AgentLog.Fatal("Current only support x86_64")
 	}
 
 	var btfFileDir string
