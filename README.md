@@ -48,7 +48,7 @@ Kyanos was created specifically for rapid network troubleshooting. It is a **dev
 
 ## ❗ Requirements
 
-Kyanos currently supports kernel versions 3.10 and 4.14 or above (with plans to support versions between 4.7 and 4.14 in the future).  
+Kyanos currently supports kernel versions 3.10(from 3.10.0-957) and 4.14 or above (with plans to support versions between 4.7 and 4.14 in the future).  
 > You can check your kernel version using `uname -r`.
 
 At the moment, running Kyanos inside a container requires privileged mode.
