@@ -8,70 +8,11 @@
 #include <bpf/bpf_core_read.h> 
 #include <bpf/bpf_endian.h>
 #include "pktlatency.h"
-
 #include "protocol_inference.h"
+#include "data_common.h"
+
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
-
-#define COND key.dport == 3306
-#define COND_P key->dport == 3306
-
-#define ETH_P_IP	0x0800
-#define ETH_P_IPV6	0x86DD		/* IPv6 over bluebook		*/
-#define ETH_HLEN	14		/* Total octets in header.	 */
-
-#define _(src)							\
-({								\
-	typeof(src) tmp;					\
-	bpf_probe_read_kernel(&tmp, sizeof(src), &(src));	\
-	tmp;							\
-})
-
-
-#define _C(src, a, ...)		BPF_CORE_READ(src, a, ##__VA_ARGS__)
-
-#define _U(src, a, ...)		BPF_PROBE_READ_USER(src, a, ##__VA_ARGS__)
-
-#ifdef BPF_DEBUG
-#define pr_bpf_debug(fmt, args...) {				\
-	bpf_printk("nettrace: "fmt"\n", ##args);	\
-}
-#else
-#define pr_bpf_debug(fmt, ...) 
-#endif
-
-
-#define IP_H_LEN	(sizeof(struct iphdr))
-#define PROTOCOL_VEC_LIMIT 3
-#define LOOP_LIMIT 2
-
-
-#define TP_ARGS(dst, idx, ctx) \
-{void *__p = (void*)ctx + sizeof(struct trace_entry) + sizeof(long int) + idx * (sizeof(long unsigned int)); \
-bpf_probe_read_kernel(dst, sizeof(*dst), __p);}
-
-#define TP_RET(dst, ctx) \
-{void *__p = (void*)ctx + sizeof(struct trace_entry) + sizeof(long int); \
-bpf_probe_read_kernel(dst, sizeof(*dst), __p); }
-
-
-#define MY_BPF_HASH(name, key_type, value_type) \
-struct {													\
-	__uint(type, BPF_MAP_TYPE_HASH); \
-	__uint(key_size, sizeof(key_type)); \
-	__uint(value_size, sizeof(value_type)); \
-	__uint(max_entries, 65535); \
-	__uint(map_flags, 0); \
-} name SEC(".maps");
-
-#define MY_BPF_ARRAY_PERCPU(name, value_type) \
-struct {													\
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY); \
-	__uint(key_size, sizeof(__u32)); \
-	__uint(value_size, sizeof(value_type)); \
-	__uint(max_entries, 1); \
-	__uint(map_flags, 0); \
-} name SEC(".maps");
 
 
 const struct kern_evt *kern_evt_unused __attribute__((unused));
@@ -116,40 +57,8 @@ struct {
 	__uint(map_flags, 0);
 } sock_key_conn_id_map SEC(".maps");
 
-MY_BPF_HASH(conn_info_map, uint64_t, struct conn_info_t);
-MY_BPF_ARRAY_PERCPU(syscall_data_map, struct kern_evt_data)
 MY_BPF_ARRAY_PERCPU(conn_info_t_map, struct conn_info_t)
 
-#ifdef KERNEL_VERSION_BELOW_58 
-struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32));
-} rb SEC(".maps");
-struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32));
-} syscall_rb SEC(".maps");
-struct {
-    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-    __uint(key_size, sizeof(u32));
-    __uint(value_size, sizeof(u32));
-} conn_evt_rb SEC(".maps");
-#else
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 1<<24);
-} rb SEC(".maps");
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 1<<24);
-} syscall_rb SEC(".maps");
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 1 << 24);
-} conn_evt_rb SEC(".maps");
-#endif
 
 MY_BPF_HASH(control_values, uint32_t, int64_t)
 
@@ -291,97 +200,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	bpf_ringbuf_submit(evt, 0);
 #endif
 }
-static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn) {
-	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
-	if (_len == 0) {
-		return;
-	}
-	
-	int zero = 0;
-	struct kern_evt_data* evt = bpf_map_lookup_elem(&syscall_data_map, &zero);
-	if(!evt || !conn_id_s) {
-		return;
-	}
-	evt->ke.conn_id_s = *conn_id_s;
-	evt->ke.seq = seq;
-	evt->ke.len = len;
-	evt->ke.step = step;
-	if (ts != 0) {
-		evt->ke.ts = ts;
-	} else {
-		evt->ke.ts = bpf_ktime_get_ns();
-	}
-	evt->buf_size = _len; 
 
-	size_t len_minus_1 = _len - 1;
-	asm volatile("" : "+r"(len_minus_1) :);
-	_len = len_minus_1 + 1;
-	size_t amount_copied = 0;
-	if (len_minus_1 < MAX_MSG_SIZE) {
-		bpf_probe_read(evt->msg, _len, buf);
-		amount_copied = _len;
-	} else if (len_minus_1 < 0x7fffffff) {
-		bpf_probe_read(evt->msg, MAX_MSG_SIZE, buf);
-		amount_copied = MAX_MSG_SIZE;
-	}
-	evt->buf_size = amount_copied; 
-	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied;
-#ifdef KERNEL_VERSION_BELOW_58
-	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
-#else
-	bpf_ringbuf_output(&syscall_rb, evt, __len, 0);
-#endif
-}
-static void __always_inline report_syscall_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args) {
-	report_syscall_buf(ctx, seq, conn_id_s, len, step, args->ts, args->buf, args->source_fn);
-}
-static void __always_inline report_syscall_evt_vecs(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t total_size, enum step_t step, struct data_args *args) {
-	int bytes_sent = 0;
-#pragma unroll
-	for (int i = 0; i < LOOP_LIMIT && i < args->iovlen && bytes_sent < total_size; ++i) {
-    	struct iovec iov_cpy;
-		bpf_probe_read_user(&iov_cpy, sizeof(iov_cpy), &args->iov[i]);
-		const int bytes_remaining = total_size - bytes_sent;
-		const size_t iov_size = iov_cpy.iov_len < bytes_remaining ? iov_cpy.iov_len : bytes_remaining;
-		report_syscall_buf(ctx, seq, conn_id_s, iov_size, step, args->ts, iov_cpy.iov_base, args->source_fn);
-		bytes_sent += iov_size;
-		seq += iov_size;
-	}
-}
-
-
-static bool __always_inline report_conn_evt(void* ctx, struct conn_info_t *conn_info, enum conn_type_t type, uint64_t ts) {
-#ifdef KERNEL_VERSION_BELOW_58 
-	struct conn_evt_t _evt = {0};
-	struct conn_evt_t* evt = &_evt;
-#else
-	struct conn_evt_t* evt = bpf_ringbuf_reserve(&conn_evt_rb, sizeof(struct conn_evt_t), 0); 
-#endif	
-	if (!evt) {
-		return 0;
-	}
-	// evt->conn_info = *conn_info;
-	bpf_probe_read_kernel(&evt->conn_info, sizeof(struct conn_info_t), conn_info);
-	evt->conn_type = type;
-	if (ts != 0) {
-		evt->ts = ts;
-	} else {
-		evt->ts = bpf_ktime_get_ns();
-	}
-#ifdef KERNEL_VERSION_BELOW_58 
-	bpf_perf_event_output(ctx, &conn_evt_rb, BPF_F_CURRENT_CPU, evt, sizeof(struct conn_evt_t));
-#else
-	bpf_ringbuf_submit(evt, 0);
-#endif	
-	return 1;
-}
-
-static void __always_inline debug_evt(struct kern_evt* evt, const char* func_name) {
-	// bpf_printk("KPROBE ENTRY, func: %s, lip: %d, dip:%d",func_name, evt.key->sip, evt.key->dip);
-	// bpf_printk("KPROBE ENTRY, lport: %d, dport:%d, seq: %u", evt.key->sport, evt.key->dport, evt->tcp_seq);
-	// bpf_printk("KPROBE ENTRY init_seq = %u, cur_seq: %u, len: %d\n",evt->init_seq, evt->cur_seq,evt->data_len);
-	// bpf_printk("is_sample: %d, ts: %u, inode: %d\n", evt->is_sample, evt->ts, evt->inode);
-}
 #define DEBUG 0
 
 static bool __always_inline use_ipv6(struct sock_common * skc) {
@@ -484,17 +303,6 @@ static void __always_inline parse_sock_key_from_ipv6_tcp_hdr(struct sock_key *ke
 	key->dport = bpf_ntohs(dport);
 }
 
-static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
-	// conn_info->laddr.in4.sin_port
-	// bpf_printk("conn_info->laddr.in4.sin_port: %d, %d", 
-	// 	conn_info->laddr.in4.sin_port,conn_info->raddr.in4.sin_port);
-	// if (conn_info->laddr.in4.sin_port == target_port || 
-	// 	conn_info->raddr.in4.sin_port == target_port) {
-	// 		return true;
-	// }
-
-	return conn_info->protocol != kProtocolUnknown && !conn_info->no_trace;
-}
 static bool __always_inline should_trace_sock_key(struct sock_key *key) {
 	struct conn_id_s_t *conn_id_s = {0};
 	conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
@@ -935,9 +743,6 @@ static __inline void init_conn_info(uint32_t tgid, int32_t fd, struct conn_info_
   conn_info->raddr.in6.sin6_family = PX_AF_UNKNOWN;
 }
 
-static __inline uint64_t gen_tgid_fd(uint32_t tgid, int fd) {
-  return ((uint64_t)tgid << 32) | (uint32_t)fd;
-}
 static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 	struct files_struct *files = _C(task,files);
@@ -1229,9 +1034,9 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		bpf_map_update_elem(&sock_xmit_map, &key, &rcv_initial_seq, BPF_ANY);
 		return true;
 }
-#define CONDN tgid==1499551
+
 static __always_inline void process_syscall_data_vecs(void* ctx, struct data_args *args, uint64_t id, enum traffic_direction_t direct,
-	ssize_t bytes_count) {
+	ssize_t bytes_count, bool is_in_nested_ssl) {
 		
 	uint32_t tgid = id >> 32;
 	uint64_t _tgidfd = (((uint64_t)tgid) << 32 | args->fd);
@@ -1270,45 +1075,51 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 	if (!conn_info) {
 		return;
 	}
-	
-	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
-		
-		struct iovec iov_cpy;
-		size_t buf_size = 0;
-#pragma unroll
-		 for (size_t i = 0; i < PROTOCOL_VEC_LIMIT && i < args->iovlen; i++) {
-			bpf_probe_read_user(&iov_cpy, sizeof(iov_cpy), &args->iov[i]);
-			buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
-			if (buf_size != 0) {
-				enum traffic_protocol_t before_infer = conn_info->protocol;
-				struct protocol_message_t protocol_message = infer_protocol(iov_cpy.iov_base, buf_size, conn_info);
-				
-				if (before_infer != protocol_message.protocol) {
-					conn_info->protocol = protocol_message.protocol;
-					// bpf_printk("[protocol infer]: %d", conn_info->protocol);
+	if (is_in_nested_ssl) {
+		conn_info->ssl = true;
+	}
+	if (!conn_info->ssl) {
+
+		if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
+			
+			struct iovec iov_cpy;
+			size_t buf_size = 0;
+	#pragma unroll
+			for (size_t i = 0; i < PROTOCOL_VEC_LIMIT && i < args->iovlen; i++) {
+				bpf_probe_read_user(&iov_cpy, sizeof(iov_cpy), &args->iov[i]);
+				buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
+				if (buf_size != 0) {
+					enum traffic_protocol_t before_infer = conn_info->protocol;
+					struct protocol_message_t protocol_message = infer_protocol(iov_cpy.iov_base, buf_size, conn_info);
 					
-					if (conn_info->role == kRoleUnknown && protocol_message.type != kUnknown) {
-						conn_info->role = ((direct == kEgress) ^ (protocol_message.type == kResponse))
-											? kRoleClient
-											: kRoleServer;
+					if (before_infer != protocol_message.protocol) {
+						conn_info->protocol = protocol_message.protocol;
+						// bpf_printk("[protocol infer]: %d", conn_info->protocol);
+						
+						if (conn_info->role == kRoleUnknown && protocol_message.type != kUnknown) {
+							conn_info->role = ((direct == kEgress) ^ (protocol_message.type == kResponse))
+												? kRoleClient
+												: kRoleServer;
+						}
+						report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
 					}
-					report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
+					break;
 				}
-				break;
 			}
-		 }
-	} else {
+		} else {
+		}
+
+		// bpf_printk("start trace data(vecs)!, bytes_count:%d,func:%d", bytes_count, args->source_fn);		
+		uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+		struct conn_id_s_t conn_id_s;
+		conn_id_s.tgid_fd = tgid_fd;
+		// conn_id_s.direct = direct;
+		enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
+		if (should_trace_conn(conn_info)) {
+			report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args);
+		}
 	}
 	
-	// bpf_printk("start trace data(vecs)!, bytes_count:%d,func:%d", bytes_count, args->source_fn);		
-	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
-	struct conn_id_s_t conn_id_s;
-	conn_id_s.tgid_fd = tgid_fd;
-	// conn_id_s.direct = direct;
-	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
-	if (should_trace_conn(conn_info)) {
-		report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args);
-	}
 	
 	if (direct == kEgress) {
 		conn_info->write_bytes += bytes_count;
@@ -1317,8 +1128,9 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 	}
 }
 
+
 static __always_inline void process_syscall_data(void* ctx, struct data_args *args, uint64_t id, enum traffic_direction_t direct,
-	ssize_t bytes_count) {
+	ssize_t bytes_count, bool is_nested_ssl) {
 	if (bytes_count <= 0) {
 		// This read()/write() call failed, or processed nothing.
 		return;
@@ -1346,35 +1158,17 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 			}
 		}
 	} 
+
 	if (!conn_info) {
 		return;
 	}
-	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
-		enum traffic_protocol_t before_infer = conn_info->protocol;
-		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
-		// conn_info->protocol = protocol_message.protocol;
-		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
-		if (before_infer != protocol_message.protocol) {
-			conn_info->protocol = protocol_message.protocol;
-			// bpf_printk("[protocol infer]: %d", conn_info->protocol);
-			
-			if (conn_info->role == kRoleUnknown && protocol_message.type != kUnknown) {
-				conn_info->role = ((direct == kEgress) ^ (protocol_message.type == kResponse))
-									? kRoleClient
-									: kRoleServer;
-			}
-			report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
-		}
+
+	if (is_nested_ssl) {
+		conn_info->ssl = true;
 	}
-	
-	// bpf_printk("start trace data!, bytes_count:%d,func:%d", bytes_count, args->source_fn);
-	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
-	struct conn_id_s_t conn_id_s;
-	conn_id_s.tgid_fd = tgid_fd;
-	// conn_id_s.direct = direct;
-	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
-	if (should_trace_conn(conn_info)) {
-		report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
+
+	if (!conn_info->ssl) {
+		process_syscall_data_with_conn_info(ctx, args, tgid_fd, direct, bytes_count, conn_info);
 	}
 	
 	if (direct == kEgress) {
@@ -1407,6 +1201,24 @@ static __always_inline void process_implicit_conn(void* ctx, uint64_t id,
 
   submit_new_conn(ctx, tgid, args->fd, args->addr, /*socket*/ NULL, role, source_fn);
 }
+
+static __always_inline bool propagate_fd_to_uprobe(uint64_t pid_tgid, int fd) {
+	struct nested_syscall_fd_t* nested_syscall_fd_ptr = bpf_map_lookup_elem(&ssl_user_space_call_map, &pid_tgid);
+	if (nested_syscall_fd_ptr) {
+		int current_fd = nested_syscall_fd_ptr->fd;
+		if (current_fd == kInvalidFD) {
+			nested_syscall_fd_ptr->fd = fd;
+		} else if (current_fd != fd) {
+			nested_syscall_fd_ptr->mismatched_fds = true;
+		}
+
+		uint32_t tgid = pid_tgid >> 32;
+		return true;
+	} else {
+		return false;
+	}
+}
+
 SEC("kprobe/security_socket_sendmsg")
 int BPF_KPROBE(security_socket_sendmsg_enter) {
 	uint64_t id = bpf_get_current_pid_tgid();
@@ -1452,7 +1264,8 @@ int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL) {
 		args->ts = bpf_ktime_get_ns();
-		process_syscall_data(ctx, args, id, kIngress, bytes_count);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		process_syscall_data(ctx, args, id, kIngress, bytes_count, is_ssl);
 	} 
 
 	bpf_map_delete_elem(&read_args_map, &id);
@@ -1479,7 +1292,8 @@ int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->ts = bpf_ktime_get_ns();
-		process_syscall_data(ctx, args, id, kIngress, bytes_count);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		process_syscall_data(ctx, args, id, kIngress, bytes_count, is_ssl);
 	} 
 
 	bpf_map_delete_elem(&read_args_map, &id);
@@ -1536,7 +1350,8 @@ int tracepoint__syscalls__sys_exit_recvmsg(struct trace_event_raw_sys_exit *ctx)
 	// Unstash arguments, and process syscall.
 	struct data_args* read_args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (read_args != NULL) {
-		process_syscall_data_vecs(ctx, read_args, id, kIngress, bytes_count);
+		bool is_ssl = propagate_fd_to_uprobe(id, read_args->fd);
+		process_syscall_data_vecs(ctx, read_args, id, kIngress, bytes_count, is_ssl);
 	}
 
 	bpf_map_delete_elem(&read_args_map, &id);
@@ -1565,7 +1380,8 @@ int tracepoint__syscalls__sys_exit_readv(struct trace_event_raw_sys_exit *ctx) {
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->ts = bpf_ktime_get_ns();
-		process_syscall_data_vecs(ctx, args, id, kIngress, bytes_count);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		process_syscall_data_vecs(ctx, args, id, kIngress, bytes_count, is_ssl);
 	}
 	bpf_map_delete_elem(&read_args_map, &id);
 	return 0;
@@ -1595,7 +1411,8 @@ int tracepoint__syscalls__sys_exit_sendto(struct trace_event_raw_sys_exit *ctx) 
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL ) {
-		process_syscall_data(ctx, args, id, kEgress, bytes_count);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		process_syscall_data(ctx, args, id, kEgress, bytes_count, is_ssl);
 	}
 
 	bpf_map_delete_elem(&write_args_map, &id);
@@ -1623,7 +1440,8 @@ int tracepoint__syscalls__sys_exit_write(struct trace_event_raw_sys_exit *ctx) {
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL && args->sock_event) {
-		process_syscall_data(ctx, args, id, kEgress, bytes_count);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		process_syscall_data(ctx, args, id, kEgress, bytes_count, is_ssl);
 	} 
 
 	bpf_map_delete_elem(&write_args_map, &id);
@@ -1672,7 +1490,8 @@ int tracepoint__syscalls__sys_exit_sendmsg(struct trace_event_raw_sys_exit *ctx)
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL) {
-		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count, is_ssl);
 	} 
 
 	bpf_map_delete_elem(&write_args_map, &id);
@@ -1702,7 +1521,8 @@ int tracepoint__syscalls__sys_exit_writev(struct trace_event_raw_sys_exit *ctx) 
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL && args->sock_event) {
-		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count, is_ssl);
 	}
 
 	bpf_map_delete_elem(&write_args_map, &id);

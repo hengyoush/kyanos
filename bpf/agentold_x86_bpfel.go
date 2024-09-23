@@ -62,7 +62,8 @@ type AgentOldConnInfoT struct {
 	PrevBuf             [4]int8
 	PrependLengthHeader bool
 	NoTrace             bool
-	_                   [2]byte
+	Ssl                 bool
+	_                   [1]byte
 }
 
 type AgentOldConnTypeT uint32
@@ -250,6 +251,7 @@ type AgentOldProgramSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type AgentOldMapSpecs struct {
 	AcceptArgsMap        *ebpf.MapSpec `ebpf:"accept_args_map"`
+	ActiveSslReadArgsMap *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	CloseArgsMap         *ebpf.MapSpec `ebpf:"close_args_map"`
 	ConnEvtRb            *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap          *ebpf.MapSpec `ebpf:"conn_info_map"`
@@ -264,6 +266,7 @@ type AgentOldMapSpecs struct {
 	ReadArgsMap          *ebpf.MapSpec `ebpf:"read_args_map"`
 	SockKeyConnIdMap     *ebpf.MapSpec `ebpf:"sock_key_conn_id_map"`
 	SockXmitMap          *ebpf.MapSpec `ebpf:"sock_xmit_map"`
+	SslUserSpaceCallMap  *ebpf.MapSpec `ebpf:"ssl_user_space_call_map"`
 	SyscallDataMap       *ebpf.MapSpec `ebpf:"syscall_data_map"`
 	SyscallRb            *ebpf.MapSpec `ebpf:"syscall_rb"`
 	WriteArgsMap         *ebpf.MapSpec `ebpf:"write_args_map"`
@@ -289,6 +292,7 @@ func (o *AgentOldObjects) Close() error {
 // It can be passed to LoadAgentOldObjects or ebpf.CollectionSpec.LoadAndAssign.
 type AgentOldMaps struct {
 	AcceptArgsMap        *ebpf.Map `ebpf:"accept_args_map"`
+	ActiveSslReadArgsMap *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	CloseArgsMap         *ebpf.Map `ebpf:"close_args_map"`
 	ConnEvtRb            *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap          *ebpf.Map `ebpf:"conn_info_map"`
@@ -303,6 +307,7 @@ type AgentOldMaps struct {
 	ReadArgsMap          *ebpf.Map `ebpf:"read_args_map"`
 	SockKeyConnIdMap     *ebpf.Map `ebpf:"sock_key_conn_id_map"`
 	SockXmitMap          *ebpf.Map `ebpf:"sock_xmit_map"`
+	SslUserSpaceCallMap  *ebpf.Map `ebpf:"ssl_user_space_call_map"`
 	SyscallDataMap       *ebpf.Map `ebpf:"syscall_data_map"`
 	SyscallRb            *ebpf.Map `ebpf:"syscall_rb"`
 	WriteArgsMap         *ebpf.Map `ebpf:"write_args_map"`
@@ -311,6 +316,7 @@ type AgentOldMaps struct {
 func (m *AgentOldMaps) Close() error {
 	return _AgentOldClose(
 		m.AcceptArgsMap,
+		m.ActiveSslReadArgsMap,
 		m.CloseArgsMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
@@ -325,6 +331,7 @@ func (m *AgentOldMaps) Close() error {
 		m.ReadArgsMap,
 		m.SockKeyConnIdMap,
 		m.SockXmitMap,
+		m.SslUserSpaceCallMap,
 		m.SyscallDataMap,
 		m.SyscallRb,
 		m.WriteArgsMap,
