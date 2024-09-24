@@ -15,6 +15,7 @@
 
 enum step_t {
   start = 0,
+  SSL_OUT,
   SYSCALL_OUT,
   TCP_OUT,
   IP_OUT,
@@ -27,6 +28,7 @@ enum step_t {
   TCP_IN,
   USER_COPY,
   SYSCALL_IN,
+  SSL_IN,
   end
 };
 
@@ -175,6 +177,13 @@ struct kern_evt_data {
   uint32_t buf_size;
   char msg[MAX_MSG_SIZE];
 };
+struct kern_evt_ssl_data {
+  struct kern_evt ke;
+	uint64_t syscall_seq;
+	uint32_t syscall_len;
+  uint32_t buf_size;
+  char msg[MAX_MSG_SIZE];
+};
 
 
 // struct data_evt {
@@ -246,6 +255,8 @@ struct conn_info_t {
   struct conn_id_t conn_id;
   uint64_t read_bytes;
   uint64_t write_bytes;
+  uint64_t ssl_read_bytes;
+  uint64_t ssl_write_bytes;
 
   // IP address of the local endpoint.
   union sockaddr_t laddr;

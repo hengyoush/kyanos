@@ -28,3 +28,9 @@ func findHostPathForPidLibs(libnames []string, pid int, searchType HostPathForPI
 	}
 	return result
 }
+
+func detectOpenSsl(pid int) {
+	for _, matcher := range kLibSSLMatchers {
+
+	}
+}

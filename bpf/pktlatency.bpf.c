@@ -1168,7 +1168,7 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	}
 
 	if (!conn_info->ssl) {
-		process_syscall_data_with_conn_info(ctx, args, tgid_fd, direct, bytes_count, conn_info);
+		process_syscall_data_with_conn_info(ctx, args, tgid_fd, direct, bytes_count, conn_info, 0, false);
 	}
 	
 	if (direct == kEgress) {
@@ -1202,7 +1202,7 @@ static __always_inline void process_implicit_conn(void* ctx, uint64_t id,
   submit_new_conn(ctx, tgid, args->fd, args->addr, /*socket*/ NULL, role, source_fn);
 }
 
-static __always_inline bool propagate_fd_to_uprobe(uint64_t pid_tgid, int fd) {
+static __always_inline bool propagate_fd_to_uprobe(uint64_t pid_tgid, int fd, uint32_t len) {
 	struct nested_syscall_fd_t* nested_syscall_fd_ptr = bpf_map_lookup_elem(&ssl_user_space_call_map, &pid_tgid);
 	if (nested_syscall_fd_ptr) {
 		int current_fd = nested_syscall_fd_ptr->fd;
@@ -1212,6 +1212,7 @@ static __always_inline bool propagate_fd_to_uprobe(uint64_t pid_tgid, int fd) {
 			nested_syscall_fd_ptr->mismatched_fds = true;
 		}
 
+		nested_syscall_fd_ptr->syscall_len = nested_syscall_fd_ptr->syscall_len + len;
 		uint32_t tgid = pid_tgid >> 32;
 		return true;
 	} else {
@@ -1264,7 +1265,7 @@ int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL) {
 		args->ts = bpf_ktime_get_ns();
-		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd, bytes_count);
 		process_syscall_data(ctx, args, id, kIngress, bytes_count, is_ssl);
 	} 
 
@@ -1292,7 +1293,7 @@ int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->ts = bpf_ktime_get_ns();
-		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd, bytes_count);
 		process_syscall_data(ctx, args, id, kIngress, bytes_count, is_ssl);
 	} 
 
@@ -1350,7 +1351,7 @@ int tracepoint__syscalls__sys_exit_recvmsg(struct trace_event_raw_sys_exit *ctx)
 	// Unstash arguments, and process syscall.
 	struct data_args* read_args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (read_args != NULL) {
-		bool is_ssl = propagate_fd_to_uprobe(id, read_args->fd);
+		bool is_ssl = propagate_fd_to_uprobe(id, read_args->fd, bytes_count);
 		process_syscall_data_vecs(ctx, read_args, id, kIngress, bytes_count, is_ssl);
 	}
 
@@ -1380,7 +1381,7 @@ int tracepoint__syscalls__sys_exit_readv(struct trace_event_raw_sys_exit *ctx) {
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->ts = bpf_ktime_get_ns();
-		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd, bytes_count);
 		process_syscall_data_vecs(ctx, args, id, kIngress, bytes_count, is_ssl);
 	}
 	bpf_map_delete_elem(&read_args_map, &id);
@@ -1411,7 +1412,7 @@ int tracepoint__syscalls__sys_exit_sendto(struct trace_event_raw_sys_exit *ctx) 
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL ) {
-		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd, bytes_count);
 		process_syscall_data(ctx, args, id, kEgress, bytes_count, is_ssl);
 	}
 
@@ -1440,7 +1441,7 @@ int tracepoint__syscalls__sys_exit_write(struct trace_event_raw_sys_exit *ctx) {
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL && args->sock_event) {
-		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd, bytes_count);
 		process_syscall_data(ctx, args, id, kEgress, bytes_count, is_ssl);
 	} 
 
@@ -1490,7 +1491,7 @@ int tracepoint__syscalls__sys_exit_sendmsg(struct trace_event_raw_sys_exit *ctx)
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL) {
-		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd, bytes_count);
 		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count, is_ssl);
 	} 
 
@@ -1521,7 +1522,7 @@ int tracepoint__syscalls__sys_exit_writev(struct trace_event_raw_sys_exit *ctx) 
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL && args->sock_event) {
-		bool is_ssl = propagate_fd_to_uprobe(id, args->fd);
+		bool is_ssl = propagate_fd_to_uprobe(id, args->fd, bytes_count);
 		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count, is_ssl);
 	}
 

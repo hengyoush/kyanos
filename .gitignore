@@ -24,6 +24,7 @@ agent/agent_x86_bpfel.o
 go.work
 .vscode/
 .output/
+deps/**
 
 eapm-ebpf
 kyanos

@@ -1,9 +1,12 @@
 #ifndef _DATA_COMMON_H__
 #define _DATA_COMMON_H__
 
+#include "protocol_inference.h"
+
 struct nested_syscall_fd_t {
     int fd;
     bool mismatched_fds;
+	uint32_t syscall_len;
 };
 
 struct {
@@ -13,6 +16,14 @@ struct {
 	__uint(max_entries, 65535);
 	__uint(map_flags, 0);
 } active_ssl_read_args_map SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(key_size, sizeof(uint64_t));
+	__uint(value_size, sizeof(struct data_args));
+	__uint(max_entries, 65535);
+	__uint(map_flags, 0);
+} active_ssl_write_args_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -37,6 +48,11 @@ struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(key_size, sizeof(u32));
     __uint(value_size, sizeof(u32));
+} ssl_rb SEC(".maps");
+struct {
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(u32));
 } conn_evt_rb SEC(".maps");
 #else
 struct {
@@ -49,12 +65,17 @@ struct {
 } syscall_rb SEC(".maps");
 struct {
 	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 1<<24);
+} ssl_rb SEC(".maps");
+struct {
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
 	__uint(max_entries, 1 << 24);
 } conn_evt_rb SEC(".maps");
 #endif
 
 MY_BPF_HASH(conn_info_map, uint64_t, struct conn_info_t);
 MY_BPF_ARRAY_PERCPU(syscall_data_map, struct kern_evt_data)
+MY_BPF_ARRAY_PERCPU(ssl_data_map, struct kern_evt_ssl_data)
 
 const int32_t kInvalidFD = -1;
 
@@ -143,6 +164,53 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 static void __always_inline report_syscall_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args) {
 	report_syscall_buf(ctx, seq, conn_id_s, len, step, args->ts, args->buf, args->source_fn);
 }
+
+static void __always_inline report_ssl_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn, uint32_t syscall_seq, uint32_t syscall_len) {
+	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
+	if (_len == 0) {
+		return;
+	}
+	
+	int zero = 0;
+	struct kern_evt_ssl_data* evt = bpf_map_lookup_elem(&ssl_data_map, &zero);
+	if(!evt || !conn_id_s) {
+		return;
+	}
+	evt->ke.conn_id_s = *conn_id_s;
+	evt->ke.seq = seq;
+	evt->ke.len = len;
+	evt->ke.step = step;
+	if (ts != 0) {
+		evt->ke.ts = ts;
+	} else {
+		evt->ke.ts = bpf_ktime_get_ns();
+	}
+	evt->buf_size = _len; 
+	evt->syscall_len = syscall_len;
+	evt->syscall_seq = syscall_seq;
+
+	size_t len_minus_1 = _len - 1;
+	asm volatile("" : "+r"(len_minus_1) :);
+	_len = len_minus_1 + 1;
+	size_t amount_copied = 0;
+	if (len_minus_1 < MAX_MSG_SIZE) {
+		bpf_probe_read(evt->msg, _len, buf);
+		amount_copied = _len;
+	} else if (len_minus_1 < 0x7fffffff) {
+		bpf_probe_read(evt->msg, MAX_MSG_SIZE, buf);
+		amount_copied = MAX_MSG_SIZE;
+	}
+	evt->buf_size = amount_copied; 
+	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t) + sizeof(uint64_t)+ sizeof(uint32_t) + amount_copied;
+#ifdef KERNEL_VERSION_BELOW_58
+	bpf_perf_event_output(ctx, &ssl_rb, BPF_F_CURRENT_CPU, evt, __len);
+#else
+	bpf_ringbuf_output(&ssl_rb, evt, __len, 0);
+#endif
+}
+static void __always_inline report_ssl_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args, uint32_t syscall_seq, uint32_t syscall_len) {
+	report_ssl_buf(ctx, seq, conn_id_s, len, step, args->ts, args->buf, args->source_fn, syscall_seq, syscall_len);
+}
 static void __always_inline report_syscall_evt_vecs(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t total_size, enum step_t step, struct data_args *args) {
 	int bytes_sent = 0;
 #pragma unroll
@@ -162,7 +230,7 @@ static __inline uint64_t gen_tgid_fd(uint32_t tgid, int fd) {
   return ((uint64_t)tgid << 32) | (uint32_t)fd;
 }
 static __always_inline void process_syscall_data_with_conn_info(void* ctx, struct data_args *args, uint64_t tgid_fd,
- enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info) {
+ enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, uint32_t syscall_len, bool is_ssl) {
 	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
 		enum traffic_protocol_t before_infer = conn_info->protocol;
 		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
@@ -185,9 +253,33 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 	struct conn_id_s_t conn_id_s;
 	conn_id_s.tgid_fd = tgid_fd;
 	// conn_id_s.direct = direct;
-	enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
-	if (should_trace_conn(conn_info)) {
-		report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
+	enum step_t step;
+	if (is_ssl) {
+		step = direct == kEgress ? SSL_OUT : SSL_IN;
+	} else {
+		step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
+	}
+	 
+	if (should_trace_conn(conn_info)) {//, bytes_count
+		if (is_ssl) {
+			uint64_t syscall_seq = direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes;
+			report_ssl_evt(ctx, seq, &conn_id_s, bytes_count, step, args, syscall_seq - syscall_len, syscall_len);
+		} else {
+			report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
+		}
+		
 	}
 }
+
+
+static __inline void set_conn_as_ssl(uint32_t tgid, int32_t fd) {
+	uint64_t tgid_fd = gen_tgid_fd(tgid, fd);
+	struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+	if (conn_info == NULL) {
+		return;
+	}
+	conn_info->ssl = true;
+}
+
+
 #endif
