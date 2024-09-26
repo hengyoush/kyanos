@@ -14,8 +14,9 @@
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
-
+// 
 const struct kern_evt *kern_evt_unused __attribute__((unused));
+const struct kern_evt_ssl_data *kern_evt_ssl_data_unused __attribute__((unused));
 const struct conn_evt_t *conn_evt_t_unused __attribute__((unused));
 const struct sock_key *sock_key_unused __attribute__((unused));
 const struct kern_evt_data *kern_evt_data_unused __attribute__((unused));

@@ -54,7 +54,9 @@ function run() {
 
     clang -I include/ -I . offset.c -o offset
 
-    echo -e "#ifndef ECAPTURE_${header_define}" >${header_file}
+    # //go:build ignore
+    echo -e "//go:build ignore\n" >${header_file}
+    echo -e "#ifndef ECAPTURE_${header_define}" >>${header_file}
     echo -e "#define ECAPTURE_${header_define}\n" >>${header_file}
     ./offset >>${header_file}
     echo -e "#define SSL_ST_VERSION SSL_CONNECTION_ST_VERSION\n" >>${header_file}

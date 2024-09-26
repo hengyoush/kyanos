@@ -13,6 +13,24 @@ var Objs any
 
 type AttachBpfProgFunction func(interface{}) link.Link
 
+func GetProgramFromObjs(objs any, progName string) *ebpf.Program {
+	val := reflect.ValueOf(objs)
+
+	programField := val.Elem().Field(0)
+	if !programField.IsValid() {
+		return nil
+	}
+	programSpecsVal := programField
+	fieldName := progName
+	fieldVal := programSpecsVal.FieldByName(fieldName)
+	if fieldVal.IsValid() && fieldVal.Kind() == reflect.Ptr && !fieldVal.IsNil() {
+		program := fieldVal.Interface().(*ebpf.Program)
+		return program
+	} else {
+		return nil
+	}
+}
+
 func GetProgram(programs any, fieldName string) *ebpf.Program {
 	oldprograms, isOld := programs.(AgentOldPrograms)
 	if isOld {

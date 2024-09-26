@@ -112,6 +112,14 @@ type AgentKernEvtData struct {
 	_       [4]byte
 }
 
+type AgentKernEvtSslData struct {
+	Ke         AgentKernEvt
+	SyscallSeq uint64
+	SyscallLen uint32
+	BufSize    uint32
+	Msg        [30720]int8
+}
+
 type AgentSockKey struct {
 	Sip   [2]uint64
 	Dip   [2]uint64

@@ -3,6 +3,7 @@
 
 #include "protocol_inference.h"
 
+const struct kern_evt_ssl_data *kern_evt_ssl_data_unused __attribute__((unused));
 struct nested_syscall_fd_t {
     int fd;
     bool mismatched_fds;

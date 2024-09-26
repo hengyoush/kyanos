@@ -54,6 +54,7 @@ type Processor struct {
 	connManager   *ConnManager
 	connEvents    chan *bpf.AgentConnEvtT
 	syscallEvents chan *bpf.SyscallEventData
+	sslEvents     chan *bpf.SslData
 	kernEvents    chan *bpf.AgentKernEvt
 	name          string
 	messageFilter protocol.ProtocolFilter
@@ -71,6 +72,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.connManager = connManager
 	p.connEvents = make(chan *bpf.AgentConnEvtT)
 	p.syscallEvents = make(chan *bpf.SyscallEventData)
+	p.sslEvents = make(chan *bpf.SslData)
 	p.kernEvents = make(chan *bpf.AgentKernEvt)
 	p.name = name
 	p.messageFilter = filter
@@ -89,6 +91,10 @@ func (p *Processor) AddConnEvent(evt *bpf.AgentConnEvtT) {
 
 func (p *Processor) AddSyscallEvent(evt *bpf.SyscallEventData) {
 	p.syscallEvents <- evt
+}
+
+func (p *Processor) AddSslEvent(evt *bpf.SslData) {
+	p.sslEvents <- evt
 }
 
 func (p *Processor) AddKernEvent(record *bpf.AgentKernEvt) {
@@ -222,6 +228,18 @@ func (p *Processor) run() {
 				common.BPFEventLog.Debugf("[syscall][protocol unknown][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 			} else {
 				common.BPFEventLog.Debugf("[syscall][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
+			}
+		case event := <-p.sslEvents:
+			tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
+			conn := p.connManager.FindConnection4Or(tgidFd, event.SslEventHeader.Ke.Ts+common.LaunchEpochTime)
+			event.SslEventHeader.Ke.Ts += common.LaunchEpochTime
+			if conn != nil && conn.Status == Closed {
+				continue
+			}
+			if conn != nil {
+				common.BPFEventLog.Debugf("[ssl][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+			} else {
+				common.BPFEventLog.Debugf("[ssl][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SslEventHeader.BufSize, string(event.Buf))
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd

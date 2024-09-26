@@ -62,7 +62,9 @@ function run() {
 
     clang -I include/ -I crypto/include/ -I . offset.c -o offset
 
-    echo -e "#ifndef ECAPTURE_${header_define}" >${header_file}
+    # //go:build ignore
+    echo -e "//go:build ignore\n" >${header_file}
+    echo -e "#ifndef ECAPTURE_${header_define}" >>${header_file}
     echo -e "#define ECAPTURE_${header_define}\n" >>${header_file}
     ./offset >>${header_file}
     echo -e "// openssl 1.1.0 does not support TLS 1.3, set 0 default" >>${header_file}

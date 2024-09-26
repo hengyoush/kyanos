@@ -14,6 +14,7 @@ import (
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
 	"kyanos/agent/render"
+	"kyanos/agent/uprobe"
 	"kyanos/bpf"
 	"kyanos/common"
 	"os"
@@ -256,6 +257,16 @@ func SetupAgent(options AgentOptions) {
 	if !validateResult {
 		return
 	}
+	if needAttachOpenSslUprobes() {
+		uprobeLinks, err := uprobe.AttachSslUprobe(int(viper.GetInt64(common.FilterPidVarName)))
+		if err == nil {
+			for _, l := range uprobeLinks {
+				links.PushBack(l)
+			}
+		} else {
+			common.AgentLog.Warnf("Attach OpenSsl uprobes failed: %+v", err)
+		}
+	}
 
 	defer func() {
 		for e := links.Front(); e != nil; e = e.Next() {
@@ -317,12 +328,17 @@ func startReaders(options AgentOptions, kernel compatible.KernelVersion, pm *con
 		startRingbufferReader(readers[0], func(r ringbuf.Record) error {
 			return handleSyscallEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
 		})
-		// kernel event
+		// ssl
 		startRingbufferReader(readers[1], func(r ringbuf.Record) error {
+			return handleSyscallEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
+		})
+
+		// kernel event
+		startRingbufferReader(readers[2], func(r ringbuf.Record) error {
 			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
 		})
 		// conn event
-		startRingbufferReader(readers[2], func(r ringbuf.Record) error {
+		startRingbufferReader(readers[3], func(r ringbuf.Record) error {
 			return handleConnEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook)
 		})
 	} else {
@@ -345,6 +361,12 @@ func setupReaders(options AgentOptions, kernel compatible.KernelVersion, objs an
 		return nil, err
 	}
 	closers = append(closers, syscallDataReader)
+
+	sslDataReader, err := setupReader(options, kernel, objs, "SslRb", true)
+	if err != nil {
+		return nil, err
+	}
+	closers = append(closers, sslDataReader)
 
 	kernEventReader, err := setupReader(options, kernel, objs, "Rb", false)
 	if err != nil {
@@ -414,6 +436,10 @@ func startPerfeventReader(reader io.Closer, consumeFunction func(perf.Record) er
 			}
 		}
 	}()
+}
+
+func needAttachOpenSslUprobes() bool {
+	return viper.GetInt64(common.FilterPidVarName) > 0
 }
 
 func setAndValidateParameters() bool {
@@ -510,6 +536,28 @@ func handleConnEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, 
 		customConnEventHook(&event)
 	}
 	p.AddConnEvent(&event)
+	return nil
+}
+
+func handleSslDataEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customSyscallEventHook SyscallEventHook) error {
+
+	event := new(bpf.SslData)
+	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event.SslEventHeader)
+	if err != nil {
+		return err
+	}
+	msgSize := event.SslEventHeader.BufSize
+	headerSize := uint(unsafe.Sizeof(event.SslEventHeader))
+	buf := make([]byte, msgSize)
+	err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
+	if err != nil {
+		return err
+	}
+	event.Buf = buf
+	tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
+	p := pm.GetProcessor(int(tgidFd) % processorsNum)
+	// err :=
+	p.AddSslEvent(event)
 	return nil
 }
 func handleSyscallEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customSyscallEventHook SyscallEventHook) error {
