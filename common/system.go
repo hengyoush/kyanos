@@ -20,7 +20,7 @@ func GetMapPaths(pid int) []string {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		fields := strings.Split(line, " ")
+		fields := strings.Fields(line)
 		if len(fields) == kProcMapNumFields {
 			pathName := fields[len(fields)-1]
 			pathName = strings.Trim(pathName, " ")

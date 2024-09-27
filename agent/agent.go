@@ -345,10 +345,14 @@ func startReaders(options AgentOptions, kernel compatible.KernelVersion, pm *con
 		startPerfeventReader(readers[0], func(r perf.Record) error {
 			return handleSyscallEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
 		})
+		// ssl
 		startPerfeventReader(readers[1], func(r perf.Record) error {
-			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
+			return handleSslDataEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
 		})
 		startPerfeventReader(readers[2], func(r perf.Record) error {
+			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
+		})
+		startPerfeventReader(readers[3], func(r perf.Record) error {
 			return handleConnEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook)
 		})
 	}

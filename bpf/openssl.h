@@ -74,6 +74,7 @@ static __always_inline void process_ssl_data(struct pt_regs* ctx, uint64_t id,
     }                                        
     uint64_t tgid_fd = gen_tgid_fd(id>>32, args->fd);
     struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+        bpf_printk("process_ssl_data! bc: %d, id:%llu,fd:%llu", bytes_count, id>>32, args->fd);
     if (conn_info) {
         process_syscall_data_with_conn_info(ctx, args, tgid_fd, direction, bytes_count, conn_info, syscall_len, true);
         if (direction == kEgress) {
@@ -209,7 +210,7 @@ static __always_inline int do_SSL_write_entry(struct pt_regs* ctx, bool is_ex_ca
 
     char* buf = (char*)PT_REGS_PARM2(ctx);
     struct data_args write_args = {};
-    write_args.source_fn = kSSLRead;
+    write_args.source_fn = kSSLWrite;
     write_args.buf = buf;
     if (is_ex_call) {
         size_t* ssl_ex_len = (size_t*)PT_REGS_PARM4(ctx);
@@ -224,6 +225,7 @@ static __always_inline int do_SSL_write_ret(struct pt_regs* ctx, bool is_ex_call
     uint64_t id = bpf_get_current_pid_tgid();
     struct nested_syscall_fd_t* nested_syscall_fd_ptr = bpf_map_lookup_elem(&ssl_user_space_call_map, &id);
     if (nested_syscall_fd_ptr == NULL) {
+        bpf_printk("nested_syscall_fd_ptr == NULL");
         return 0;
     }
 
@@ -300,3 +302,6 @@ SEC("uretprobe/dummy:SSL_read")
 int BPF_URETPROBE(SSL_read_ret_offset) {
     return do_SSL_read_ret_offset(ctx);
 }
+
+
+char LICENSE[] SEC("license") = "Dual BSD/GPL";

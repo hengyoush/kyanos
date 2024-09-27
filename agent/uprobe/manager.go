@@ -26,7 +26,7 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 	collectionOptions := &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			LogLevel: ebpf.LogLevelInstruction,
-			LogSize:  1 * 1024 * 1024,
+			LogSize:  10 * 1024 * 1024,
 		},
 		MapReplacements: map[string]*ebpf.Map{
 			"active_ssl_read_args_map":  bpf.GetMapFromObjs(bpf.Objs, "ActiveSslReadArgsMap"),
@@ -47,12 +47,12 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 		return nil, err
 	}
 
-	matcher, err := findLibSslPath(pid)
+	matcher, libSslPath, err := findLibSslPath(pid)
 	if err != nil {
 		return nil, err
 	}
 
-	sslEx, err := link.OpenExecutable(matcher.Libssl)
+	sslEx, err := link.OpenExecutable(libSslPath)
 	if err != nil {
 		return nil, err
 	}
@@ -111,26 +111,31 @@ func buildBPFFuncName(baseName string, isEx bool, isRet bool, socketFDAccess SSL
 }
 
 func detectOpenSsl(pid int) (string, error) {
-	matcher, err := findLibSslPath(pid)
+	_, libSslPath, err := findLibSslPath(pid)
 	if err != nil {
 		return "", err
 	}
-	return getOpenSslVersionKey(matcher.Libssl)
+	if result, err := getOpenSslVersionKey(libSslPath); err == nil {
+		return result, nil
+	}
+	libSslLibName := libSslPath[strings.LastIndex(libSslPath, "/")+1:]
+	if libSslLibName == "libssl.so.3" {
+		return Linuxdefaulefilename30, nil
+	} else {
+		return Linuxdefaulefilename111, nil
+	}
 }
 
-func findLibSslPath(pid int) (SSLLibMatcher, error) {
-	var found bool
+func findLibSslPath(pid int) (SSLLibMatcher, string, error) {
 	for _, matcher := range kLibSSLMatchers {
 		libnames := []string{matcher.Libssl}
 		libnameToPath := findHostPathForPidLibs(libnames, pid, matcher.SearchType)
-		_, found = libnameToPath[matcher.Libssl]
+		path, found := libnameToPath[matcher.Libssl]
 		if found {
-			break
-		} else {
-			return matcher, nil
+			return matcher, path, nil
 		}
 	}
-	return SSLLibMatcher{}, fmt.Errorf("no dynamic link openssl found")
+	return SSLLibMatcher{}, "", fmt.Errorf("no dynamic link openssl found")
 }
 
 func findHostPathForPidLibs(libnames []string, pid int, searchType HostPathForPIDPathSearchType) map[string]string {
