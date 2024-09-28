@@ -76,7 +76,7 @@ static __always_inline void process_ssl_data(struct pt_regs* ctx, uint64_t id,
     struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
         bpf_printk("process_ssl_data! bc: %d, id:%llu,fd:%llu", bytes_count, id>>32, args->fd);
     if (conn_info) {
-        process_syscall_data_with_conn_info(ctx, args, tgid_fd, direction, bytes_count, conn_info, syscall_len, true);
+        process_syscall_data_with_conn_info(ctx, args, tgid_fd, direction, bytes_count, conn_info, syscall_len, true, true);
         if (direction == kEgress) {
             conn_info->ssl_write_bytes += bytes_count;
         } else {
@@ -162,6 +162,7 @@ static __always_inline int do_SSL_read_entry(struct pt_regs* ctx, bool is_ex_cal
         .fd = kInvalidFD,
         .syscall_len = 0,
     };
+    nested_syscall_fd.fd = get_fd(tgid, ssl);
     bpf_map_update_elem(&ssl_user_space_call_map, &id, &nested_syscall_fd, BPF_ANY);
 
     char* buf = (char*)PT_REGS_PARM2(ctx);
@@ -206,6 +207,7 @@ static __always_inline int do_SSL_write_entry(struct pt_regs* ctx, bool is_ex_ca
         .fd = kInvalidFD,
         .syscall_len = 0,
     };
+    nested_syscall_fd.fd = get_fd(tgid, ssl);
     bpf_map_update_elem(&ssl_user_space_call_map, &id, &nested_syscall_fd, BPF_ANY);
 
     char* buf = (char*)PT_REGS_PARM2(ctx);
@@ -244,62 +246,74 @@ static __always_inline int do_SSL_write_ret(struct pt_regs* ctx, bool is_ex_call
 
 SEC("uprobe/dummy:SSL_read")
 int BPF_UPROBE(SSL_read_entry_nested_syscall) {
+    bpf_printk("SSL_read_entry_nested_syscall");
     return do_SSL_read_entry(ctx, false);
 }
 
 SEC("uretprobe/dummy:SSL_read")
 int BPF_URETPROBE(SSL_read_ret_nested_syscall) {
+    bpf_printk("SSL_read_ret_nested_syscall");
     return do_SSL_read_ret(ctx, false);
 }
 
 
 SEC("uprobe/dummy:SSL_read_ex")
 int BPF_UPROBE(SSL_read_ex_entry_nested_syscall) {
+    bpf_printk("SSL_read_ex_entry_nested_syscall");
     return do_SSL_read_entry(ctx, true);
 }
 
 SEC("uretprobe/dummy:SSL_read_ex")
 int BPF_URETPROBE(SSL_read_ex_ret_nested_syscall) {
+    bpf_printk("SSL_read_ex_ret_nested_syscall");
     return do_SSL_read_ret(ctx, true);
 }
 
 SEC("uprobe/dummy:SSL_write")
 int BPF_UPROBE(SSL_write_entry_nested_syscall) {
+    bpf_printk("SSL_write_entry_nested_syscall");
     return do_SSL_write_entry(ctx, false);
 }
 
 SEC("uretprobe/dummy:SSL_write")
 int BPF_URETPROBE(SSL_write_ret_nested_syscall) {
+    bpf_printk("SSL_write_ret_nested_syscall");
     return do_SSL_write_ret(ctx, false);
 }
 
 SEC("uprobe/dummy:SSL_write_ex")
 int BPF_UPROBE(SSL_write_ex_entry_nested_syscall) {
+    bpf_printk("SSL_write_ex_entry_nested_syscall");
     return do_SSL_write_entry(ctx, true);
 }
 
 SEC("uretprobe/dummy:SSL_write_ex")
 int BPF_URETPROBE(SSL_write_ex_ret_nested_syscall) {
+    bpf_printk("SSL_write_ex_ret_nested_syscall");
     return do_SSL_write_ret(ctx, true);
 }
 
 SEC("uprobe/dummy:SSL_write")
 int BPF_UPROBE(SSL_write_entry_offset) {
+    bpf_printk("SSL_write_entry_offset");
     return do_SSL_write_entry_offset(ctx, false);
 }
 
 SEC("uretprobe/dummy:SSL_write")
 int BPF_URETPROBE(SSL_write_ret_offset) {
+    bpf_printk("SSL_write_ret_offset");
     return do_SSL_write_ret_offset(ctx);
 }
 
 SEC("uprobe/dummy:SSL_read")
 int BPF_UPROBE(SSL_read_entry_offset) {
+    bpf_printk("SSL_read_entry_offset");
     return do_SSL_read_entry_offset(ctx, false);
 }
 
 SEC("uretprobe/dummy:SSL_read")
 int BPF_URETPROBE(SSL_read_ret_offset) {
+    bpf_printk("SSL_read_entry_offset");
     return do_SSL_read_ret_offset(ctx);
 }
 

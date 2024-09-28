@@ -1077,6 +1077,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		return;
 	}
 	if (is_in_nested_ssl) {
+		bpf_printk("set ssl=true for tgid: %lld, fd: %d", tgid, args->fd);
 		conn_info->ssl = true;
 	}
 	if (!conn_info->ssl) {
@@ -1119,6 +1120,13 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		if (should_trace_conn(conn_info)) {
 			report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args);
 		}
+	} else {
+		// only report syscall event without data
+		uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+		struct conn_id_s_t conn_id_s;
+		conn_id_s.tgid_fd = tgid_fd;
+		enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
+		report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, 0, args->source_fn);
 	}
 	
 	
@@ -1169,7 +1177,7 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	}
 
 	if (!conn_info->ssl) {
-		process_syscall_data_with_conn_info(ctx, args, tgid_fd, direct, bytes_count, conn_info, 0, false);
+		process_syscall_data_with_conn_info(ctx, args, tgid_fd, direct, bytes_count, conn_info, 0, false, !conn_info->ssl);
 	}
 	
 	if (direct == kEgress) {
@@ -1206,6 +1214,7 @@ static __always_inline void process_implicit_conn(void* ctx, uint64_t id,
 static __always_inline bool propagate_fd_to_uprobe(uint64_t pid_tgid, int fd, uint32_t len) {
 	struct nested_syscall_fd_t* nested_syscall_fd_ptr = bpf_map_lookup_elem(&ssl_user_space_call_map, &pid_tgid);
 	if (nested_syscall_fd_ptr) {
+		bpf_printk("propagate_fd_to_uprobe, tgid: %lld, fd: %lld, len:%d",pid_tgid >> 32, fd ,len);
 		int current_fd = nested_syscall_fd_ptr->fd;
 		if (current_fd == kInvalidFD) {
 			nested_syscall_fd_ptr->fd = fd;

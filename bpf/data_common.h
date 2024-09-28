@@ -120,7 +120,35 @@ static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
 	return conn_info->protocol != kProtocolUnknown && !conn_info->no_trace;
 }
 
+static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, enum source_function_t source_fn) {
+	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
+	if (_len == 0) {
+		return;
+	}
+	
+	int zero = 0;
+	struct kern_evt_data* evt = bpf_map_lookup_elem(&syscall_data_map, &zero);
+	if(!evt || !conn_id_s) {
+		return;
+	}
+	evt->ke.conn_id_s = *conn_id_s;
+	evt->ke.seq = seq;
+	evt->ke.len = len;
+	evt->ke.step = step;
+	if (ts != 0) {
+		evt->ke.ts = ts;
+	} else {
+		evt->ke.ts = bpf_ktime_get_ns();
+	}
+	evt->buf_size = 0; 
 
+	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t);
+#ifdef KERNEL_VERSION_BELOW_58
+	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
+#else
+	bpf_ringbuf_output(&syscall_rb, evt, __len, 0);
+#endif
+}
 static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn) {
 	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
@@ -231,7 +259,7 @@ static __inline uint64_t gen_tgid_fd(uint32_t tgid, int fd) {
   return ((uint64_t)tgid << 32) | (uint32_t)fd;
 }
 static __always_inline void process_syscall_data_with_conn_info(void* ctx, struct data_args *args, uint64_t tgid_fd,
- enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, uint32_t syscall_len, bool is_ssl) {
+ enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, uint32_t syscall_len, bool is_ssl, bool with_data) {
 	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
 		enum traffic_protocol_t before_infer = conn_info->protocol;
 		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
@@ -265,10 +293,11 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		if (is_ssl) {
 			uint64_t syscall_seq = direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes;
 			report_ssl_evt(ctx, seq, &conn_id_s, bytes_count, step, args, syscall_seq - syscall_len, syscall_len);
-		} else {
+		} else if (with_data) {
 			report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
+		} else {
+			report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, 0, args->source_fn);
 		}
-		
 	}
 }
 
