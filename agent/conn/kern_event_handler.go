@@ -12,6 +12,7 @@ import (
 type KernEventStream struct {
 	conn       *Connection4
 	kernEvents map[bpf.AgentStepT][]KernEvent
+	sslEvents  []SslEvent
 	maxLen     int
 }
 
@@ -24,7 +25,28 @@ func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
 	monitor.RegisterMetricExporter(stream)
 	return stream
 }
-
+func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
+	index, found := slices.BinarySearchFunc(s.sslEvents, SslEvent{Seq: event.SslEventHeader.Ke.Seq}, func(i SslEvent, j SslEvent) int {
+		return cmp.Compare(i.Seq, j.Seq)
+	})
+	if found {
+		return
+	}
+	s.sslEvents = slices.Insert(s.sslEvents, index, SslEvent{
+		Seq:       event.SslEventHeader.Ke.Seq,
+		KernSeq:   event.SslEventHeader.SyscallSeq,
+		Len:       int(event.SslEventHeader.Ke.Len),
+		KernLen:   int(event.SslEventHeader.SyscallLen),
+		Timestamp: event.SslEventHeader.Ke.Ts,
+		Step:      event.SslEventHeader.Ke.Step,
+	})
+	if len(s.sslEvents) > s.maxLen {
+		common.ConntrackLog.Debugf("ssl event size: %d exceed maxLen", len(s.sslEvents))
+	}
+	for len(s.sslEvents) > s.maxLen {
+		s.sslEvents = s.sslEvents[1:]
+	}
+}
 func (s *KernEventStream) AddSyscallEvent(event *bpf.SyscallEventData) {
 	s.AddKernEvent(&event.SyscallEvent.Ke)
 }
@@ -57,6 +79,32 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 		}
 		s.kernEvents[event.Step] = kernEvtSlice
 	}
+}
+
+func (s *KernEventStream) FindAndRemoveSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []SslEvent {
+	sslEvents := s.sslEvents
+	start := seq
+	end := start + uint64(len)
+	needsRemoveLastIndex := -1
+	result := make([]SslEvent, 0)
+	for index, each := range sslEvents {
+		if each.Seq < start {
+			needsRemoveLastIndex = index
+			continue
+		}
+
+		if each.Seq < end {
+			result = append(result, each)
+			needsRemoveLastIndex = index
+		} else {
+			break
+		}
+	}
+	if needsRemoveLastIndex != -1 {
+		s.sslEvents = sslEvents[needsRemoveLastIndex+1:]
+	}
+
+	return result
 }
 
 func (s *KernEventStream) FindAndRemoveEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []KernEvent {
@@ -126,6 +174,15 @@ func (kernevent *KernEvent) GetTimestamp() uint64 {
 
 func (kernevent *KernEvent) GetStep() bpf.AgentStepT {
 	return kernevent.step
+}
+
+type SslEvent struct {
+	Seq       uint64
+	KernSeq   uint64
+	Len       int
+	KernLen   int
+	Timestamp uint64
+	Step      bpf.AgentStepT
 }
 
 type TcpKernEvent struct {

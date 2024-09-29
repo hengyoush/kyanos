@@ -26,6 +26,8 @@ type AnnotatedRecord struct {
 	protocol.Record
 	startTs                      uint64
 	endTs                        uint64
+	reqSslSize                   int
+	respSslSize                  int
 	reqSize                      int
 	respSize                     int
 	totalDuration                float64
@@ -150,6 +152,111 @@ type PacketEventDetail struct {
 	timestamp uint64
 }
 
+type events struct {
+	sslWriteSyscallEvents                                []conn.SslEvent
+	sslReadSyscallEvents                                 []conn.SslEvent
+	writeSyscallEvents                                   []conn.KernEvent
+	readSyscallEvents                                    []conn.KernEvent
+	devOutEvents                                         []conn.KernEvent
+	nicIngressEvents                                     []conn.KernEvent
+	userCopyEvents                                       []conn.KernEvent
+	tcpInEvents                                          []conn.KernEvent
+	egressMessage                                        protocol.ParsedMessage
+	ingressMessage                                       protocol.ParsedMessage
+	ingressSeq, egressSeq, ingressKernSeq, egressKernSeq uint64
+	ingressKernLen, egressKernLen                        int
+}
+
+func getKernSeqAndLen(syscallEvents []conn.SslEvent) (uint64, int) {
+	var syscallSeq uint64
+	var syscallLen int
+	if len(syscallEvents) > 0 {
+		for idx := 0; idx < len(syscallEvents); idx++ {
+			each := syscallEvents[idx]
+			if each.KernSeq != 0 {
+				syscallSeq = each.KernSeq
+				break
+			}
+		}
+		if syscallSeq == 0 {
+			return 0, 0
+		}
+
+		for idx := len(syscallEvents) - 1; idx >= 0; idx-- {
+			each := syscallEvents[idx]
+			if each.KernSeq != 0 {
+				syscallLen = int(each.KernSeq - syscallSeq)
+				break
+			}
+		}
+
+		return syscallSeq, syscallLen
+	}
+	return 0, 0
+}
+
+func prepareEvents(r protocol.Record, connection *conn.Connection4) *events {
+	streamEvents := connection.StreamEvents
+	var events events
+	var writeSyscallEvents, readSyscallEvents, devOutEvents, nicIngressEvents, userCopyEvents, tcpInEvents []conn.KernEvent
+	var sslWriteSyscallEvents, sslReadSyscallEvents []conn.SslEvent
+	var ingressSeq, egressSeq, ingressKernSeq, egressKernSeq uint64
+	var ingressKernLen, egressKernLen int
+
+	egressMessage := getParsedMessageBySide(r, connection.IsServerSide(), DirectEgress)
+	ingressMessage := getParsedMessageBySide(r, connection.IsServerSide(), DirectIngress)
+	ssl := connection.IsSsl()
+	if ssl {
+		ingressSeq = ingressMessage.Seq()
+		egressSeq = egressMessage.Seq()
+		sslWriteSyscallEvents = streamEvents.FindAndRemoveSslEventsBySeqAndLen(bpf.AgentStepTSSL_OUT, egressMessage.Seq(), egressMessage.ByteSize())
+		sslReadSyscallEvents = streamEvents.FindAndRemoveSslEventsBySeqAndLen(bpf.AgentStepTSSL_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
+
+		egressKernSeq, egressKernLen = getKernSeqAndLen(sslWriteSyscallEvents)
+		ingressKernSeq, ingressKernLen = getKernSeqAndLen(sslReadSyscallEvents)
+	} else {
+		// non-ssl connection kernSeq equals to seq
+		ingressSeq = ingressMessage.Seq()
+		ingressKernSeq = ingressSeq
+		ingressKernLen = ingressMessage.ByteSize()
+		egressSeq = egressMessage.Seq()
+		egressKernSeq = egressSeq
+		egressKernLen = egressMessage.ByteSize()
+	}
+	writeSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_OUT, egressKernSeq, egressKernLen)
+	readSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, ingressKernSeq, ingressKernLen)
+
+	devOutEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_OUT, egressKernSeq, egressKernLen)
+	nicIngressEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTNIC_IN, ingressKernSeq, ingressKernLen)
+	userCopyEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, ingressKernSeq, ingressKernLen)
+	tcpInEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTTCP_IN, ingressKernSeq, ingressKernLen)
+
+	if len(nicIngressEvents) == 0 {
+		nicIngressEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_IN, ingressKernSeq, ingressKernLen)
+	}
+	events.sslReadSyscallEvents = sslReadSyscallEvents
+	events.sslWriteSyscallEvents = sslWriteSyscallEvents
+
+	events.writeSyscallEvents = writeSyscallEvents
+	events.readSyscallEvents = readSyscallEvents
+
+	events.devOutEvents = devOutEvents
+	events.nicIngressEvents = nicIngressEvents
+	events.userCopyEvents = userCopyEvents
+	events.tcpInEvents = tcpInEvents
+
+	events.ingressSeq = ingressSeq
+	events.egressSeq = egressSeq
+	events.ingressKernSeq = ingressKernSeq
+	events.egressKernSeq = egressKernSeq
+	events.ingressKernLen = ingressKernLen
+	events.egressKernLen = egressKernLen
+
+	events.egressMessage = egressMessage
+	events.ingressMessage = ingressMessage
+	return &events
+}
+
 func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connection4, recordsChannel chan<- *AnnotatedRecord) error {
 	streamEvents := connection.StreamEvents
 	annotatedRecord := CreateAnnotedRecord()
@@ -168,81 +275,77 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		Side:       side,
 	}
 
-	var writeSyscallEvents, readSyscallEvents, devOutSyscallEvents, nicIngressEvents, userCopyEvents, tcpInEvents []conn.KernEvent
-	egressMessage := getParsedMessageBySide(r, connection.IsServerSide(), DirectEgress)
-	ingressMessage := getParsedMessageBySide(r, connection.IsServerSide(), DirectIngress)
-	writeSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_OUT, egressMessage.Seq(), egressMessage.ByteSize())
-	readSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
-	devOutSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_OUT, egressMessage.Seq(), egressMessage.ByteSize())
-	nicIngressEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTNIC_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
-	userCopyEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, ingressMessage.Seq(), ingressMessage.ByteSize())
-	tcpInEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTTCP_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
+	events := prepareEvents(r, connection)
 
-	hasNicInEvents := len(nicIngressEvents) > 0
-	if !hasNicInEvents {
-		nicIngressEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
-		hasNicInEvents = len(nicIngressEvents) > 0
-	}
-	hasDevOutEvents := len(devOutSyscallEvents) > 0
-	hasReadSyscallEvents := len(readSyscallEvents) > 0
-	hasWriteSyscallEvents := len(writeSyscallEvents) > 0
-	hasUserCopyEvents := len(userCopyEvents) > 0
-	hasTcpInEvents := len(tcpInEvents) > 0
+	hasNicInEvents := len(events.nicIngressEvents) > 0
+	hasDevOutEvents := len(events.devOutEvents) > 0
+	hasReadSyscallEvents := len(events.readSyscallEvents) > 0
+	hasWriteSyscallEvents := len(events.writeSyscallEvents) > 0
+	hasUserCopyEvents := len(events.userCopyEvents) > 0
+	hasTcpInEvents := len(events.tcpInEvents) > 0
 	if connection.IsServerSide() {
 		if hasNicInEvents {
-			annotatedRecord.startTs = nicIngressEvents[0].GetTimestamp()
+			annotatedRecord.startTs = events.nicIngressEvents[0].GetTimestamp()
 		}
 		if hasDevOutEvents {
-			annotatedRecord.endTs = devOutSyscallEvents[len(devOutSyscallEvents)-1].GetTimestamp()
+			annotatedRecord.endTs = events.devOutEvents[len(events.devOutEvents)-1].GetTimestamp()
 		}
-		annotatedRecord.reqSize = ingressMessage.ByteSize()
-		annotatedRecord.respSize = egressMessage.ByteSize()
+		if connection.IsSsl() {
+			annotatedRecord.reqSslSize = events.ingressMessage.ByteSize()
+			annotatedRecord.respSslSize = events.egressMessage.ByteSize()
+		}
+		annotatedRecord.reqSize = events.ingressKernLen
+		annotatedRecord.respSize = events.egressKernLen
 		if hasNicInEvents && hasDevOutEvents {
 			annotatedRecord.totalDuration = float64(annotatedRecord.endTs) - float64(annotatedRecord.startTs)
 		}
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
-			annotatedRecord.blackBoxDuration = float64(writeSyscallEvents[len(writeSyscallEvents)-1].GetTimestamp()) - float64(readSyscallEvents[0].GetTimestamp())
+			annotatedRecord.blackBoxDuration = float64(events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetTimestamp()) - float64(events.readSyscallEvents[0].GetTimestamp())
 		} else {
-			annotatedRecord.blackBoxDuration = float64(egressMessage.TimestampNs()) - float64(ingressMessage.TimestampNs())
+			annotatedRecord.blackBoxDuration = float64(events.egressMessage.TimestampNs()) - float64(events.ingressMessage.TimestampNs())
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
-			annotatedRecord.readFromSocketBufferDuration = float64(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - float64(tcpInEvents[0].GetTimestamp())
+			annotatedRecord.readFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp()) - float64(events.tcpInEvents[0].GetTimestamp())
 		}
-		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](readSyscallEvents)
-		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](writeSyscallEvents)
-		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](nicIngressEvents)
-		annotatedRecord.respNicEventDetails = KernEventsToEventDetails[NicEventDetail](devOutSyscallEvents)
+		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](events.readSyscallEvents)
+		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](events.writeSyscallEvents)
+		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](events.nicIngressEvents)
+		annotatedRecord.respNicEventDetails = KernEventsToEventDetails[NicEventDetail](events.devOutEvents)
 	} else {
 		if hasWriteSyscallEvents {
-			annotatedRecord.startTs = writeSyscallEvents[0].GetTimestamp()
+			annotatedRecord.startTs = events.writeSyscallEvents[0].GetTimestamp()
 		} else {
-			annotatedRecord.startTs = egressMessage.TimestampNs()
+			annotatedRecord.startTs = events.egressMessage.TimestampNs()
 		}
 		if hasReadSyscallEvents {
-			annotatedRecord.endTs = readSyscallEvents[len(readSyscallEvents)-1].GetTimestamp()
+			annotatedRecord.endTs = events.readSyscallEvents[len(events.readSyscallEvents)-1].GetTimestamp()
 		} else {
-			annotatedRecord.endTs = ingressMessage.TimestampNs()
+			annotatedRecord.endTs = events.ingressMessage.TimestampNs()
 		}
-		annotatedRecord.reqSize = egressMessage.ByteSize()
-		annotatedRecord.respSize = ingressMessage.ByteSize()
+		if connection.IsSsl() {
+			annotatedRecord.reqSslSize = events.egressMessage.ByteSize()
+			annotatedRecord.respSslSize = events.ingressMessage.ByteSize()
+		}
+		annotatedRecord.reqSize = events.egressKernLen
+		annotatedRecord.respSize = events.ingressKernLen
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
 			annotatedRecord.totalDuration = float64(annotatedRecord.endTs) - float64(annotatedRecord.startTs)
 		} else {
-			annotatedRecord.totalDuration = float64(ingressMessage.TimestampNs()) - float64(egressMessage.TimestampNs())
+			annotatedRecord.totalDuration = float64(events.ingressMessage.TimestampNs()) - float64(events.egressMessage.TimestampNs())
 		}
 		if hasNicInEvents && hasDevOutEvents {
-			annotatedRecord.blackBoxDuration = float64(nicIngressEvents[len(nicIngressEvents)-1].GetTimestamp()) - float64(devOutSyscallEvents[0].GetTimestamp())
+			annotatedRecord.blackBoxDuration = float64(events.nicIngressEvents[len(events.nicIngressEvents)-1].GetTimestamp()) - float64(events.devOutEvents[0].GetTimestamp())
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
-			annotatedRecord.readFromSocketBufferDuration = float64(userCopyEvents[len(userCopyEvents)-1].GetTimestamp()) - float64(tcpInEvents[0].GetTimestamp())
+			annotatedRecord.readFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp()) - float64(events.tcpInEvents[0].GetTimestamp())
 		}
-		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](writeSyscallEvents)
-		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](readSyscallEvents)
-		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](devOutSyscallEvents)
-		annotatedRecord.respNicEventDetails = KernEventsToEventDetails[NicEventDetail](nicIngressEvents)
+		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](events.writeSyscallEvents)
+		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](events.readSyscallEvents)
+		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](events.devOutEvents)
+		annotatedRecord.respNicEventDetails = KernEventsToEventDetails[NicEventDetail](events.nicIngressEvents)
 	}
-	streamEvents.DiscardEventsBySeq(egressMessage.Seq()+uint64(egressMessage.ByteSize()), true)
-	streamEvents.DiscardEventsBySeq(ingressMessage.Seq()+uint64(ingressMessage.ByteSize()), false)
+	streamEvents.DiscardEventsBySeq(events.egressKernSeq+uint64(events.egressKernLen), true)
+	streamEvents.DiscardEventsBySeq(events.ingressKernSeq+uint64(events.ingressKernLen), false)
 	if recordsChannel == nil {
 		outputLog.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
 			Nano: false,

@@ -184,6 +184,10 @@ func (p *Processor) run() {
 							common.BPFEventLog.Debugf("%s process temp syscall events before infer\n", conn.ToString())
 							conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 						}
+						for _, sslEvent := range conn.TempSslEvents {
+							common.BPFEventLog.Debugf("%s process temp ssl events before infer\n", conn.ToString())
+							conn.OnSslDataEvent(sslEvent.Buf, sslEvent, recordChannel)
+						}
 						conn.UpdateConnectionTraceable(true)
 					}
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
@@ -236,10 +240,17 @@ func (p *Processor) run() {
 			if conn != nil && conn.Status == Closed {
 				continue
 			}
-			if conn != nil {
-				common.BPFEventLog.Warnf("[ssl][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+			if conn != nil && conn.ProtocolInferred() {
+				common.BPFEventLog.Debugf("[ssl][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+
+				conn.OnSslDataEvent(event.Buf, event, recordChannel)
+			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
+				conn.AddSslEvent(event)
+				common.BPFEventLog.Debugf("[ssl][protocol unset][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
+				common.BPFEventLog.Debugf("[ssl][protocol unknown][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
 			} else {
-				common.BPFEventLog.Warnf("[ssl][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SslEventHeader.BufSize, string(event.Buf))
+				common.BPFEventLog.Debugf("[ssl][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SslEventHeader.BufSize, string(event.Buf))
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd

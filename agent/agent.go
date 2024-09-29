@@ -574,10 +574,12 @@ func handleSyscallEvt(record []byte, pm *conn.ProcessorManager, processorsNum in
 	}
 	msgSize := event.SyscallEvent.BufSize
 	buf := make([]byte, msgSize)
-	headerSize := uint(unsafe.Sizeof(event.SyscallEvent)) - 4
-	err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
-	if err != nil {
-		return err
+	if msgSize > 0 {
+		headerSize := uint(unsafe.Sizeof(event.SyscallEvent)) - 4
+		err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
+		if err != nil {
+			return err
+		}
 	}
 	event.Buf = buf
 

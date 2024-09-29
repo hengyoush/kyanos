@@ -30,9 +30,12 @@ type Connection4 struct {
 	Role       bpf.AgentEndpointRoleT
 	TgidFd     uint64
 
+	ssl bool
+
 	TempKernEvents    []*bpf.AgentKernEvt
 	TempConnEvents    []*bpf.AgentConnEvtT
 	TempSyscallEvents []*bpf.SyscallEventData
+	TempSslEvents     []*bpf.SslData
 	Status            ConnStatus
 	TCPHandshakeStatus
 
@@ -43,13 +46,13 @@ type Connection4 struct {
 	lastRespMadeProgressTime int64
 	RespQueue                []protocol.ParsedMessage
 	StreamEvents             *KernEventStream
+	protocolParsers          map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser
 
 	MessageFilter protocol.ProtocolFilter
 	LatencyFilter protocol.LatencyFilter
 	SizeFilter    protocol.SizeFilter
 
-	prevConn        []*Connection4
-	protocolParsers map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser
+	prevConn []*Connection4
 }
 type ConnStatus uint8
 
@@ -185,7 +188,17 @@ func (c *Connection4) AddConnEvent(e *bpf.AgentConnEvtT) {
 }
 
 func (c *Connection4) AddSyscallEvent(e *bpf.SyscallEventData) {
+	if c.TempSyscallEvents == nil {
+		c.TempSyscallEvents = make([]*bpf.SyscallEventData, 0)
+	}
 	c.TempSyscallEvents = append(c.TempSyscallEvents, e)
+}
+
+func (c *Connection4) AddSslEvent(e *bpf.SslData) {
+	if c.TempSslEvents == nil {
+		c.TempSslEvents = make([]*bpf.SslData, 0)
+	}
+	c.TempSslEvents = append(c.TempSslEvents, e)
 }
 
 func (c *Connection4) ProtocolInferred() bool {
@@ -304,12 +317,12 @@ func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 	}
 	return true
 }
-func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, recordChannel chan RecordWithConn) {
-	isReq, _ := isReq(c, &event.SyscallEvent.Ke)
+func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernEvt) {
+	isReq, _ := isReq(c, ke)
 	if isReq {
-		c.reqStreamBuffer.Add(event.SyscallEvent.Ke.Seq, data, event.SyscallEvent.Ke.Ts)
+		c.reqStreamBuffer.Add(ke.Seq, data, ke.Ts)
 	} else {
-		c.respStreamBuffer.Add(event.SyscallEvent.Ke.Seq, data, event.SyscallEvent.Ke.Ts)
+		c.respStreamBuffer.Add(ke.Seq, data, ke.Ts)
 	}
 	reqSteamMessageType := protocol.Request
 	if c.Role == bpf.AgentEndpointRoleTKRoleUnknown {
@@ -319,8 +332,37 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 	if c.Role == bpf.AgentEndpointRoleTKRoleUnknown {
 		respSteamMessageType = protocol.Unknown
 	}
-	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, event.SyscallEvent.Ke.Step)
-	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, event.SyscallEvent.Ke.Step)
+	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, ke.Step)
+	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, ke.Step)
+}
+func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChannel chan RecordWithConn) {
+	if len(data) > 0 {
+		c.addDataToBufferAndTryParse(data, &event.SslEventHeader.Ke)
+	}
+	c.ssl = true
+
+	c.StreamEvents.AddSslEvent(event)
+
+	parser := c.GetProtocolParser(c.Protocol)
+	if parser == nil {
+		panic("no protocol parser!")
+	}
+
+	records := parser.Match(&c.ReqQueue, &c.RespQueue)
+	if len(records) != 0 {
+		for _, record := range records {
+			recordChannel <- RecordWithConn{record, c}
+		}
+	}
+}
+func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, recordChannel chan RecordWithConn) {
+	if len(data) > 0 {
+		if c.ssl {
+			common.ConntrackLog.Warnf("%s is ssl, but receive syscall event with data!", c.ToString())
+		} else {
+			c.addDataToBufferAndTryParse(data, &event.SyscallEvent.Ke)
+		}
+	}
 	c.StreamEvents.AddSyscallEvent(event)
 
 	parser := c.GetProtocolParser(c.Protocol)
@@ -361,7 +403,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		case protocol.Success:
 			if c.Role == bpf.AgentEndpointRoleTKRoleUnknown && len(parseResult.ParsedMessages) > 0 {
 				parsedMessage := parseResult.ParsedMessages[0]
-				if (step == bpf.AgentStepTSYSCALL_IN && parsedMessage.IsReq()) || (step == bpf.AgentStepTSYSCALL_OUT && !parsedMessage.IsReq()) {
+				if (bpf.IsIngressStep(step) && parsedMessage.IsReq()) || (bpf.IsEgressStep(step) && !parsedMessage.IsReq()) {
 					c.Role = bpf.AgentEndpointRoleTKRoleServer
 				} else {
 					c.Role = bpf.AgentEndpointRoleTKRoleClient
@@ -434,7 +476,7 @@ func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
 		return false
 	}
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
-	if !ok || time.Now().UnixMilli()-int64(common.NanoToMills(headTime)) > 1000 {
+	if !ok || time.Now().UnixMilli()-int64(common.NanoToMills(headTime)) > 5000 {
 		sb.RemoveHead()
 		return true
 	} else {
@@ -463,6 +505,10 @@ func (c *Connection4) IsServerSide() bool {
 	}
 }
 
+func (c *Connection4) IsSsl() bool {
+	return c.ssl
+}
+
 func (c *Connection4) Side() common.SideEnum {
 	if c.Role == bpf.AgentEndpointRoleTKRoleClient {
 		return common.ClientSide
@@ -488,7 +534,11 @@ func (c *Connection4) ToString() string {
 	} else {
 		direct = "<unknown>"
 	}
-	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d][%s] *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, c.StatusString(), c.LocalIp.String(), c.LocalPort, direct, c.RemoteIp.String(), c.RemotePort)
+	var sslString string
+	if c.ssl {
+		sslString = "[ssl]"
+	}
+	return fmt.Sprintf("[tgid=%d fd=%d][protocol=%d][%s]%s *%s:%d %s %s:%d", c.TgidFd>>32, uint32(c.TgidFd), c.Protocol, c.StatusString(), sslString, c.LocalIp.String(), c.LocalPort, direct, c.RemoteIp.String(), c.RemotePort)
 }
 
 func (c *Connection4) StatusString() string {
