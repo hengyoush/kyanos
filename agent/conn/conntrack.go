@@ -227,37 +227,14 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 	if needClearBpfMap {
 		connInfoMap := bpf.GetMap("ConnInfoMap")
 		err := connInfoMap.Delete(c.TgidFd)
-		if err != nil {
-			common.ConntrackLog.Debugf("clean conn_info_map failed: %v", err)
-		} else {
-			common.ConntrackLog.Debugf("clean conn_info_map deleted")
-		}
 		key, revKey := c.extractSockKeys()
 		sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
 		err = sockKeyConnIdMap.Delete(key)
-		if err != nil {
-			common.ConntrackLog.Debugf("clean sock_key_conn_id_map key failed: %v", err)
-		} else {
-			common.ConntrackLog.Debugf("clean sockKeyConnIdMap deleted key")
-		}
 		err = sockKeyConnIdMap.Delete(revKey)
-		if err != nil {
-			common.ConntrackLog.Debugf("clean sock_key_conn_id_map revkey failed: %v", err)
-		} else {
-			common.ConntrackLog.Debugf("clean sockKeyConnIdMap deleted revkey")
-		}
 		sockXmitMap := bpf.GetMap("SockXmitMap")
 		err = sockXmitMap.Delete(key)
-		if err == nil {
-			common.ConntrackLog.Debugf("clean sockXmitMap deleted key")
-		} else {
-			common.ConntrackLog.Debugf("clean sockXmitMap failed: %v", err)
-		}
 		err = sockXmitMap.Delete(revKey)
 		if err == nil {
-			common.ConntrackLog.Debugf("clean sockXmitMap deleted revkey")
-		} else {
-			common.ConntrackLog.Debugf("clean sockXmitMap failed: %v", err)
 		}
 	}
 	monitor.UnregisterMetricExporter(c.StreamEvents)

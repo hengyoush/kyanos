@@ -11,22 +11,66 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/shirou/gopsutil/process"
 )
+
+var attachedLibPaths map[string]bool = make(map[string]bool)
+var uprobeLinks []link.Link = make([]link.Link, 0)
+
+func StartHandleSchedExecEvent() chan *bpf.AgentProcessExecEvent {
+	ch := make(chan *bpf.AgentProcessExecEvent)
+	go func() {
+		for event := range ch {
+			handleSchedExecEvent(event)
+		}
+	}()
+	return ch
+}
+
+func handleSchedExecEvent(event *bpf.AgentProcessExecEvent) {
+	links, err := AttachSslUprobe(int(event.Pid))
+	if err == nil {
+		uprobeLinks = append(uprobeLinks, links...)
+	} else {
+		var procName string
+		if proc, err := process.NewProcess(event.Pid); err == nil {
+			procName, _ = proc.Name()
+		}
+		common.UprobeLog.Debugf("AttachSslUprobe failed for exec event(pid: %d %s): %v", event.Pid, procName, err)
+	}
+}
 
 func AttachSslUprobe(pid int) ([]link.Link, error) {
 	versionKey, err := detectOpenSsl(pid)
+	if err != nil || versionKey == "" {
+		return []link.Link{}, err
+	}
+	bpfFunc := sslVersionBpfMap[versionKey]
+
+	matcher, libSslPath, err := findLibSslPath(pid)
+	if err != nil || libSslPath == "" {
+		return nil, err
+	}
+
+	if _, found := attachedLibPaths[libSslPath]; found {
+		return []link.Link{}, nil
+	} else {
+		attachedLibPaths[libSslPath] = true
+	}
+
+	sslEx, err := link.OpenExecutable(libSslPath)
 	if err != nil {
 		return nil, err
 	}
-	bpfFunc := sslVersionBpfMap[versionKey]
+
 	spec, objs, err := bpfFunc()
 	if err != nil {
 		return nil, err
 	}
 	collectionOptions := &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
-			LogLevel: ebpf.LogLevelInstruction,
-			LogSize:  10 * 1024 * 1024,
+			// LogLevel: ebpf.LogLevelInstruction,
+			LogSize: 10 * 1024,
 		},
 		MapReplacements: map[string]*ebpf.Map{
 			"active_ssl_read_args_map":  bpf.GetMapFromObjs(bpf.Objs, "ActiveSslReadArgsMap"),
@@ -43,17 +87,7 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 	}
 	err = spec.LoadAndAssign(objs, collectionOptions)
 	if err != nil {
-		common.UprobeLog.Errorln(err)
-		return nil, err
-	}
-
-	matcher, libSslPath, err := findLibSslPath(pid)
-	if err != nil {
-		return nil, err
-	}
-
-	sslEx, err := link.OpenExecutable(libSslPath)
-	if err != nil {
+		common.UprobeLog.Warnf("load openssl uprobe failed for pid %d lib path %s : %v", pid, libSslPath, err)
 		return nil, err
 	}
 
@@ -84,9 +118,7 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 }
 
 func handleAttachOpenSslUprobeResult(l link.Link, err error, links []link.Link) []link.Link {
-	if err != nil {
-		common.UprobeLog.Warnf("attach openssl probe failed: %v", err)
-	} else {
+	if err == nil {
 		links = append(links, l)
 	}
 	return links
@@ -112,7 +144,7 @@ func buildBPFFuncName(baseName string, isEx bool, isRet bool, socketFDAccess SSL
 
 func detectOpenSsl(pid int) (string, error) {
 	_, libSslPath, err := findLibSslPath(pid)
-	if err != nil {
+	if err != nil || libSslPath == "" {
 		return "", err
 	}
 	if result, err := getOpenSslVersionKey(libSslPath); err == nil {
@@ -135,7 +167,7 @@ func findLibSslPath(pid int) (SSLLibMatcher, string, error) {
 			return matcher, path, nil
 		}
 	}
-	return SSLLibMatcher{}, "", fmt.Errorf("no dynamic link openssl found")
+	return SSLLibMatcher{}, "", nil
 }
 
 func findHostPathForPidLibs(libnames []string, pid int, searchType HostPathForPIDPathSearchType) map[string]string {

@@ -26,8 +26,8 @@ type AnnotatedRecord struct {
 	protocol.Record
 	startTs                      uint64
 	endTs                        uint64
-	reqSslSize                   int
-	respSslSize                  int
+	reqPlainTextSize             int
+	respPlainTextSize            int
 	reqSize                      int
 	respSize                     int
 	totalDuration                float64
@@ -72,6 +72,7 @@ type AnnotatedRecordToStringOptions struct {
 	protocol.RecordToStringOptions
 	MetricTypeSet
 	IncludeSyscallStat bool
+	IncludeConnDesc    bool
 }
 
 func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string {
@@ -79,6 +80,10 @@ func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string 
 	var result string
 	result += r.Record.String(options.RecordToStringOptions)
 	result += "\n"
+	if options.IncludeConnDesc {
+		result += fmt.Sprintf("[conn] [local addr]=%s:%d [remote addr]=%s:%d [side]=%s [ssl]=%v\n",
+			r.LocalAddr.String(), r.LocalPort, r.RemoteAddr.String(), r.RemotePort, r.Side.String(), r.IsSsl)
+	}
 	if _, ok := options.MetricTypeSet[TotalDuration]; ok {
 		result += fmt.Sprintf("[total duration] = %.3f(%s)(start=%s, end=%s)\n", common.ConvertDurationToMillisecondsIfNeeded(float64(r.totalDuration), nano), timeUnitName(nano),
 			common.FormatTimestampWithPrecision(r.startTs, nano),
@@ -93,22 +98,37 @@ func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string 
 			common.ConvertDurationToMillisecondsIfNeeded(float64(r.blackBoxDuration), nano),
 			timeUnitName(nano))
 	}
-	if _, ok := options.MetricTypeSet[RequestSize]; ok {
-		result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d\n",
-			r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
-			r.syscallDisplayName(true), r.reqSize)
-	}
-	if _, ok := options.MetricTypeSet[ResponseSize]; ok {
-		result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d\n",
-			r.syscallDisplayName(false), len(r.respSyscallEventDetails),
-			r.syscallDisplayName(false), r.respSize)
-	}
+
 	if options.IncludeSyscallStat {
-		result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d [%s count]=%d [%s bytes]=%d\n\n",
+		result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d [%s count]=%d [%s bytes]=%d\n",
 			r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
 			r.syscallDisplayName(true), r.reqSize,
 			r.syscallDisplayName(false), len(r.respSyscallEventDetails),
 			r.syscallDisplayName(false), r.respSize)
+		if r.ConnDesc.IsSsl {
+			result += fmt.Sprintf("[ssl][plaintext] [%s bytes]=%d [%s bytes]=%d\n", r.syscallDisplayName(true), r.reqPlainTextSize,
+				r.syscallDisplayName(false), r.respPlainTextSize)
+		}
+		result += "\n"
+	} else {
+		if _, ok := options.MetricTypeSet[RequestSize]; ok {
+			result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d",
+				r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
+				r.syscallDisplayName(true), r.reqSize)
+			if r.ConnDesc.IsSsl {
+				result += fmt.Sprintf("[plaintext bytes]=%d", r.reqPlainTextSize)
+			}
+			result += "\n"
+		}
+		if _, ok := options.MetricTypeSet[ResponseSize]; ok {
+			result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d",
+				r.syscallDisplayName(false), len(r.respSyscallEventDetails),
+				r.syscallDisplayName(false), r.respSize)
+			if r.ConnDesc.IsSsl {
+				result += fmt.Sprintf("[plaintext bytes]=%d", r.respPlainTextSize)
+			}
+			result += "\n"
+		}
 	}
 	return result
 }
@@ -161,36 +181,35 @@ type events struct {
 	nicIngressEvents                                     []conn.KernEvent
 	userCopyEvents                                       []conn.KernEvent
 	tcpInEvents                                          []conn.KernEvent
-	egressMessage                                        protocol.ParsedMessage
-	ingressMessage                                       protocol.ParsedMessage
+	egressMessage, ingressMessage                        protocol.ParsedMessage
 	ingressSeq, egressSeq, ingressKernSeq, egressKernSeq uint64
 	ingressKernLen, egressKernLen                        int
 }
 
 func getKernSeqAndLen(syscallEvents []conn.SslEvent) (uint64, int) {
-	var syscallSeq uint64
+	var syscallSeq int64 = -1
 	var syscallLen int
 	if len(syscallEvents) > 0 {
 		for idx := 0; idx < len(syscallEvents); idx++ {
 			each := syscallEvents[idx]
-			if each.KernSeq != 0 {
-				syscallSeq = each.KernSeq
+			if each.KernSeq != 0 || each.KernLen != 0 {
+				syscallSeq = int64(each.KernSeq)
 				break
 			}
 		}
-		if syscallSeq == 0 {
+		if syscallSeq == -1 {
 			return 0, 0
 		}
 
 		for idx := len(syscallEvents) - 1; idx >= 0; idx-- {
 			each := syscallEvents[idx]
-			if each.KernSeq != 0 {
-				syscallLen = int(each.KernSeq - syscallSeq)
+			if each.KernSeq != 0 || each.KernLen != 0 {
+				syscallLen = int(int64(each.KernLen) + int64(each.KernSeq) - syscallSeq)
 				break
 			}
 		}
 
-		return syscallSeq, syscallLen
+		return uint64(syscallSeq), syscallLen
 	}
 	return 0, 0
 }
@@ -273,6 +292,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		Protocol:   uint32(connection.Protocol),
 		Pid:        uint32(connection.TgidFd >> 32),
 		Side:       side,
+		IsSsl:      connection.IsSsl(),
 	}
 
 	events := prepareEvents(r, connection)
@@ -291,8 +311,8 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			annotatedRecord.endTs = events.devOutEvents[len(events.devOutEvents)-1].GetTimestamp()
 		}
 		if connection.IsSsl() {
-			annotatedRecord.reqSslSize = events.ingressMessage.ByteSize()
-			annotatedRecord.respSslSize = events.egressMessage.ByteSize()
+			annotatedRecord.reqPlainTextSize = events.ingressMessage.ByteSize()
+			annotatedRecord.respPlainTextSize = events.egressMessage.ByteSize()
 		}
 		annotatedRecord.reqSize = events.ingressKernLen
 		annotatedRecord.respSize = events.egressKernLen
@@ -323,8 +343,8 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			annotatedRecord.endTs = events.ingressMessage.TimestampNs()
 		}
 		if connection.IsSsl() {
-			annotatedRecord.reqSslSize = events.egressMessage.ByteSize()
-			annotatedRecord.respSslSize = events.ingressMessage.ByteSize()
+			annotatedRecord.reqPlainTextSize = events.egressMessage.ByteSize()
+			annotatedRecord.respPlainTextSize = events.ingressMessage.ByteSize()
 		}
 		annotatedRecord.reqSize = events.egressKernLen
 		annotatedRecord.respSize = events.ingressKernLen
@@ -356,6 +376,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 				BlackBoxDuration:             true,
 				TotalDuration:                true,
 			}, IncludeSyscallStat: true,
+			IncludeConnDesc: true,
 			RecordToStringOptions: protocol.RecordToStringOptions{
 				IncludeReqBody:     true,
 				IncludeRespBody:    true,

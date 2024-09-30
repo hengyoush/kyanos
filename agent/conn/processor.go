@@ -261,7 +261,7 @@ func (p *Processor) run() {
 					conn.ToString(), event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
 			} else {
-				common.BPFEventLog.Debugf("[data no conn][func=%s][ts=%d][%s] | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
+				common.BPFEventLog.Debugf("[data no conn][tgid=%d fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n", tgidFd>>32, uint32(tgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
 					event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
 			}

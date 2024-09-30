@@ -54,6 +54,7 @@ var AgentLogLevel int32
 var BPFEventLogLevel int32
 var ConntrackLogLevel int32
 var ProtocolLogLevel int32
+var UprobeLogLevel int32
 
 func init() {
 	rootCmd.PersistentFlags().Int64VarP(&FilterPid, "pid", "p", 0, "Filter by pid")
@@ -70,9 +71,10 @@ func init() {
 	rootCmd.PersistentFlags().Int32Var(&BPFEventLogLevel, "bpf-event-log-level", 0, "specify bpf event log level individually")
 	rootCmd.PersistentFlags().Int32Var(&ConntrackLogLevel, "conntrack-log-level", 0, "specify conntrack module log level individually")
 	rootCmd.PersistentFlags().Int32Var(&ProtocolLogLevel, "protocol-log-level", 0, "specify protocol module log level individually")
+	rootCmd.PersistentFlags().Int32Var(&UprobeLogLevel, "uprobe-log-level", 0, "specify uprobe module log level individually")
 
 	// internal
-	rootCmd.PersistentFlags().IntVar(&BPFVerifyLogSize, "bpf-verify-log-size", 1*1024*1024, "--bpf-verify-log-size 1024")
+	rootCmd.PersistentFlags().IntVar(&BPFVerifyLogSize, "bpf-verify-log-size", 10*1024, "--bpf-verify-log-size 1024")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "kern-perf-event-buffer-size", 1*1024*1024, "--kern-perf-event-buffer-size 1024")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "data-perf-event-buffer-size", 30*1024*1024, "--data-perf-event-buffer-size 1024")
 

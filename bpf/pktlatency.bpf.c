@@ -14,7 +14,6 @@
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
-// 
 const struct kern_evt *kern_evt_unused __attribute__((unused));
 const struct kern_evt_ssl_data *kern_evt_ssl_data_unused __attribute__((unused));
 const struct conn_evt_t *conn_evt_t_unused __attribute__((unused));
@@ -22,6 +21,7 @@ const struct sock_key *sock_key_unused __attribute__((unused));
 const struct kern_evt_data *kern_evt_data_unused __attribute__((unused));
 const struct conn_id_s_t *conn_id_s_t_unused __attribute__((unused));
 const struct conn_info_t *conn_info_t_unused __attribute__((unused));
+const struct process_exec_event *process_exec_event_unused __attribute__((unused));
 const enum conn_type_t *conn_type_t_unused __attribute__((unused));
 const enum endpoint_role_t *endpoint_role_unused  __attribute__((unused));
 const enum traffic_direction_t *traffic_direction_t_unused __attribute__((unused));
@@ -130,6 +130,10 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 #endif
 		return;
 	}
+	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &conn_id_s->tgid_fd);
+	if (conn_info == NULL || conn_info->protocol == kProtocolUnknown) {
+		return;
+	}
 
 	bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
 	evt->seq = cur_seq; 
@@ -174,6 +178,10 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 		// 	bpf_printk("discard!");
 		// 	print_sock_key(key);
 		// }
+		return;
+	}
+	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &conn_id_s->tgid_fd);
+	if (conn_info == NULL || conn_info->protocol == kProtocolUnknown) {
 		return;
 	}
 
@@ -1077,7 +1085,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		return;
 	}
 	if (is_in_nested_ssl) {
-		bpf_printk("set ssl=true for tgid: %lld, fd: %d", tgid, args->fd);
+		// bpf_printk("set ssl=true for tgid: %lld, fd: %d", tgid, args->fd);
 		conn_info->ssl = true;
 	}
 	if (!conn_info->ssl) {
@@ -1176,9 +1184,7 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 		conn_info->ssl = true;
 	}
 
-	if (!conn_info->ssl) {
-		process_syscall_data_with_conn_info(ctx, args, tgid_fd, direct, bytes_count, conn_info, 0, false, !conn_info->ssl);
-	}
+	process_syscall_data_with_conn_info(ctx, args, tgid_fd, direct, bytes_count, conn_info, 0, false, !conn_info->ssl);
 	
 	if (direct == kEgress) {
 		conn_info->write_bytes += bytes_count;
@@ -1214,7 +1220,7 @@ static __always_inline void process_implicit_conn(void* ctx, uint64_t id,
 static __always_inline bool propagate_fd_to_uprobe(uint64_t pid_tgid, int fd, uint32_t len) {
 	struct nested_syscall_fd_t* nested_syscall_fd_ptr = bpf_map_lookup_elem(&ssl_user_space_call_map, &pid_tgid);
 	if (nested_syscall_fd_ptr) {
-		bpf_printk("propagate_fd_to_uprobe, tgid: %lld, fd: %lld, len:%d",pid_tgid >> 32, fd ,len);
+		// bpf_printk("propagate_fd_to_uprobe, tgid: %lld, fd: %lld, len:%d",pid_tgid >> 32, fd ,len);
 		int current_fd = nested_syscall_fd_ptr->fd;
 		if (current_fd == kInvalidFD) {
 			nested_syscall_fd_ptr->fd = fd;
@@ -1634,4 +1640,30 @@ int tracepoint__syscalls__sys_exit_accept4(struct trace_event_raw_sys_exit *ctx)
 	} 
 	bpf_map_delete_elem(&accept_args_map, &id);
 	return 0;
+}
+
+
+struct {
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(u32));
+} proc_exec_events SEC(".maps");
+
+struct process_exec_event {
+	int pid;
+};
+
+SEC("tracepoint/sched/sched_process_exec")
+int tracepoint__sched__sched_process_exec(struct trace_event_raw_sched_process_exec *ctx) {
+	struct process_exec_event event = {0};
+	uint64_t id = bpf_get_current_pid_tgid();
+	uint32_t tgid = id >> 32;
+	uint32_t tid = id;
+
+	bool is_thread_group_leader = tgid == tid;
+	if (is_thread_group_leader) {
+		event.pid = tgid;
+		bpf_perf_event_output(ctx, &proc_exec_events, BPF_F_CURRENT_CPU, &event, sizeof(struct process_exec_event));
+	}
+	return BPF_OK;
 }

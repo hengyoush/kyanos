@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/shirou/gopsutil/process"
 )
 
 func GetMapPaths(pid int) []string {
@@ -33,10 +35,12 @@ func GetMapPaths(pid int) []string {
 func ProcPidRootPath(pid int, paths ...string) string {
 	basePath := fmt.Sprintf("/proc/%d", pid)
 	for _, path := range paths {
-		if strings.HasPrefix(path, "/") {
-			path = path[1:]
-		}
+		path = strings.TrimPrefix(path, "/")
 		basePath = basePath + "/" + path
 	}
 	return basePath
+}
+
+func GetAllPids() ([]int32, error) {
+	return process.Pids()
 }

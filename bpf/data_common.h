@@ -291,8 +291,10 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 	 
 	if (should_trace_conn(conn_info)) {//, bytes_count
 		if (is_ssl) {
-			uint64_t syscall_seq = direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes;
+			uint64_t syscall_seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+			seq = (direct == kEgress ?  conn_info->ssl_write_bytes : conn_info->ssl_read_bytes) + 1;
 			report_ssl_evt(ctx, seq, &conn_id_s, bytes_count, step, args, syscall_seq - syscall_len, syscall_len);
+			// bpf_printk("report ssl evt, seq: %lld len: %d",)
 		} else if (with_data) {
 			report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
 		} else {
