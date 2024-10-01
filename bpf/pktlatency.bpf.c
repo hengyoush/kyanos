@@ -130,7 +130,8 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 #endif
 		return;
 	}
-	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &conn_id_s->tgid_fd);
+	uint64_t tgid_fd = conn_id_s->tgid_fd;
+	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 	if (conn_info == NULL || conn_info->protocol == kProtocolUnknown) {
 		return;
 	}
@@ -180,7 +181,8 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 		// }
 		return;
 	}
-	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &conn_id_s->tgid_fd);
+	uint64_t tgid_fd = conn_id_s->tgid_fd;
+	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 	if (conn_info == NULL || conn_info->protocol == kProtocolUnknown) {
 		return;
 	}
