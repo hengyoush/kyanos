@@ -114,7 +114,7 @@ func DissectIntParam[T common.KInt](s string, offset *int, nbytes uint, param *s
 
 func DissectInt[T common.KInt](msg string, offset *int, length int, result *T) bool {
 	if len(msg) < *offset+length {
-		common.ProtocolParserLog.Errorln("Not enough bytes to dissect int param.")
+		common.ProtocolParserLog.Warnln("Not enough bytes to dissect int param.")
 		return false
 	}
 	*result, _ = common.LEndianBytesToKInt[T]([]byte(msg[*offset:]), length)
@@ -190,7 +190,7 @@ func processLengthEncodedInt(s string, offset *int) (int64, bool) {
 
 func DissectStringParam(s string, offset *int, param *string) bool {
 	param_length, ok := processLengthEncodedInt(s, offset)
-	if !ok {
+	if !ok || len(s) < *offset+int(param_length) {
 		return false
 	}
 	*param = s[*offset : *offset+int(param_length)]
