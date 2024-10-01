@@ -116,7 +116,7 @@ func init() {
 		Capabilities: map[Capability]bool{
 			SupportConstants:     true,
 			SupportRawTracepoint: true,
-			SupportRingBuffer:    true,
+			SupportRingBuffer:    false,
 			SupportBTF:           true,
 		},
 	}

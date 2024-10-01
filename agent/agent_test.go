@@ -2,6 +2,7 @@ package agent_test
 
 import (
 	"fmt"
+	"kyanos/agent"
 	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
 	"kyanos/bpf"
@@ -14,8 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var customAgentOptions agent.AgentOptions = agent.AgentOptions{}
+
 func TestMain(m *testing.M) {
-	// call flag.Parse() here if TestMain uses flags
+	// call flag.Parse() here if TestMain uses flags]
+	customAgentOptions = agent.AgentOptions{}
 	retCode := m.Run()
 	tearDown()
 	os.Exit(retCode)
@@ -44,7 +48,7 @@ func TestConnectSyscall(t *testing.T) {
 		agentStopper <- MySignal{}
 	}()
 	fmt.Println("Start Send Http Request")
-	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true, targetUrl: "http://www.baidu.com"})
+	sendTestHttpRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true, targetUrl: "http://www.baidu.com"})
 
 	time.Sleep(1 * time.Second)
 	if len(connEventList) == 0 {
@@ -86,7 +90,7 @@ func TestCloseSyscall(t *testing.T) {
 		agentStopper <- MySignal{}
 	}()
 	fmt.Println("Start Send Http Request")
-	sendTestRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true, targetUrl: "http://www.baidu.com"})
+	sendTestHttpRequest(t, SendTestHttpRequestOptions{disableKeepAlived: true, targetUrl: "http://www.baidu.com"})
 
 	time.Sleep(1 * time.Second)
 	if len(connEventList) == 0 {
@@ -508,6 +512,196 @@ func TestRecvmsg(t *testing.T) {
 		})
 		seq += uint64(readBufSizeSlice[index])
 	}
+}
+
+func TestSslRead(t *testing.T) {
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	sslEventList := make([]bpf.SslData, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
+	StartAgent0(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		&sslEventList,
+		nil,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper, false)
+
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+	_, cmd, _ := curlHTTPSRequest("https://www.baidu.com:443", "GET", nil, "")
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, sslEventList)
+	syscallEvents := findInterestedSslEvents(t, sslEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       443,
+		connEventList:    connEventList,
+		findByPid:        true,
+		pid:              cmd.Process.Pid,
+		findByStep:       true,
+		step:             bpf.AgentStepTSSL_IN,
+	})
+	sslEvent := syscallEvents[0]
+	conn := connManager.FindConnection4Exactly(sslEvent.SslEventHeader.Ke.ConnIdS.TgidFd)
+	AssertSslEventData(t, sslEvent, SyscallDataEventAssertConditions{
+		KernDataEventAssertConditions: KernDataEventAssertConditions{
+			direct:           Egress,
+			pid:              uint64(cmd.Process.Pid),
+			fd:               uint32(conn.TgidFd),
+			ignoreFuncName:   true,
+			ignoreDataLen:    true,
+			seq:              1,
+			step:             bpf.AgentStepTSSL_OUT,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		},
+		bufSizeAssertFunction: func(u uint32) bool { return u > 0 },
+	})
+}
+
+func TestSslEventsCanRelatedToKernEvents(t *testing.T) {
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	sslEventList := make([]bpf.SslData, 0)
+	kernEventList := make([]bpf.AgentKernEvt, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
+	StartAgent0(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachSyscallRecvfromEntry,
+			bpf.AttachSyscallRecvfromExit,
+			bpf.AttachSyscallReadEntry,
+			bpf.AttachSyscallReadExit,
+			bpf.AttachSyscallWriteEntry,
+			bpf.AttachSyscallWriteExit,
+			bpf.AttachKProbeSecuritySocketSendmsgEntry,
+			bpf.AttachKProbeSecuritySocketRecvmsgEntry,
+			func(p interface{}) link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN, p)
+			},
+			func(p interface{}) link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY, p)
+			},
+			func(p interface{}) link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN, p)
+			},
+			func(p interface{}) link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN, p)
+			},
+			func(p interface{}) link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT, p)
+			},
+			func(p interface{}) link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_OUT, p)
+			},
+			func(p interface{}) link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTQDISC_OUT, p)
+			},
+		},
+		&connEventList,
+		&syscallEventList,
+		&sslEventList,
+		&kernEventList,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper, false)
+
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+	_, cmd, _ := curlHTTPSRequest("https://www.baidu.com:443", "GET", nil, "")
+	time.Sleep(500 * time.Millisecond)
+	sslEvents := findInterestedSslEvents(t, sslEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       443,
+		connEventList:    connEventList,
+		findByPid:        true,
+		pid:              cmd.Process.Pid,
+		findByStep:       true,
+		step:             bpf.AgentStepTSSL_OUT,
+	})
+	assert.True(t, len(sslEvents) > 0)
+	sslEvent := sslEvents[0]
+	conn := connManager.FindConnection4Exactly(sslEvent.SslEventHeader.Ke.ConnIdS.TgidFd)
+	se := conn.StreamEvents
+	sslOutEvents := se.FindAndRemoveSslEventsBySeqAndLen(bpf.AgentStepTSSL_OUT, 1, 1000)
+	assert.True(t, len(sslOutEvents) > 0)
+	sslInEvents := se.FindAndRemoveSslEventsBySeqAndLen(bpf.AgentStepTSSL_IN, 1, 10000)
+	assert.True(t, len(sslInEvents) > 0)
+
+	kernSeq := sslInEvents[0].KernSeq
+	kernLen := sslInEvents[0].KernLen
+	devinEvents := se.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_IN, kernSeq, kernLen)
+	assert.True(t, len(devinEvents) > 0)
+	ipinEvents := se.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTIP_IN, kernSeq, kernLen)
+	assert.True(t, len(ipinEvents) > 0)
+	usercopyEvents := se.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, kernSeq, kernLen)
+	assert.True(t, len(usercopyEvents) > 0)
+	syscallInEvents := se.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, kernSeq, kernLen)
+	assert.True(t, len(syscallInEvents) > 0)
+}
+
+func TestSslWrite(t *testing.T) {
+	connEventList := make([]bpf.AgentConnEvtT, 0)
+	syscallEventList := make([]bpf.SyscallEventData, 0)
+	sslEventList := make([]bpf.SslData, 0)
+	var connManager *conn.ConnManager = conn.InitConnManager()
+	agentStopper := make(chan os.Signal, 1)
+	StartAgent0(
+		[]bpf.AttachBpfProgFunction{
+			bpf.AttachSyscallConnectEntry,
+			bpf.AttachSyscallConnectExit,
+			bpf.AttachKProbeSecuritySocketSendmsgEntry,
+		},
+		&connEventList,
+		&syscallEventList,
+		&sslEventList,
+		nil,
+		func(cm *conn.ConnManager) {
+			*connManager = *cm
+		}, agentStopper, false)
+
+	defer func() {
+		agentStopper <- MySignal{}
+	}()
+	_, cmd, _ := curlHTTPSRequest("https://www.baidu.com:443", "GET", nil, "")
+	time.Sleep(500 * time.Millisecond)
+
+	assert.NotEmpty(t, sslEventList)
+	syscallEvents := findInterestedSslEvents(t, sslEventList, FindInterestedSyscallEventOptions{
+		findByRemotePort: true,
+		remotePort:       443,
+		connEventList:    connEventList,
+		findByPid:        true,
+		pid:              cmd.Process.Pid,
+		findByStep:       true,
+		step:             bpf.AgentStepTSSL_OUT,
+	})
+	sslEvent := syscallEvents[0]
+	conn := connManager.FindConnection4Exactly(sslEvent.SslEventHeader.Ke.ConnIdS.TgidFd)
+	AssertSslEventData(t, sslEvent, SyscallDataEventAssertConditions{
+		KernDataEventAssertConditions: KernDataEventAssertConditions{
+			direct:           Egress,
+			pid:              uint64(cmd.Process.Pid),
+			fd:               uint32(conn.TgidFd),
+			ignoreFuncName:   true,
+			ignoreDataLen:    true,
+			seq:              1,
+			step:             bpf.AgentStepTSSL_OUT,
+			tsAssertFunction: func(u uint64) bool { return u > 0 },
+		},
+		bufSizeAssertFunction: func(u uint32) bool { return u > 0 },
+	})
 }
 
 func TestWrite(t *testing.T) {

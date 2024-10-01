@@ -15,6 +15,7 @@
 
 enum step_t {
   start = 0,
+  SSL_OUT,
   SYSCALL_OUT,
   TCP_OUT,
   IP_OUT,
@@ -27,6 +28,7 @@ enum step_t {
   TCP_IN,
   USER_COPY,
   SYSCALL_IN,
+  SSL_IN,
   end
 };
 
@@ -175,6 +177,13 @@ struct kern_evt_data {
   uint32_t buf_size;
   char msg[MAX_MSG_SIZE];
 };
+struct kern_evt_ssl_data {
+  struct kern_evt ke;
+	uint64_t syscall_seq;
+	uint32_t syscall_len;
+  uint32_t buf_size;
+  char msg[MAX_MSG_SIZE];
+};
 
 
 // struct data_evt {
@@ -246,6 +255,8 @@ struct conn_info_t {
   struct conn_id_t conn_id;
   uint64_t read_bytes;
   uint64_t write_bytes;
+  uint64_t ssl_read_bytes;
+  uint64_t ssl_write_bytes;
 
   // IP address of the local endpoint.
   union sockaddr_t laddr;
@@ -263,6 +274,7 @@ struct conn_info_t {
   bool prepend_length_header;
   
   bool no_trace;
+  bool ssl;
 };
 
 
@@ -293,4 +305,66 @@ struct parse_kern_evt_body {
 // const char DEV_HARD_XMIT_FUNC_NAME[] = "dev_hard_start_xmit";
 // const char DEV_QUEUE_XMIT_FUNC_NAME[] = "dev_queue_xmit";
 // const char IP_QUEUE_XMIT_FUNC_NAME[] = "ip_queue_xmit";
+
+#define MY_BPF_HASH(name, key_type, value_type) \
+struct {													\
+	__uint(type, BPF_MAP_TYPE_HASH); \
+	__uint(key_size, sizeof(key_type)); \
+	__uint(value_size, sizeof(value_type)); \
+	__uint(max_entries, 65535); \
+	__uint(map_flags, 0); \
+} name SEC(".maps");
+
+#define MY_BPF_ARRAY_PERCPU(name, value_type) \
+struct {													\
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY); \
+	__uint(key_size, sizeof(__u32)); \
+	__uint(value_size, sizeof(value_type)); \
+	__uint(max_entries, 1); \
+	__uint(map_flags, 0); \
+} name SEC(".maps");
+
+
+
+#define ETH_P_IP	0x0800
+#define ETH_P_IPV6	0x86DD		/* IPv6 over bluebook		*/
+#define ETH_HLEN	14		/* Total octets in header.	 */
+
+#define _(src)							\
+({								\
+	typeof(src) tmp;					\
+	bpf_probe_read_kernel(&tmp, sizeof(src), &(src));	\
+	tmp;							\
+})
+
+
+#define _C(src, a, ...)		BPF_CORE_READ(src, a, ##__VA_ARGS__)
+
+#define _U(src, a, ...)		BPF_PROBE_READ_USER(src, a, ##__VA_ARGS__)
+
+#ifdef BPF_DEBUG
+#define pr_bpf_debug(fmt, args...) {				\
+	bpf_printk("nettrace: "fmt"\n", ##args);	\
+}
+#else
+#define pr_bpf_debug(fmt, ...) 
+#endif
+
+
+#define IP_H_LEN	(sizeof(struct iphdr))
+#define PROTOCOL_VEC_LIMIT 3
+#define LOOP_LIMIT 2
+
+
+#define TP_ARGS(dst, idx, ctx) \
+{void *__p = (void*)ctx + sizeof(struct trace_entry) + sizeof(long int) + idx * (sizeof(long unsigned int)); \
+bpf_probe_read_kernel(dst, sizeof(*dst), __p);}
+
+#define TP_RET(dst, ctx) \
+{void *__p = (void*)ctx + sizeof(struct trace_entry) + sizeof(long int); \
+bpf_probe_read_kernel(dst, sizeof(*dst), __p); }
+
+
+
+
 #endif		

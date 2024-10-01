@@ -54,6 +54,7 @@ type Processor struct {
 	connManager   *ConnManager
 	connEvents    chan *bpf.AgentConnEvtT
 	syscallEvents chan *bpf.SyscallEventData
+	sslEvents     chan *bpf.SslData
 	kernEvents    chan *bpf.AgentKernEvt
 	name          string
 	messageFilter protocol.ProtocolFilter
@@ -71,6 +72,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.connManager = connManager
 	p.connEvents = make(chan *bpf.AgentConnEvtT)
 	p.syscallEvents = make(chan *bpf.SyscallEventData)
+	p.sslEvents = make(chan *bpf.SslData)
 	p.kernEvents = make(chan *bpf.AgentKernEvt)
 	p.name = name
 	p.messageFilter = filter
@@ -89,6 +91,10 @@ func (p *Processor) AddConnEvent(evt *bpf.AgentConnEvtT) {
 
 func (p *Processor) AddSyscallEvent(evt *bpf.SyscallEventData) {
 	p.syscallEvents <- evt
+}
+
+func (p *Processor) AddSslEvent(evt *bpf.SslData) {
+	p.sslEvents <- evt
 }
 
 func (p *Processor) AddKernEvent(record *bpf.AgentKernEvt) {
@@ -178,6 +184,10 @@ func (p *Processor) run() {
 							common.BPFEventLog.Debugf("%s process temp syscall events before infer\n", conn.ToString())
 							conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 						}
+						for _, sslEvent := range conn.TempSslEvents {
+							common.BPFEventLog.Debugf("%s process temp ssl events before infer\n", conn.ToString())
+							conn.OnSslDataEvent(sslEvent.Buf, sslEvent, recordChannel)
+						}
 						conn.UpdateConnectionTraceable(true)
 					}
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
@@ -223,6 +233,26 @@ func (p *Processor) run() {
 			} else {
 				common.BPFEventLog.Debugf("[syscall][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 			}
+		case event := <-p.sslEvents:
+			tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
+			conn := p.connManager.FindConnection4Or(tgidFd, event.SslEventHeader.Ke.Ts+common.LaunchEpochTime)
+			event.SslEventHeader.Ke.Ts += common.LaunchEpochTime
+			if conn != nil && conn.Status == Closed {
+				continue
+			}
+			if conn != nil && conn.ProtocolInferred() {
+				common.BPFEventLog.Debugf("[ssl][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+
+				conn.OnSslDataEvent(event.Buf, event, recordChannel)
+			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
+				conn.AddSslEvent(event)
+				common.BPFEventLog.Debugf("[ssl][protocol unset][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
+				conn.AddSslEvent(event)
+				common.BPFEventLog.Debugf("[ssl][protocol unknown][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+			} else {
+				common.BPFEventLog.Debugf("[ssl][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SslEventHeader.BufSize, string(event.Buf))
+			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.Ts+common.LaunchEpochTime)
@@ -232,7 +262,7 @@ func (p *Processor) run() {
 					conn.ToString(), event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
 			} else {
-				common.BPFEventLog.Debugf("[data no conn][func=%s][ts=%d][%s] | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
+				common.BPFEventLog.Debugf("[data no conn][tgid=%d fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n", tgidFd>>32, uint32(tgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
 					event.Seq, event.Len,
 					common.DisplayTcpFlags(event.Flags))
 			}
@@ -240,7 +270,7 @@ func (p *Processor) run() {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					conn.OnKernEvent(event)
 					// log.Debug("[skip] skip due to protocol unset")
-					common.BPFEventLog.Debugf("[data][protocol-unset][func=%s][%s]%s | %d:%d \n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
+					common.BPFEventLog.Debugf("[data][protocol-unset][func=%s][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len, common.DisplayTcpFlags(event.Flags))
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 					flag := conn.OnKernEvent(event)
 					if !flag {

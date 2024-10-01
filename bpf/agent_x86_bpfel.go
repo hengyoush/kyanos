@@ -36,9 +36,11 @@ type AgentConnInfoT struct {
 		_    [4]byte
 		Tsid uint64
 	}
-	ReadBytes  uint64
-	WriteBytes uint64
-	Laddr      struct {
+	ReadBytes     uint64
+	WriteBytes    uint64
+	SslReadBytes  uint64
+	SslWriteBytes uint64
+	Laddr         struct {
 		In6 struct {
 			Sin6Family   uint16
 			Sin6Port     uint16
@@ -62,7 +64,8 @@ type AgentConnInfoT struct {
 	PrevBuf             [4]int8
 	PrependLengthHeader bool
 	NoTrace             bool
-	_                   [2]byte
+	Ssl                 bool
+	_                   [1]byte
 }
 
 type AgentConnTypeT uint32
@@ -109,6 +112,16 @@ type AgentKernEvtData struct {
 	_       [4]byte
 }
 
+type AgentKernEvtSslData struct {
+	Ke         AgentKernEvt
+	SyscallSeq uint64
+	SyscallLen uint32
+	BufSize    uint32
+	Msg        [30720]int8
+}
+
+type AgentProcessExecEvent struct{ Pid int32 }
+
 type AgentSockKey struct {
 	Sip   [2]uint64
 	Dip   [2]uint64
@@ -121,19 +134,21 @@ type AgentStepT uint32
 
 const (
 	AgentStepTStart       AgentStepT = 0
-	AgentStepTSYSCALL_OUT AgentStepT = 1
-	AgentStepTTCP_OUT     AgentStepT = 2
-	AgentStepTIP_OUT      AgentStepT = 3
-	AgentStepTQDISC_OUT   AgentStepT = 4
-	AgentStepTDEV_OUT     AgentStepT = 5
-	AgentStepTNIC_OUT     AgentStepT = 6
-	AgentStepTNIC_IN      AgentStepT = 7
-	AgentStepTDEV_IN      AgentStepT = 8
-	AgentStepTIP_IN       AgentStepT = 9
-	AgentStepTTCP_IN      AgentStepT = 10
-	AgentStepTUSER_COPY   AgentStepT = 11
-	AgentStepTSYSCALL_IN  AgentStepT = 12
-	AgentStepTEnd         AgentStepT = 13
+	AgentStepTSSL_OUT     AgentStepT = 1
+	AgentStepTSYSCALL_OUT AgentStepT = 2
+	AgentStepTTCP_OUT     AgentStepT = 3
+	AgentStepTIP_OUT      AgentStepT = 4
+	AgentStepTQDISC_OUT   AgentStepT = 5
+	AgentStepTDEV_OUT     AgentStepT = 6
+	AgentStepTNIC_OUT     AgentStepT = 7
+	AgentStepTNIC_IN      AgentStepT = 8
+	AgentStepTDEV_IN      AgentStepT = 9
+	AgentStepTIP_IN       AgentStepT = 10
+	AgentStepTTCP_IN      AgentStepT = 11
+	AgentStepTUSER_COPY   AgentStepT = 12
+	AgentStepTSYSCALL_IN  AgentStepT = 13
+	AgentStepTSSL_IN      AgentStepT = 14
+	AgentStepTEnd         AgentStepT = 15
 )
 
 type AgentTrafficDirectionT uint32
@@ -220,6 +235,7 @@ type AgentProgramSpecs struct {
 	TcpV4DoRcv                         *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                           *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
 	TracepointNetifReceiveSkb          *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
+	TracepointSchedSchedProcessExec    *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSyscallsSysEnterAccept4  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_close"`
 	TracepointSyscallsSysEnterConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_connect"`
@@ -249,24 +265,30 @@ type AgentProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type AgentMapSpecs struct {
-	AcceptArgsMap        *ebpf.MapSpec `ebpf:"accept_args_map"`
-	CloseArgsMap         *ebpf.MapSpec `ebpf:"close_args_map"`
-	ConnEvtRb            *ebpf.MapSpec `ebpf:"conn_evt_rb"`
-	ConnInfoMap          *ebpf.MapSpec `ebpf:"conn_info_map"`
-	ConnInfoT_map        *ebpf.MapSpec `ebpf:"conn_info_t_map"`
-	ConnectArgsMap       *ebpf.MapSpec `ebpf:"connect_args_map"`
-	ControlValues        *ebpf.MapSpec `ebpf:"control_values"`
-	EnabledLocalIpv4Map  *ebpf.MapSpec `ebpf:"enabled_local_ipv4_map"`
-	EnabledLocalPortMap  *ebpf.MapSpec `ebpf:"enabled_local_port_map"`
-	EnabledRemoteIpv4Map *ebpf.MapSpec `ebpf:"enabled_remote_ipv4_map"`
-	EnabledRemotePortMap *ebpf.MapSpec `ebpf:"enabled_remote_port_map"`
-	Rb                   *ebpf.MapSpec `ebpf:"rb"`
-	ReadArgsMap          *ebpf.MapSpec `ebpf:"read_args_map"`
-	SockKeyConnIdMap     *ebpf.MapSpec `ebpf:"sock_key_conn_id_map"`
-	SockXmitMap          *ebpf.MapSpec `ebpf:"sock_xmit_map"`
-	SyscallDataMap       *ebpf.MapSpec `ebpf:"syscall_data_map"`
-	SyscallRb            *ebpf.MapSpec `ebpf:"syscall_rb"`
-	WriteArgsMap         *ebpf.MapSpec `ebpf:"write_args_map"`
+	AcceptArgsMap         *ebpf.MapSpec `ebpf:"accept_args_map"`
+	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
+	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
+	CloseArgsMap          *ebpf.MapSpec `ebpf:"close_args_map"`
+	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
+	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
+	ConnInfoT_map         *ebpf.MapSpec `ebpf:"conn_info_t_map"`
+	ConnectArgsMap        *ebpf.MapSpec `ebpf:"connect_args_map"`
+	ControlValues         *ebpf.MapSpec `ebpf:"control_values"`
+	EnabledLocalIpv4Map   *ebpf.MapSpec `ebpf:"enabled_local_ipv4_map"`
+	EnabledLocalPortMap   *ebpf.MapSpec `ebpf:"enabled_local_port_map"`
+	EnabledRemoteIpv4Map  *ebpf.MapSpec `ebpf:"enabled_remote_ipv4_map"`
+	EnabledRemotePortMap  *ebpf.MapSpec `ebpf:"enabled_remote_port_map"`
+	ProcExecEvents        *ebpf.MapSpec `ebpf:"proc_exec_events"`
+	Rb                    *ebpf.MapSpec `ebpf:"rb"`
+	ReadArgsMap           *ebpf.MapSpec `ebpf:"read_args_map"`
+	SockKeyConnIdMap      *ebpf.MapSpec `ebpf:"sock_key_conn_id_map"`
+	SockXmitMap           *ebpf.MapSpec `ebpf:"sock_xmit_map"`
+	SslDataMap            *ebpf.MapSpec `ebpf:"ssl_data_map"`
+	SslRb                 *ebpf.MapSpec `ebpf:"ssl_rb"`
+	SslUserSpaceCallMap   *ebpf.MapSpec `ebpf:"ssl_user_space_call_map"`
+	SyscallDataMap        *ebpf.MapSpec `ebpf:"syscall_data_map"`
+	SyscallRb             *ebpf.MapSpec `ebpf:"syscall_rb"`
+	WriteArgsMap          *ebpf.MapSpec `ebpf:"write_args_map"`
 }
 
 // AgentObjects contains all objects after they have been loaded into the kernel.
@@ -288,29 +310,37 @@ func (o *AgentObjects) Close() error {
 //
 // It can be passed to LoadAgentObjects or ebpf.CollectionSpec.LoadAndAssign.
 type AgentMaps struct {
-	AcceptArgsMap        *ebpf.Map `ebpf:"accept_args_map"`
-	CloseArgsMap         *ebpf.Map `ebpf:"close_args_map"`
-	ConnEvtRb            *ebpf.Map `ebpf:"conn_evt_rb"`
-	ConnInfoMap          *ebpf.Map `ebpf:"conn_info_map"`
-	ConnInfoT_map        *ebpf.Map `ebpf:"conn_info_t_map"`
-	ConnectArgsMap       *ebpf.Map `ebpf:"connect_args_map"`
-	ControlValues        *ebpf.Map `ebpf:"control_values"`
-	EnabledLocalIpv4Map  *ebpf.Map `ebpf:"enabled_local_ipv4_map"`
-	EnabledLocalPortMap  *ebpf.Map `ebpf:"enabled_local_port_map"`
-	EnabledRemoteIpv4Map *ebpf.Map `ebpf:"enabled_remote_ipv4_map"`
-	EnabledRemotePortMap *ebpf.Map `ebpf:"enabled_remote_port_map"`
-	Rb                   *ebpf.Map `ebpf:"rb"`
-	ReadArgsMap          *ebpf.Map `ebpf:"read_args_map"`
-	SockKeyConnIdMap     *ebpf.Map `ebpf:"sock_key_conn_id_map"`
-	SockXmitMap          *ebpf.Map `ebpf:"sock_xmit_map"`
-	SyscallDataMap       *ebpf.Map `ebpf:"syscall_data_map"`
-	SyscallRb            *ebpf.Map `ebpf:"syscall_rb"`
-	WriteArgsMap         *ebpf.Map `ebpf:"write_args_map"`
+	AcceptArgsMap         *ebpf.Map `ebpf:"accept_args_map"`
+	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
+	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
+	CloseArgsMap          *ebpf.Map `ebpf:"close_args_map"`
+	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
+	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
+	ConnInfoT_map         *ebpf.Map `ebpf:"conn_info_t_map"`
+	ConnectArgsMap        *ebpf.Map `ebpf:"connect_args_map"`
+	ControlValues         *ebpf.Map `ebpf:"control_values"`
+	EnabledLocalIpv4Map   *ebpf.Map `ebpf:"enabled_local_ipv4_map"`
+	EnabledLocalPortMap   *ebpf.Map `ebpf:"enabled_local_port_map"`
+	EnabledRemoteIpv4Map  *ebpf.Map `ebpf:"enabled_remote_ipv4_map"`
+	EnabledRemotePortMap  *ebpf.Map `ebpf:"enabled_remote_port_map"`
+	ProcExecEvents        *ebpf.Map `ebpf:"proc_exec_events"`
+	Rb                    *ebpf.Map `ebpf:"rb"`
+	ReadArgsMap           *ebpf.Map `ebpf:"read_args_map"`
+	SockKeyConnIdMap      *ebpf.Map `ebpf:"sock_key_conn_id_map"`
+	SockXmitMap           *ebpf.Map `ebpf:"sock_xmit_map"`
+	SslDataMap            *ebpf.Map `ebpf:"ssl_data_map"`
+	SslRb                 *ebpf.Map `ebpf:"ssl_rb"`
+	SslUserSpaceCallMap   *ebpf.Map `ebpf:"ssl_user_space_call_map"`
+	SyscallDataMap        *ebpf.Map `ebpf:"syscall_data_map"`
+	SyscallRb             *ebpf.Map `ebpf:"syscall_rb"`
+	WriteArgsMap          *ebpf.Map `ebpf:"write_args_map"`
 }
 
 func (m *AgentMaps) Close() error {
 	return _AgentClose(
 		m.AcceptArgsMap,
+		m.ActiveSslReadArgsMap,
+		m.ActiveSslWriteArgsMap,
 		m.CloseArgsMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
@@ -321,10 +351,14 @@ func (m *AgentMaps) Close() error {
 		m.EnabledLocalPortMap,
 		m.EnabledRemoteIpv4Map,
 		m.EnabledRemotePortMap,
+		m.ProcExecEvents,
 		m.Rb,
 		m.ReadArgsMap,
 		m.SockKeyConnIdMap,
 		m.SockXmitMap,
+		m.SslDataMap,
+		m.SslRb,
+		m.SslUserSpaceCallMap,
 		m.SyscallDataMap,
 		m.SyscallRb,
 		m.WriteArgsMap,
@@ -351,6 +385,7 @@ type AgentPrograms struct {
 	TcpV4DoRcv                         *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                           *ebpf.Program `ebpf:"tcp_v4_rcv"`
 	TracepointNetifReceiveSkb          *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
+	TracepointSchedSchedProcessExec    *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSyscallsSysEnterAccept4  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_close"`
 	TracepointSyscallsSysEnterConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_connect"`
@@ -394,6 +429,7 @@ func (p *AgentPrograms) Close() error {
 		p.TcpV4DoRcv,
 		p.TcpV4Rcv,
 		p.TracepointNetifReceiveSkb,
+		p.TracepointSchedSchedProcessExec,
 		p.TracepointSyscallsSysEnterAccept4,
 		p.TracepointSyscallsSysEnterClose,
 		p.TracepointSyscallsSysEnterConnect,

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"cmp"
 	"container/list"
 	"encoding/binary"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
 	"kyanos/agent/render"
+	"kyanos/agent/uprobe"
 	"kyanos/bpf"
 	"kyanos/common"
 	"os"
@@ -41,19 +43,21 @@ import (
 
 type LoadBpfProgramFunction func(programs interface{}) *list.List
 type SyscallEventHook func(evt *bpf.SyscallEventData)
+type SslEventHook func(evt *bpf.SslData)
 type ConnEventHook func(evt *bpf.AgentConnEvtT)
 type KernEventHook func(evt *bpf.AgentKernEvt)
 type InitCompletedHook func()
 type ConnManagerInitHook func(*conn.ConnManager)
 
 const perfEventDataBufferSize = 30 * 1024 * 1024
-const perfEventControlBufferSize = 2 * 1024 * 1024
+const perfEventControlBufferSize = 1 * 1024 * 1024
 
 type AgentOptions struct {
 	Stopper                chan os.Signal
 	CustomSyscallEventHook SyscallEventHook
 	CustomConnEventHook    ConnEventHook
 	CustomKernEventHook    KernEventHook
+	CustomSslEventHook     SslEventHook
 	InitCompletedHook      InitCompletedHook
 	ConnManagerInitHook    ConnManagerInitHook
 	LoadBpfProgramFunction LoadBpfProgramFunction
@@ -69,6 +73,7 @@ type AgentOptions struct {
 	analysis.AnalysisOptions
 	PerfEventBufferSizeForData  int
 	PerfEventBufferSizeForEvent int
+	DisableOpensslUprobe        bool
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -83,7 +88,7 @@ func validateAndRepairOptions(options AgentOptions) AgentOptions {
 		newOptions.MessageFilter = protocol.BaseFilter{}
 	}
 	if newOptions.BPFVerifyLogSize <= 0 {
-		newOptions.BPFVerifyLogSize = 1 * 1024 * 1024
+		newOptions.BPFVerifyLogSize = 10 * 1024
 	}
 	if newOptions.PerfEventBufferSizeForData <= 0 {
 		newOptions.PerfEventBufferSizeForData = perfEventDataBufferSize
@@ -248,6 +253,7 @@ func SetupAgent(options AgentOptions) {
 			links = attachBpfProgs(agentObjects.AgentPrograms, options.IfName, kernelVersion, options)
 		}
 	}
+
 	if !kernelVersion.SupportCapability(compatible.SupportXDP) {
 		enabledXdp := bpf.AgentControlValueIndexTKEnabledXdpIndex
 		var enableXdpValue int64 = 0
@@ -255,6 +261,15 @@ func SetupAgent(options AgentOptions) {
 	}
 	if !validateResult {
 		return
+	}
+
+	if !options.DisableOpensslUprobe {
+		reader := attachOpenSslUprobes(links, options, kernelVersion, objs)
+		defer func() {
+			if reader != nil {
+				reader.Close()
+			}
+		}()
 	}
 
 	defer func() {
@@ -311,28 +326,87 @@ func SetupAgent(options AgentOptions) {
 	return
 }
 
+func attachOpenSslUprobes(links *list.List, options AgentOptions, kernelVersion compatible.KernelVersion, objs any) io.Closer {
+	if attachOpensslToSpecificProcess() {
+		uprobeLinks, err := uprobe.AttachSslUprobe(int(viper.GetInt64(common.FilterPidVarName)))
+		if err == nil {
+			for _, l := range uprobeLinks {
+				links.PushBack(l)
+			}
+		} else {
+			common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, viper.GetInt64(common.FilterPidVarName))
+		}
+	} else {
+		pids, err := common.GetAllPids()
+		if err == nil {
+			for _, pid := range pids {
+				uprobeLinks, err := uprobe.AttachSslUprobe(int(pid))
+				if err == nil && len(uprobeLinks) > 0 {
+					for _, l := range uprobeLinks {
+						links.PushBack(l)
+					}
+					common.AgentLog.Infof("Attach OpenSsl uprobes success for pid: %d", pid)
+				} else if err != nil {
+					common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
+				} else if len(uprobeLinks) == 0 {
+					common.AgentLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
+				}
+			}
+		} else {
+			common.AgentLog.Warnf("get all pid failed: %v", err)
+		}
+		attachSchedProgs(links)
+		uprobeSchedExecEvent := uprobe.StartHandleSchedExecEvent()
+		reader, err := setupReader(options, kernelVersion, objs, "ProcExecEvents", false)
+		if err == nil {
+			startPerfeventReader(reader, func(record perf.Record) error {
+				var event bpf.AgentProcessExecEvent
+				err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event)
+				if err != nil {
+					return err
+				}
+				uprobeSchedExecEvent <- &event
+				return nil
+			})
+			return reader
+		} else {
+			common.AgentLog.Warnf("setup process exec events perf reader failed: %v", err)
+		}
+	}
+	return nil
+}
+
 func startReaders(options AgentOptions, kernel compatible.KernelVersion, pm *conn.ProcessorManager, readers []io.Closer) {
 	if kernel.SupportCapability(compatible.SupportRingBuffer) {
 		// syscall
 		startRingbufferReader(readers[0], func(r ringbuf.Record) error {
 			return handleSyscallEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
 		})
-		// kernel event
+		// ssl
 		startRingbufferReader(readers[1], func(r ringbuf.Record) error {
+			return handleSslDataEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSslEventHook)
+		})
+
+		// kernel event
+		startRingbufferReader(readers[2], func(r ringbuf.Record) error {
 			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
 		})
 		// conn event
-		startRingbufferReader(readers[2], func(r ringbuf.Record) error {
+		startRingbufferReader(readers[3], func(r ringbuf.Record) error {
 			return handleConnEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook)
 		})
 	} else {
 		startPerfeventReader(readers[0], func(r perf.Record) error {
 			return handleSyscallEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
 		})
+		// ssl
 		startPerfeventReader(readers[1], func(r perf.Record) error {
-			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
+			return handleSslDataEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSslEventHook)
 		})
 		startPerfeventReader(readers[2], func(r perf.Record) error {
+			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
+		})
+		startPerfeventReader(readers[3], func(r perf.Record) error {
 			return handleConnEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomConnEventHook)
 		})
 	}
@@ -345,6 +419,12 @@ func setupReaders(options AgentOptions, kernel compatible.KernelVersion, objs an
 		return nil, err
 	}
 	closers = append(closers, syscallDataReader)
+
+	sslDataReader, err := setupReader(options, kernel, objs, "SslRb", true)
+	if err != nil {
+		return nil, err
+	}
+	closers = append(closers, sslDataReader)
 
 	kernEventReader, err := setupReader(options, kernel, objs, "Rb", false)
 	if err != nil {
@@ -414,6 +494,10 @@ func startPerfeventReader(reader io.Closer, consumeFunction func(perf.Record) er
 			}
 		}
 	}()
+}
+
+func attachOpensslToSpecificProcess() bool {
+	return viper.GetInt64(common.FilterPidVarName) > 0
 }
 
 func setAndValidateParameters() bool {
@@ -512,6 +596,30 @@ func handleConnEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, 
 	p.AddConnEvent(&event)
 	return nil
 }
+
+func handleSslDataEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customSslEventHook SslEventHook) error {
+	event := new(bpf.SslData)
+	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event.SslEventHeader)
+	if err != nil {
+		return err
+	}
+	msgSize := event.SslEventHeader.BufSize
+	headerSize := uint(unsafe.Sizeof(event.SslEventHeader))
+	buf := make([]byte, msgSize)
+	err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
+	if err != nil {
+		return err
+	}
+	event.Buf = buf
+	tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
+	p := pm.GetProcessor(int(tgidFd) % processorsNum)
+	// err :=
+	if customSslEventHook != nil {
+		customSslEventHook(event)
+	}
+	p.AddSslEvent(event)
+	return nil
+}
 func handleSyscallEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customSyscallEventHook SyscallEventHook) error {
 	// 首先看这个连接上有没有堆积的请求，如果有继续堆积
 	// 如果没有作为新的请求
@@ -522,10 +630,12 @@ func handleSyscallEvt(record []byte, pm *conn.ProcessorManager, processorsNum in
 	}
 	msgSize := event.SyscallEvent.BufSize
 	buf := make([]byte, msgSize)
-	headerSize := uint(unsafe.Sizeof(event.SyscallEvent)) - 4
-	err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
-	if err != nil {
-		return err
+	if msgSize > 0 {
+		headerSize := uint(unsafe.Sizeof(event.SyscallEvent)) - 4
+		err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
+		if err != nil {
+			return err
+		}
 	}
 	event.Buf = buf
 
@@ -641,6 +751,15 @@ func attachBpfProgs(programs any, ifName string, kernelVersion compatible.Kernel
 	return linkList
 }
 
+func attachSchedProgs(links *list.List) {
+	link, err := link.Tracepoint("sched", "sched_process_exec", bpf.GetProgramFromObjs(bpf.Objs, "TracepointSchedSchedProcessExec"), nil)
+	if err != nil {
+		common.AgentLog.Warnf("Attach tracepoint/sched/sched_process_exec error: %v", err)
+	} else {
+		links.PushBack(link)
+	}
+}
+
 func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelVersion) {
 	finalCProgNames := make([]string, 0)
 
@@ -661,7 +780,7 @@ func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelV
 
 	finalCProgNames = append(finalCProgNames, bpf.SyscallExtraProgNames...)
 	for name := range coll.Programs {
-		if strings.HasPrefix(name, "tracepoint__syscalls") {
+		if strings.HasPrefix(name, "tracepoint__syscalls") || strings.HasPrefix(name, "tracepoint__sched") {
 			finalCProgNames = append(finalCProgNames, name)
 		}
 	}
@@ -743,11 +862,24 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 		common.AgentLog.Debug("find btf file exactly failed, try to find a lower version btf file...")
 	}
 
-	key, value := btfFileNames.Floor(release)
-	if key != nil {
+	sortedBtfFileNames := btfFileNames.Keys()
+	slices.SortFunc(sortedBtfFileNames, func(a, b interface{}) int {
+		return cmp.Compare(a.(string), b.(string))
+	})
+	var result string
+	var commonPrefixLength = 0
+	for _, btfFileName := range btfFileNames.Keys() {
+		prefix := common.CommonPrefix(btfFileName.(string), release)
+		if len(prefix) > commonPrefixLength {
+			result = btfFileName.(string)
+			commonPrefixLength = len(prefix)
+		}
+	}
+	if result != "" {
+		value, _ := btfFileNames.Get(result)
 		dirEntry := value.(fs.DirEntry)
 		fileName := dirEntry.Name()
-		common.AgentLog.Debugf("find a lower version btf file success: %s", fileName)
+		common.AgentLog.Debugf("find a  btf file may be success: %s", fileName)
 		file, err := bpf.BtfFiles.ReadFile(btfFileDir + "/" + fileName)
 		if err == nil {
 			return file, nil
