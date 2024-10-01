@@ -190,7 +190,7 @@ func processLengthEncodedInt(s string, offset *int) (int64, bool) {
 
 func DissectStringParam(s string, offset *int, param *string) bool {
 	param_length, ok := processLengthEncodedInt(s, offset)
-	if !ok {
+	if !ok || len(s) < *offset+int(param_length) {
 		return false
 	}
 	*param = s[*offset : *offset+int(param_length)]
