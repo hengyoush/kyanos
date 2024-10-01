@@ -252,8 +252,9 @@ func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
 	if err == nil {
 		connInfo.NoTrace = !traceable
 		connInfoMap.Update(c.TgidFd, &connInfo, ebpf.UpdateExist)
+		common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v success!", c.ToString(), traceable)
 	} else {
-		common.ConntrackLog.Debugf("try to update %s conn_info_map to no_trace, but no entry in map found!", c.ToString())
+		common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v, but no entry in map found!", c.ToString(), traceable)
 	}
 }
 
@@ -264,7 +265,7 @@ func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m
 		connIds.NoTrace = !traceable
 		m.Update(&key, &connIds, ebpf.UpdateExist)
 	} else {
-		common.ConntrackLog.Debugf("try to update %s conn_id_map to no_trace, but no entry in map found! key: %v", c.ToString(), key)
+		common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, but no entry in map found! key: %v", c.ToString(), traceable, key)
 	}
 }
 

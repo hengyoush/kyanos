@@ -234,6 +234,7 @@ static __always_inline int do_SSL_write_ret(struct pt_regs* ctx, bool is_ex_call
 
     struct data_args* data_arg = bpf_map_lookup_elem(&active_ssl_write_args_map, &id);
     if (data_arg) {
+        // bpf_printk("do_SSL_write_ret, tgid: %lld, fd: %d, bc: %d", id>>32, fd, PT_REGS_RC(ctx));
         data_arg->fd = fd;
         process_ssl_data(ctx, id, kEgress, data_arg, is_ex_call, nested_syscall_fd_ptr->syscall_len);
     }

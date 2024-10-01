@@ -8,7 +8,7 @@ import (
 )
 
 func TestDetectOpenSsl(t *testing.T) {
-	key, err := detectOpenSsl(1262837)
+	key, err := detectOpenSsl(2276284)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, key)
 

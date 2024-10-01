@@ -42,6 +42,7 @@ import (
 
 type LoadBpfProgramFunction func(programs interface{}) *list.List
 type SyscallEventHook func(evt *bpf.SyscallEventData)
+type SslEventHook func(evt *bpf.SslData)
 type ConnEventHook func(evt *bpf.AgentConnEvtT)
 type KernEventHook func(evt *bpf.AgentKernEvt)
 type InitCompletedHook func()
@@ -55,6 +56,7 @@ type AgentOptions struct {
 	CustomSyscallEventHook SyscallEventHook
 	CustomConnEventHook    ConnEventHook
 	CustomKernEventHook    KernEventHook
+	CustomSslEventHook     SslEventHook
 	InitCompletedHook      InitCompletedHook
 	ConnManagerInitHook    ConnManagerInitHook
 	LoadBpfProgramFunction LoadBpfProgramFunction
@@ -70,6 +72,7 @@ type AgentOptions struct {
 	analysis.AnalysisOptions
 	PerfEventBufferSizeForData  int
 	PerfEventBufferSizeForEvent int
+	DisableOpensslUprobe        bool
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -258,8 +261,15 @@ func SetupAgent(options AgentOptions) {
 	if !validateResult {
 		return
 	}
-	reader := attachOpenSslUprobes(links, options, kernelVersion, objs)
-	defer reader.Close()
+
+	if !options.DisableOpensslUprobe {
+		reader := attachOpenSslUprobes(links, options, kernelVersion, objs)
+		defer func() {
+			if reader != nil {
+				reader.Close()
+			}
+		}()
+	}
 
 	defer func() {
 		for e := links.Front(); e != nil; e = e.Next() {
@@ -337,6 +347,8 @@ func attachOpenSslUprobes(links *list.List, options AgentOptions, kernelVersion 
 					common.AgentLog.Infof("Attach OpenSsl uprobes success for pid: %d", pid)
 				} else if err != nil {
 					common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
+				} else if len(uprobeLinks) == 0 {
+					common.AgentLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
 				}
 			}
 		} else {
@@ -371,7 +383,7 @@ func startReaders(options AgentOptions, kernel compatible.KernelVersion, pm *con
 		})
 		// ssl
 		startRingbufferReader(readers[1], func(r ringbuf.Record) error {
-			return handleSyscallEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
+			return handleSslDataEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSslEventHook)
 		})
 
 		// kernel event
@@ -388,7 +400,7 @@ func startReaders(options AgentOptions, kernel compatible.KernelVersion, pm *con
 		})
 		// ssl
 		startPerfeventReader(readers[1], func(r perf.Record) error {
-			return handleSslDataEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSyscallEventHook)
+			return handleSslDataEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomSslEventHook)
 		})
 		startPerfeventReader(readers[2], func(r perf.Record) error {
 			return handleKernEvt(r.RawSample, pm, options.ProcessorsNum, options.CustomKernEventHook)
@@ -584,8 +596,7 @@ func handleConnEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, 
 	return nil
 }
 
-func handleSslDataEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customSyscallEventHook SyscallEventHook) error {
-
+func handleSslDataEvt(record []byte, pm *conn.ProcessorManager, processorsNum int, customSslEventHook SslEventHook) error {
 	event := new(bpf.SslData)
 	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event.SslEventHeader)
 	if err != nil {
@@ -602,6 +613,9 @@ func handleSslDataEvt(record []byte, pm *conn.ProcessorManager, processorsNum in
 	tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
 	p := pm.GetProcessor(int(tgidFd) % processorsNum)
 	// err :=
+	if customSslEventHook != nil {
+		customSslEventHook(event)
+	}
 	p.AddSslEvent(event)
 	return nil
 }

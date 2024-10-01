@@ -29,13 +29,17 @@ func StartHandleSchedExecEvent() chan *bpf.AgentProcessExecEvent {
 
 func handleSchedExecEvent(event *bpf.AgentProcessExecEvent) {
 	links, err := AttachSslUprobe(int(event.Pid))
+	var procName string
+	if proc, err := process.NewProcess(event.Pid); err == nil {
+		procName, _ = proc.Name()
+	}
 	if err == nil {
-		uprobeLinks = append(uprobeLinks, links...)
-	} else {
-		var procName string
-		if proc, err := process.NewProcess(event.Pid); err == nil {
-			procName, _ = proc.Name()
+		if len(links) > 0 {
+			uprobeLinks = append(uprobeLinks, links...)
+		} else {
+			common.UprobeLog.Debugf("Attach OpenSsl uprobes success for pid: %d (%s) use previous libssl path", event.Pid, procName)
 		}
+	} else {
 		common.UprobeLog.Debugf("AttachSslUprobe failed for exec event(pid: %d %s): %v", event.Pid, procName, err)
 	}
 }

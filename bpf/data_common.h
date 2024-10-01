@@ -259,7 +259,8 @@ static __inline uint64_t gen_tgid_fd(uint32_t tgid, int fd) {
   return ((uint64_t)tgid << 32) | (uint32_t)fd;
 }
 static __always_inline void process_syscall_data_with_conn_info(void* ctx, struct data_args *args, uint64_t tgid_fd,
- enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, uint32_t syscall_len, bool is_ssl, bool with_data) {
+ enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, int32_t syscall_len, bool is_ssl, bool with_data) {
+	bool inferred = false;
 	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
 		enum traffic_protocol_t before_infer = conn_info->protocol;
 		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
@@ -267,13 +268,14 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
 		if (before_infer != protocol_message.protocol) {
 			conn_info->protocol = protocol_message.protocol;
-			// bpf_printk("[protocol infer]: %d", conn_info->protocol);
+			// bpf_printk("[protocol infer]: %d, func: %d", conn_info->protocol, args->source_fn);
 			
 			if (conn_info->role == kRoleUnknown && protocol_message.type != kUnknown) {
 				conn_info->role = ((direct == kEgress) ^ (protocol_message.type == kResponse))
 									? kRoleClient
 									: kRoleServer;
 			}
+			inferred = true;
 			report_conn_evt(ctx, conn_info, kProtocolInfer, 0);
 		}
 	}
@@ -289,11 +291,11 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 	}
 	 
-	if (should_trace_conn(conn_info)) {//, bytes_count
+	if (conn_info->protocol != kProtocolUnknown && (inferred || !conn_info->no_trace)) {//, bytes_count
 		if (is_ssl) {
 			uint64_t syscall_seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 			seq = (direct == kEgress ?  conn_info->ssl_write_bytes : conn_info->ssl_read_bytes) + 1;
-			report_ssl_evt(ctx, seq, &conn_id_s, bytes_count, step, args, syscall_seq - syscall_len, syscall_len);
+			report_ssl_evt(ctx, seq, &conn_id_s, bytes_count, step, args, syscall_len < 0 ? 0 : (syscall_seq - syscall_len), syscall_len < 0 ? 0 : syscall_len);
 			// bpf_printk("report ssl evt, seq: %lld len: %d",)
 		} else if (with_data) {
 			report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);

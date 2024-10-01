@@ -276,3 +276,18 @@ func TruncateString(s string, maxBytes int) string {
 		return fmt.Sprintf("%s...(truncated, total: %dbytes)", s[:maxBytes], len(s))
 	}
 }
+
+// 计算两个字符串的公共前缀长度
+func CommonPrefix(str1, str2 string) string {
+	minLen := len(str1)
+	if len(str2) < minLen {
+		minLen = len(str2)
+	}
+
+	i := 0
+	for i < minLen && str1[i] == str2[i] {
+		i++
+	}
+
+	return str1[:i]
+}
