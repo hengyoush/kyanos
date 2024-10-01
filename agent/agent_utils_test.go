@@ -2,7 +2,9 @@ package agent_test
 
 import (
 	"bufio"
+	"bytes"
 	"container/list"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -30,12 +33,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
+func StartAgent0(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 	connEventList *[]bpf.AgentConnEvtT,
 	syscallEventList *[]bpf.SyscallEventData,
+	sslEventList *[]bpf.SslData,
 	kernEventList *[]bpf.AgentKernEvt,
 	connManagerInitHook func(*conn.ConnManager),
-	agentStopper chan os.Signal) {
+	agentStopper chan os.Signal,
+	useSelfPidAsFitler bool) {
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -52,13 +58,16 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 		}
 	}
 	go func(pid int) {
-		cmd.FilterPid = int64(pid)
+		if useSelfPidAsFitler {
+			cmd.FilterPid = int64(pid)
+		}
 		cmd.DefaultLogLevel = int32(logrus.DebugLevel)
 		cmd.Debug = true
 		cmd.InitLog()
 		agent.SetupAgent(agent.AgentOptions{
 			Stopper:                agentStopper,
 			LoadBpfProgramFunction: loadBpfProgramFunction,
+			DisableOpensslUprobe:   customAgentOptions.DisableOpensslUprobe,
 			CustomSyscallEventHook: func(evt *bpf.SyscallEventData) {
 				if syscallEventList != nil {
 					*syscallEventList = append(*syscallEventList, *evt)
@@ -77,11 +86,25 @@ func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 					*kernEventList = append(*kernEventList, *evt)
 				}
 			},
+			CustomSslEventHook: func(evt *bpf.SslData) {
+				if sslEventList != nil {
+					*sslEventList = append(*sslEventList, *evt)
+				}
+			},
 			ConnManagerInitHook: connManagerInitHook,
 		})
 	}(os.Getpid())
 
 	wg.Wait()
+
+}
+func StartAgent(bpfAttachFunctions []bpf.AttachBpfProgFunction,
+	connEventList *[]bpf.AgentConnEvtT,
+	syscallEventList *[]bpf.SyscallEventData,
+	kernEventList *[]bpf.AgentKernEvt,
+	connManagerInitHook func(*conn.ConnManager),
+	agentStopper chan os.Signal) {
+	StartAgent0(bpfAttachFunctions, connEventList, syscallEventList, nil, kernEventList, connManagerInitHook, agentStopper, true)
 }
 
 type ConnEventAssertions struct {
@@ -234,7 +257,18 @@ func AssertKernEvent(t *testing.T, kernEvt *bpf.AgentKernEvt, conditions KernDat
 		assert.True(t, conditions.tsAssertFunction(ts))
 	}
 }
-
+func AssertSslEventData(t *testing.T, event bpf.SslData, conditions SyscallDataEventAssertConditions) {
+	kernEvt := event.SslEventHeader.Ke
+	AssertKernEvent(t, &kernEvt, conditions.KernDataEventAssertConditions)
+	bufSize := event.SslEventHeader.BufSize
+	if conditions.bufSizeAssertFunction != nil {
+		assert.True(t, conditions.bufSizeAssertFunction(bufSize))
+	}
+	buf := event.Buf
+	if conditions.bufAssertFunction != nil {
+		assert.True(t, conditions.bufAssertFunction(buf))
+	}
+}
 func AssertSyscallEventData(t *testing.T, event bpf.SyscallEventData, conditions SyscallDataEventAssertConditions) {
 	kernEvt := event.SyscallEvent.Ke
 	AssertKernEvent(t, &kernEvt, conditions.KernDataEventAssertConditions)
@@ -265,7 +299,11 @@ type FindInterestedSyscallEventOptions struct {
 	remotePort       uint16
 	findByLocalPort  bool
 	localPort        uint16
+	findByPid        bool
+	pid              int
 	throw            bool
+	findByStep       bool
+	step             bpf.AgentStepT
 
 	connEventList []bpf.AgentConnEvtT
 }
@@ -316,6 +354,37 @@ func findInterestedConnEvent(t *testing.T, connEventList []bpf.AgentConnEvtT, op
 	return resultList
 }
 
+func findInterestedSslEvents(t *testing.T, sslEventList []bpf.SslData, options FindInterestedSyscallEventOptions) []bpf.SslData {
+	t.Helper()
+	resultList := make([]bpf.SslData, 0)
+	for _, each := range sslEventList {
+		connectEvents := findInterestedConnEvent(t, options.connEventList, FindInterestedConnEventOptions{
+			findByTgidFd:   true,
+			findByConnType: true,
+			tgidFd:         each.SslEventHeader.Ke.ConnIdS.TgidFd,
+			connType:       bpf.AgentConnTypeTKConnect,
+			throw:          false,
+		})
+		if len(connectEvents) == 0 {
+			continue
+		}
+		connectEvent := connectEvents[0]
+		if options.findByRemotePort && connectEvent.ConnInfo.Raddr.In6.Sin6Port != options.remotePort {
+			continue
+		}
+		if options.findByLocalPort && connectEvent.ConnInfo.Laddr.In6.Sin6Port != options.localPort {
+			continue
+		}
+		if options.findByPid && each.SslEventHeader.Ke.ConnIdS.TgidFd>>32 != uint64(options.pid) {
+			continue
+		}
+		resultList = append(resultList, each)
+	}
+	if options.throw && len(resultList) == 0 {
+		t.Fatalf("no syscall event found for: %v", options)
+	}
+	return resultList
+}
 func findInterestedSyscallEvents(t *testing.T, syscallEventList []bpf.SyscallEventData, options FindInterestedSyscallEventOptions) []bpf.SyscallEventData {
 	t.Helper()
 	resultList := make([]bpf.SyscallEventData, 0)
@@ -391,34 +460,75 @@ func findInterestedKernEvents(t *testing.T, kernEventList []bpf.AgentKernEvt, op
 type SendTestHttpRequestOptions struct {
 	disableKeepAlived bool
 	targetUrl         string
+	num               int
 }
 
-func sendTestRequest(t *testing.T, options SendTestHttpRequestOptions) error {
+func curlHTTPSRequest(url string, method string, headers map[string]string, data string) (string, *exec.Cmd, error) {
+	// 构建curl命令参数
+	args := []string{"-X", method}
+
+	// 添加自定义请求头
+	for key, value := range headers {
+		args = append(args, "-H", fmt.Sprintf("%s: %s", key, value))
+	}
+
+	// 添加请求体
+	if data != "" {
+		args = append(args, "-d", data)
+	}
+
+	// 添加URL
+	args = append(args, url)
+
+	// 执行curl命令
+	cmd := exec.Command("curl", args...)
+
+	// 捕获输出
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	// 执行命令
+	err := cmd.Start()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to execute curl: %v, output: %s", err, out.String())
+	}
+
+	cmd.Process.Wait()
+	return out.String(), cmd, nil
+}
+func sendTestHttpRequest(t *testing.T, options SendTestHttpRequestOptions) error {
+	if options.num <= 0 {
+		options.num = 1
+	}
 	// 创建http客户端，连接baidu.com
 	// 创建一个HTTP客户端（实际上，在这个例子中直接使用http.Get也是可以的，因为它内部会创建一个默认的客户端）
 	client := &http.Client{
 		Transport: &http.Transport{
 			DisableKeepAlives: options.disableKeepAlived,
+			TLSNextProto:      make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
 		},
 	}
 
-	// 创建一个请求
-	req, err := http.NewRequest("GET", options.targetUrl, nil)
-	resp, err := client.Do(req)
-	if err != nil {
-		// 如果有错误，则打印错误并退出
-		t.Fatal("Error sending request:", err)
-		return err
+	for i := 0; i < options.num; i++ {
+		// 创建一个请求
+		req, err := http.NewRequest("GET", options.targetUrl, nil)
+		resp, err := client.Do(req)
+		if err != nil {
+			// 如果有错误，则打印错误并退出
+			t.Fatal("Error sending request:", err)
+			return err
+		}
+		_, err = io.ReadAll(resp.Body)
+		if err != nil {
+			// 如果有错误，则打印错误并退出
+			t.Fatal("Error reading response body:", err)
+			return err
+		}
+		fmt.Printf("Status Code: %d\n", resp.StatusCode)
+		resp.Body.Close()
 	}
-	_, err = io.ReadAll(resp.Body)
-	if err != nil {
-		// 如果有错误，则打印错误并退出
-		t.Fatal("Error reading response body:", err)
-		return err
-	}
-	fmt.Printf("Status Code: %d\n", resp.StatusCode)
-	resp.Body.Close()
-	return err
+	return nil
 }
 
 func StartEchoTcpServerAndWait() {
@@ -728,7 +838,7 @@ func KernRcvTestWithHTTP(t *testing.T, progs []bpf.AttachBpfProgFunction, kernEv
 		agentStopper <- MySignal{}
 		time.Sleep(1 * time.Second)
 	}()
-	sendTestRequest(t, SendTestHttpRequestOptions{
+	sendTestHttpRequest(t, SendTestHttpRequestOptions{
 		targetUrl:         "http://www.baidu.com/abc",
 		disableKeepAlived: true,
 	})

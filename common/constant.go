@@ -26,6 +26,16 @@ const AllSide SideEnum = 0
 const ServerSide SideEnum = 1
 const ClientSide SideEnum = 2
 
+func (s SideEnum) String() string {
+	if s == ServerSide {
+		return "server"
+	} else if s == ClientSide {
+		return "client"
+	} else {
+		return "all"
+	}
+}
+
 type DirectEnum int
 
 const DirectEgress DirectEnum = 0

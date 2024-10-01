@@ -131,8 +131,8 @@ func processRequestWithBasicResponse(reqPacket *MysqlPacket, stringReq bool,
 
 	if len(respView) > 1 {
 		common.ProtocolParserLog.Warnf(
-			"Did not expect more than one response packet [cmd=%c, num_extra_packets=%d].\n",
-			reqPacket.msg[0], len(respView)-1)
+			"Did not expect more than one response packet [cmd=%s, num_extra_packets=%d].\n",
+			reqPacket.msg, len(respView)-1)
 		return Invalid
 	}
 

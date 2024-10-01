@@ -126,6 +126,7 @@ func InitLog() {
 	common.BPFEventLog.SetLevel(common.DefaultLog.Level)
 	common.ConntrackLog.SetLevel(common.DefaultLog.Level)
 	common.ProtocolParserLog.SetLevel(common.DefaultLog.Level)
+	common.UprobeLog.SetLevel(common.DefaultLog.Level)
 
 	// override log level individually
 	if isValidLogLevel(AgentLogLevel) {
@@ -139,6 +140,9 @@ func InitLog() {
 	}
 	if isValidLogLevel(ProtocolLogLevel) {
 		common.ProtocolParserLog.SetLevel(logrus.Level(ProtocolLogLevel))
+	}
+	if isValidLogLevel(UprobeLogLevel) {
+		common.UprobeLog.SetLevel(logrus.Level(UprobeLogLevel))
 	}
 }
 

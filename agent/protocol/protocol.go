@@ -89,6 +89,17 @@ const (
 	Unknown
 )
 
+func (m MessageType) String() string {
+	switch m {
+	case Request:
+		return "Request"
+	case Response:
+		return "Response"
+	default:
+		return "Unknwon"
+	}
+}
+
 const (
 	Invalid ParseState = iota
 	NeedsMoreData

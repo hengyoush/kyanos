@@ -28,6 +28,7 @@ type ConnDesc struct {
 	Protocol   uint32
 	Side       SideEnum
 	StreamId   int
+	IsSsl      bool
 }
 
 func (c *ConnDesc) Identity() string {
