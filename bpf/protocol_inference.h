@@ -21,9 +21,9 @@ static __always_inline int is_mysql_protocol(const char *old_buf, size_t count, 
 
   // Second statement checks whether suspected header matches the length of current packet.
   bool use_prev_buf = (conn_info->prev_count == 4) && (*((uint32_t*)conn_info->prev_buf) == count);
-  if (conn_info->prev_count == 4) {
-    bpf_printk("prevbuf: %d", (*((uint32_t*)conn_info->prev_buf)));
-  }
+  // if (conn_info->prev_count == 4) {
+  //   bpf_printk("prevbuf: %d", (*((uint32_t*)conn_info->prev_buf)));
+  // }
   if (use_prev_buf) {
     
     // Check the header_state to find out if the header has been read. MySQL server tends to
