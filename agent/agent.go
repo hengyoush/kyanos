@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"cmp"
 	"container/list"
 	"encoding/binary"
 	"errors"
@@ -861,11 +862,24 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 		common.AgentLog.Debug("find btf file exactly failed, try to find a lower version btf file...")
 	}
 
-	key, value := btfFileNames.Floor(release)
-	if key != nil {
+	sortedBtfFileNames := btfFileNames.Keys()
+	slices.SortFunc(sortedBtfFileNames, func(a, b interface{}) int {
+		return cmp.Compare(a.(string), b.(string))
+	})
+	var result string
+	var commonPrefixLength = 0
+	for _, btfFileName := range btfFileNames.Keys() {
+		prefix := common.CommonPrefix(btfFileName.(string), release)
+		if len(prefix) > commonPrefixLength {
+			result = btfFileName.(string)
+			commonPrefixLength = len(prefix)
+		}
+	}
+	if result != "" {
+		value, _ := btfFileNames.Get(result)
 		dirEntry := value.(fs.DirEntry)
 		fileName := dirEntry.Name()
-		common.AgentLog.Debugf("find a lower version btf file success: %s", fileName)
+		common.AgentLog.Debugf("find a  btf file may be success: %s", fileName)
 		file, err := bpf.BtfFiles.ReadFile(btfFileDir + "/" + fileName)
 		if err == nil {
 			return file, nil
