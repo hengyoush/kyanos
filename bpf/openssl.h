@@ -71,7 +71,9 @@ static __always_inline void process_ssl_data(struct pt_regs* ctx, uint64_t id,
         size_t ex_bytes;
         bpf_probe_read_kernel(&ex_bytes, sizeof(size_t), &args->ssl_ex_len);
         bytes_count = ex_bytes;
-    }                                        
+    } else if (bytes_count < 0) {
+        return ;
+    }         
     uint64_t tgid_fd = gen_tgid_fd(id>>32, args->fd);
     struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
     if (conn_info) {
@@ -189,6 +191,7 @@ static __always_inline int do_SSL_read_ret(struct pt_regs* ctx, bool is_ex_call)
 
     struct data_args* data_arg = bpf_map_lookup_elem(&active_ssl_read_args_map, &id);
     if (data_arg) {
+        // bpf_printk("bc: %d", PT_REGS_RC(ctx));
         data_arg->fd = fd;
         process_ssl_data(ctx, id, kIngress, data_arg, is_ex_call, nested_syscall_fd_ptr->syscall_len);
     }
@@ -245,22 +248,26 @@ static __always_inline int do_SSL_write_ret(struct pt_regs* ctx, bool is_ex_call
 
 SEC("uprobe/dummy:SSL_read")
 int BPF_UPROBE(SSL_read_entry_nested_syscall) {
+    // bpf_printk("SSL_read_entry_nested_syscall");
     return do_SSL_read_entry(ctx, false);
 }
 
 SEC("uretprobe/dummy:SSL_read")
 int BPF_URETPROBE(SSL_read_ret_nested_syscall) {
+    // bpf_printk("SSL_read_ret_nested_syscall");
     return do_SSL_read_ret(ctx, false);
 }
 
 
 SEC("uprobe/dummy:SSL_read_ex")
 int BPF_UPROBE(SSL_read_ex_entry_nested_syscall) {
+    // bpf_printk("SSL_read_ex_entry_nested_syscall");
     return do_SSL_read_entry(ctx, true);
 }
 
 SEC("uretprobe/dummy:SSL_read_ex")
 int BPF_URETPROBE(SSL_read_ex_ret_nested_syscall) {
+    // bpf_printk("SSL_read_ex_ret_nested_syscall");
     return do_SSL_read_ret(ctx, true);
 }
 

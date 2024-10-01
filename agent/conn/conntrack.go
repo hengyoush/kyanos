@@ -404,7 +404,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			} else {
 				removed := c.checkProgress(streamBuffer)
 				if removed {
-					common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer head due to stuck", c.ToString())
+					common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
 					stop = false
 				} else {
 					stop = true
@@ -413,7 +413,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		case protocol.NeedsMoreData:
 			removed := c.checkProgress(streamBuffer)
 			if removed {
-				common.ConntrackLog.Debugf("Needs more data, %s Removed streambuffer head due to stuck", c.ToString())
+				common.ConntrackLog.Debugf("Needs more data, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
 				stop = false
 			} else {
 				stop = true
