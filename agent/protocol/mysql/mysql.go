@@ -243,7 +243,7 @@ func (m *MysqlParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType
 	if messageType == Request {
 		packet.isReq = true
 		if len(buf) < kPacketHeaderLength+1 {
-			return ParseResult{ParseState: Invalid}
+			return ParseResult{ParseState: NeedsMoreData}
 		}
 
 		commandByte := buf[kPacketHeaderLength]

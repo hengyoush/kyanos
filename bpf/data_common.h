@@ -11,6 +11,35 @@ struct nested_syscall_fd_t {
 };
 
 struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10);
+    __type(key, u32);
+    __type(value, u8);
+} filter_mntns_map SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10);
+    __type(key, u32);
+    __type(value, u8);
+} filter_pidns_map SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10);
+    __type(key, u32);
+    __type(value, u8);
+} filter_netns_map SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10);
+    __type(key, u32);
+    __type(value, u8);
+} filter_pid_map SEC(".maps");
+
+
+struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(key_size, sizeof(uint64_t));
 	__uint(value_size, sizeof(struct data_args));

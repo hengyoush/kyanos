@@ -310,8 +310,8 @@ func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernE
 	if c.Role == bpf.AgentEndpointRoleTKRoleUnknown {
 		respSteamMessageType = protocol.Unknown
 	}
-	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, ke.Step)
-	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, ke.Step)
+	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, ke)
+	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, ke)
 }
 func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChannel chan RecordWithConn) {
 	if len(data) > 0 {
@@ -356,7 +356,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 	}
 }
 
-func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, step bpf.AgentStepT) {
+func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, ke *bpf.AgentKernEvt) {
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
 		streamBuffer.Clear()
@@ -381,7 +381,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		case protocol.Success:
 			if c.Role == bpf.AgentEndpointRoleTKRoleUnknown && len(parseResult.ParsedMessages) > 0 {
 				parsedMessage := parseResult.ParsedMessages[0]
-				if (bpf.IsIngressStep(step) && parsedMessage.IsReq()) || (bpf.IsEgressStep(step) && !parsedMessage.IsReq()) {
+				if (bpf.IsIngressStep(ke.Step) && parsedMessage.IsReq()) || (bpf.IsEgressStep(ke.Step) && !parsedMessage.IsReq()) {
 					c.Role = bpf.AgentEndpointRoleTKRoleServer
 				} else {
 					c.Role = bpf.AgentEndpointRoleTKRoleClient
@@ -402,12 +402,17 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 				streamBuffer.RemovePrefix(pos)
 				stop = false
 			} else {
-				removed := c.checkProgress(streamBuffer)
-				if removed {
-					common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
+				if streamBuffer.Head().Len() > int(ke.Len) {
+					streamBuffer.RemovePrefix(streamBuffer.Head().Len() - int(ke.Len))
 					stop = false
 				} else {
-					stop = true
+					removed := c.checkProgress(streamBuffer)
+					if removed {
+						common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
+						stop = false
+					} else {
+						stop = true
+					}
 				}
 			}
 		case protocol.NeedsMoreData:

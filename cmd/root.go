@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"kyanos/agent"
+	"kyanos/agent/metadata/k8s"
 	"kyanos/common"
+	"strings"
 
 	"github.com/jefurry/logrus"
 	"github.com/spf13/cobra"
@@ -39,7 +41,7 @@ sudo kyanos stat http --metrics tq --sort-by avg --group-by remote-ip`,
 
 var Daemon bool
 var Debug bool
-var FilterPid int64
+var FilterPids []string
 var RemotePorts []string
 var LocalPorts []string
 var RemoteIps []string
@@ -55,9 +57,15 @@ var BPFEventLogLevel int32
 var ConntrackLogLevel int32
 var ProtocolLogLevel int32
 var UprobeLogLevel int32
+var DockerEndpoint string
+var ContainerdEndpoint string
+var CriRuntimeEndpoint string
+var ContainerId string
+var ContainerName string
+var PodName string
 
 func init() {
-	rootCmd.PersistentFlags().Int64VarP(&FilterPid, "pid", "p", 0, "Filter by pid")
+	rootCmd.PersistentFlags().StringSliceVarP(&FilterPids, "pids", "p", []string{}, "Filter by pids, seperate by ','")
 	rootCmd.PersistentFlags().StringSliceVarP(&RemotePorts, common.RemotePortsVarName, "", []string{}, "Filter by remote ports, seperate by ','")
 	rootCmd.PersistentFlags().StringSliceVarP(&LocalPorts, common.LocalPortsVarName, "", []string{}, "Filter by local ports, seperate by ','")
 	rootCmd.PersistentFlags().StringSliceVarP(&RemoteIps, common.RemoteIpsVarName, "", []string{}, "Filter by remote ips, seperate by ','")
@@ -72,6 +80,19 @@ func init() {
 	rootCmd.PersistentFlags().Int32Var(&ConntrackLogLevel, "conntrack-log-level", 0, "specify conntrack module log level individually")
 	rootCmd.PersistentFlags().Int32Var(&ProtocolLogLevel, "protocol-log-level", 0, "specify protocol module log level individually")
 	rootCmd.PersistentFlags().Int32Var(&UprobeLogLevel, "uprobe-log-level", 0, "specify uprobe module log level individually")
+
+	// container
+	rootCmd.PersistentFlags().StringVar(&ContainerId, "container-id", "", "Filter by container id (only TCP and UDP packets are supported)")
+	rootCmd.PersistentFlags().StringVar(&ContainerName, "container-name", "", "Filter by container name (only TCP and UDP packets are supported)")
+	rootCmd.PersistentFlags().StringVar(&PodName, "pod-name", "", "Filter by pod name (format: NAME.NAMESPACE, only TCP and UDP packets are supported)")
+	rootCmd.PersistentFlags().StringVar(&DockerEndpoint, "docker-address", "unix:///var/run/docker.sock",
+		`Address of Docker Engine service`)
+	rootCmd.PersistentFlags().StringVar(&ContainerdEndpoint, "containerd-address", "/run/containerd/containerd.sock",
+		`Address of containerd service`)
+	rootCmd.PersistentFlags().StringVar(&CriRuntimeEndpoint, "cri-runtime-address", "",
+		"Address of CRI container runtime service "+
+			fmt.Sprintf("(default: uses in order the first successful one of [%s])",
+				strings.Join(getDefaultCriRuntimeEndpoint(), ", ")))
 
 	// internal
 	rootCmd.PersistentFlags().IntVar(&BPFVerifyLogSize, "bpf-verify-log-size", 10*1024, "--bpf-verify-log-size 1024")
@@ -97,4 +118,12 @@ func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 	}
+}
+
+func getDefaultCriRuntimeEndpoint() []string {
+	var rs []string
+	for _, end := range k8s.DefaultRuntimeEndpoints {
+		rs = append(rs, strings.TrimPrefix(end, "unix://"))
+	}
+	return rs
 }

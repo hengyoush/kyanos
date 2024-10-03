@@ -291,3 +291,13 @@ func CommonPrefix(str1, str2 string) string {
 
 	return str1[:i]
 }
+
+func UnwrapErr(err error) error {
+	for {
+		if v := errors.Unwrap(err); v != nil {
+			err = v
+		} else {
+			return err
+		}
+	}
+}

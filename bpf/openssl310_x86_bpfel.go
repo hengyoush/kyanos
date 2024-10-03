@@ -79,10 +79,14 @@ const (
 type Openssl310ControlValueIndexT uint32
 
 const (
-	Openssl310ControlValueIndexTKTargetTGIDIndex   Openssl310ControlValueIndexT = 0
-	Openssl310ControlValueIndexTKStirlingTGIDIndex Openssl310ControlValueIndexT = 1
-	Openssl310ControlValueIndexTKEnabledXdpIndex   Openssl310ControlValueIndexT = 2
-	Openssl310ControlValueIndexTKNumControlValues  Openssl310ControlValueIndexT = 3
+	Openssl310ControlValueIndexTKTargetTGIDIndex          Openssl310ControlValueIndexT = 0
+	Openssl310ControlValueIndexTKStirlingTGIDIndex        Openssl310ControlValueIndexT = 1
+	Openssl310ControlValueIndexTKEnabledXdpIndex          Openssl310ControlValueIndexT = 2
+	Openssl310ControlValueIndexTKEnableFilterByPid        Openssl310ControlValueIndexT = 3
+	Openssl310ControlValueIndexTKEnableFilterByLocalPort  Openssl310ControlValueIndexT = 4
+	Openssl310ControlValueIndexTKEnableFilterByRemotePort Openssl310ControlValueIndexT = 5
+	Openssl310ControlValueIndexTKEnableFilterByRemoteHost Openssl310ControlValueIndexT = 6
+	Openssl310ControlValueIndexTKNumControlValues         Openssl310ControlValueIndexT = 7
 )
 
 type Openssl310EndpointRoleT uint32
@@ -231,6 +235,10 @@ type Openssl310MapSpecs struct {
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
+	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
 	Rb                    *ebpf.MapSpec `ebpf:"rb"`
 	SslDataMap            *ebpf.MapSpec `ebpf:"ssl_data_map"`
 	SslRb                 *ebpf.MapSpec `ebpf:"ssl_rb"`
@@ -262,6 +270,10 @@ type Openssl310Maps struct {
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
+	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
 	Rb                    *ebpf.Map `ebpf:"rb"`
 	SslDataMap            *ebpf.Map `ebpf:"ssl_data_map"`
 	SslRb                 *ebpf.Map `ebpf:"ssl_rb"`
@@ -276,6 +288,10 @@ func (m *Openssl310Maps) Close() error {
 		m.ActiveSslWriteArgsMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
+		m.FilterMntnsMap,
+		m.FilterNetnsMap,
+		m.FilterPidMap,
+		m.FilterPidnsMap,
 		m.Rb,
 		m.SslDataMap,
 		m.SslRb,

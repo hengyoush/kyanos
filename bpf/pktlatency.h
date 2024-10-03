@@ -94,6 +94,10 @@ enum control_value_index_t {
   kTargetTGIDIndex = 0,
   kStirlingTGIDIndex,
   kEnabledXdpIndex,
+  kEnableFilterByPid,
+  kEnableFilterByLocalPort,
+  kEnableFilterByRemotePort,
+  kEnableFilterByRemoteHost,
   kNumControlValues,
 };
 

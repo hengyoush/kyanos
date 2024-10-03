@@ -59,7 +59,7 @@ func StartAgent0(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 	}
 	go func(pid int) {
 		if useSelfPidAsFitler {
-			cmd.FilterPid = int64(pid)
+			cmd.FilterPids = []string{strconv.Itoa(pid)}
 		}
 		cmd.DefaultLogLevel = int32(logrus.DebugLevel)
 		cmd.Debug = true

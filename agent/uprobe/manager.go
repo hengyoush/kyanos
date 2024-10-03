@@ -87,6 +87,10 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 			"ssl_user_space_call_map":   bpf.GetMapFromObjs(bpf.Objs, "SslUserSpaceCallMap"),
 			"syscall_data_map":          bpf.GetMapFromObjs(bpf.Objs, "SyscallDataMap"),
 			"syscall_rb":                bpf.GetMapFromObjs(bpf.Objs, "SyscallRb"),
+			"filter_mntns_map":          bpf.GetMapFromObjs(bpf.Objs, "FilterMntnsMap"),
+			"filter_netns_map":          bpf.GetMapFromObjs(bpf.Objs, "FilterNetnsMap"),
+			"filter_pid_map":            bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap"),
+			"filter_pidns_map":          bpf.GetMapFromObjs(bpf.Objs, "FilterPidnsMap"),
 		},
 	}
 	err = spec.LoadAndAssign(objs, collectionOptions)

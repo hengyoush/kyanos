@@ -22,6 +22,7 @@ const struct kern_evt_data *kern_evt_data_unused __attribute__((unused));
 const struct conn_id_s_t *conn_id_s_t_unused __attribute__((unused));
 const struct conn_info_t *conn_info_t_unused __attribute__((unused));
 const struct process_exec_event *process_exec_event_unused __attribute__((unused));
+const struct process_exit_event *process_exit_event_unused __attribute__((unused));
 const enum conn_type_t *conn_type_t_unused __attribute__((unused));
 const enum endpoint_role_t *endpoint_role_unused  __attribute__((unused));
 const enum traffic_direction_t *traffic_direction_t_unused __attribute__((unused));
@@ -69,23 +70,52 @@ enum target_tgid_match_result_t {
   TARGET_TGID_MATCHED,
   TARGET_TGID_UNMATCHED,
 };
+
+static __always_inline int filter_mntns(u32 ns) {
+    if (bpf_map_lookup_elem(&filter_mntns_map, &ns)) {
+        return 0;
+    }
+    return -1;
+}
+
+static __always_inline int filter_pidns(u32 ns) {
+    if (bpf_map_lookup_elem(&filter_pidns_map, &ns)) {
+        return 0;
+    }
+    return -1;
+}
+
+static __always_inline int filter_netns(u32 ns) {
+    if (bpf_map_lookup_elem(&filter_netns_map, &ns)) {
+        return 0;
+    }
+    return -1;
+}
+
 static __inline enum target_tgid_match_result_t match_trace_tgid(const uint32_t tgid) {
-  // TODO(yzhao): Use externally-defined macro to replace BPF_MAP. Since this function is called for
-  // all PIDs, this optimization is useful.
-  uint32_t idx = kTargetTGIDIndex;
-  int64_t* target_tgid = bpf_map_lookup_elem(&control_values, &idx);
-  if (target_tgid == NULL) {
-    return TARGET_TGID_UNSPECIFIED;
-  }
-  if (*target_tgid < 0) {
-    // Negative value means trace all.
-    return TARGET_TGID_ALL;
-  }
-  if (*target_tgid == tgid) {
-    return TARGET_TGID_MATCHED;
-  }
-  return TARGET_TGID_UNMATCHED;
-// return TARGET_TGID_UNSPECIFIED;
+	uint32_t idx = kEnableFilterByPid;
+	int64_t* target_tgid = bpf_map_lookup_elem(&control_values, &idx);
+	if (target_tgid == NULL) {
+		return TARGET_TGID_ALL;
+	}
+	if (bpf_map_lookup_elem(&filter_pid_map, &tgid)) {
+		return TARGET_TGID_MATCHED;
+	}
+	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+
+    bool should_filter = false;
+    u32 mntns_id = BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
+    u32 netns_id = BPF_CORE_READ(task, nsproxy, net_ns, ns.inum);
+    u32 pidns_id = BPF_CORE_READ(task, nsproxy, pid_ns_for_children, ns.inum);
+    if ((filter_pidns(pidns_id) == 0) || (filter_mntns(mntns_id) == 0) || (filter_netns(netns_id) == 0)) {
+        should_filter = true;
+    }
+	if (should_filter) {
+    	u8 u8_zero = 0;
+        bpf_map_update_elem(&filter_pid_map, &tgid, &u8_zero, BPF_NOEXIST);
+		return TARGET_TGID_MATCHED;
+	}
+	return TARGET_TGID_UNMATCHED;
 }
 
 static __always_inline void reverse_sock_key_no_copy(struct sock_key* key) {
@@ -314,22 +344,6 @@ static void __always_inline parse_sock_key_from_ipv6_tcp_hdr(struct sock_key *ke
 	key->dport = bpf_ntohs(dport);
 }
 
-static bool __always_inline should_trace_sock_key(struct sock_key *key) {
-	struct conn_id_s_t *conn_id_s = {0};
-	conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
-	if (conn_id_s == NULL) {
-		// 可能还在握手
-		return true;
-	}
-	struct conn_info_t *conn_info = {0};
-	u64 tgidfd = conn_id_s->tgid_fd;
-	conn_info = bpf_map_lookup_elem(&conn_info_map, &tgidfd);
-	if (conn_info == NULL) {
-		// why?
-		return true;
-	}
-	return should_trace_conn(conn_info);
-}
 
 static __always_inline int enabledXDP() {
 	uint32_t idx = kEnabledXdpIndex;
@@ -362,9 +376,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 			int  *found = {0};
 			found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 			if (found == NULL) { 
-				return 0;
-			}
-			if (!should_trace_sock_key(&key)) {
 				return 0;
 			}
 			bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
@@ -462,12 +473,12 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 					// if (key.dport != target_port && key.sport != target_port) {
 					// 	goto err;
 					// }
-					if (!should_trace_sock_key(&key)) {
-						goto err;
-					}
+					// if (!should_trace_sock_key(&key)) {
+					// 	goto err;
+					// }
 					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 					if (found == NULL) {
-						if (step == DEV_IN && enabledXDP() != 1 && should_trace_sock_key(&key)) {
+						if (step == DEV_IN) {
 							BPF_CORE_READ_INTO(&inital_seq, tcp, seq);
 							inital_seq = bpf_ntohl(inital_seq);
 							uint8_t flag = 0;
@@ -520,9 +531,9 @@ static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, 
 	if (!found) {
 		return BPF_OK;
 	}
-	if (!should_trace_sock_key(&key)) {
-		return BPF_OK;
-	}
+	// if (!should_trace_sock_key(&key)) {
+	// 	return BPF_OK;
+	// }
 	u32 inital_seq = 0;
 	bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 
@@ -629,7 +640,7 @@ static __always_inline int handle_ip_queue_xmit(void* ctx, struct sk_buff *skb)
 	parse_sock_key(skb, &key);
 	// 如果map里有才进行后面的步骤
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
-	if (found == NULL && !should_trace_sock_key(&key)) {
+	if (found == NULL) {
 		return 0;
 	}
 	u32 inital_seq = 0;
@@ -1650,8 +1661,17 @@ struct {
     __uint(key_size, sizeof(u32));
     __uint(value_size, sizeof(u32));
 } proc_exec_events SEC(".maps");
+struct {
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(u32));
+} proc_exit_events SEC(".maps");
 
 struct process_exec_event {
+	int pid;
+};
+
+struct process_exit_event {
 	int pid;
 };
 
@@ -1666,6 +1686,22 @@ int tracepoint__sched__sched_process_exec(struct trace_event_raw_sched_process_e
 	if (is_thread_group_leader) {
 		event.pid = tgid;
 		bpf_perf_event_output(ctx, &proc_exec_events, BPF_F_CURRENT_CPU, &event, sizeof(struct process_exec_event));
+	}
+	return BPF_OK;
+}
+
+
+SEC("tracepoint/sched/sched_process_exit")
+int tracepoint__sched__sched_process_exit(struct trace_event_raw_sched_process_exec *ctx) {
+	struct process_exit_event event = {0};
+	uint64_t id = bpf_get_current_pid_tgid();
+	uint32_t tgid = id >> 32;
+	uint32_t tid = id;
+
+	bool is_thread_group_leader = tgid == tid;
+	if (is_thread_group_leader) {
+		event.pid = tgid;
+		bpf_perf_event_output(ctx, &proc_exit_events, BPF_F_CURRENT_CPU, &event, sizeof(struct process_exit_event));
 	}
 	return BPF_OK;
 }

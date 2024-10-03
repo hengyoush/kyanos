@@ -6,10 +6,12 @@ import (
 	"kyanos/agent/protocol"
 	"kyanos/common"
 
+	"github.com/go-logr/logr"
 	"github.com/jefurry/logrus"
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/klog/v2"
 )
 
 type ModeEnum int
@@ -56,6 +58,13 @@ func startAgent(options agent.AgentOptions) {
 	options.BPFVerifyLogSize = BPFVerifyLogSize
 	options.PerfEventBufferSizeForEvent = KernEvtPerfEventBufferSize
 	options.PerfEventBufferSizeForData = DataEvtPerfEventBufferSize
+
+	options.ContainerdEndpoint = ContainerdEndpoint
+	options.DockerEndpoint = DockerEndpoint
+	options.CriRuntimeEndpoint = CriRuntimeEndpoint
+	options.ContainerId = ContainerId
+	options.ContainerName = ContainerName
+	options.PodName = PodName
 
 	InitLog()
 	common.AgentLog.Infoln("Kyanos starting...")
@@ -143,6 +152,13 @@ func InitLog() {
 	}
 	if isValidLogLevel(UprobeLogLevel) {
 		common.UprobeLog.SetLevel(logrus.Level(UprobeLogLevel))
+	}
+
+	switch common.AgentLog.Level {
+	case logrus.InfoLevel:
+		fallthrough
+	case logrus.DebugLevel:
+		klog.SetLogger(logr.Discard())
 	}
 }
 

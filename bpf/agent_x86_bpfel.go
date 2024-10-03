@@ -79,10 +79,14 @@ const (
 type AgentControlValueIndexT uint32
 
 const (
-	AgentControlValueIndexTKTargetTGIDIndex   AgentControlValueIndexT = 0
-	AgentControlValueIndexTKStirlingTGIDIndex AgentControlValueIndexT = 1
-	AgentControlValueIndexTKEnabledXdpIndex   AgentControlValueIndexT = 2
-	AgentControlValueIndexTKNumControlValues  AgentControlValueIndexT = 3
+	AgentControlValueIndexTKTargetTGIDIndex          AgentControlValueIndexT = 0
+	AgentControlValueIndexTKStirlingTGIDIndex        AgentControlValueIndexT = 1
+	AgentControlValueIndexTKEnabledXdpIndex          AgentControlValueIndexT = 2
+	AgentControlValueIndexTKEnableFilterByPid        AgentControlValueIndexT = 3
+	AgentControlValueIndexTKEnableFilterByLocalPort  AgentControlValueIndexT = 4
+	AgentControlValueIndexTKEnableFilterByRemotePort AgentControlValueIndexT = 5
+	AgentControlValueIndexTKEnableFilterByRemoteHost AgentControlValueIndexT = 6
+	AgentControlValueIndexTKNumControlValues         AgentControlValueIndexT = 7
 )
 
 type AgentEndpointRoleT uint32
@@ -121,6 +125,8 @@ type AgentKernEvtSslData struct {
 }
 
 type AgentProcessExecEvent struct{ Pid int32 }
+
+type AgentProcessExitEvent struct{ Pid int32 }
 
 type AgentSockKey struct {
 	Sip   [2]uint64
@@ -236,6 +242,7 @@ type AgentProgramSpecs struct {
 	TcpV4Rcv                           *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
 	TracepointNetifReceiveSkb          *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec    *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
+	TracepointSchedSchedProcessExit    *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exit"`
 	TracepointSyscallsSysEnterAccept4  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_close"`
 	TracepointSyscallsSysEnterConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_connect"`
@@ -278,7 +285,12 @@ type AgentMapSpecs struct {
 	EnabledLocalPortMap   *ebpf.MapSpec `ebpf:"enabled_local_port_map"`
 	EnabledRemoteIpv4Map  *ebpf.MapSpec `ebpf:"enabled_remote_ipv4_map"`
 	EnabledRemotePortMap  *ebpf.MapSpec `ebpf:"enabled_remote_port_map"`
+	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
 	ProcExecEvents        *ebpf.MapSpec `ebpf:"proc_exec_events"`
+	ProcExitEvents        *ebpf.MapSpec `ebpf:"proc_exit_events"`
 	Rb                    *ebpf.MapSpec `ebpf:"rb"`
 	ReadArgsMap           *ebpf.MapSpec `ebpf:"read_args_map"`
 	SockKeyConnIdMap      *ebpf.MapSpec `ebpf:"sock_key_conn_id_map"`
@@ -323,7 +335,12 @@ type AgentMaps struct {
 	EnabledLocalPortMap   *ebpf.Map `ebpf:"enabled_local_port_map"`
 	EnabledRemoteIpv4Map  *ebpf.Map `ebpf:"enabled_remote_ipv4_map"`
 	EnabledRemotePortMap  *ebpf.Map `ebpf:"enabled_remote_port_map"`
+	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
 	ProcExecEvents        *ebpf.Map `ebpf:"proc_exec_events"`
+	ProcExitEvents        *ebpf.Map `ebpf:"proc_exit_events"`
 	Rb                    *ebpf.Map `ebpf:"rb"`
 	ReadArgsMap           *ebpf.Map `ebpf:"read_args_map"`
 	SockKeyConnIdMap      *ebpf.Map `ebpf:"sock_key_conn_id_map"`
@@ -351,7 +368,12 @@ func (m *AgentMaps) Close() error {
 		m.EnabledLocalPortMap,
 		m.EnabledRemoteIpv4Map,
 		m.EnabledRemotePortMap,
+		m.FilterMntnsMap,
+		m.FilterNetnsMap,
+		m.FilterPidMap,
+		m.FilterPidnsMap,
 		m.ProcExecEvents,
+		m.ProcExitEvents,
 		m.Rb,
 		m.ReadArgsMap,
 		m.SockKeyConnIdMap,
@@ -386,6 +408,7 @@ type AgentPrograms struct {
 	TcpV4Rcv                           *ebpf.Program `ebpf:"tcp_v4_rcv"`
 	TracepointNetifReceiveSkb          *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec    *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
+	TracepointSchedSchedProcessExit    *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exit"`
 	TracepointSyscallsSysEnterAccept4  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_close"`
 	TracepointSyscallsSysEnterConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_connect"`
@@ -430,6 +453,7 @@ func (p *AgentPrograms) Close() error {
 		p.TcpV4Rcv,
 		p.TracepointNetifReceiveSkb,
 		p.TracepointSchedSchedProcessExec,
+		p.TracepointSchedSchedProcessExit,
 		p.TracepointSyscallsSysEnterAccept4,
 		p.TracepointSyscallsSysEnterClose,
 		p.TracepointSyscallsSysEnterConnect,

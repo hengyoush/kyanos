@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"container/list"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	ac "kyanos/agent/common"
 	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
+	"kyanos/agent/metadata"
 	"kyanos/agent/protocol"
 	"kyanos/agent/render"
 	"kyanos/agent/uprobe"
@@ -74,6 +76,44 @@ type AgentOptions struct {
 	PerfEventBufferSizeForData  int
 	PerfEventBufferSizeForEvent int
 	DisableOpensslUprobe        bool
+
+	DockerEndpoint     string
+	ContainerdEndpoint string
+	CriRuntimeEndpoint string
+	ContainerId        string
+	ContainerName      string
+	PodName            string
+	PodNameSpace       string
+
+	cc   *metadata.ContainerCache
+	objs any
+	ctx  context.Context
+}
+
+func (o AgentOptions) filterByContainer() bool {
+	return o.ContainerId != "" || o.ContainerName != "" || o.PodName != ""
+}
+
+func (o AgentOptions) filterByK8s() bool {
+	return o.PodName != ""
+}
+
+func getPodNameFilter(raw string) (name, ns string) {
+	if !strings.Contains(raw, ".") {
+		return raw, "default"
+	}
+	index := strings.LastIndex(raw, ".")
+	return raw[:index], raw[index+1:]
+}
+
+func getEndpoint(raw string) string {
+	if strings.HasPrefix(raw, "http") {
+		return raw
+	}
+	if strings.HasPrefix(raw, "unix://") {
+		return raw
+	}
+	return fmt.Sprintf("unix://%s", raw)
 }
 
 func validateAndRepairOptions(options AgentOptions) AgentOptions {
@@ -95,6 +135,15 @@ func validateAndRepairOptions(options AgentOptions) AgentOptions {
 	}
 	if newOptions.PerfEventBufferSizeForEvent <= 0 {
 		newOptions.PerfEventBufferSizeForEvent = perfEventControlBufferSize
+	}
+	if newOptions.PodName != "" {
+		newOptions.PodName, newOptions.PodNameSpace = getPodNameFilter(newOptions.PodName)
+	}
+	if newOptions.DockerEndpoint != "" {
+		newOptions.DockerEndpoint = getEndpoint(newOptions.DockerEndpoint)
+	}
+	if newOptions.CriRuntimeEndpoint != "" {
+		newOptions.CriRuntimeEndpoint = getEndpoint(newOptions.CriRuntimeEndpoint)
 	}
 	return newOptions
 }
@@ -131,6 +180,11 @@ func SetupAgent(options AgentOptions) {
 	}
 
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)
+	ctx, stopFunc := signal.NotifyContext(
+		context.Background(), syscall.SIGINT, syscall.SIGTERM,
+	)
+	options.ctx = ctx
+	defer stopFunc()
 
 	// Remove resource limits for kernels <5.11.
 	if err := rlimit.RemoveMemlock(); err != nil {
@@ -188,7 +242,6 @@ func SetupAgent(options AgentOptions) {
 				},
 			}
 		}
-
 	}
 	if !kernelVersion.SupportCapability(compatible.SupportRingBuffer) {
 		objs = &bpf.AgentOldObjects{}
@@ -204,6 +257,7 @@ func SetupAgent(options AgentOptions) {
 		}
 	}
 	bpf.Objs = objs
+	options.objs = objs
 
 	filterFunctions(spec, kernelVersion)
 	err = spec.LoadAndAssign(objs, collectionOptions)
@@ -238,7 +292,7 @@ func SetupAgent(options AgentOptions) {
 
 		closer.Close()
 	}()
-	var validateResult = setAndValidateParameters()
+	var validateResult = setAndValidateParameters(ctx, &options)
 	if !kernelVersion.SupportCapability(compatible.SupportRingBuffer) {
 		if options.LoadBpfProgramFunction != nil {
 			links = options.LoadBpfProgramFunction(agentOldObjects.AgentOldPrograms)
@@ -271,6 +325,7 @@ func SetupAgent(options AgentOptions) {
 			}
 		}()
 	}
+	bpf.PullProcessExitEvents(options.ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.ctx)})
 
 	defer func() {
 		for e := links.Front(); e != nil; e = e.Next() {
@@ -500,15 +555,40 @@ func attachOpensslToSpecificProcess() bool {
 	return viper.GetInt64(common.FilterPidVarName) > 0
 }
 
-func setAndValidateParameters() bool {
+func setAndValidateParameters(ctx context.Context, options *AgentOptions) bool {
 	var controlValues *ebpf.Map = bpf.GetMap("ControlValues")
 	var enabledRemotePortMap *ebpf.Map = bpf.GetMap("EnabledRemotePortMap")
 	var enabledRemoteIpv4Map *ebpf.Map = bpf.GetMap("EnabledRemoteIpv4Map")
 	var enabledLocalPortMap *ebpf.Map = bpf.GetMap("EnabledLocalPortMap")
+	var filterPidMap *ebpf.Map = bpf.GetMap("FilterPidMap")
 
-	if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
-		common.AgentLog.Infoln("filter for pid: ", targetPid)
-		controlValues.Update(bpf.AgentControlValueIndexTKTargetTGIDIndex, targetPid, ebpf.UpdateAny)
+	// if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
+	// 	common.AgentLog.Infoln("filter for pid: ", targetPid)
+	// 	controlValues.Update(bpf.AgentControlValueIndexTKTargetTGIDIndex, targetPid, ebpf.UpdateAny)
+	// }
+	targetPids := viper.GetStringSlice(common.FilterPidVarName)
+	if len(targetPids) > 0 {
+		common.AgentLog.Infoln("filter for remote pids: ", targetPids)
+		one := int64(1)
+		controlValues.Update(bpf.AgentControlValueIndexTKEnableFilterByPid, one, ebpf.UpdateAny)
+		for _, each := range targetPids {
+			pidInt, err := strconv.Atoi(each)
+			if err != nil {
+				common.AgentLog.Errorf("Invalid pid : %s\n", each)
+				return false
+			}
+			filterPidMap.Update(pidInt, one, ebpf.UpdateAny)
+		}
+	}
+
+	if options.filterByContainer() {
+		cc, filterResult, err := applyContainerFilter(ctx, options)
+		if err == nil {
+			options.cc = cc
+			writeFilterNsIdsToMap(filterResult, options.objs)
+			one := int64(1)
+			controlValues.Update(bpf.AgentControlValueIndexTKEnableFilterByPid, one, ebpf.UpdateAny)
+		}
 	}
 
 	remotePorts := viper.GetStringSlice(common.RemotePortsVarName)
