@@ -171,8 +171,8 @@ struct kern_evt {
 	uint64_t seq;
 	uint32_t len;
   uint8_t flags;
+	uint32_t ifindex;
   struct conn_id_s_t conn_id_s;
-	int is_sample;
   enum step_t step;
 };
 #define MAX_MSG_SIZE 30720
@@ -298,6 +298,7 @@ struct parse_kern_evt_body {
 	const char *func_name;
 	enum step_t step;
   struct tcphdr* tcp;
+  u32 ifindex;
 };
 
 // const char SYSCALL_FUNC_NAME[] = "syscall";

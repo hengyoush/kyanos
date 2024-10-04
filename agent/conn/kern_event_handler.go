@@ -73,16 +73,32 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 		index, found := slices.BinarySearchFunc(kernEvtSlice, KernEvent{seq: event.Seq}, func(i KernEvent, j KernEvent) int {
 			return cmp.Compare(i.seq, j.seq)
 		})
+		var kernEvent *KernEvent
 		if found {
+			kernEvent = &kernEvtSlice[index]
+		} else {
+			kernEvent = &KernEvent{
+				seq:       event.Seq,
+				len:       int(event.Len),
+				timestamp: event.Ts,
+				step:      event.Step,
+			}
+		}
+
+		if event.Step == bpf.AgentStepTDEV_OUT || event.Step == bpf.AgentStepTDEV_IN {
+			if kernEvent.attributes == nil {
+				kernEvent.attributes = make(map[string]any)
+			}
+			ifname, err := common.GetInterfaceNameByIndex(int(event.Ifindex))
+			if err != nil {
+				ifname = "unknown"
+			}
+			kernEvent.UpdateIfTimestampAttr(ifname, event.Ts)
+		} else if found {
 			return
 			// panic("found duplicate kern event on same seq")
 		}
-		kernEvtSlice = slices.Insert(kernEvtSlice, index, KernEvent{
-			seq:       event.Seq,
-			len:       int(event.Len),
-			timestamp: event.Ts,
-			step:      event.Step,
-		})
+		kernEvtSlice = slices.Insert(kernEvtSlice, index, *kernEvent)
 		if len(kernEvtSlice) > s.maxLen {
 			common.ConntrackLog.Debugf("kern event stream size: %d exceed maxLen", len(kernEvtSlice))
 		}
@@ -175,10 +191,11 @@ func (s *KernEventStream) DiscardEventsBySeq(seq uint64, egress bool) {
 }
 
 type KernEvent struct {
-	seq       uint64
-	len       int
-	timestamp uint64
-	step      bpf.AgentStepT
+	seq        uint64
+	len        int
+	timestamp  uint64
+	step       bpf.AgentStepT
+	attributes map[string]any
 }
 
 func (kernevent *KernEvent) GetSeq() uint64 {
@@ -195,6 +212,14 @@ func (kernevent *KernEvent) GetTimestamp() uint64 {
 
 func (kernevent *KernEvent) GetStep() bpf.AgentStepT {
 	return kernevent.step
+}
+
+func (kernevent *KernEvent) GetAttributes() map[string]any {
+	return kernevent.attributes
+}
+
+func (kernevent *KernEvent) UpdateIfTimestampAttr(ifname string, time uint64) {
+	kernevent.attributes[fmt.Sprintf("time-%s", ifname)] = time
 }
 
 type SslEvent struct {

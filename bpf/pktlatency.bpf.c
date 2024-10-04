@@ -60,6 +60,7 @@ struct {
 } sock_key_conn_id_map SEC(".maps");
 
 MY_BPF_ARRAY_PERCPU(conn_info_t_map, struct conn_info_t)
+MY_BPF_ARRAY_PERCPU(kern_evt_t_map, struct kern_evt)
 
 
 MY_BPF_HASH(control_values, uint32_t, int64_t)
@@ -191,14 +192,17 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	const char *func_name = param->func_name;
 	enum step_t step = param->step;
 #ifdef KERNEL_VERSION_BELOW_58 
-	struct kern_evt _evt = {0};
-	struct kern_evt* evt = &_evt;
+	// struct kern_evt _evt = {0};
+	// struct kern_evt* evt = &_evt;
+
+	int zero = 0;
+	struct kern_evt* evt = bpf_map_lookup_elem(&kern_evt_t_map, &zero);
 #else
 	struct kern_evt* evt = bpf_ringbuf_reserve(&rb, sizeof(struct kern_evt), 0); 
+#endif
 	if(!evt) {
 		return;
 	}
-#endif
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
  
 	if (conn_id_s == NULL || conn_id_s->no_trace) {
@@ -230,6 +234,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	evt->len = len - hdr_len;
 	evt->ts = bpf_ktime_get_ns();
 	evt->step = step;
+	evt->ifindex = param->ifindex;
 	// evt->flags = _(((u8 *)tcp)[13]);
 	bpf_probe_read_kernel(&evt->flags, sizeof(uint8_t), &(((u8 *)tcp)[13]));
 	// bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
@@ -503,6 +508,13 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 				body.len = tcp_len;
 				// body.func_name = func_name;
 				body.step = step;	
+
+				struct net_device *dev = _C(skb, dev);
+				if (dev) {
+					body.ifindex = _C(dev, ifindex);
+				} else {
+					body.ifindex = _C(skb, skb_iif);
+				}
 				if (step >= NIC_IN){
 					reverse_sock_key_no_copy(&key);
 				}
