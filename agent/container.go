@@ -129,8 +129,8 @@ func initProcExitEventChannel(ctx context.Context) chan *bpf.AgentProcessExitEve
 			select {
 			case <-ctx.Done():
 				return
-			case <-ch:
-
+			case evt := <-ch:
+				common.DeleteIfIdxToNameEntry(int(evt.Pid))
 			}
 		}
 	}()

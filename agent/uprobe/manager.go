@@ -3,6 +3,7 @@ package uprobe
 import (
 	"debug/elf"
 	"fmt"
+	ac "kyanos/agent/common"
 	"kyanos/bpf"
 	"kyanos/common"
 	"os"
@@ -49,7 +50,11 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 	if err != nil || versionKey == "" {
 		return []link.Link{}, err
 	}
-	bpfFunc := sslVersionBpfMap[versionKey]
+	bpfFunc, ok := sslVersionBpfMap[versionKey]
+	if !ok {
+		common.UprobeLog.Warnf("versionKey %s found but bpfFunc not found", versionKey)
+		return []link.Link{}, nil
+	}
 
 	matcher, libSslPath, err := findLibSslPath(pid)
 	if err != nil || libSslPath == "" {
@@ -74,7 +79,8 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 	collectionOptions := &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			// LogLevel: ebpf.LogLevelInstruction,
-			LogSize: 10 * 1024,
+			LogSize:     10 * 1024,
+			KernelTypes: ac.CollectionOpts.Programs.KernelTypes,
 		},
 		MapReplacements: map[string]*ebpf.Map{
 			"active_ssl_read_args_map":  bpf.GetMapFromObjs(bpf.Objs, "ActiveSslReadArgsMap"),

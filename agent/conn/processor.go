@@ -289,7 +289,7 @@ func (p *Processor) run() {
 func FormatKernEvt(evt *bpf.AgentKernEvt, conn *Connection4) string {
 	var interfaceStr string
 	if evt.Ifindex != 0 {
-		name, err := common.GetInterfaceNameByIndex(int(evt.Ifindex))
+		name, err := common.GetInterfaceNameByIndex(int(evt.Ifindex), int(evt.ConnIdS.TgidFd>>32))
 		if err != nil {
 			interfaceStr = "[if=unknown]"
 		} else {

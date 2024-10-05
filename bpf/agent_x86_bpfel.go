@@ -104,9 +104,11 @@ type AgentKernEvt struct {
 	Len      uint32
 	Flags    uint8
 	_        [3]byte
+	Ifindex  uint32
+	_        [4]byte
 	ConnIdS  AgentConnIdS_t
-	IsSample int32
 	Step     AgentStepT
+	_        [4]byte
 }
 
 type AgentKernEvtData struct {
@@ -230,6 +232,8 @@ type AgentProgramSpecs struct {
 	IpQueueXmit                        *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
 	IpQueueXmit2                       *ebpf.ProgramSpec `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                          *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
+	KprobeNfNatManipPkt                *ebpf.ProgramSpec `ebpf:"kprobe__nf_nat_manip_pkt"`
+	KprobeNfNatPacket                  *ebpf.ProgramSpec `ebpf:"kprobe__nf_nat_packet"`
 	SecuritySocketRecvmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIovec               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iovec"`
@@ -289,6 +293,8 @@ type AgentMapSpecs struct {
 	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
+	KernEvtT_map          *ebpf.MapSpec `ebpf:"kern_evt_t_map"`
+	NatFlowMap            *ebpf.MapSpec `ebpf:"nat_flow_map"`
 	ProcExecEvents        *ebpf.MapSpec `ebpf:"proc_exec_events"`
 	ProcExitEvents        *ebpf.MapSpec `ebpf:"proc_exit_events"`
 	Rb                    *ebpf.MapSpec `ebpf:"rb"`
@@ -339,6 +345,8 @@ type AgentMaps struct {
 	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
+	KernEvtT_map          *ebpf.Map `ebpf:"kern_evt_t_map"`
+	NatFlowMap            *ebpf.Map `ebpf:"nat_flow_map"`
 	ProcExecEvents        *ebpf.Map `ebpf:"proc_exec_events"`
 	ProcExitEvents        *ebpf.Map `ebpf:"proc_exit_events"`
 	Rb                    *ebpf.Map `ebpf:"rb"`
@@ -372,6 +380,8 @@ func (m *AgentMaps) Close() error {
 		m.FilterNetnsMap,
 		m.FilterPidMap,
 		m.FilterPidnsMap,
+		m.KernEvtT_map,
+		m.NatFlowMap,
 		m.ProcExecEvents,
 		m.ProcExitEvents,
 		m.Rb,
@@ -396,6 +406,8 @@ type AgentPrograms struct {
 	IpQueueXmit                        *ebpf.Program `ebpf:"ip_queue_xmit"`
 	IpQueueXmit2                       *ebpf.Program `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                          *ebpf.Program `ebpf:"ip_rcv_core"`
+	KprobeNfNatManipPkt                *ebpf.Program `ebpf:"kprobe__nf_nat_manip_pkt"`
+	KprobeNfNatPacket                  *ebpf.Program `ebpf:"kprobe__nf_nat_packet"`
 	SecuritySocketRecvmsgEnter         *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIovec               *ebpf.Program `ebpf:"skb_copy_datagram_iovec"`
@@ -441,6 +453,8 @@ func (p *AgentPrograms) Close() error {
 		p.IpQueueXmit,
 		p.IpQueueXmit2,
 		p.IpRcvCore,
+		p.KprobeNfNatManipPkt,
+		p.KprobeNfNatPacket,
 		p.SecuritySocketRecvmsgEnter,
 		p.SecuritySocketSendmsgEnter,
 		p.SkbCopyDatagramIovec,

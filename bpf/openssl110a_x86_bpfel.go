@@ -104,9 +104,11 @@ type Openssl110aKernEvt struct {
 	Len      uint32
 	Flags    uint8
 	_        [3]byte
+	Ifindex  uint32
+	_        [4]byte
 	ConnIdS  Openssl110aConnIdS_t
-	IsSample int32
 	Step     Openssl110aStepT
+	_        [4]byte
 }
 
 type Openssl110aKernEvtData struct {

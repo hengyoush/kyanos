@@ -104,9 +104,11 @@ type Openssl320KernEvt struct {
 	Len      uint32
 	Flags    uint8
 	_        [3]byte
+	Ifindex  uint32
+	_        [4]byte
 	ConnIdS  Openssl320ConnIdS_t
-	IsSample int32
 	Step     Openssl320StepT
+	_        [4]byte
 }
 
 type Openssl320KernEvtData struct {

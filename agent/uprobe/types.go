@@ -176,6 +176,8 @@ func initOpensslOffset() {
 		"boringssl na": nil,
 	}
 
+	sslVersionBpfMap["openssl 1.1.1"] = sslVersionBpfMap[Linuxdefaulefilename111]
+
 	// in openssl source files, there are 4 offset groups for all 1.1.1* version.
 	// group a : 1.1.1a
 	sslVersionBpfMap["openssl 1.1.1a"] = func() (*ebpf.CollectionSpec, any, error) {

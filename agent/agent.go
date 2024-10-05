@@ -243,6 +243,7 @@ func SetupAgent(options AgentOptions) {
 			}
 		}
 	}
+	ac.CollectionOpts = collectionOptions
 	if !kernelVersion.SupportCapability(compatible.SupportRingBuffer) {
 		objs = &bpf.AgentOldObjects{}
 		spec, err = bpf.LoadAgentOld()
@@ -325,6 +326,8 @@ func SetupAgent(options AgentOptions) {
 			}
 		}()
 	}
+	// attach netfilter functions for NATed packet
+	attachNfFunctions(links)
 	bpf.PullProcessExitEvents(options.ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.ctx)})
 
 	defer func() {
@@ -840,6 +843,21 @@ func attachSchedProgs(links *list.List) {
 	}
 }
 
+func attachNfFunctions(links *list.List) {
+	l, err := link.Kprobe("nf_nat_manip_pkt", bpf.GetProgramFromObjs(bpf.Objs, "KprobeNfNatManipPkt"), nil)
+	if err != nil {
+		common.AgentLog.Warnf("Attahc kprobe/nf_nat_manip_pkt failed: %v", err)
+	} else {
+		links.PushBack(l)
+	}
+	l, err = link.Kprobe("nf_nat_packet", bpf.GetProgramFromObjs(bpf.Objs, "KprobeNfNatPacket"), nil)
+	if err != nil {
+		common.AgentLog.Warnf("Attahc kprobe/nf_nat_packet failed: %v", err)
+	} else {
+		links.PushBack(l)
+	}
+}
+
 func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelVersion) {
 	finalCProgNames := make([]string, 0)
 
@@ -860,7 +878,8 @@ func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelV
 
 	finalCProgNames = append(finalCProgNames, bpf.SyscallExtraProgNames...)
 	for name := range coll.Programs {
-		if strings.HasPrefix(name, "tracepoint__syscalls") || strings.HasPrefix(name, "tracepoint__sched") {
+		if strings.HasPrefix(name, "tracepoint__syscalls") || strings.HasPrefix(name, "tracepoint__sched") || strings.HasPrefix(name, "kprobe__nf") {
+			// if strings.HasPrefix(name, "tracepoint__syscalls") {
 			finalCProgNames = append(finalCProgNames, name)
 		}
 	}

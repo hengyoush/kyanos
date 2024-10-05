@@ -59,6 +59,14 @@ struct {
 	__uint(map_flags, 0);
 } sock_key_conn_id_map SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(key_size, sizeof(struct sock_key));
+	__uint(value_size, sizeof(struct sock_key));
+	__uint(max_entries, 65535);
+	__uint(map_flags, 0);
+} nat_flow_map SEC(".maps");
+
 MY_BPF_ARRAY_PERCPU(conn_info_t_map, struct conn_info_t)
 MY_BPF_ARRAY_PERCPU(kern_evt_t_map, struct kern_evt)
 
@@ -93,7 +101,7 @@ static __always_inline int filter_netns(u32 ns) {
     return -1;
 }
 
-static __inline enum target_tgid_match_result_t match_trace_tgid(const uint32_t tgid) {
+static __always_inline enum target_tgid_match_result_t match_trace_tgid(const uint32_t tgid) {
 	uint32_t idx = kEnableFilterByPid;
 	int64_t* target_tgid = bpf_map_lookup_elem(&control_values, &idx);
 	if (target_tgid == NULL) {
@@ -474,7 +482,12 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 					}else{
 						parse_sock_key_from_ipv6_tcp_hdr(&key, ipv6, tcp);
 					}
-					
+					if (step == DEV_IN || step == DEV_OUT) {
+						struct sock_key *translated_flow = bpf_map_lookup_elem(&nat_flow_map, &key);
+						if (translated_flow != NULL) {
+							key = *translated_flow;
+						}
+					}
 					// if (key.dport != target_port && key.sport != target_port) {
 					// 	goto err;
 					// }
@@ -719,6 +732,81 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 	return BPF_OK;
 }
 // #endif
+
+// nat
+
+static __always_inline void parse_conntrack_tuple(struct nf_conntrack_tuple *tuple, struct sock_key *flow) {
+    BPF_CORE_READ_INTO(&flow->sip, tuple, src.u3.all);
+    BPF_CORE_READ_INTO(&flow->dip, tuple, dst.u3.all);
+
+    flow->sport = bpf_ntohs(tuple->src.u.all);
+    flow->dport = bpf_ntohs(tuple->dst.u.all);
+}
+static __always_inline void reverse_flow(struct sock_key *orig_flow, struct sock_key *new_flow) {
+    new_flow->sip[0] = orig_flow->dip[0];
+    new_flow->sip[1] = orig_flow->dip[1];
+
+    new_flow->dip[0] = orig_flow->sip[0];
+    new_flow->dip[1] = orig_flow->sip[1];
+
+    new_flow->sport = orig_flow->dport;
+    new_flow->dport = orig_flow->sport;
+}
+
+static __always_inline void handle_nat(struct nf_conn *ct) {
+    struct nf_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
+
+    if (bpf_core_field_exists(ct->tuplehash)) {
+        BPF_CORE_READ_INTO(&tuplehash, ct, tuplehash);
+    } else {
+        struct nf_conn___older_52 *nf_conn_old = (void *)ct;
+        if (bpf_core_field_exists(nf_conn_old->tuplehash)) {
+            BPF_CORE_READ_INTO(&tuplehash, nf_conn_old, tuplehash);
+        } else {
+            return;
+        }
+    }
+
+    struct nf_conntrack_tuple *orig_tuple = &tuplehash[IP_CT_DIR_ORIGINAL].tuple;
+    struct nf_conntrack_tuple *reply_tuple = &tuplehash[IP_CT_DIR_REPLY].tuple;
+
+    struct sock_key orig = {0};
+    struct sock_key reply = {0};
+    parse_conntrack_tuple(orig_tuple, &orig);
+    parse_conntrack_tuple(reply_tuple, &reply);
+
+    struct sock_key reversed_orig = {0};
+    reverse_flow(&orig, &reversed_orig);
+    // debug_log("[ptcpdump] nat flow %pI4:%d %pI4:%d ->\n",
+    // 		&reply.saddr[0], reply.sport,
+    // 	       	&reply.daddr[0], reply.dport);
+    // debug_log("[ptcpdump]                               -> %pI4:%d %pI4:%d\n",
+    // 		&reversed_orig.saddr[0], reversed_orig.sport,
+    // 		&reversed_orig.saddr[0], reversed_orig.dport);
+    bpf_map_update_elem(&nat_flow_map, &reply, &reversed_orig, BPF_ANY);
+
+    struct sock_key reversed_reply = {0};
+    reverse_flow(&reply, &reversed_reply);
+    // debug_log("[ptcpdump] nat flow %pI4:%d %pI4:%d ->\n",
+    // 		&reversed_reply.saddr[0], reversed_reply.sport,
+    // 	       	&reversed_reply.daddr[0], reversed_reply.dport);
+    // debug_log("[ptcpdump]                               -> %pI4:%d %pI4:%d\n",
+    // 		&orig.saddr[0], orig.sport,
+    // 		&orig.saddr[0], orig.dport);
+    bpf_map_update_elem(&nat_flow_map, &reversed_reply, &orig, BPF_ANY);
+}
+
+SEC("kprobe/nf_nat_packet")
+int BPF_KPROBE(kprobe__nf_nat_packet, struct nf_conn *ct) {
+    handle_nat(ct);
+    return 0;
+}
+
+SEC("kprobe/nf_nat_manip_pkt")
+int BPF_KPROBE(kprobe__nf_nat_manip_pkt, void *_, struct nf_conn *ct) {
+    handle_nat(ct);
+    return 0;
+}
 
 MY_BPF_HASH(accept_args_map, uint64_t, struct accept_args)
 MY_BPF_HASH(connect_args_map, uint64_t, struct connect_args)

@@ -401,8 +401,9 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			if pos != -1 {
 				streamBuffer.RemovePrefix(pos)
 				stop = false
-			} else {
+			} else if c.progressIsStucked(streamBuffer) {
 				if streamBuffer.Head().Len() > int(ke.Len) {
+					common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue", c.ToString(), streamBuffer.Head().Len()-int(ke.Len), messageType.String())
 					streamBuffer.RemovePrefix(streamBuffer.Head().Len() - int(ke.Len))
 					stop = false
 				} else {
@@ -414,6 +415,8 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 						stop = true
 					}
 				}
+			} else {
+				stop = true
 			}
 		case protocol.NeedsMoreData:
 			removed := c.checkProgress(streamBuffer)
@@ -453,13 +456,26 @@ func (c *Connection4) getLastProgressTime(sb *buffer.StreamBuffer) int64 {
 		return c.lastRespMadeProgressTime
 	}
 }
-func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
+func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 	if c.getLastProgressTime(sb) == 0 {
 		c.updateProgressTime(sb)
 		return false
 	}
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
 	if !ok || time.Now().UnixMilli()-int64(common.NanoToMills(headTime)) > 5000 {
+		return true
+	}
+	return false
+}
+func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
+	if c.getLastProgressTime(sb) == 0 {
+		c.updateProgressTime(sb)
+		return false
+	}
+	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
+	now := time.Now().UnixMilli()
+	headTimeMills := int64(common.NanoToMills(headTime))
+	if !ok || now-headTimeMills > 5000 {
 		sb.RemoveHead()
 		return true
 	} else {

@@ -89,7 +89,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 			if kernEvent.attributes == nil {
 				kernEvent.attributes = make(map[string]any)
 			}
-			ifname, err := common.GetInterfaceNameByIndex(int(event.Ifindex))
+			ifname, err := common.GetInterfaceNameByIndex(int(event.Ifindex), int(event.ConnIdS.TgidFd>>32))
 			if err != nil {
 				ifname = "unknown"
 			}

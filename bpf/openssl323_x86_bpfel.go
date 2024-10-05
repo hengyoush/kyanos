@@ -104,9 +104,11 @@ type Openssl323KernEvt struct {
 	Len      uint32
 	Flags    uint8
 	_        [3]byte
+	Ifindex  uint32
+	_        [4]byte
 	ConnIdS  Openssl323ConnIdS_t
-	IsSample int32
 	Step     Openssl323StepT
+	_        [4]byte
 }
 
 type Openssl323KernEvtData struct {
