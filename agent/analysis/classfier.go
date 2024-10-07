@@ -2,16 +2,16 @@ package analysis
 
 import (
 	"fmt"
+
+	anc "kyanos/agent/analysis/common"
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
 )
 
-type ClassfierType int
+type Classfier func(*anc.AnnotatedRecord) (ClassId, error)
+type ClassIdAsHumanReadable func(*anc.AnnotatedRecord) string
 
-type Classfier func(*AnnotatedRecord) (ClassId, error)
-type ClassIdAsHumanReadable func(*AnnotatedRecord) string
-
-var ClassfierTypeNames = map[ClassfierType]string{
+var ClassfierTypeNames = map[anc.ClassfierType]string{
 	None:         "none",
 	Conn:         "conn",
 	RemotePort:   "remote-port",
@@ -23,7 +23,7 @@ var ClassfierTypeNames = map[ClassfierType]string{
 }
 
 const (
-	None ClassfierType = iota
+	None anc.ClassfierType = iota
 	Conn
 	RemotePort
 	LocalPort
@@ -39,25 +39,25 @@ const (
 
 type ClassId string
 
-var classfierMap map[ClassfierType]Classfier
-var classIdHumanReadableMap map[ClassfierType]ClassIdAsHumanReadable
+var classfierMap map[anc.ClassfierType]Classfier
+var classIdHumanReadableMap map[anc.ClassfierType]ClassIdAsHumanReadable
 
 func init() {
-	classfierMap = make(map[ClassfierType]Classfier)
-	classfierMap[None] = func(ar *AnnotatedRecord) (ClassId, error) { return "none", nil }
-	classfierMap[Conn] = func(ar *AnnotatedRecord) (ClassId, error) {
+	classfierMap = make(map[anc.ClassfierType]Classfier)
+	classfierMap[None] = func(ar *anc.AnnotatedRecord) (ClassId, error) { return "none", nil }
+	classfierMap[Conn] = func(ar *anc.AnnotatedRecord) (ClassId, error) {
 		return ClassId(ar.ConnDesc.Identity()), nil
 	}
-	classfierMap[RemotePort] = func(ar *AnnotatedRecord) (ClassId, error) { return ClassId(fmt.Sprintf("%d", ar.RemotePort)), nil }
-	classfierMap[LocalPort] = func(ar *AnnotatedRecord) (ClassId, error) { return ClassId(fmt.Sprintf("%d", ar.LocalPort)), nil }
-	classfierMap[RemoteIp] = func(ar *AnnotatedRecord) (ClassId, error) { return ClassId(ar.RemoteAddr.String()), nil }
-	classfierMap[Protocol] = func(ar *AnnotatedRecord) (ClassId, error) { return ClassId(fmt.Sprintf("%d", ar.Protocol)), nil }
+	classfierMap[RemotePort] = func(ar *anc.AnnotatedRecord) (ClassId, error) { return ClassId(fmt.Sprintf("%d", ar.RemotePort)), nil }
+	classfierMap[LocalPort] = func(ar *anc.AnnotatedRecord) (ClassId, error) { return ClassId(fmt.Sprintf("%d", ar.LocalPort)), nil }
+	classfierMap[RemoteIp] = func(ar *anc.AnnotatedRecord) (ClassId, error) { return ClassId(ar.RemoteAddr.String()), nil }
+	classfierMap[Protocol] = func(ar *anc.AnnotatedRecord) (ClassId, error) { return ClassId(fmt.Sprintf("%d", ar.Protocol)), nil }
 
-	classIdHumanReadableMap = make(map[ClassfierType]ClassIdAsHumanReadable)
-	classIdHumanReadableMap[Conn] = func(ar *AnnotatedRecord) string {
+	classIdHumanReadableMap = make(map[anc.ClassfierType]ClassIdAsHumanReadable)
+	classIdHumanReadableMap[Conn] = func(ar *anc.AnnotatedRecord) string {
 		return ar.ConnDesc.String()
 	}
-	classIdHumanReadableMap[HttpPath] = func(ar *AnnotatedRecord) string {
+	classIdHumanReadableMap[HttpPath] = func(ar *anc.AnnotatedRecord) string {
 		httpReq, ok := ar.Record.Request().(*protocol.ParsedHttpRequest)
 		if !ok {
 			return "__not_a_http_req__"
@@ -66,11 +66,11 @@ func init() {
 		}
 	}
 
-	classIdHumanReadableMap[Protocol] = func(ar *AnnotatedRecord) string {
+	classIdHumanReadableMap[Protocol] = func(ar *anc.AnnotatedRecord) string {
 		return bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(ar.Protocol)]
 	}
 }
 
-func getClassfier(classfierType ClassfierType) Classfier {
+func getClassfier(classfierType anc.ClassfierType) Classfier {
 	return classfierMap[classfierType]
 }

@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"kyanos/agent"
+	ac "kyanos/agent/common"
 
 	"github.com/spf13/cobra"
 )
@@ -25,7 +25,7 @@ sudo kyanos watch mysql --latency 100 --req-size 1024 --resp-size 2048
 			if list {
 				fmt.Println([]string{"http", "redis", "mysql"})
 			} else {
-				startAgent(agent.AgentOptions{LatencyFilter: initLatencyFilter(cmd), SizeFilter: initSizeFilter(cmd)})
+				startAgent(ac.AgentOptions{LatencyFilter: initLatencyFilter(cmd), SizeFilter: initSizeFilter(cmd)})
 			}
 		}
 	},

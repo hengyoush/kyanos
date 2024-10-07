@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"kyanos/agent"
+	ac "kyanos/agent/common"
 	"kyanos/agent/protocol"
 
 	"github.com/spf13/cobra"
@@ -23,7 +23,7 @@ var httpCmd *cobra.Command = &cobra.Command{
 		if err != nil {
 			logger.Fatalf("invalid host: %v\n", err)
 		}
-		startAgent(agent.AgentOptions{
+		startAgent(ac.AgentOptions{
 			MessageFilter: protocol.HttpFilter{
 				TargetPath:     path,
 				TargetMethods:  methods,

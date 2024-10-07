@@ -11,7 +11,7 @@ import (
 
 var Objs any
 
-type AttachBpfProgFunction func(interface{}) link.Link
+type AttachBpfProgFunction func() link.Link
 
 func GetProgramFromObjs(objs any, progName string) *ebpf.Program {
 	val := reflect.ValueOf(objs)
@@ -31,139 +31,125 @@ func GetProgramFromObjs(objs any, progName string) *ebpf.Program {
 	}
 }
 
-func GetProgram(programs any, fieldName string) *ebpf.Program {
-	oldprograms, isOld := programs.(AgentOldPrograms)
-	if isOld {
-		v := reflect.ValueOf(oldprograms)
-		f := v.FieldByName(fieldName).Interface()
-		return f.(*ebpf.Program)
-	} else {
-		newprograms := programs.(AgentPrograms)
-		v := reflect.ValueOf(newprograms)
-		f := v.FieldByName(fieldName).Interface()
-		return f.(*ebpf.Program)
-	}
-}
-
 /* accept pair */
-func AttachSyscallAcceptEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_accept4", GetProgram(programs, "TracepointSyscallsSysEnterAccept4"))
+func AttachSyscallAcceptEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_accept4", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterAccept4"))
 }
 
-func AttachSyscallAcceptExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_accept4", GetProgram(programs, "TracepointSyscallsSysExitAccept4"))
+func AttachSyscallAcceptExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_accept4", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitAccept4"))
 }
 
 /* sock_alloc */
-func AttachSyscallSockAllocExit(programs interface{}) link.Link {
-	return KretprobeNoError("sock_alloc", GetProgram(programs, "SockAllocRet"))
+func AttachSyscallSockAllocExit() link.Link {
+	return KretprobeNoError("sock_alloc", GetProgramFromObjs(Objs, "SockAllocRet"))
 }
 
 /* connect pair */
-func AttachSyscallConnectEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_connect", GetProgram(programs, "TracepointSyscallsSysEnterConnect"))
+func AttachSyscallConnectEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_connect", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterConnect"))
 }
 
-func AttachSyscallConnectExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_connect", GetProgram(programs, "TracepointSyscallsSysExitConnect"))
+func AttachSyscallConnectExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_connect", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitConnect"))
 }
 
 /* close pair */
-func AttachSyscallCloseEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_close", GetProgram(programs, "TracepointSyscallsSysEnterClose"))
+func AttachSyscallCloseEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_close", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterClose"))
 }
 
-func AttachSyscallCloseExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_close", GetProgram(programs, "TracepointSyscallsSysExitClose"))
+func AttachSyscallCloseExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_close", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitClose"))
 }
 
 /* write pair */
-func AttachSyscallWriteEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_write", GetProgram(programs, "TracepointSyscallsSysEnterWrite"))
+func AttachSyscallWriteEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_write", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterWrite"))
 }
 
-func AttachSyscallWriteExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_write", GetProgram(programs, "TracepointSyscallsSysExitWrite"))
+func AttachSyscallWriteExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_write", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitWrite"))
 }
 
 /* sendmsg pair */
-func AttachSyscallSendMsgEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_sendmsg", GetProgram(programs, "TracepointSyscallsSysEnterSendmsg"))
+func AttachSyscallSendMsgEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_sendmsg", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterSendmsg"))
 }
 
-func AttachSyscallSendMsgExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_sendmsg", GetProgram(programs, "TracepointSyscallsSysExitSendmsg"))
+func AttachSyscallSendMsgExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_sendmsg", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitSendmsg"))
 }
 
 /* recvmsg pair */
-func AttachSyscallRecvMsgEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_recvmsg", GetProgram(programs, "TracepointSyscallsSysEnterRecvmsg"))
+func AttachSyscallRecvMsgEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_recvmsg", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterRecvmsg"))
 }
 
-func AttachSyscallRecvMsgExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_recvmsg", GetProgram(programs, "TracepointSyscallsSysExitRecvmsg"))
+func AttachSyscallRecvMsgExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_recvmsg", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitRecvmsg"))
 }
 
 /* writev pair */
-func AttachSyscallWritevEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_writev", GetProgram(programs, "TracepointSyscallsSysEnterWritev"))
+func AttachSyscallWritevEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_writev", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterWritev"))
 }
 
-func AttachSyscallWritevExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_writev", GetProgram(programs, "TracepointSyscallsSysExitWritev"))
+func AttachSyscallWritevExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_writev", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitWritev"))
 }
 
 /* sendto pair */
-func AttachSyscallSendtoEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_sendto", GetProgram(programs, "TracepointSyscallsSysEnterSendto"))
+func AttachSyscallSendtoEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_sendto", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterSendto"))
 }
 
-func AttachSyscallSendtoExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_sendto", GetProgram(programs, "TracepointSyscallsSysExitSendto"))
+func AttachSyscallSendtoExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_sendto", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitSendto"))
 }
 
 /* read pair */
-func AttachSyscallReadEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_read", GetProgram(programs, "TracepointSyscallsSysEnterRead"))
+func AttachSyscallReadEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_read", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterRead"))
 }
 
-func AttachSyscallReadExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_read", GetProgram(programs, "TracepointSyscallsSysExitRead"))
+func AttachSyscallReadExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_read", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitRead"))
 }
 
 /* readv pair */
-func AttachSyscallReadvEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_readv", GetProgram(programs, "TracepointSyscallsSysEnterReadv"))
+func AttachSyscallReadvEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_readv", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterReadv"))
 }
 
-func AttachSyscallReadvExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_readv", GetProgram(programs, "TracepointSyscallsSysExitReadv"))
+func AttachSyscallReadvExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_readv", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitReadv"))
 }
 
 /* recvfrom pair */
-func AttachSyscallRecvfromEntry(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_enter_recvfrom", GetProgram(programs, "TracepointSyscallsSysEnterRecvfrom"))
+func AttachSyscallRecvfromEntry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_recvfrom", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterRecvfrom"))
 }
 
-func AttachSyscallRecvfromExit(programs interface{}) link.Link {
-	return TracepointNoError("syscalls", "sys_exit_recvfrom", GetProgram(programs, "TracepointSyscallsSysExitRecvfrom"))
+func AttachSyscallRecvfromExit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_recvfrom", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitRecvfrom"))
 }
 
 /* security_socket_recvmsg */
-func AttachKProbeSecuritySocketRecvmsgEntry(programs interface{}) link.Link {
-	return Kprobe2("security_socket_recvmsg", GetProgram(programs, "SecuritySocketRecvmsgEnter"))
+func AttachKProbeSecuritySocketRecvmsgEntry() link.Link {
+	return Kprobe2("security_socket_recvmsg", GetProgramFromObjs(Objs, "SecuritySocketRecvmsgEnter"))
 }
 
 /* security_socket_sendmsg */
-func AttachKProbeSecuritySocketSendmsgEntry(programs interface{}) link.Link {
-	return Kprobe2("security_socket_sendmsg", GetProgram(programs, "SecuritySocketSendmsgEnter"))
+func AttachKProbeSecuritySocketSendmsgEntry() link.Link {
+	return Kprobe2("security_socket_sendmsg", GetProgramFromObjs(Objs, "SecuritySocketSendmsgEnter"))
 }
 
 /* tcp_destroy_sock */
-func AttachRawTracepointTcpDestroySockEntry(programs interface{}) (link.Link, error) {
+func AttachRawTracepointTcpDestroySockEntry() (link.Link, error) {
 	return link.AttachRawTracepoint(link.RawTracepointOptions{
 		Name:    "tcp_destroy_sock",
-		Program: GetProgram(programs, "TcpDestroySock"),
+		Program: GetProgramFromObjs(Objs, "TcpDestroySock"),
 	})
 	// if err != nil {
 	// 	log.Fatal("tcp_destroy_sock failed: ", err)
@@ -171,20 +157,20 @@ func AttachRawTracepointTcpDestroySockEntry(programs interface{}) (link.Link, er
 	// return l
 }
 
-func AttachKProbeDevQueueXmitEntry(programs interface{}) (link.Link, error) {
-	return Kprobe("dev_queue_xmit", GetProgram(programs, "DevQueueXmit"))
+func AttachKProbeDevQueueXmitEntry() (link.Link, error) {
+	return Kprobe("dev_queue_xmit", GetProgramFromObjs(Objs, "DevQueueXmit"))
 }
-func AttachKProbeDevHardStartXmitEntry(programs interface{}) (link.Link, error) {
-	return Kprobe("dev_hard_start_xmit", GetProgram(programs, "DevHardStartXmit"))
+func AttachKProbeDevHardStartXmitEntry() (link.Link, error) {
+	return Kprobe("dev_hard_start_xmit", GetProgramFromObjs(Objs, "DevHardStartXmit"))
 }
-func AttachKProbeTcpV4DoRcvEntry(programs interface{}) (link.Link, error) {
-	return Kprobe("tcp_v4_do_rcv", GetProgram(programs, "TcpV4DoRcv"))
+func AttachKProbeTcpV4DoRcvEntry() (link.Link, error) {
+	return Kprobe("tcp_v4_do_rcv", GetProgramFromObjs(Objs, "TcpV4DoRcv"))
 }
 
-func AttachTracepointNetifReceiveSkb(programs interface{}) link.Link {
-	return TracepointNoError("net", "netif_receive_skb", GetProgram(programs, "TracepointNetifReceiveSkb"))
+func AttachTracepointNetifReceiveSkb() link.Link {
+	return TracepointNoError("net", "netif_receive_skb", GetProgramFromObjs(Objs, "TracepointNetifReceiveSkb"))
 }
-func AttachXdpWithSpecifiedIfName(programs interface{}, ifname string) (link.Link, error) {
+func AttachXdpWithSpecifiedIfName(ifname string) (link.Link, error) {
 
 	iface, err := net.InterfaceByName(ifname)
 	if err != nil {
@@ -193,21 +179,21 @@ func AttachXdpWithSpecifiedIfName(programs interface{}, ifname string) (link.Lin
 	}
 
 	l, err := link.AttachXDP(link.XDPOptions{
-		Program:   GetProgram(programs, "XdpProxy"),
+		Program:   GetProgramFromObjs(Objs, "XdpProxy"),
 		Interface: iface.Index,
 		Flags:     link.XDPDriverMode,
 	})
 	if err != nil {
 		l, err = link.AttachXDP(link.XDPOptions{
-			Program:   GetProgram(programs, "XdpProxy"),
+			Program:   GetProgramFromObjs(Objs, "XdpProxy"),
 			Interface: iface.Index,
 			Flags:     link.XDPGenericMode,
 		})
 	}
 	return l, err
 }
-func AttachXdp(programs interface{}) (link.Link, error) {
-	return AttachXdpWithSpecifiedIfName(programs, "eth0")
+func AttachXdp() (link.Link, error) {
+	return AttachXdpWithSpecifiedIfName("eth0")
 }
 
 func Kprobe(func_name string, prog *ebpf.Program) (link.Link, error) {

@@ -41,6 +41,37 @@ func (pm *ProcessorManager) GetProcessor(i int) *Processor {
 	return pm.processors[i]
 }
 
+func (pm *ProcessorManager) GetSyscallEventsChannels() []chan *bpf.SyscallEventData {
+	var channels []chan *bpf.SyscallEventData = make([]chan *bpf.SyscallEventData, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.syscallEvents)
+	}
+	return channels
+}
+
+func (pm *ProcessorManager) GetSslEventsChannels() []chan *bpf.SslData {
+	var channels []chan *bpf.SslData = make([]chan *bpf.SslData, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.sslEvents)
+	}
+	return channels
+}
+
+func (pm *ProcessorManager) GetConnEventsChannels() []chan *bpf.AgentConnEvtT {
+	var channels []chan *bpf.AgentConnEvtT = make([]chan *bpf.AgentConnEvtT, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.connEvents)
+	}
+	return channels
+}
+func (pm *ProcessorManager) GetKernEventsChannels() []chan *bpf.AgentKernEvt {
+	var channels []chan *bpf.AgentKernEvt = make([]chan *bpf.AgentKernEvt, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.kernEvents)
+	}
+	return channels
+}
+
 func (pm *ProcessorManager) StopAll() error {
 	pm.cancel()
 	pm.wg.Wait()

@@ -110,12 +110,16 @@ static __always_inline enum target_tgid_match_result_t match_trace_tgid(const ui
 	if (bpf_map_lookup_elem(&filter_pid_map, &tgid)) {
 		return TARGET_TGID_MATCHED;
 	}
+#ifdef LAGACY_KERNEL_310
+
+	return TARGET_TGID_UNMATCHED;
+#else
 	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 
     bool should_filter = false;
+    u32 pidns_id = BPF_CORE_READ(task, nsproxy, pid_ns_for_children, ns.inum);
     u32 mntns_id = BPF_CORE_READ(task, nsproxy, mnt_ns, ns.inum);
     u32 netns_id = BPF_CORE_READ(task, nsproxy, net_ns, ns.inum);
-    u32 pidns_id = BPF_CORE_READ(task, nsproxy, pid_ns_for_children, ns.inum);
     if ((filter_pidns(pidns_id) == 0) || (filter_mntns(mntns_id) == 0) || (filter_netns(netns_id) == 0)) {
         should_filter = true;
     }
@@ -124,7 +128,9 @@ static __always_inline enum target_tgid_match_result_t match_trace_tgid(const ui
         bpf_map_update_elem(&filter_pid_map, &tgid, &u8_zero, BPF_NOEXIST);
 		return TARGET_TGID_MATCHED;
 	}
+
 	return TARGET_TGID_UNMATCHED;
+#endif
 }
 
 static __always_inline void reverse_sock_key_no_copy(struct sock_key* key) {
@@ -152,21 +158,14 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 	u32 len = param->len;
 	const char *func_name = param->func_name;
 	enum step_t step = param->step;
-#ifdef KERNEL_VERSION_BELOW_58 
-	struct kern_evt _evt = {0};
-	struct kern_evt* evt = &_evt;
-#else
-	struct kern_evt* evt = bpf_ringbuf_reserve(&rb, sizeof(struct kern_evt), 0); 
-#endif
+	int zero = 0;
+	struct kern_evt* evt = bpf_map_lookup_elem(&kern_evt_t_map, &zero);
 	if(!evt) {
 		return;
 	}
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
  
 	if (conn_id_s == NULL || conn_id_s->no_trace) {
-#ifndef KERNEL_VERSION_BELOW_58
-		bpf_ringbuf_discard(evt, 0);
-#endif
 		return;
 	}
 	uint64_t tgid_fd = conn_id_s->tgid_fd;
@@ -184,11 +183,7 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 	evt->step = step;
 	bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
 	// my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
-#ifdef KERNEL_VERSION_BELOW_58
-	bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(_evt));
-#else
-	bpf_ringbuf_submit(evt, 0);
-#endif
+	bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt));
 }
 // static __always_inline void  report_kern_evt(void* ctx, u32 seq, struct sock_key* key,struct tcphdr* tcp, int len, char* func_name, enum step_t step) {
 static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) {
@@ -199,24 +194,17 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	int len = param->len;
 	const char *func_name = param->func_name;
 	enum step_t step = param->step;
-#ifdef KERNEL_VERSION_BELOW_58 
 	// struct kern_evt _evt = {0};
 	// struct kern_evt* evt = &_evt;
 
 	int zero = 0;
 	struct kern_evt* evt = bpf_map_lookup_elem(&kern_evt_t_map, &zero);
-#else
-	struct kern_evt* evt = bpf_ringbuf_reserve(&rb, sizeof(struct kern_evt), 0); 
-#endif
 	if(!evt) {
 		return;
 	}
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
  
 	if (conn_id_s == NULL || conn_id_s->no_trace) {
-#ifndef KERNEL_VERSION_BELOW_58
-		bpf_ringbuf_discard(evt, 0);
-#endif
 		// if (key->sport==3306&& step == DEV_IN) {
 		// 	bpf_printk("discard!");
 		// 	print_sock_key(key);
@@ -248,11 +236,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	// bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
 	// my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
 
-#ifdef KERNEL_VERSION_BELOW_58
 	bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt));
-#else
-	bpf_ringbuf_submit(evt, 0);
-#endif
 }
 
 #define DEBUG 0
@@ -541,13 +525,10 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 	err:return BPF_OK;
 }
 
-// #ifndef KERNEL_VERSION_BELOW_58
 SEC("xdp")
 int xdp_proxy(struct xdp_md *ctx){
 	return XDP_PASS;
 }
-// #else
-// #endif
 
 static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, int offset, struct iov_iter *to, int len) {
 	struct sock_key key = {0};
@@ -703,7 +684,6 @@ int BPF_KPROBE(ip_queue_xmit, void *sk, struct sk_buff *skb)
 	return handle_ip_queue_xmit(ctx, skb);
 }
 
-// #ifndef KERNEL_VERSION_BELOW_58
 SEC("raw_tp/tcp_destroy_sock")
 int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 {
@@ -891,10 +871,10 @@ static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 		sk = (struct tcp_sock *)_C(socket,sk);
 	}
 	if ((socket_type == SOCK_STREAM || socket_type == SOCK_DGRAM) 
-#ifdef KERNEL_VERSION_BELOW_58
-#else
-	   && check_file == file /*&& __socket.state == SS_CONNECTED */
-#endif
+// #ifdef KERNEL_VERSION_BELOW_58
+// #else
+// 	   && check_file == file /*&& __socket.state == SS_CONNECTED */
+// #endif
 		) {
 		return sk;
 	}

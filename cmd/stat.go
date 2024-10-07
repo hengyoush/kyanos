@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"kyanos/agent"
 	"kyanos/agent/analysis"
+	anc "kyanos/agent/analysis/common"
+	ac "kyanos/agent/common"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -39,7 +40,7 @@ sudo kyanos stat http --metrics tqp
 	`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) { Mode = AnalysisMode },
 	Run: func(cmd *cobra.Command, args []string) {
-		startAgent(agent.AgentOptions{LatencyFilter: initLatencyFilter(cmd), SizeFilter: initSizeFilter(cmd)})
+		startAgent(ac.AgentOptions{LatencyFilter: initLatencyFilter(cmd), SizeFilter: initSizeFilter(cmd)})
 	},
 }
 var enabledMetricsString string
@@ -60,30 +61,30 @@ func validateEnabledMetricsString() error {
 	return nil
 }
 
-func createAnalysisOptions() (analysis.AnalysisOptions, error) {
-	options := analysis.AnalysisOptions{
-		EnabledMetricTypeSet: make(analysis.MetricTypeSet),
+func createAnalysisOptions() (anc.AnalysisOptions, error) {
+	options := anc.AnalysisOptions{
+		EnabledMetricTypeSet: make(anc.MetricTypeSet),
 	}
 	err := validateEnabledMetricsString()
 	if err != nil {
 		logger.Errorln(err)
-		return analysis.AnalysisOptions{}, err
+		return anc.AnalysisOptions{}, err
 	}
 	enabledMetricsBytes := []byte(enabledMetricsString)
 	if slices.Contains(enabledMetricsBytes, 't') {
-		options.EnabledMetricTypeSet[analysis.TotalDuration] = true
+		options.EnabledMetricTypeSet[anc.TotalDuration] = true
 	}
 	if slices.Contains(enabledMetricsBytes, 'q') {
-		options.EnabledMetricTypeSet[analysis.RequestSize] = true
+		options.EnabledMetricTypeSet[anc.RequestSize] = true
 	}
 	if slices.Contains(enabledMetricsBytes, 'p') {
-		options.EnabledMetricTypeSet[analysis.ResponseSize] = true
+		options.EnabledMetricTypeSet[anc.ResponseSize] = true
 	}
 	if slices.Contains(enabledMetricsBytes, 'n') || slices.Contains(enabledMetricsBytes, 'i') {
-		options.EnabledMetricTypeSet[analysis.BlackBoxDuration] = true
+		options.EnabledMetricTypeSet[anc.BlackBoxDuration] = true
 	}
 	if slices.Contains(enabledMetricsBytes, 's') {
-		options.EnabledMetricTypeSet[analysis.ReadFromSocketBufferDuration] = true
+		options.EnabledMetricTypeSet[anc.ReadFromSocketBufferDuration] = true
 	}
 	if sampleCount < 0 {
 		sampleCount = 0
@@ -101,18 +102,18 @@ func createAnalysisOptions() (analysis.AnalysisOptions, error) {
 
 	switch sortByPar {
 	case "avg":
-		options.SortBy = analysis.Avg
+		options.SortBy = anc.Avg
 	case "max":
-		options.SortBy = analysis.Max
+		options.SortBy = anc.Max
 	case "p50":
-		options.SortBy = analysis.P50
+		options.SortBy = anc.P50
 	case "P90":
-		options.SortBy = analysis.P90
+		options.SortBy = anc.P90
 	case "P99":
-		options.SortBy = analysis.P99
+		options.SortBy = anc.P99
 	default:
 		logger.Warnf("unknown --sort-by flag: %s, use default '%s'", sortByPar, "avg")
-		options.SortBy = analysis.Avg
+		options.SortBy = anc.Avg
 	}
 
 	if fullBody {

@@ -225,13 +225,13 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 	OnCloseRecordFunc(c)
 	c.Status = Closed
 	if needClearBpfMap {
-		connInfoMap := bpf.GetMap("ConnInfoMap")
+		connInfoMap := bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap")
 		err := connInfoMap.Delete(c.TgidFd)
 		key, revKey := c.extractSockKeys()
-		sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
+		sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
 		err = sockKeyConnIdMap.Delete(key)
 		err = sockKeyConnIdMap.Delete(revKey)
-		sockXmitMap := bpf.GetMap("SockXmitMap")
+		sockXmitMap := bpf.GetMapFromObjs(bpf.Objs, "SockXmitMap")
 		err = sockXmitMap.Delete(key)
 		err = sockXmitMap.Delete(revKey)
 		if err == nil {
@@ -242,11 +242,11 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 
 func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
 	key, revKey := c.extractSockKeys()
-	sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
+	sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
 	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap, traceable)
 	c.doUpdateConnIdMapProtocolToUnknwon(revKey, sockKeyConnIdMap, traceable)
 
-	connInfoMap := bpf.GetMap("ConnInfoMap")
+	connInfoMap := bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap")
 	connInfo := bpf.AgentConnInfoT{}
 	err := connInfoMap.Lookup(c.TgidFd, &connInfo)
 	if err == nil {

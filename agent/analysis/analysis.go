@@ -2,7 +2,8 @@ package analysis
 
 import (
 	"cmp"
-	ac "kyanos/agent/common"
+	"context"
+	analysis_common "kyanos/agent/analysis/common"
 	"kyanos/agent/protocol"
 	"kyanos/common"
 	"math"
@@ -10,55 +11,44 @@ import (
 	"time"
 )
 
-type AnalysisOptions struct {
-	EnabledMetricTypeSet MetricTypeSet
-	SampleLimit          int
-	DisplayLimit         int
-	Interval             int
-	Side                 common.SideEnum
-	ClassfierType
-	SortBy         LatencyMetric
-	FullRecordBody bool
-}
-
 type aggregator struct {
-	*AnalysisOptions
+	*analysis_common.AnalysisOptions
 	*ConnStat
 }
 
 func createAggregatorWithHumanReadableClassId(humanReadableClassId string,
-	classId ClassId, aggregateOption *AnalysisOptions) *aggregator {
+	classId ClassId, aggregateOption *analysis_common.AnalysisOptions) *aggregator {
 	aggregator := createAggregator(classId, aggregateOption)
 	aggregator.HumanReadbleClassId = humanReadableClassId
 	return aggregator
 }
 
-func createAggregator(classId ClassId, aggregateOption *AnalysisOptions) *aggregator {
+func createAggregator(classId ClassId, aggregateOption *analysis_common.AnalysisOptions) *aggregator {
 	aggregator := aggregator{}
 	aggregator.reset(classId, aggregateOption)
 	return &aggregator
 }
 
-func (a *aggregator) reset(classId ClassId, aggregateOption *AnalysisOptions) {
+func (a *aggregator) reset(classId ClassId, aggregateOption *analysis_common.AnalysisOptions) {
 	a.AnalysisOptions = aggregateOption
 	a.ConnStat = &ConnStat{
 		ClassId:       classId,
 		ClassfierType: aggregateOption.ClassfierType,
 	}
-	a.SamplesMap = make(map[MetricType][]*AnnotatedRecord)
-	a.PercentileCalculators = make(map[MetricType]*PercentileCalculator)
-	a.MaxMap = make(map[MetricType]float32)
-	a.SumMap = make(map[MetricType]float64)
+	a.SamplesMap = make(map[analysis_common.MetricType][]*analysis_common.AnnotatedRecord)
+	a.PercentileCalculators = make(map[analysis_common.MetricType]*PercentileCalculator)
+	a.MaxMap = make(map[analysis_common.MetricType]float32)
+	a.SumMap = make(map[analysis_common.MetricType]float64)
 	for rawMetricType, enabled := range aggregateOption.EnabledMetricTypeSet {
 		if enabled {
-			metricType := MetricType(rawMetricType)
+			metricType := analysis_common.MetricType(rawMetricType)
 			a.PercentileCalculators[metricType] = NewPercentileCalculator()
-			a.SamplesMap[metricType] = make([]*AnnotatedRecord, 0)
+			a.SamplesMap[metricType] = make([]*analysis_common.AnnotatedRecord, 0)
 		}
 	}
 }
 
-func (a *aggregator) receive(record *AnnotatedRecord) error {
+func (a *aggregator) receive(record *analysis_common.AnnotatedRecord) error {
 	o := a.ConnStat
 
 	o.Count++
@@ -72,12 +62,12 @@ func (a *aggregator) receive(record *AnnotatedRecord) error {
 	a.ConnStat.Side = record.ConnDesc.Side
 
 	for rawMetricType, enabled := range a.AnalysisOptions.EnabledMetricTypeSet {
-		metricType := MetricType(rawMetricType)
+		metricType := analysis_common.MetricType(rawMetricType)
 
 		if enabled {
 			samples := a.SamplesMap[metricType]
-			MetricExtract := GetMetricExtractFunc[float64](metricType)
-			a.SamplesMap[metricType] = AddToSamples(samples, record, MetricExtract, a.SampleLimit)
+			MetricExtract := analysis_common.GetMetricExtractFunc[float64](metricType)
+			a.SamplesMap[metricType] = AddToSamples(samples, record, MetricExtract, a.AnalysisOptions.SampleLimit)
 
 			metricValue := MetricExtract(record)
 
@@ -91,10 +81,10 @@ func (a *aggregator) receive(record *AnnotatedRecord) error {
 	return nil
 }
 
-func AddToSamples[T MetricValueType](samples []*AnnotatedRecord, newSample *AnnotatedRecord, extractMetric MetricExtract[T], maxSamplesNum int) []*AnnotatedRecord {
+func AddToSamples[T analysis_common.MetricValueType](samples []*analysis_common.AnnotatedRecord, newSample *analysis_common.AnnotatedRecord, extractMetric analysis_common.MetricExtract[T], maxSamplesNum int) []*analysis_common.AnnotatedRecord {
 	result := samples
 	isFull := len(samples) == maxSamplesNum
-	idx, _ := slices.BinarySearchFunc(samples, newSample, func(o1 *AnnotatedRecord, o2 *AnnotatedRecord) int {
+	idx, _ := slices.BinarySearchFunc(samples, newSample, func(o1 *analysis_common.AnnotatedRecord, o2 *analysis_common.AnnotatedRecord) int {
 		t1, t2 := extractMetric(o1), extractMetric(o2)
 		return cmp.Compare(t1, t2)
 	})
@@ -112,20 +102,21 @@ func AddToSamples[T MetricValueType](samples []*AnnotatedRecord, newSample *Anno
 
 type Analyzer struct {
 	Classfier
-	*AnalysisOptions
+	*analysis_common.AnalysisOptions
 	common.SideEnum // 那一边的统计指标TODO 根据参数自动推断
 	Aggregators     map[ClassId]*aggregator
-	recordsChannel  <-chan *AnnotatedRecord
+	recordsChannel  <-chan *analysis_common.AnnotatedRecord
 	stopper         <-chan int
 	resultChannel   chan<- []*ConnStat
 	renderStopper   chan int
 	ticker          *time.Ticker
 	tickerC         <-chan time.Time
+	ctx             context.Context
 }
 
-func CreateAnalyzer(recordsChannel <-chan *AnnotatedRecord, showOption *AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int) *Analyzer {
+func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, showOption *analysis_common.AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int, ctx context.Context) *Analyzer {
 	stopper := make(chan int)
-	ac.AddToFastStopper(stopper)
+	// ac.AddToFastStopper(stopper)
 	analyzer := &Analyzer{
 		Classfier:       getClassfier(showOption.ClassfierType),
 		recordsChannel:  recordsChannel,
@@ -147,7 +138,8 @@ func CreateAnalyzer(recordsChannel <-chan *AnnotatedRecord, showOption *Analysis
 func (a *Analyzer) Run() {
 	for {
 		select {
-		case <-a.stopper:
+		// case <-a.stopper:
+		case <-a.ctx.Done():
 			if a.AnalysisOptions.Interval == 0 {
 				a.resultChannel <- a.harvest()
 				time.Sleep(1 * time.Second)
@@ -166,19 +158,19 @@ func (a *Analyzer) harvest() []*ConnStat {
 	result := make([]*ConnStat, 0)
 	for _, aggregator := range a.Aggregators {
 		connstat := aggregator.ConnStat
-		// aggregator.reset(classId, a.AnalysisOptions)
+		// aggregator.reset(classId, a.analysis_common.AnalysisOptions)
 		result = append(result, connstat)
 	}
 	a.Aggregators = make(map[ClassId]*aggregator)
 	return result
 }
 
-func (a *Analyzer) analyze(record *AnnotatedRecord) {
+func (a *Analyzer) analyze(record *analysis_common.AnnotatedRecord) {
 	class, err := a.Classfier(record)
 	if err == nil {
 		aggregator, exists := a.Aggregators[class]
 		if !exists {
-			humanReadableFunc, ok := classIdHumanReadableMap[a.ClassfierType]
+			humanReadableFunc, ok := classIdHumanReadableMap[a.AnalysisOptions.ClassfierType]
 			if ok {
 				humanReadableClassId := humanReadableFunc(record)
 				a.Aggregators[class] = createAggregatorWithHumanReadableClassId(humanReadableClassId,

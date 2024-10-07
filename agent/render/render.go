@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"kyanos/agent/analysis"
+	anc "kyanos/agent/analysis/common"
 	"kyanos/agent/protocol"
 	"kyanos/common"
 	"slices"
@@ -20,10 +21,10 @@ type RenderOptions struct {
 type Render struct {
 	resultChannel <-chan []*analysis.ConnStat
 	stopper       <-chan int
-	*analysis.AnalysisOptions
+	*anc.AnalysisOptions
 }
 
-func CreateRender(resultChannel <-chan []*analysis.ConnStat, stopper chan int, options *analysis.AnalysisOptions) *Render {
+func CreateRender(resultChannel <-chan []*analysis.ConnStat, stopper chan int, options *anc.AnalysisOptions) *Render {
 	return &Render{
 		resultChannel:   resultChannel,
 		stopper:         stopper,
@@ -91,7 +92,7 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 				record := records[len(records)-i-1]
 				s += fmt.Sprintf("----------------------------------------Top %s Sample %d---------------------------------------------\n", metricSampleName(metricType, r.Side), i+1)
 				if r.FullRecordBody {
-					s += record.String(analysis.AnnotatedRecordToStringOptions{
+					s += record.String(anc.AnnotatedRecordToStringOptions{
 						MetricTypeSet: r.AnalysisOptions.EnabledMetricTypeSet,
 						RecordToStringOptions: protocol.RecordToStringOptions{
 							RecordMaxDumpBytes: 1024,
@@ -101,7 +102,7 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 						IncludeSyscallStat: false,
 					})
 				} else {
-					s += record.String(analysis.AnnotatedRecordToStringOptions{
+					s += record.String(anc.AnnotatedRecordToStringOptions{
 						MetricTypeSet: r.AnalysisOptions.EnabledMetricTypeSet,
 						RecordToStringOptions: protocol.RecordToStringOptions{
 							RecordMaxDumpBytes: 1024,
@@ -119,10 +120,10 @@ func (r *Render) simpleRender(constats []*analysis.ConnStat) string {
 	return s
 }
 
-func metricName(metricType analysis.MetricType, side common.SideEnum) string {
+func metricName(metricType anc.MetricType, side common.SideEnum) string {
 
 	metricName := MetricTypeNames[metricType]
-	if metricType == analysis.BlackBoxDuration {
+	if metricType == anc.BlackBoxDuration {
 		if side == common.ClientSide {
 			metricName = "Network Duration"
 		} else {
@@ -132,10 +133,10 @@ func metricName(metricType analysis.MetricType, side common.SideEnum) string {
 	return metricName
 }
 
-func metricSampleName(metricType analysis.MetricType, side common.SideEnum) string {
+func metricSampleName(metricType anc.MetricType, side common.SideEnum) string {
 
 	metricName := MetricTypeNames[metricType]
-	if metricType == analysis.BlackBoxDuration {
+	if metricType == anc.BlackBoxDuration {
 		if side == common.ClientSide {
 			metricName = "Max Network Duration"
 		} else {

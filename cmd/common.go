@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"kyanos/agent"
+	ac "kyanos/agent/common"
 	"kyanos/agent/protocol"
 	"kyanos/common"
 
@@ -38,7 +39,7 @@ func ParseSide(side string) (common.SideEnum, error) {
 	}
 }
 
-func startAgent(options agent.AgentOptions) {
+func startAgent(options ac.AgentOptions) {
 	side, err := ParseSide(SidePar)
 	if err != nil {
 		return
