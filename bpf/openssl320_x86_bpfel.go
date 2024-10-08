@@ -79,10 +79,14 @@ const (
 type Openssl320ControlValueIndexT uint32
 
 const (
-	Openssl320ControlValueIndexTKTargetTGIDIndex   Openssl320ControlValueIndexT = 0
-	Openssl320ControlValueIndexTKStirlingTGIDIndex Openssl320ControlValueIndexT = 1
-	Openssl320ControlValueIndexTKEnabledXdpIndex   Openssl320ControlValueIndexT = 2
-	Openssl320ControlValueIndexTKNumControlValues  Openssl320ControlValueIndexT = 3
+	Openssl320ControlValueIndexTKTargetTGIDIndex          Openssl320ControlValueIndexT = 0
+	Openssl320ControlValueIndexTKStirlingTGIDIndex        Openssl320ControlValueIndexT = 1
+	Openssl320ControlValueIndexTKEnabledXdpIndex          Openssl320ControlValueIndexT = 2
+	Openssl320ControlValueIndexTKEnableFilterByPid        Openssl320ControlValueIndexT = 3
+	Openssl320ControlValueIndexTKEnableFilterByLocalPort  Openssl320ControlValueIndexT = 4
+	Openssl320ControlValueIndexTKEnableFilterByRemotePort Openssl320ControlValueIndexT = 5
+	Openssl320ControlValueIndexTKEnableFilterByRemoteHost Openssl320ControlValueIndexT = 6
+	Openssl320ControlValueIndexTKNumControlValues         Openssl320ControlValueIndexT = 7
 )
 
 type Openssl320EndpointRoleT uint32
@@ -100,9 +104,11 @@ type Openssl320KernEvt struct {
 	Len      uint32
 	Flags    uint8
 	_        [3]byte
+	Ifindex  uint32
+	_        [4]byte
 	ConnIdS  Openssl320ConnIdS_t
-	IsSample int32
 	Step     Openssl320StepT
+	_        [4]byte
 }
 
 type Openssl320KernEvtData struct {
@@ -231,6 +237,10 @@ type Openssl320MapSpecs struct {
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
+	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
 	Rb                    *ebpf.MapSpec `ebpf:"rb"`
 	SslDataMap            *ebpf.MapSpec `ebpf:"ssl_data_map"`
 	SslRb                 *ebpf.MapSpec `ebpf:"ssl_rb"`
@@ -262,6 +272,10 @@ type Openssl320Maps struct {
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
+	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
 	Rb                    *ebpf.Map `ebpf:"rb"`
 	SslDataMap            *ebpf.Map `ebpf:"ssl_data_map"`
 	SslRb                 *ebpf.Map `ebpf:"ssl_rb"`
@@ -276,6 +290,10 @@ func (m *Openssl320Maps) Close() error {
 		m.ActiveSslWriteArgsMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
+		m.FilterMntnsMap,
+		m.FilterNetnsMap,
+		m.FilterPidMap,
+		m.FilterPidnsMap,
 		m.Rb,
 		m.SslDataMap,
 		m.SslRb,

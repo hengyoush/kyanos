@@ -1,11 +1,10 @@
 package analysis
 
 import (
-	"fmt"
+	analysisCommon "kyanos/agent/analysis/common"
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
-	"kyanos/common"
 	. "kyanos/common"
 
 	"github.com/jefurry/logrus"
@@ -21,116 +20,20 @@ func InitStatRecorder() *StatRecorder {
 	return sr
 }
 
-type AnnotatedRecord struct {
-	ConnDesc
-	protocol.Record
-	startTs                      uint64
-	endTs                        uint64
-	reqPlainTextSize             int
-	respPlainTextSize            int
-	reqSize                      int
-	respSize                     int
-	totalDuration                float64
-	blackBoxDuration             float64
-	readFromSocketBufferDuration float64
-	reqSyscallEventDetails       []SyscallEventDetail
-	respSyscallEventDetails      []SyscallEventDetail
-	reqNicEventDetails           []NicEventDetail
-	respNicEventDetails          []NicEventDetail
-}
-
-func (a *AnnotatedRecord) GetTotalDurationMills() float64 {
-	return common.NanoToMills(int32(a.totalDuration))
-}
-
-func (a *AnnotatedRecord) GetBlackBoxDurationMills() float64 {
-	return common.NanoToMills(int32(a.blackBoxDuration))
-}
-
-func (a *AnnotatedRecord) GetReadFromSocketBufferDurationMills() float64 {
-	return common.NanoToMills(int32(a.readFromSocketBufferDuration))
-}
-
-func CreateAnnotedRecord() *AnnotatedRecord {
-	return &AnnotatedRecord{
-		startTs:                      0,
-		endTs:                        0,
-		reqSize:                      -1,
-		respSize:                     -1,
-		totalDuration:                -1,
-		blackBoxDuration:             -1,
-		readFromSocketBufferDuration: -1,
-		reqSyscallEventDetails:       make([]SyscallEventDetail, 0),
-		respSyscallEventDetails:      make([]SyscallEventDetail, 0),
-		reqNicEventDetails:           make([]NicEventDetail, 0),
-		respNicEventDetails:          make([]NicEventDetail, 0),
+func CreateAnnotedRecord() *analysisCommon.AnnotatedRecord {
+	return &analysisCommon.AnnotatedRecord{
+		StartTs:                      0,
+		EndTs:                        0,
+		ReqSize:                      -1,
+		RespSize:                     -1,
+		TotalDuration:                -1,
+		BlackBoxDuration:             -1,
+		ReadFromSocketBufferDuration: -1,
+		ReqSyscallEventDetails:       make([]analysisCommon.SyscallEventDetail, 0),
+		RespSyscallEventDetails:      make([]analysisCommon.SyscallEventDetail, 0),
+		ReqNicEventDetails:           make([]analysisCommon.NicEventDetail, 0),
+		RespNicEventDetails:          make([]analysisCommon.NicEventDetail, 0),
 	}
-}
-
-type AnnotatedRecordToStringOptions struct {
-	Nano bool
-	protocol.RecordToStringOptions
-	MetricTypeSet
-	IncludeSyscallStat bool
-	IncludeConnDesc    bool
-}
-
-func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string {
-	nano := options.Nano
-	var result string
-	result += r.Record.String(options.RecordToStringOptions)
-	result += "\n"
-	if options.IncludeConnDesc {
-		result += fmt.Sprintf("[conn] [local addr]=%s:%d [remote addr]=%s:%d [side]=%s [ssl]=%v\n",
-			r.LocalAddr.String(), r.LocalPort, r.RemoteAddr.String(), r.RemotePort, r.Side.String(), r.IsSsl)
-	}
-	if _, ok := options.MetricTypeSet[TotalDuration]; ok {
-		result += fmt.Sprintf("[total duration] = %.3f(%s)(start=%s, end=%s)\n", common.ConvertDurationToMillisecondsIfNeeded(float64(r.totalDuration), nano), timeUnitName(nano),
-			common.FormatTimestampWithPrecision(r.startTs, nano),
-			common.FormatTimestampWithPrecision(r.endTs, nano))
-	}
-	if _, ok := options.MetricTypeSet[ReadFromSocketBufferDuration]; ok {
-		result += fmt.Sprintf("[read from sockbuf]=%.3f(%s)\n", common.ConvertDurationToMillisecondsIfNeeded(float64(r.readFromSocketBufferDuration), nano),
-			timeUnitName(nano))
-	}
-	if _, ok := options.MetricTypeSet[BlackBoxDuration]; ok {
-		result += fmt.Sprintf("[%s]=%.3f(%s)\n", r.blackboxName(),
-			common.ConvertDurationToMillisecondsIfNeeded(float64(r.blackBoxDuration), nano),
-			timeUnitName(nano))
-	}
-
-	if options.IncludeSyscallStat {
-		result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d [%s count]=%d [%s bytes]=%d\n",
-			r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
-			r.syscallDisplayName(true), r.reqSize,
-			r.syscallDisplayName(false), len(r.respSyscallEventDetails),
-			r.syscallDisplayName(false), r.respSize)
-		if r.ConnDesc.IsSsl {
-			result += fmt.Sprintf("[ssl][plaintext] [%s bytes]=%d [%s bytes]=%d\n", r.syscallDisplayName(true), r.reqPlainTextSize,
-				r.syscallDisplayName(false), r.respPlainTextSize)
-		}
-		result += "\n"
-	} else {
-		if _, ok := options.MetricTypeSet[RequestSize]; ok {
-			result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d",
-				r.syscallDisplayName(true), len(r.reqSyscallEventDetails),
-				r.syscallDisplayName(true), r.reqSize)
-			if r.ConnDesc.IsSsl {
-				result += fmt.Sprintf("[plaintext bytes]=%d", r.reqPlainTextSize)
-			}
-			result += "\n"
-		}
-		if _, ok := options.MetricTypeSet[ResponseSize]; ok {
-			result += fmt.Sprintf("[syscall] [%s count]=%d [%s bytes]=%d",
-				r.syscallDisplayName(false), len(r.respSyscallEventDetails),
-				r.syscallDisplayName(false), r.respSize)
-			if r.ConnDesc.IsSsl {
-				result += fmt.Sprintf("[plaintext bytes]=%d", r.respPlainTextSize)
-			}
-			result += "\n"
-		}
-	}
-	return result
 }
 
 func timeUnitName(nano bool) string {
@@ -139,37 +42,6 @@ func timeUnitName(nano bool) string {
 	} else {
 		return "ms"
 	}
-}
-
-func (r *AnnotatedRecord) blackboxName() string {
-	if r.ConnDesc.Side == ServerSide {
-		return "process internal duration"
-	} else {
-		return "network duration"
-	}
-}
-
-func (r *AnnotatedRecord) syscallDisplayName(isReq bool) string {
-	if isReq {
-		if r.ConnDesc.Side == ServerSide {
-			return "read"
-		} else {
-			return "write"
-		}
-	} else {
-		if r.ConnDesc.Side == ServerSide {
-			return "write"
-		} else {
-			return "read"
-		}
-	}
-}
-
-type SyscallEventDetail PacketEventDetail
-type NicEventDetail PacketEventDetail
-type PacketEventDetail struct {
-	byteSize  int
-	timestamp uint64
 }
 
 type events struct {
@@ -276,7 +148,7 @@ func prepareEvents(r protocol.Record, connection *conn.Connection4) *events {
 	return &events
 }
 
-func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connection4, recordsChannel chan<- *AnnotatedRecord) error {
+func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connection4, recordsChannel chan<- *analysisCommon.AnnotatedRecord) error {
 	streamEvents := connection.StreamEvents
 	annotatedRecord := CreateAnnotedRecord()
 	annotatedRecord.Record = r
@@ -305,76 +177,76 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	hasTcpInEvents := len(events.tcpInEvents) > 0
 	if connection.IsServerSide() {
 		if hasNicInEvents {
-			annotatedRecord.startTs = events.nicIngressEvents[0].GetTimestamp()
+			annotatedRecord.StartTs = events.nicIngressEvents[0].GetTimestamp()
 		}
 		if hasDevOutEvents {
-			annotatedRecord.endTs = events.devOutEvents[len(events.devOutEvents)-1].GetTimestamp()
+			annotatedRecord.EndTs = events.devOutEvents[len(events.devOutEvents)-1].GetTimestamp()
 		}
 		if connection.IsSsl() {
-			annotatedRecord.reqPlainTextSize = events.ingressMessage.ByteSize()
-			annotatedRecord.respPlainTextSize = events.egressMessage.ByteSize()
+			annotatedRecord.ReqPlainTextSize = events.ingressMessage.ByteSize()
+			annotatedRecord.RespPlainTextSize = events.egressMessage.ByteSize()
 		}
-		annotatedRecord.reqSize = events.ingressKernLen
-		annotatedRecord.respSize = events.egressKernLen
+		annotatedRecord.ReqSize = events.ingressKernLen
+		annotatedRecord.RespSize = events.egressKernLen
 		if hasNicInEvents && hasDevOutEvents {
-			annotatedRecord.totalDuration = float64(annotatedRecord.endTs) - float64(annotatedRecord.startTs)
+			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		}
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
-			annotatedRecord.blackBoxDuration = float64(events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetTimestamp()) - float64(events.readSyscallEvents[0].GetTimestamp())
+			annotatedRecord.BlackBoxDuration = float64(events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetTimestamp()) - float64(events.readSyscallEvents[0].GetTimestamp())
 		} else {
-			annotatedRecord.blackBoxDuration = float64(events.egressMessage.TimestampNs()) - float64(events.ingressMessage.TimestampNs())
+			annotatedRecord.BlackBoxDuration = float64(events.egressMessage.TimestampNs()) - float64(events.ingressMessage.TimestampNs())
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
-			annotatedRecord.readFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp()) - float64(events.tcpInEvents[0].GetTimestamp())
+			annotatedRecord.ReadFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp()) - float64(events.tcpInEvents[0].GetTimestamp())
 		}
-		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](events.readSyscallEvents)
-		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](events.writeSyscallEvents)
-		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](events.nicIngressEvents)
-		annotatedRecord.respNicEventDetails = KernEventsToEventDetails[NicEventDetail](events.devOutEvents)
+		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.readSyscallEvents)
+		annotatedRecord.RespSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.writeSyscallEvents)
+		annotatedRecord.ReqNicEventDetails = KernEventsToEventDetails[analysisCommon.NicEventDetail](events.nicIngressEvents)
+		annotatedRecord.RespNicEventDetails = KernEventsToEventDetails[analysisCommon.NicEventDetail](events.devOutEvents)
 	} else {
 		if hasWriteSyscallEvents {
-			annotatedRecord.startTs = events.writeSyscallEvents[0].GetTimestamp()
+			annotatedRecord.StartTs = events.writeSyscallEvents[0].GetTimestamp()
 		} else {
-			annotatedRecord.startTs = events.egressMessage.TimestampNs()
+			annotatedRecord.StartTs = events.egressMessage.TimestampNs()
 		}
 		if hasReadSyscallEvents {
-			annotatedRecord.endTs = events.readSyscallEvents[len(events.readSyscallEvents)-1].GetTimestamp()
+			annotatedRecord.EndTs = events.readSyscallEvents[len(events.readSyscallEvents)-1].GetTimestamp()
 		} else {
-			annotatedRecord.endTs = events.ingressMessage.TimestampNs()
+			annotatedRecord.EndTs = events.ingressMessage.TimestampNs()
 		}
 		if connection.IsSsl() {
-			annotatedRecord.reqPlainTextSize = events.egressMessage.ByteSize()
-			annotatedRecord.respPlainTextSize = events.ingressMessage.ByteSize()
+			annotatedRecord.ReqPlainTextSize = events.egressMessage.ByteSize()
+			annotatedRecord.RespPlainTextSize = events.ingressMessage.ByteSize()
 		}
-		annotatedRecord.reqSize = events.egressKernLen
-		annotatedRecord.respSize = events.ingressKernLen
+		annotatedRecord.ReqSize = events.egressKernLen
+		annotatedRecord.RespSize = events.ingressKernLen
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
-			annotatedRecord.totalDuration = float64(annotatedRecord.endTs) - float64(annotatedRecord.startTs)
+			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		} else {
-			annotatedRecord.totalDuration = float64(events.ingressMessage.TimestampNs()) - float64(events.egressMessage.TimestampNs())
+			annotatedRecord.TotalDuration = float64(events.ingressMessage.TimestampNs()) - float64(events.egressMessage.TimestampNs())
 		}
 		if hasNicInEvents && hasDevOutEvents {
-			annotatedRecord.blackBoxDuration = float64(events.nicIngressEvents[len(events.nicIngressEvents)-1].GetTimestamp()) - float64(events.devOutEvents[0].GetTimestamp())
+			annotatedRecord.BlackBoxDuration = float64(events.nicIngressEvents[len(events.nicIngressEvents)-1].GetTimestamp()) - float64(events.devOutEvents[0].GetTimestamp())
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
-			annotatedRecord.readFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp()) - float64(events.tcpInEvents[0].GetTimestamp())
+			annotatedRecord.ReadFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp()) - float64(events.tcpInEvents[0].GetTimestamp())
 		}
-		annotatedRecord.reqSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](events.writeSyscallEvents)
-		annotatedRecord.respSyscallEventDetails = KernEventsToEventDetails[SyscallEventDetail](events.readSyscallEvents)
-		annotatedRecord.reqNicEventDetails = KernEventsToEventDetails[NicEventDetail](events.devOutEvents)
-		annotatedRecord.respNicEventDetails = KernEventsToEventDetails[NicEventDetail](events.nicIngressEvents)
+		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.writeSyscallEvents)
+		annotatedRecord.RespSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.readSyscallEvents)
+		annotatedRecord.ReqNicEventDetails = KernEventsToEventDetails[analysisCommon.NicEventDetail](events.devOutEvents)
+		annotatedRecord.RespNicEventDetails = KernEventsToEventDetails[analysisCommon.NicEventDetail](events.nicIngressEvents)
 	}
 	streamEvents.DiscardEventsBySeq(events.egressKernSeq+uint64(events.egressKernLen), true)
 	streamEvents.DiscardEventsBySeq(events.ingressKernSeq+uint64(events.ingressKernLen), false)
 	if recordsChannel == nil {
-		outputLog.Infoln(annotatedRecord.String(AnnotatedRecordToStringOptions{
+		outputLog.Infoln(annotatedRecord.String(analysisCommon.AnnotatedRecordToStringOptions{
 			Nano: false,
-			MetricTypeSet: MetricTypeSet{
-				ResponseSize:                 false,
-				RequestSize:                  false,
-				ReadFromSocketBufferDuration: true,
-				BlackBoxDuration:             true,
-				TotalDuration:                true,
+			MetricTypeSet: analysisCommon.MetricTypeSet{
+				analysisCommon.ResponseSize:                 false,
+				analysisCommon.RequestSize:                  false,
+				analysisCommon.ReadFromSocketBufferDuration: true,
+				analysisCommon.BlackBoxDuration:             true,
+				analysisCommon.TotalDuration:                true,
 			}, IncludeSyscallStat: true,
 			IncludeConnDesc: true,
 			RecordToStringOptions: protocol.RecordToStringOptions{
@@ -389,15 +261,15 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	return nil
 }
 
-func KernEventsToEventDetails[k PacketEventDetail | SyscallEventDetail | NicEventDetail](kernEvents []conn.KernEvent) []k {
+func KernEventsToEventDetails[K analysisCommon.PacketEventDetail | analysisCommon.SyscallEventDetail | analysisCommon.NicEventDetail](kernEvents []conn.KernEvent) []K {
 	if len(kernEvents) == 0 {
-		return []k{}
+		return []K{}
 	}
-	result := make([]k, 0)
+	result := make([]K, 0)
 	for _, each := range kernEvents {
-		result = append(result, k{
-			byteSize:  each.GetLen(),
-			timestamp: each.GetTimestamp(),
+		result = append(result, K{
+			ByteSize:  each.GetLen(),
+			Timestamp: each.GetTimestamp(),
 		})
 	}
 	return result

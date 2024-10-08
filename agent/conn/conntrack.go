@@ -225,13 +225,13 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 	OnCloseRecordFunc(c)
 	c.Status = Closed
 	if needClearBpfMap {
-		connInfoMap := bpf.GetMap("ConnInfoMap")
+		connInfoMap := bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap")
 		err := connInfoMap.Delete(c.TgidFd)
 		key, revKey := c.extractSockKeys()
-		sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
+		sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
 		err = sockKeyConnIdMap.Delete(key)
 		err = sockKeyConnIdMap.Delete(revKey)
-		sockXmitMap := bpf.GetMap("SockXmitMap")
+		sockXmitMap := bpf.GetMapFromObjs(bpf.Objs, "SockXmitMap")
 		err = sockXmitMap.Delete(key)
 		err = sockXmitMap.Delete(revKey)
 		if err == nil {
@@ -242,11 +242,11 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 
 func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
 	key, revKey := c.extractSockKeys()
-	sockKeyConnIdMap := bpf.GetMap("SockKeyConnIdMap")
+	sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
 	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap, traceable)
 	c.doUpdateConnIdMapProtocolToUnknwon(revKey, sockKeyConnIdMap, traceable)
 
-	connInfoMap := bpf.GetMap("ConnInfoMap")
+	connInfoMap := bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap")
 	connInfo := bpf.AgentConnInfoT{}
 	err := connInfoMap.Lookup(c.TgidFd, &connInfo)
 	if err == nil {
@@ -310,8 +310,8 @@ func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernE
 	if c.Role == bpf.AgentEndpointRoleTKRoleUnknown {
 		respSteamMessageType = protocol.Unknown
 	}
-	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, ke.Step)
-	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, ke.Step)
+	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, ke)
+	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, ke)
 }
 func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChannel chan RecordWithConn) {
 	if len(data) > 0 {
@@ -356,7 +356,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 	}
 }
 
-func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, step bpf.AgentStepT) {
+func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, ke *bpf.AgentKernEvt) {
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
 		streamBuffer.Clear()
@@ -381,7 +381,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		case protocol.Success:
 			if c.Role == bpf.AgentEndpointRoleTKRoleUnknown && len(parseResult.ParsedMessages) > 0 {
 				parsedMessage := parseResult.ParsedMessages[0]
-				if (bpf.IsIngressStep(step) && parsedMessage.IsReq()) || (bpf.IsEgressStep(step) && !parsedMessage.IsReq()) {
+				if (bpf.IsIngressStep(ke.Step) && parsedMessage.IsReq()) || (bpf.IsEgressStep(ke.Step) && !parsedMessage.IsReq()) {
 					c.Role = bpf.AgentEndpointRoleTKRoleServer
 				} else {
 					c.Role = bpf.AgentEndpointRoleTKRoleClient
@@ -401,14 +401,22 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			if pos != -1 {
 				streamBuffer.RemovePrefix(pos)
 				stop = false
-			} else {
-				removed := c.checkProgress(streamBuffer)
-				if removed {
-					common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
+			} else if c.progressIsStucked(streamBuffer) {
+				if streamBuffer.Head().Len() > int(ke.Len) {
+					common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue", c.ToString(), streamBuffer.Head().Len()-int(ke.Len), messageType.String())
+					streamBuffer.RemovePrefix(streamBuffer.Head().Len() - int(ke.Len))
 					stop = false
 				} else {
-					stop = true
+					removed := c.checkProgress(streamBuffer)
+					if removed {
+						common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
+						stop = false
+					} else {
+						stop = true
+					}
 				}
+			} else {
+				stop = true
 			}
 		case protocol.NeedsMoreData:
 			removed := c.checkProgress(streamBuffer)
@@ -448,13 +456,26 @@ func (c *Connection4) getLastProgressTime(sb *buffer.StreamBuffer) int64 {
 		return c.lastRespMadeProgressTime
 	}
 }
-func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
+func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 	if c.getLastProgressTime(sb) == 0 {
 		c.updateProgressTime(sb)
 		return false
 	}
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
 	if !ok || time.Now().UnixMilli()-int64(common.NanoToMills(headTime)) > 5000 {
+		return true
+	}
+	return false
+}
+func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
+	if c.getLastProgressTime(sb) == 0 {
+		c.updateProgressTime(sb)
+		return false
+	}
+	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
+	now := time.Now().UnixMilli()
+	headTimeMills := int64(common.NanoToMills(headTime))
+	if !ok || now-headTimeMills > 5000 {
 		sb.RemoveHead()
 		return true
 	} else {

@@ -21,6 +21,7 @@ const (
 	SupportRawTracepoint
 	SupportRingBuffer
 	SupportBTF
+	SupportFilterByContainer
 )
 
 type InstrumentFunction struct {
@@ -114,10 +115,11 @@ func init() {
 			bpf.AgentStepTUSER_COPY: {InstrumentFunction{"kprobe/__skb_datagram_iter", "SkbCopyDatagramIter"}},
 		},
 		Capabilities: map[Capability]bool{
-			SupportConstants:     true,
-			SupportRawTracepoint: true,
-			SupportRingBuffer:    false,
-			SupportBTF:           true,
+			SupportConstants:         true,
+			SupportRawTracepoint:     true,
+			SupportRingBuffer:        false,
+			SupportBTF:               true,
+			SupportFilterByContainer: true,
 		},
 	}
 	baseVersion.addBackupInstrumentFunction(bpf.AgentStepTQDISC_OUT, InstrumentFunction{"kprobe/__dev_queue_xmit", "DevQueueXmit"})
@@ -151,7 +153,8 @@ func init() {
 	v310.removeCapability(SupportConstants).
 		removeCapability(SupportRawTracepoint).
 		removeCapability(SupportXDP).
-		removeCapability(SupportBTF)
+		removeCapability(SupportBTF).
+		removeCapability(SupportFilterByContainer)
 	KernelVersionsMap.Put(v310.Version, v310)
 }
 

@@ -2,7 +2,7 @@ package agent_test
 
 import (
 	"fmt"
-	"kyanos/agent"
+	ac "kyanos/agent/common"
 	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
 	"kyanos/bpf"
@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var customAgentOptions agent.AgentOptions = agent.AgentOptions{}
+var customAgentOptions ac.AgentOptions = ac.AgentOptions{}
 
 func TestMain(m *testing.M) {
 	// call flag.Parse() here if TestMain uses flags]
-	customAgentOptions = agent.AgentOptions{}
+	customAgentOptions = ac.AgentOptions{}
 	retCode := m.Run()
 	tearDown()
 	os.Exit(retCode)
@@ -586,26 +586,26 @@ func TestSslEventsCanRelatedToKernEvents(t *testing.T) {
 			bpf.AttachSyscallWriteExit,
 			bpf.AttachKProbeSecuritySocketSendmsgEntry,
 			bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN)
 			},
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY)
 			},
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN)
 			},
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN)
 			},
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT)
 			},
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_OUT, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_OUT)
 			},
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTQDISC_OUT, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTQDISC_OUT)
 			},
 		},
 		&connEventList,
@@ -964,8 +964,8 @@ func TestIpXmit(t *testing.T) {
 			bpf.AttachSyscallWriteEntry,
 			bpf.AttachSyscallWriteExit,
 			bpf.AttachKProbeSecuritySocketSendmsgEntry,
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT)
 			},
 		},
 		"GET TestIpXmit\n", Write, Read,
@@ -994,11 +994,11 @@ func TestDevQueueXmit(t *testing.T) {
 		bpf.AttachSyscallWriteEntry,
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
-		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT, p)
+		func() link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT)
 		},
-		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTQDISC_OUT, p)
+		func() link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTQDISC_OUT)
 		},
 	}, "GET DevQueueXmit\n", Write, Read,
 		FindInterestedKernEventOptions{
@@ -1029,11 +1029,11 @@ func TestDevHardStartXmit(t *testing.T) {
 			bpf.AttachSyscallWriteEntry,
 			bpf.AttachSyscallWriteExit,
 			bpf.AttachKProbeSecuritySocketSendmsgEntry,
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT)
 			},
-			func(p interface{}) link.Link {
-				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_OUT, p)
+			func() link.Link {
+				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_OUT)
 			},
 		}, "GET DevHardStartXmit\n", Write, Read,
 		FindInterestedKernEventOptions{
@@ -1110,11 +1110,11 @@ func TestIpRcvCore(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN, p)
+		func() link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN)
 		},
-		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN, p)
+		func() link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN)
 		},
 	},
 		FindInterestedKernEventOptions{
@@ -1150,11 +1150,11 @@ func TestTcpV4DoRcv(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN, p)
+		func() link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN)
 		},
-		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN, p)
+		func() link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN)
 		},
 	},
 		FindInterestedKernEventOptions{
@@ -1190,11 +1190,11 @@ func TestSkbCopyDatagramIter(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN, p)
+		func() link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN)
 		},
-		func(p interface{}) link.Link {
-			return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY, p)
+		func() link.Link {
+			return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY)
 		},
 	},
 		FindInterestedKernEventOptions{

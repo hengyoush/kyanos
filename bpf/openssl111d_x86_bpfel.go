@@ -79,10 +79,14 @@ const (
 type Openssl111dControlValueIndexT uint32
 
 const (
-	Openssl111dControlValueIndexTKTargetTGIDIndex   Openssl111dControlValueIndexT = 0
-	Openssl111dControlValueIndexTKStirlingTGIDIndex Openssl111dControlValueIndexT = 1
-	Openssl111dControlValueIndexTKEnabledXdpIndex   Openssl111dControlValueIndexT = 2
-	Openssl111dControlValueIndexTKNumControlValues  Openssl111dControlValueIndexT = 3
+	Openssl111dControlValueIndexTKTargetTGIDIndex          Openssl111dControlValueIndexT = 0
+	Openssl111dControlValueIndexTKStirlingTGIDIndex        Openssl111dControlValueIndexT = 1
+	Openssl111dControlValueIndexTKEnabledXdpIndex          Openssl111dControlValueIndexT = 2
+	Openssl111dControlValueIndexTKEnableFilterByPid        Openssl111dControlValueIndexT = 3
+	Openssl111dControlValueIndexTKEnableFilterByLocalPort  Openssl111dControlValueIndexT = 4
+	Openssl111dControlValueIndexTKEnableFilterByRemotePort Openssl111dControlValueIndexT = 5
+	Openssl111dControlValueIndexTKEnableFilterByRemoteHost Openssl111dControlValueIndexT = 6
+	Openssl111dControlValueIndexTKNumControlValues         Openssl111dControlValueIndexT = 7
 )
 
 type Openssl111dEndpointRoleT uint32
@@ -100,9 +104,11 @@ type Openssl111dKernEvt struct {
 	Len      uint32
 	Flags    uint8
 	_        [3]byte
+	Ifindex  uint32
+	_        [4]byte
 	ConnIdS  Openssl111dConnIdS_t
-	IsSample int32
 	Step     Openssl111dStepT
+	_        [4]byte
 }
 
 type Openssl111dKernEvtData struct {
@@ -231,6 +237,10 @@ type Openssl111dMapSpecs struct {
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
+	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
 	Rb                    *ebpf.MapSpec `ebpf:"rb"`
 	SslDataMap            *ebpf.MapSpec `ebpf:"ssl_data_map"`
 	SslRb                 *ebpf.MapSpec `ebpf:"ssl_rb"`
@@ -262,6 +272,10 @@ type Openssl111dMaps struct {
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
+	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
 	Rb                    *ebpf.Map `ebpf:"rb"`
 	SslDataMap            *ebpf.Map `ebpf:"ssl_data_map"`
 	SslRb                 *ebpf.Map `ebpf:"ssl_rb"`
@@ -276,6 +290,10 @@ func (m *Openssl111dMaps) Close() error {
 		m.ActiveSslWriteArgsMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
+		m.FilterMntnsMap,
+		m.FilterNetnsMap,
+		m.FilterPidMap,
+		m.FilterPidnsMap,
 		m.Rb,
 		m.SslDataMap,
 		m.SslRb,

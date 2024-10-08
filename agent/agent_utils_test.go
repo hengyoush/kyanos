@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"kyanos/agent"
+	ac "kyanos/agent/common"
 	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
 	"kyanos/bpf"
@@ -45,13 +46,13 @@ func StartAgent0(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	var loadBpfProgramFunction agent.LoadBpfProgramFunction = nil
+	var loadBpfProgramFunction ac.LoadBpfProgramFunction = nil
 	if bpfAttachFunctions != nil {
-		loadBpfProgramFunction = func(objs interface{}) *list.List {
+		loadBpfProgramFunction = func() *list.List {
 			progs := list.New()
 			for _, each := range bpfAttachFunctions {
 				if each != nil {
-					progs.PushBack(each(objs))
+					progs.PushBack(each())
 				}
 			}
 			return progs
@@ -59,12 +60,12 @@ func StartAgent0(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 	}
 	go func(pid int) {
 		if useSelfPidAsFitler {
-			cmd.FilterPid = int64(pid)
+			cmd.FilterPids = []string{strconv.Itoa(pid)}
 		}
 		cmd.DefaultLogLevel = int32(logrus.DebugLevel)
 		cmd.Debug = true
 		cmd.InitLog()
-		agent.SetupAgent(agent.AgentOptions{
+		agent.SetupAgent(ac.AgentOptions{
 			Stopper:                agentStopper,
 			LoadBpfProgramFunction: loadBpfProgramFunction,
 			DisableOpensslUprobe:   customAgentOptions.DisableOpensslUprobe,
@@ -776,11 +777,11 @@ func min(a, b int) int {
 // 	compatilbeMode = b
 // }
 
-func ApplyKernelVersionFunctions(t *testing.T, step bpf.AgentStepT, programs any) link.Link {
+func ApplyKernelVersionFunctions(t *testing.T, step bpf.AgentStepT) link.Link {
 	v := compatible.GetCurrentKernelVersion()
 	if step == bpf.AgentStepTNIC_IN {
 		if v.SupportCapability(compatible.SupportXDP) {
-			l, err := bpf.AttachXdp(programs)
+			l, err := bpf.AttachXdp()
 			if err != nil {
 				t.Fatal(err)
 			} else {
@@ -798,12 +799,12 @@ func ApplyKernelVersionFunctions(t *testing.T, step bpf.AgentStepT, programs any
 		var err error
 		var l link.Link
 		if function.IsKprobe() {
-			l, err = bpf.Kprobe(function.GetKprobeName(), bpf.GetProgram(programs, function.BPFGoProgName))
+			l, err = bpf.Kprobe(function.GetKprobeName(), bpf.GetProgramFromObjs(bpf.Objs, function.BPFGoProgName))
 		} else if function.IsTracepoint() {
 			l, err = bpf.Tracepoint(function.GetTracepointGroupName(), function.GetTracepointName(),
-				bpf.GetProgram(programs, function.BPFGoProgName))
+				bpf.GetProgramFromObjs(bpf.Objs, function.BPFGoProgName))
 		} else if function.IsKRetprobe() {
-			l, err = bpf.Kretprobe(function.GetKprobeName(), bpf.GetProgram(programs, function.BPFGoProgName))
+			l, err = bpf.Kretprobe(function.GetKprobeName(), bpf.GetProgramFromObjs(bpf.Objs, function.BPFGoProgName))
 		} else {
 			panic(fmt.Sprintf("invalid program type: %v", function))
 		}

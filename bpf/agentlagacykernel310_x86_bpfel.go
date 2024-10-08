@@ -12,20 +12,20 @@ import (
 	"github.com/cilium/ebpf"
 )
 
-type AgentOldConnEvtT struct {
-	ConnInfo AgentOldConnInfoT
-	ConnType AgentOldConnTypeT
+type AgentLagacyKernel310ConnEvtT struct {
+	ConnInfo AgentLagacyKernel310ConnInfoT
+	ConnType AgentLagacyKernel310ConnTypeT
 	_        [4]byte
 	Ts       uint64
 }
 
-type AgentOldConnIdS_t struct {
+type AgentLagacyKernel310ConnIdS_t struct {
 	TgidFd  uint64
 	NoTrace bool
 	_       [7]byte
 }
 
-type AgentOldConnInfoT struct {
+type AgentLagacyKernel310ConnInfoT struct {
 	ConnId struct {
 		Upid struct {
 			Pid            uint32
@@ -58,8 +58,8 @@ type AgentOldConnInfoT struct {
 			Sin6ScopeId  uint32
 		}
 	}
-	Protocol            AgentOldTrafficProtocolT
-	Role                AgentOldEndpointRoleT
+	Protocol            AgentLagacyKernel310TrafficProtocolT
+	Role                AgentLagacyKernel310EndpointRoleT
 	PrevCount           uint64
 	PrevBuf             [4]int8
 	PrependLengthHeader bool
@@ -68,51 +68,57 @@ type AgentOldConnInfoT struct {
 	_                   [1]byte
 }
 
-type AgentOldConnTypeT uint32
+type AgentLagacyKernel310ConnTypeT uint32
 
 const (
-	AgentOldConnTypeTKConnect       AgentOldConnTypeT = 0
-	AgentOldConnTypeTKClose         AgentOldConnTypeT = 1
-	AgentOldConnTypeTKProtocolInfer AgentOldConnTypeT = 2
+	AgentLagacyKernel310ConnTypeTKConnect       AgentLagacyKernel310ConnTypeT = 0
+	AgentLagacyKernel310ConnTypeTKClose         AgentLagacyKernel310ConnTypeT = 1
+	AgentLagacyKernel310ConnTypeTKProtocolInfer AgentLagacyKernel310ConnTypeT = 2
 )
 
-type AgentOldControlValueIndexT uint32
+type AgentLagacyKernel310ControlValueIndexT uint32
 
 const (
-	AgentOldControlValueIndexTKTargetTGIDIndex   AgentOldControlValueIndexT = 0
-	AgentOldControlValueIndexTKStirlingTGIDIndex AgentOldControlValueIndexT = 1
-	AgentOldControlValueIndexTKEnabledXdpIndex   AgentOldControlValueIndexT = 2
-	AgentOldControlValueIndexTKNumControlValues  AgentOldControlValueIndexT = 3
+	AgentLagacyKernel310ControlValueIndexTKTargetTGIDIndex          AgentLagacyKernel310ControlValueIndexT = 0
+	AgentLagacyKernel310ControlValueIndexTKStirlingTGIDIndex        AgentLagacyKernel310ControlValueIndexT = 1
+	AgentLagacyKernel310ControlValueIndexTKEnabledXdpIndex          AgentLagacyKernel310ControlValueIndexT = 2
+	AgentLagacyKernel310ControlValueIndexTKEnableFilterByPid        AgentLagacyKernel310ControlValueIndexT = 3
+	AgentLagacyKernel310ControlValueIndexTKEnableFilterByLocalPort  AgentLagacyKernel310ControlValueIndexT = 4
+	AgentLagacyKernel310ControlValueIndexTKEnableFilterByRemotePort AgentLagacyKernel310ControlValueIndexT = 5
+	AgentLagacyKernel310ControlValueIndexTKEnableFilterByRemoteHost AgentLagacyKernel310ControlValueIndexT = 6
+	AgentLagacyKernel310ControlValueIndexTKNumControlValues         AgentLagacyKernel310ControlValueIndexT = 7
 )
 
-type AgentOldEndpointRoleT uint32
+type AgentLagacyKernel310EndpointRoleT uint32
 
 const (
-	AgentOldEndpointRoleTKRoleClient  AgentOldEndpointRoleT = 1
-	AgentOldEndpointRoleTKRoleServer  AgentOldEndpointRoleT = 2
-	AgentOldEndpointRoleTKRoleUnknown AgentOldEndpointRoleT = 4
+	AgentLagacyKernel310EndpointRoleTKRoleClient  AgentLagacyKernel310EndpointRoleT = 1
+	AgentLagacyKernel310EndpointRoleTKRoleServer  AgentLagacyKernel310EndpointRoleT = 2
+	AgentLagacyKernel310EndpointRoleTKRoleUnknown AgentLagacyKernel310EndpointRoleT = 4
 )
 
-type AgentOldKernEvt struct {
+type AgentLagacyKernel310KernEvt struct {
 	FuncName [16]int8
 	Ts       uint64
 	Seq      uint64
 	Len      uint32
 	Flags    uint8
 	_        [3]byte
-	ConnIdS  AgentOldConnIdS_t
-	IsSample int32
-	Step     AgentOldStepT
+	Ifindex  uint32
+	_        [4]byte
+	ConnIdS  AgentLagacyKernel310ConnIdS_t
+	Step     AgentLagacyKernel310StepT
+	_        [4]byte
 }
 
-type AgentOldKernEvtData struct {
-	Ke      AgentOldKernEvt
+type AgentLagacyKernel310KernEvtData struct {
+	Ke      AgentLagacyKernel310KernEvt
 	BufSize uint32
 	Msg     [30720]int8
 	_       [4]byte
 }
 
-type AgentOldSockKey struct {
+type AgentLagacyKernel310SockKey struct {
 	Sip   [2]uint64
 	Dip   [2]uint64
 	Sport uint16
@@ -120,76 +126,76 @@ type AgentOldSockKey struct {
 	_     [4]byte
 }
 
-type AgentOldStepT uint32
+type AgentLagacyKernel310StepT uint32
 
 const (
-	AgentOldStepTStart       AgentOldStepT = 0
-	AgentOldStepTSSL_OUT     AgentOldStepT = 1
-	AgentOldStepTSYSCALL_OUT AgentOldStepT = 2
-	AgentOldStepTTCP_OUT     AgentOldStepT = 3
-	AgentOldStepTIP_OUT      AgentOldStepT = 4
-	AgentOldStepTQDISC_OUT   AgentOldStepT = 5
-	AgentOldStepTDEV_OUT     AgentOldStepT = 6
-	AgentOldStepTNIC_OUT     AgentOldStepT = 7
-	AgentOldStepTNIC_IN      AgentOldStepT = 8
-	AgentOldStepTDEV_IN      AgentOldStepT = 9
-	AgentOldStepTIP_IN       AgentOldStepT = 10
-	AgentOldStepTTCP_IN      AgentOldStepT = 11
-	AgentOldStepTUSER_COPY   AgentOldStepT = 12
-	AgentOldStepTSYSCALL_IN  AgentOldStepT = 13
-	AgentOldStepTSSL_IN      AgentOldStepT = 14
-	AgentOldStepTEnd         AgentOldStepT = 15
+	AgentLagacyKernel310StepTStart       AgentLagacyKernel310StepT = 0
+	AgentLagacyKernel310StepTSSL_OUT     AgentLagacyKernel310StepT = 1
+	AgentLagacyKernel310StepTSYSCALL_OUT AgentLagacyKernel310StepT = 2
+	AgentLagacyKernel310StepTTCP_OUT     AgentLagacyKernel310StepT = 3
+	AgentLagacyKernel310StepTIP_OUT      AgentLagacyKernel310StepT = 4
+	AgentLagacyKernel310StepTQDISC_OUT   AgentLagacyKernel310StepT = 5
+	AgentLagacyKernel310StepTDEV_OUT     AgentLagacyKernel310StepT = 6
+	AgentLagacyKernel310StepTNIC_OUT     AgentLagacyKernel310StepT = 7
+	AgentLagacyKernel310StepTNIC_IN      AgentLagacyKernel310StepT = 8
+	AgentLagacyKernel310StepTDEV_IN      AgentLagacyKernel310StepT = 9
+	AgentLagacyKernel310StepTIP_IN       AgentLagacyKernel310StepT = 10
+	AgentLagacyKernel310StepTTCP_IN      AgentLagacyKernel310StepT = 11
+	AgentLagacyKernel310StepTUSER_COPY   AgentLagacyKernel310StepT = 12
+	AgentLagacyKernel310StepTSYSCALL_IN  AgentLagacyKernel310StepT = 13
+	AgentLagacyKernel310StepTSSL_IN      AgentLagacyKernel310StepT = 14
+	AgentLagacyKernel310StepTEnd         AgentLagacyKernel310StepT = 15
 )
 
-type AgentOldTrafficDirectionT uint32
+type AgentLagacyKernel310TrafficDirectionT uint32
 
 const (
-	AgentOldTrafficDirectionTKEgress  AgentOldTrafficDirectionT = 0
-	AgentOldTrafficDirectionTKIngress AgentOldTrafficDirectionT = 1
+	AgentLagacyKernel310TrafficDirectionTKEgress  AgentLagacyKernel310TrafficDirectionT = 0
+	AgentLagacyKernel310TrafficDirectionTKIngress AgentLagacyKernel310TrafficDirectionT = 1
 )
 
-type AgentOldTrafficProtocolT uint32
+type AgentLagacyKernel310TrafficProtocolT uint32
 
 const (
-	AgentOldTrafficProtocolTKProtocolUnset   AgentOldTrafficProtocolT = 0
-	AgentOldTrafficProtocolTKProtocolUnknown AgentOldTrafficProtocolT = 1
-	AgentOldTrafficProtocolTKProtocolHTTP    AgentOldTrafficProtocolT = 2
-	AgentOldTrafficProtocolTKProtocolHTTP2   AgentOldTrafficProtocolT = 3
-	AgentOldTrafficProtocolTKProtocolMySQL   AgentOldTrafficProtocolT = 4
-	AgentOldTrafficProtocolTKProtocolCQL     AgentOldTrafficProtocolT = 5
-	AgentOldTrafficProtocolTKProtocolPGSQL   AgentOldTrafficProtocolT = 6
-	AgentOldTrafficProtocolTKProtocolDNS     AgentOldTrafficProtocolT = 7
-	AgentOldTrafficProtocolTKProtocolRedis   AgentOldTrafficProtocolT = 8
-	AgentOldTrafficProtocolTKProtocolNATS    AgentOldTrafficProtocolT = 9
-	AgentOldTrafficProtocolTKProtocolMongo   AgentOldTrafficProtocolT = 10
-	AgentOldTrafficProtocolTKProtocolKafka   AgentOldTrafficProtocolT = 11
-	AgentOldTrafficProtocolTKProtocolMux     AgentOldTrafficProtocolT = 12
-	AgentOldTrafficProtocolTKProtocolAMQP    AgentOldTrafficProtocolT = 13
-	AgentOldTrafficProtocolTKNumProtocols    AgentOldTrafficProtocolT = 14
+	AgentLagacyKernel310TrafficProtocolTKProtocolUnset   AgentLagacyKernel310TrafficProtocolT = 0
+	AgentLagacyKernel310TrafficProtocolTKProtocolUnknown AgentLagacyKernel310TrafficProtocolT = 1
+	AgentLagacyKernel310TrafficProtocolTKProtocolHTTP    AgentLagacyKernel310TrafficProtocolT = 2
+	AgentLagacyKernel310TrafficProtocolTKProtocolHTTP2   AgentLagacyKernel310TrafficProtocolT = 3
+	AgentLagacyKernel310TrafficProtocolTKProtocolMySQL   AgentLagacyKernel310TrafficProtocolT = 4
+	AgentLagacyKernel310TrafficProtocolTKProtocolCQL     AgentLagacyKernel310TrafficProtocolT = 5
+	AgentLagacyKernel310TrafficProtocolTKProtocolPGSQL   AgentLagacyKernel310TrafficProtocolT = 6
+	AgentLagacyKernel310TrafficProtocolTKProtocolDNS     AgentLagacyKernel310TrafficProtocolT = 7
+	AgentLagacyKernel310TrafficProtocolTKProtocolRedis   AgentLagacyKernel310TrafficProtocolT = 8
+	AgentLagacyKernel310TrafficProtocolTKProtocolNATS    AgentLagacyKernel310TrafficProtocolT = 9
+	AgentLagacyKernel310TrafficProtocolTKProtocolMongo   AgentLagacyKernel310TrafficProtocolT = 10
+	AgentLagacyKernel310TrafficProtocolTKProtocolKafka   AgentLagacyKernel310TrafficProtocolT = 11
+	AgentLagacyKernel310TrafficProtocolTKProtocolMux     AgentLagacyKernel310TrafficProtocolT = 12
+	AgentLagacyKernel310TrafficProtocolTKProtocolAMQP    AgentLagacyKernel310TrafficProtocolT = 13
+	AgentLagacyKernel310TrafficProtocolTKNumProtocols    AgentLagacyKernel310TrafficProtocolT = 14
 )
 
-// LoadAgentOld returns the embedded CollectionSpec for AgentOld.
-func LoadAgentOld() (*ebpf.CollectionSpec, error) {
-	reader := bytes.NewReader(_AgentOldBytes)
+// LoadAgentLagacyKernel310 returns the embedded CollectionSpec for AgentLagacyKernel310.
+func LoadAgentLagacyKernel310() (*ebpf.CollectionSpec, error) {
+	reader := bytes.NewReader(_AgentLagacyKernel310Bytes)
 	spec, err := ebpf.LoadCollectionSpecFromReader(reader)
 	if err != nil {
-		return nil, fmt.Errorf("can't load AgentOld: %w", err)
+		return nil, fmt.Errorf("can't load AgentLagacyKernel310: %w", err)
 	}
 
 	return spec, err
 }
 
-// LoadAgentOldObjects loads AgentOld and converts it into a struct.
+// LoadAgentLagacyKernel310Objects loads AgentLagacyKernel310 and converts it into a struct.
 //
 // The following types are suitable as obj argument:
 //
-//	*AgentOldObjects
-//	*AgentOldPrograms
-//	*AgentOldMaps
+//	*AgentLagacyKernel310Objects
+//	*AgentLagacyKernel310Programs
+//	*AgentLagacyKernel310Maps
 //
 // See ebpf.CollectionSpec.LoadAndAssign documentation for details.
-func LoadAgentOldObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
-	spec, err := LoadAgentOld()
+func LoadAgentLagacyKernel310Objects(obj interface{}, opts *ebpf.CollectionOptions) error {
+	spec, err := LoadAgentLagacyKernel310()
 	if err != nil {
 		return err
 	}
@@ -197,23 +203,25 @@ func LoadAgentOldObjects(obj interface{}, opts *ebpf.CollectionOptions) error {
 	return spec.LoadAndAssign(obj, opts)
 }
 
-// AgentOldSpecs contains maps and programs before they are loaded into the kernel.
+// AgentLagacyKernel310Specs contains maps and programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
-type AgentOldSpecs struct {
-	AgentOldProgramSpecs
-	AgentOldMapSpecs
+type AgentLagacyKernel310Specs struct {
+	AgentLagacyKernel310ProgramSpecs
+	AgentLagacyKernel310MapSpecs
 }
 
-// AgentOldSpecs contains programs before they are loaded into the kernel.
+// AgentLagacyKernel310Specs contains programs before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
-type AgentOldProgramSpecs struct {
+type AgentLagacyKernel310ProgramSpecs struct {
 	DevHardStartXmit                   *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                       *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                        *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
 	IpQueueXmit2                       *ebpf.ProgramSpec `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                          *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
+	KprobeNfNatManipPkt                *ebpf.ProgramSpec `ebpf:"kprobe__nf_nat_manip_pkt"`
+	KprobeNfNatPacket                  *ebpf.ProgramSpec `ebpf:"kprobe__nf_nat_packet"`
 	SecuritySocketRecvmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIovec               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iovec"`
@@ -226,6 +234,7 @@ type AgentOldProgramSpecs struct {
 	TcpV4Rcv                           *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
 	TracepointNetifReceiveSkb          *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec    *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
+	TracepointSchedSchedProcessExit    *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exit"`
 	TracepointSyscallsSysEnterAccept4  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_close"`
 	TracepointSyscallsSysEnterConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_connect"`
@@ -251,10 +260,10 @@ type AgentOldProgramSpecs struct {
 	XdpProxy                           *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
 }
 
-// AgentOldMapSpecs contains maps before they are loaded into the kernel.
+// AgentLagacyKernel310MapSpecs contains maps before they are loaded into the kernel.
 //
 // It can be passed ebpf.CollectionSpec.Assign.
-type AgentOldMapSpecs struct {
+type AgentLagacyKernel310MapSpecs struct {
 	AcceptArgsMap         *ebpf.MapSpec `ebpf:"accept_args_map"`
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
@@ -268,7 +277,14 @@ type AgentOldMapSpecs struct {
 	EnabledLocalPortMap   *ebpf.MapSpec `ebpf:"enabled_local_port_map"`
 	EnabledRemoteIpv4Map  *ebpf.MapSpec `ebpf:"enabled_remote_ipv4_map"`
 	EnabledRemotePortMap  *ebpf.MapSpec `ebpf:"enabled_remote_port_map"`
+	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
+	KernEvtT_map          *ebpf.MapSpec `ebpf:"kern_evt_t_map"`
+	NatFlowMap            *ebpf.MapSpec `ebpf:"nat_flow_map"`
 	ProcExecEvents        *ebpf.MapSpec `ebpf:"proc_exec_events"`
+	ProcExitEvents        *ebpf.MapSpec `ebpf:"proc_exit_events"`
 	Rb                    *ebpf.MapSpec `ebpf:"rb"`
 	ReadArgsMap           *ebpf.MapSpec `ebpf:"read_args_map"`
 	SockKeyConnIdMap      *ebpf.MapSpec `ebpf:"sock_key_conn_id_map"`
@@ -281,25 +297,25 @@ type AgentOldMapSpecs struct {
 	WriteArgsMap          *ebpf.MapSpec `ebpf:"write_args_map"`
 }
 
-// AgentOldObjects contains all objects after they have been loaded into the kernel.
+// AgentLagacyKernel310Objects contains all objects after they have been loaded into the kernel.
 //
-// It can be passed to LoadAgentOldObjects or ebpf.CollectionSpec.LoadAndAssign.
-type AgentOldObjects struct {
-	AgentOldPrograms
-	AgentOldMaps
+// It can be passed to LoadAgentLagacyKernel310Objects or ebpf.CollectionSpec.LoadAndAssign.
+type AgentLagacyKernel310Objects struct {
+	AgentLagacyKernel310Programs
+	AgentLagacyKernel310Maps
 }
 
-func (o *AgentOldObjects) Close() error {
-	return _AgentOldClose(
-		&o.AgentOldPrograms,
-		&o.AgentOldMaps,
+func (o *AgentLagacyKernel310Objects) Close() error {
+	return _AgentLagacyKernel310Close(
+		&o.AgentLagacyKernel310Programs,
+		&o.AgentLagacyKernel310Maps,
 	)
 }
 
-// AgentOldMaps contains all maps after they have been loaded into the kernel.
+// AgentLagacyKernel310Maps contains all maps after they have been loaded into the kernel.
 //
-// It can be passed to LoadAgentOldObjects or ebpf.CollectionSpec.LoadAndAssign.
-type AgentOldMaps struct {
+// It can be passed to LoadAgentLagacyKernel310Objects or ebpf.CollectionSpec.LoadAndAssign.
+type AgentLagacyKernel310Maps struct {
 	AcceptArgsMap         *ebpf.Map `ebpf:"accept_args_map"`
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
@@ -313,7 +329,14 @@ type AgentOldMaps struct {
 	EnabledLocalPortMap   *ebpf.Map `ebpf:"enabled_local_port_map"`
 	EnabledRemoteIpv4Map  *ebpf.Map `ebpf:"enabled_remote_ipv4_map"`
 	EnabledRemotePortMap  *ebpf.Map `ebpf:"enabled_remote_port_map"`
+	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
+	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
+	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
+	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
+	KernEvtT_map          *ebpf.Map `ebpf:"kern_evt_t_map"`
+	NatFlowMap            *ebpf.Map `ebpf:"nat_flow_map"`
 	ProcExecEvents        *ebpf.Map `ebpf:"proc_exec_events"`
+	ProcExitEvents        *ebpf.Map `ebpf:"proc_exit_events"`
 	Rb                    *ebpf.Map `ebpf:"rb"`
 	ReadArgsMap           *ebpf.Map `ebpf:"read_args_map"`
 	SockKeyConnIdMap      *ebpf.Map `ebpf:"sock_key_conn_id_map"`
@@ -326,8 +349,8 @@ type AgentOldMaps struct {
 	WriteArgsMap          *ebpf.Map `ebpf:"write_args_map"`
 }
 
-func (m *AgentOldMaps) Close() error {
-	return _AgentOldClose(
+func (m *AgentLagacyKernel310Maps) Close() error {
+	return _AgentLagacyKernel310Close(
 		m.AcceptArgsMap,
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
@@ -341,7 +364,14 @@ func (m *AgentOldMaps) Close() error {
 		m.EnabledLocalPortMap,
 		m.EnabledRemoteIpv4Map,
 		m.EnabledRemotePortMap,
+		m.FilterMntnsMap,
+		m.FilterNetnsMap,
+		m.FilterPidMap,
+		m.FilterPidnsMap,
+		m.KernEvtT_map,
+		m.NatFlowMap,
 		m.ProcExecEvents,
+		m.ProcExitEvents,
 		m.Rb,
 		m.ReadArgsMap,
 		m.SockKeyConnIdMap,
@@ -355,15 +385,17 @@ func (m *AgentOldMaps) Close() error {
 	)
 }
 
-// AgentOldPrograms contains all programs after they have been loaded into the kernel.
+// AgentLagacyKernel310Programs contains all programs after they have been loaded into the kernel.
 //
-// It can be passed to LoadAgentOldObjects or ebpf.CollectionSpec.LoadAndAssign.
-type AgentOldPrograms struct {
+// It can be passed to LoadAgentLagacyKernel310Objects or ebpf.CollectionSpec.LoadAndAssign.
+type AgentLagacyKernel310Programs struct {
 	DevHardStartXmit                   *ebpf.Program `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                       *ebpf.Program `ebpf:"dev_queue_xmit"`
 	IpQueueXmit                        *ebpf.Program `ebpf:"ip_queue_xmit"`
 	IpQueueXmit2                       *ebpf.Program `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                          *ebpf.Program `ebpf:"ip_rcv_core"`
+	KprobeNfNatManipPkt                *ebpf.Program `ebpf:"kprobe__nf_nat_manip_pkt"`
+	KprobeNfNatPacket                  *ebpf.Program `ebpf:"kprobe__nf_nat_packet"`
 	SecuritySocketRecvmsgEnter         *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
 	SecuritySocketSendmsgEnter         *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
 	SkbCopyDatagramIovec               *ebpf.Program `ebpf:"skb_copy_datagram_iovec"`
@@ -376,6 +408,7 @@ type AgentOldPrograms struct {
 	TcpV4Rcv                           *ebpf.Program `ebpf:"tcp_v4_rcv"`
 	TracepointNetifReceiveSkb          *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec    *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
+	TracepointSchedSchedProcessExit    *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exit"`
 	TracepointSyscallsSysEnterAccept4  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_close"`
 	TracepointSyscallsSysEnterConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_connect"`
@@ -401,13 +434,15 @@ type AgentOldPrograms struct {
 	XdpProxy                           *ebpf.Program `ebpf:"xdp_proxy"`
 }
 
-func (p *AgentOldPrograms) Close() error {
-	return _AgentOldClose(
+func (p *AgentLagacyKernel310Programs) Close() error {
+	return _AgentLagacyKernel310Close(
 		p.DevHardStartXmit,
 		p.DevQueueXmit,
 		p.IpQueueXmit,
 		p.IpQueueXmit2,
 		p.IpRcvCore,
+		p.KprobeNfNatManipPkt,
+		p.KprobeNfNatPacket,
 		p.SecuritySocketRecvmsgEnter,
 		p.SecuritySocketSendmsgEnter,
 		p.SkbCopyDatagramIovec,
@@ -420,6 +455,7 @@ func (p *AgentOldPrograms) Close() error {
 		p.TcpV4Rcv,
 		p.TracepointNetifReceiveSkb,
 		p.TracepointSchedSchedProcessExec,
+		p.TracepointSchedSchedProcessExit,
 		p.TracepointSyscallsSysEnterAccept4,
 		p.TracepointSyscallsSysEnterClose,
 		p.TracepointSyscallsSysEnterConnect,
@@ -446,7 +482,7 @@ func (p *AgentOldPrograms) Close() error {
 	)
 }
 
-func _AgentOldClose(closers ...io.Closer) error {
+func _AgentLagacyKernel310Close(closers ...io.Closer) error {
 	for _, closer := range closers {
 		if err := closer.Close(); err != nil {
 			return err
@@ -457,5 +493,5 @@ func _AgentOldClose(closers ...io.Closer) error {
 
 // Do not access this directly.
 //
-//go:embed agentold_x86_bpfel.o
-var _AgentOldBytes []byte
+//go:embed agentlagacykernel310_x86_bpfel.o
+var _AgentLagacyKernel310Bytes []byte

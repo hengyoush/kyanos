@@ -11,6 +11,35 @@ struct nested_syscall_fd_t {
 };
 
 struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10);
+    __type(key, u32);
+    __type(value, u8);
+} filter_mntns_map SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10);
+    __type(key, u32);
+    __type(value, u8);
+} filter_pidns_map SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10);
+    __type(key, u32);
+    __type(value, u8);
+} filter_netns_map SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10);
+    __type(key, u32);
+    __type(value, u8);
+} filter_pid_map SEC(".maps");
+
+
+struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(key_size, sizeof(uint64_t));
 	__uint(value_size, sizeof(struct data_args));
@@ -34,7 +63,6 @@ struct {
 	__uint(map_flags, 0);
 } ssl_user_space_call_map SEC(".maps");
 
-#ifdef KERNEL_VERSION_BELOW_58 
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(key_size, sizeof(u32));
@@ -55,24 +83,6 @@ struct {
     __uint(key_size, sizeof(u32));
     __uint(value_size, sizeof(u32));
 } conn_evt_rb SEC(".maps");
-#else
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 1<<24);
-} rb SEC(".maps");
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 1<<24);
-} syscall_rb SEC(".maps");
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 1<<24);
-} ssl_rb SEC(".maps");
-struct {
-	__uint(type, BPF_MAP_TYPE_RINGBUF);
-	__uint(max_entries, 1 << 24);
-} conn_evt_rb SEC(".maps");
-#endif
 
 MY_BPF_HASH(conn_info_map, uint64_t, struct conn_info_t);
 MY_BPF_ARRAY_PERCPU(syscall_data_map, struct kern_evt_data)
@@ -83,12 +93,8 @@ const int32_t kInvalidFD = -1;
 
 
 static bool __always_inline report_conn_evt(void* ctx, struct conn_info_t *conn_info, enum conn_type_t type, uint64_t ts) {
-#ifdef KERNEL_VERSION_BELOW_58 
 	struct conn_evt_t _evt = {0};
 	struct conn_evt_t* evt = &_evt;
-#else
-	struct conn_evt_t* evt = bpf_ringbuf_reserve(&conn_evt_rb, sizeof(struct conn_evt_t), 0); 
-#endif	
 	if (!evt) {
 		return 0;
 	}
@@ -100,11 +106,7 @@ static bool __always_inline report_conn_evt(void* ctx, struct conn_info_t *conn_
 	} else {
 		evt->ts = bpf_ktime_get_ns();
 	}
-#ifdef KERNEL_VERSION_BELOW_58 
 	bpf_perf_event_output(ctx, &conn_evt_rb, BPF_F_CURRENT_CPU, evt, sizeof(struct conn_evt_t));
-#else
-	bpf_ringbuf_submit(evt, 0);
-#endif	
 	return 1;
 }
 
@@ -143,11 +145,7 @@ static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t 
 	evt->buf_size = 0; 
 
 	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t);
-#ifdef KERNEL_VERSION_BELOW_58
 	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
-#else
-	bpf_ringbuf_output(&syscall_rb, evt, __len, 0);
-#endif
 }
 static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn) {
 	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
@@ -184,11 +182,7 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	}
 	evt->buf_size = amount_copied; 
 	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied;
-#ifdef KERNEL_VERSION_BELOW_58
 	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
-#else
-	bpf_ringbuf_output(&syscall_rb, evt, __len, 0);
-#endif
 }
 static void __always_inline report_syscall_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args) {
 	report_syscall_buf(ctx, seq, conn_id_s, len, step, args->ts, args->buf, args->source_fn);
@@ -231,11 +225,7 @@ static void __always_inline report_ssl_buf(void* ctx, uint64_t seq, struct conn_
 	}
 	evt->buf_size = amount_copied; 
 	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t) + sizeof(uint64_t)+ sizeof(uint32_t) + amount_copied;
-#ifdef KERNEL_VERSION_BELOW_58
 	bpf_perf_event_output(ctx, &ssl_rb, BPF_F_CURRENT_CPU, evt, __len);
-#else
-	bpf_ringbuf_output(&ssl_rb, evt, __len, 0);
-#endif
 }
 static void __always_inline report_ssl_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args, uint32_t syscall_seq, uint32_t syscall_len) {
 	report_ssl_buf(ctx, seq, conn_id_s, len, step, args->ts, args->buf, args->source_fn, syscall_seq, syscall_len);

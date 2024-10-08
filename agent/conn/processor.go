@@ -41,6 +41,37 @@ func (pm *ProcessorManager) GetProcessor(i int) *Processor {
 	return pm.processors[i]
 }
 
+func (pm *ProcessorManager) GetSyscallEventsChannels() []chan *bpf.SyscallEventData {
+	var channels []chan *bpf.SyscallEventData = make([]chan *bpf.SyscallEventData, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.syscallEvents)
+	}
+	return channels
+}
+
+func (pm *ProcessorManager) GetSslEventsChannels() []chan *bpf.SslData {
+	var channels []chan *bpf.SslData = make([]chan *bpf.SslData, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.sslEvents)
+	}
+	return channels
+}
+
+func (pm *ProcessorManager) GetConnEventsChannels() []chan *bpf.AgentConnEvtT {
+	var channels []chan *bpf.AgentConnEvtT = make([]chan *bpf.AgentConnEvtT, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.connEvents)
+	}
+	return channels
+}
+func (pm *ProcessorManager) GetKernEventsChannels() []chan *bpf.AgentKernEvt {
+	var channels []chan *bpf.AgentKernEvt = make([]chan *bpf.AgentKernEvt, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.kernEvents)
+	}
+	return channels
+}
+
 func (pm *ProcessorManager) StopAll() error {
 	pm.cancel()
 	pm.wg.Wait()
@@ -257,32 +288,48 @@ func (p *Processor) run() {
 			tgidFd := event.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.Ts+common.LaunchEpochTime)
 			event.Ts += common.LaunchEpochTime
-			if conn != nil {
-				common.BPFEventLog.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
-					conn.ToString(), event.Seq, event.Len,
-					common.DisplayTcpFlags(event.Flags))
-			} else {
-				common.BPFEventLog.Debugf("[data no conn][tgid=%d fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n", tgidFd>>32, uint32(tgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
-					event.Seq, event.Len,
-					common.DisplayTcpFlags(event.Flags))
-			}
+			// if conn != nil {
+			// 	common.BPFEventLog.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
+			// 		conn.ToString(), event.Seq, event.Len,
+			// 		common.DisplayTcpFlags(event.Flags))
+			// } else {
+			// 	common.BPFEventLog.Debugf("[data no conn][tgid=%d fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n", tgidFd>>32, uint32(tgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
+			// 		event.Seq, event.Len,
+			// 		common.DisplayTcpFlags(event.Flags))
+			// }
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					conn.OnKernEvent(event)
 					// log.Debug("[skip] skip due to protocol unset")
-					common.BPFEventLog.Debugf("[data][protocol-unset][func=%s][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len, common.DisplayTcpFlags(event.Flags))
+					common.BPFEventLog.Debugf("[protocol-unset]%s", FormatKernEvt(event, conn))
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
-					flag := conn.OnKernEvent(event)
-					if !flag {
-						common.BPFEventLog.Debug("[skip] skip due to cur req/resp is nil ?(maybe bug)")
-					}
+					common.BPFEventLog.Debugf("%s", FormatKernEvt(event, conn))
+					conn.OnKernEvent(event)
 				}
 			} else if event.Len > 0 && conn != nil {
-				common.BPFEventLog.Debug("[skip] skip due to protocol is unknwon")
-				common.BPFEventLog.Debugf("[data][func=%s][%s]%s | %d:%d\n", common.Int8ToStr(event.FuncName[:]), bpf.StepCNNames[event.Step], conn.ToString(), event.Seq, event.Len)
+				common.BPFEventLog.Debugf("[protocol-unknown]%s\n", FormatKernEvt(event, conn))
 			} else if event.Len == 0 && conn != nil {
 				conn.OnKernEvent(event)
+			} else if conn == nil {
+				common.BPFEventLog.Debugf("[no-conn]%s\n", FormatKernEvt(event, conn))
 			}
 		}
+	}
+}
+
+func FormatKernEvt(evt *bpf.AgentKernEvt, conn *Connection4) string {
+	var interfaceStr string
+	if evt.Ifindex != 0 {
+		name, err := common.GetInterfaceNameByIndex(int(evt.Ifindex), int(evt.ConnIdS.TgidFd>>32))
+		if err != nil {
+			interfaceStr = "[if=unknown]"
+		} else {
+			interfaceStr = fmt.Sprintf("[if=%s]", name)
+		}
+	}
+	if conn != nil {
+		return fmt.Sprintf("[kern][ts=%d]%s[%s]%s | %d|%d flags:%s\n", evt.Ts, interfaceStr, bpf.StepCNNames[evt.Step], conn.ToString(), evt.Seq, evt.Len, common.DisplayTcpFlags(evt.Flags))
+	} else {
+		return fmt.Sprintf("[kern][ts=%d]%s[%s] | %d|%d flags:%s\n", evt.Ts, interfaceStr, bpf.StepCNNames[evt.Step], evt.Seq, evt.Len, common.DisplayTcpFlags(evt.Flags))
 	}
 }

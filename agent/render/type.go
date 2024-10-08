@@ -1,7 +1,7 @@
 package render
 
 import (
-	. "kyanos/agent/analysis"
+	. "kyanos/agent/analysis/common"
 )
 
 var MetricTypeNames = map[MetricType]string{
