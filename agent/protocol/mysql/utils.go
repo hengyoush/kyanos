@@ -58,7 +58,7 @@ func isOkPacket(packet *MysqlPacket) bool {
 	}
 
 	if warnings > 1000 {
-		common.ProtocolParserLog.Warnln("Large warnings count is a sign of misclassification of OK packet.")
+		common.ProtocolParserLog.Infoln("Large warnings count is a sign of misclassification of OK packet.")
 	}
 
 	// 7 byte minimum packet size in protocol 4.1.
@@ -78,14 +78,14 @@ func isStmtPrepareOKPacket(packet *MysqlPacket) bool {
 
 func DissectDateTimeParam(msg string, offset *int, param *string) bool {
 	if len(msg) < *offset+1 {
-		common.ProtocolParserLog.Warnln("Not enough bytes to dissect date/time param.")
+		common.ProtocolParserLog.Infoln("Not enough bytes to dissect date/time param.")
 		return false
 	}
 
 	length := msg[*offset]
 	*offset = *offset + 1
 	if len(msg) < *offset+int(length) {
-		common.ProtocolParserLog.Warnln("Not enough bytes to dissect date/time param.")
+		common.ProtocolParserLog.Infoln("Not enough bytes to dissect date/time param.")
 		return false
 	}
 	*param = "MySQL DateTime rendering not implemented yet"
@@ -97,7 +97,7 @@ func DissectFloatParam[T common.KFloat](msg string, offset *int, params *string)
 	var t T
 	length := int(unsafe.Sizeof(t))
 	if len(msg) < *offset+length {
-		common.ProtocolParserLog.Warnln("Not enough bytes to dissect float param.")
+		common.ProtocolParserLog.Infoln("Not enough bytes to dissect float param.")
 		return false
 	}
 	*params = fmt.Sprintf("%f", common.LEndianBytesToFloat[T]([]byte(msg[*offset:*offset+length])))
@@ -114,7 +114,7 @@ func DissectIntParam[T common.KInt](s string, offset *int, nbytes uint, param *s
 
 func DissectInt[T common.KInt](msg string, offset *int, length int, result *T) bool {
 	if len(msg) < *offset+length {
-		common.ProtocolParserLog.Warnln("Not enough bytes to dissect int param.")
+		common.ProtocolParserLog.Infoln("Not enough bytes to dissect int param.")
 		return false
 	}
 	*result, _ = common.LEndianBytesToKInt[T]([]byte(msg[*offset:]), length)
@@ -217,7 +217,7 @@ func MoreResultsExist(packet *MysqlPacket) bool {
 		_, ok1 := processLengthEncodedInt(packet.msg, &pos)
 		_, ok2 := processLengthEncodedInt(packet.msg, &pos)
 		if !ok1 || !ok2 {
-			common.ProtocolParserLog.Warnln("Error parsing OK packet for SERVER_MORE_RESULTS_EXIST_FLAG")
+			common.ProtocolParserLog.Infoln("Error parsing OK packet for SERVER_MORE_RESULTS_EXIST_FLAG")
 			return false
 		}
 		return int8(packet.msg[pos])&kServerMoreResultsExistFlag != 0
