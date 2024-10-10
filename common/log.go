@@ -10,3 +10,5 @@ var BPFEventLog *logrus.Logger = logrus.New()
 var UprobeLog *logrus.Logger = logrus.New()
 var ConntrackLog *logrus.Logger = logrus.New()
 var ProtocolParserLog *logrus.Logger = logrus.New()
+
+var Loggers []*logrus.Logger = []*logrus.Logger{DefaultLog, AgentLog, BPFLog, BPFEventLog, UprobeLog, ConntrackLog, ProtocolParserLog}
