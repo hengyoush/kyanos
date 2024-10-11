@@ -2,13 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"kyanos/agent"
 	ac "kyanos/agent/common"
 	"kyanos/agent/protocol"
 	"kyanos/common"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/jefurry/logrus"
+	"github.com/jefurry/logrus/hooks/rotatelog"
 	"github.com/sevlyar/go-daemon"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -160,6 +163,20 @@ func InitLog() {
 		fallthrough
 	case logrus.DebugLevel:
 		klog.SetLogger(logr.Discard())
+	}
+	for _, l := range common.Loggers {
+		l.SetOut(io.Discard)
+		logdir := "/tmp"
+		if logdir != "" {
+			hook, err := rotatelog.NewHook(
+				logdir+"/kyanos.log.%Y%m%d",
+				rotatelog.WithMaxAge(time.Hour*24),
+				rotatelog.WithRotationTime(time.Hour),
+			)
+			if err == nil {
+				l.Hooks.Add(hook)
+			}
+		}
 	}
 }
 

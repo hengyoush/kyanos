@@ -7,12 +7,11 @@ import (
 	"kyanos/common"
 	"strings"
 
-	"github.com/jefurry/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var logger *logrus.Logger = common.DefaultLog
+var logger *common.Klogger = common.DefaultLog
 
 var rootCmd = &cobra.Command{
 	Use: `kyanos <command> [flags]`,

@@ -47,3 +47,11 @@ func (c *ConnDesc) String() string {
 	}
 	return fmt.Sprintf("[pid=%d][protocol=%d] *%s:%d %s %s:%d", c.Pid, c.Protocol, c.LocalAddr.String(), c.LocalPort, direct, c.RemoteAddr.String(), c.RemotePort)
 }
+
+func (c *ConnDesc) SimpleString() string {
+	direct := "=>"
+	if c.Side != ClientSide {
+		direct = "<="
+	}
+	return fmt.Sprintf("%s:%d %s %s:%d", c.LocalAddr.String(), c.LocalPort, direct, c.RemoteAddr.String(), c.RemotePort)
+}

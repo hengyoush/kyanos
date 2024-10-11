@@ -9,6 +9,7 @@ import (
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
 	"kyanos/agent/render"
+	"kyanos/agent/render/watch"
 	"kyanos/bpf"
 	"kyanos/bpf/loader"
 	"kyanos/common"
@@ -40,16 +41,7 @@ func SetupAgent(options ac.AgentOptions) {
 	statRecorder := analysis.InitStatRecorder()
 
 	var recordsChannel chan *anc.AnnotatedRecord = nil
-	if options.AnalysisEnable {
-		recordsChannel = make(chan *anc.AnnotatedRecord, 1000)
-		resultChannel := make(chan []*analysis.ConnStat, 1000)
-		renderStopper := make(chan int)
-		analyzer := analysis.CreateAnalyzer(recordsChannel, &options.AnalysisOptions, resultChannel, renderStopper, options.Ctx)
-		go analyzer.Run()
-
-		render := render.CreateRender(resultChannel, renderStopper, analyzer.AnalysisOptions)
-		go render.Run()
-	}
+	recordsChannel = make(chan *anc.AnnotatedRecord, 1000)
 
 	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter, options.TraceSide)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
@@ -107,8 +99,20 @@ func SetupAgent(options ac.AgentOptions) {
 	if options.InitCompletedHook != nil {
 		options.InitCompletedHook()
 	}
-	for !stop {
-		time.Sleep(time.Second * 1)
+
+	if options.AnalysisEnable {
+		resultChannel := make(chan []*analysis.ConnStat, 1000)
+		renderStopper := make(chan int)
+		analyzer := analysis.CreateAnalyzer(recordsChannel, &options.AnalysisOptions, resultChannel, renderStopper, options.Ctx)
+		go analyzer.Run()
+
+		render := render.CreateRender(resultChannel, renderStopper, analyzer.AnalysisOptions)
+		go render.Run()
+		for !stop {
+			time.Sleep(time.Second * 1)
+		}
+	} else {
+		watch.RunWatchRender(ctx, recordsChannel)
 	}
 	common.AgentLog.Infoln("Kyanos Stopped")
 	return
