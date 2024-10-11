@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"kyanos/agent/analysis"
 	anc "kyanos/agent/analysis/common"
-	ac "kyanos/agent/common"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -40,7 +39,9 @@ sudo kyanos stat http --metrics tqp
 	`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) { Mode = AnalysisMode },
 	Run: func(cmd *cobra.Command, args []string) {
-		startAgent(ac.AgentOptions{LatencyFilter: initLatencyFilter(cmd), SizeFilter: initSizeFilter(cmd)})
+		options.LatencyFilter = initLatencyFilter(cmd)
+		options.SizeFilter = initSizeFilter(cmd)
+		startAgent()
 	},
 }
 var enabledMetricsString string

@@ -8,6 +8,7 @@ import (
 	"kyanos/bpf"
 	c "kyanos/common"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,6 +45,7 @@ type model struct {
 	help     help.Model
 	chosen   bool
 	ready    bool
+	wide     bool
 }
 
 func (m model) Init() tea.Cmd { return tea.Batch(m.spinner.Tick) }
@@ -59,13 +61,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			records := (*m.records)[len(rows):]
 			idx := len(rows) + 1
 			for i, record := range records {
-				row := table.Row{
-					fmt.Sprintf("%d", i+idx),
-					record.ConnDesc.SimpleString(),
-					bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(record.ConnDesc.Protocol)],
-					fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.TotalDuration, false)),
-					fmt.Sprintf("%d", record.ReqSize),
-					fmt.Sprintf("%d", record.RespSize),
+				var row table.Row
+				if m.wide {
+					row = table.Row{
+						fmt.Sprintf("%d", i+idx),
+						c.GetPidCmdString(int32(record.Pid)),
+						record.ConnDesc.SimpleString(),
+						bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(record.ConnDesc.Protocol)],
+						fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.TotalDuration, false)),
+						fmt.Sprintf("%d", record.ReqSize),
+						fmt.Sprintf("%d", record.RespSize),
+						fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.BlackBoxDuration, false)),
+						fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.ReadFromSocketBufferDuration, false)),
+					}
+				} else {
+					row = table.Row{
+						fmt.Sprintf("%d", i+idx),
+						record.ConnDesc.SimpleString(),
+						bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(record.ConnDesc.Protocol)],
+						fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.TotalDuration, false)),
+						fmt.Sprintf("%d", record.ReqSize),
+						fmt.Sprintf("%d", record.RespSize),
+					}
 				}
 				rows = append(rows, row)
 			}
@@ -107,7 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					r := (*m.records)[idx-1]
 					line := strings.Repeat("+", m.viewport.Width)
 					m.viewport.SetContent("[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
-						c.TruncateString(r.Resp.FormatToString(), 10240) + "\n" + line)
+						c.TruncateString(r.Resp.FormatToString(), 10240))
 				} else {
 					panic("!")
 				}
@@ -215,14 +232,23 @@ func (k watchKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{{detailViewKeyMap["n"], detailViewKeyMap["p"]}}
 }
 
-func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord) {
+func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, options WatchOptions) {
 	columns := []table.Column{
 		{Title: "id", Width: 3},
 		{Title: "Connection", Width: 40},
-		{Title: "Protocol", Width: 10},
-		{Title: "Total Time", Width: 10},
-		{Title: "Req Size", Width: 10},
-		{Title: "Resp Size", Width: 10},
+		{Title: "Proto", Width: 5},
+		{Title: "TotalTime", Width: 10},
+		{Title: "ReqSize", Width: 7},
+		{Title: "RespSize", Width: 8},
+	}
+	if options.wideOutput {
+		columns = slices.Insert(columns, 1, table.Column{
+			Title: "Proc", Width: 20,
+		})
+		columns = append(columns, []table.Column{
+			{Title: "Net/Internal", Width: 15},
+			{Title: "ReadSocket", Width: 12},
+		}...)
 	}
 	rows := []table.Row{}
 	t := table.New(
@@ -230,7 +256,7 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord) {
 		table.WithRows(rows),
 		table.WithFocused(true),
 		table.WithHeight(7),
-		table.WithWidth(96),
+		// table.WithWidth(96),
 	)
 	s := table.DefaultStyles()
 	s.Header = s.Header.
@@ -244,7 +270,7 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord) {
 		Bold(false)
 	t.SetStyles(s)
 	records := &[]*common.AnnotatedRecord{}
-	m := model{t, viewport.New(100, 100), records, spinner.New(spinner.WithSpinner(spinner.Dot)), help.NewModel(), false, false}
+	m := model{t, viewport.New(100, 100), records, spinner.New(spinner.WithSpinner(spinner.Dot)), help.New(), false, false, options.wideOutput}
 	go func(mod *model, channel chan *common.AnnotatedRecord) {
 		for {
 			select {

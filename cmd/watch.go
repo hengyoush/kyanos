@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	ac "kyanos/agent/common"
 
 	"github.com/spf13/cobra"
 )
@@ -25,7 +24,9 @@ sudo kyanos watch mysql --latency 100 --req-size 1024 --resp-size 2048
 			if list {
 				fmt.Println([]string{"http", "redis", "mysql"})
 			} else {
-				startAgent(ac.AgentOptions{LatencyFilter: initLatencyFilter(cmd), SizeFilter: initSizeFilter(cmd)})
+				options.LatencyFilter = initLatencyFilter(cmd)
+				options.SizeFilter = initSizeFilter(cmd)
+				startAgent()
 			}
 		}
 	},
@@ -36,6 +37,7 @@ func init() {
 	watchCmd.PersistentFlags().Float64("latency", 0, "Filter based on request response time")
 	watchCmd.PersistentFlags().Int64("req-size", 0, "Filter based on request bytes size")
 	watchCmd.PersistentFlags().Int64("resp-size", 0, "Filter based on response bytes size")
+	watchCmd.PersistentFlags().StringVarP(&options.WatchOptions.Opts, "output", "o", "", "Can be `wide`")
 	watchCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "Filter based on connection side. can be: server | client")
 	watchCmd.Flags().SortFlags = false
 	watchCmd.PersistentFlags().SortFlags = false

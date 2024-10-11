@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	ac "kyanos/agent/common"
 	"kyanos/agent/metadata/k8s"
 	"kyanos/common"
 	"strings"
@@ -34,7 +33,7 @@ sudo kyanos stat http --metrics t --group-by remote-ip
 sudo kyanos stat http --metrics t --samples 3 --full-body
 sudo kyanos stat http --metrics tq --sort-by avg --group-by remote-ip`,
 	Run: func(cmd *cobra.Command, args []string) {
-		startAgent(ac.AgentOptions{})
+		startAgent()
 	},
 }
 

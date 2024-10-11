@@ -44,3 +44,16 @@ func ProcPidRootPath(pid int, paths ...string) string {
 func GetAllPids() ([]int32, error) {
 	return process.Pids()
 }
+
+func GetPidCmdString(pid int32) string {
+	proc, err := process.NewProcess(pid)
+	if err != nil {
+		return fmt.Sprintf("%d<%s>", pid, "unknwon")
+	} else {
+		name, err := proc.Name()
+		if err != nil {
+			return fmt.Sprintf("%d<%s>", pid, "unknwon")
+		}
+		return fmt.Sprintf("%d<%s>", pid, name)
+	}
+}

@@ -42,7 +42,9 @@ func ParseSide(side string) (common.SideEnum, error) {
 	}
 }
 
-func startAgent(options ac.AgentOptions) {
+var options ac.AgentOptions
+
+func startAgent() {
 	side, err := ParseSide(SidePar)
 	if err != nil {
 		return

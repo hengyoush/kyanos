@@ -112,7 +112,7 @@ func SetupAgent(options ac.AgentOptions) {
 			time.Sleep(time.Second * 1)
 		}
 	} else {
-		watch.RunWatchRender(ctx, recordsChannel)
+		watch.RunWatchRender(ctx, recordsChannel, options.WatchOptions)
 	}
 	common.AgentLog.Infoln("Kyanos Stopped")
 	return
