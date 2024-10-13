@@ -114,24 +114,23 @@ type Analyzer struct {
 	ctx             context.Context
 }
 
-func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, showOption *analysis_common.AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int, ctx context.Context) *Analyzer {
+func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, opts *analysis_common.AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int, ctx context.Context) *Analyzer {
 	stopper := make(chan int)
 	// ac.AddToFastStopper(stopper)
+	opts.Init()
 	analyzer := &Analyzer{
-		Classfier:       getClassfier(showOption.ClassfierType),
+		Classfier:       getClassfier(opts.ClassfierType),
 		recordsChannel:  recordsChannel,
 		Aggregators:     make(map[ClassId]*aggregator),
-		AnalysisOptions: showOption,
+		AnalysisOptions: opts,
 		stopper:         stopper,
 		resultChannel:   resultChannel,
 		renderStopper:   renderStopper,
+		ctx:             ctx,
 	}
-	if showOption.Interval > 0 {
-		analyzer.ticker = time.NewTicker(time.Second * time.Duration(showOption.Interval))
-		analyzer.tickerC = analyzer.ticker.C
-	} else {
-		analyzer.tickerC = make(<-chan time.Time)
-	}
+
+	analyzer.ticker = time.NewTicker(time.Second * 1)
+	analyzer.tickerC = analyzer.ticker.C
 	return analyzer
 }
 
@@ -140,10 +139,6 @@ func (a *Analyzer) Run() {
 		select {
 		// case <-a.stopper:
 		case <-a.ctx.Done():
-			if a.AnalysisOptions.Interval == 0 {
-				a.resultChannel <- a.harvest()
-				time.Sleep(1 * time.Second)
-			}
 			a.renderStopper <- 1
 			return
 		case record := <-a.recordsChannel:
@@ -161,7 +156,9 @@ func (a *Analyzer) harvest() []*ConnStat {
 		// aggregator.reset(classId, a.analysis_common.AnalysisOptions)
 		result = append(result, connstat)
 	}
-	a.Aggregators = make(map[ClassId]*aggregator)
+	if a.AnalysisOptions.CleanWhenHarvest {
+		a.Aggregators = make(map[ClassId]*aggregator)
+	}
 	return result
 }
 

@@ -55,7 +55,7 @@ func init() {
 
 	classIdHumanReadableMap = make(map[anc.ClassfierType]ClassIdAsHumanReadable)
 	classIdHumanReadableMap[Conn] = func(ar *anc.AnnotatedRecord) string {
-		return ar.ConnDesc.String()
+		return ar.ConnDesc.SimpleString()
 	}
 	classIdHumanReadableMap[HttpPath] = func(ar *anc.AnnotatedRecord) string {
 		httpReq, ok := ar.Record.Request().(*protocol.ParsedHttpRequest)

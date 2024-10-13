@@ -12,12 +12,16 @@ import (
 type AnalysisOptions struct {
 	EnabledMetricTypeSet MetricTypeSet
 	SampleLimit          int
-	DisplayLimit         int
-	Interval             int
 	Side                 ac.SideEnum
 	ClassfierType
-	SortBy         LatencyMetric
-	FullRecordBody bool
+	CleanWhenHarvest bool
+}
+
+func (a *AnalysisOptions) Init() {
+	if a.SampleLimit <= 0 {
+		a.SampleLimit = 10
+	}
+	a.CleanWhenHarvest = false
 }
 
 type ClassfierType int
@@ -68,6 +72,14 @@ const (
 	NoneType
 )
 
+func (m MetricType) IsTotalMeaningful() bool {
+	switch m {
+	case ResponseSize, RequestSize:
+		return true
+	default:
+		return false
+	}
+}
 func GetMetricExtractFunc[T MetricValueType](t MetricType) MetricExtract[T] {
 	switch t {
 	case ResponseSize:

@@ -8,7 +8,7 @@ import (
 	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
-	"kyanos/agent/render"
+	"kyanos/agent/render/stat"
 	"kyanos/agent/render/watch"
 	"kyanos/bpf"
 	"kyanos/bpf/loader"
@@ -16,7 +16,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/cilium/ebpf/rlimit"
 )
@@ -106,14 +105,16 @@ func SetupAgent(options ac.AgentOptions) {
 		analyzer := analysis.CreateAnalyzer(recordsChannel, &options.AnalysisOptions, resultChannel, renderStopper, options.Ctx)
 		go analyzer.Run()
 
-		render := render.CreateRender(resultChannel, renderStopper, analyzer.AnalysisOptions)
-		go render.Run()
-		for !stop {
-			time.Sleep(time.Second * 1)
-		}
+		stat.StartStatRender(ctx, resultChannel, options.AnalysisOptions)
+		// render := render.CreateRender(resultChannel, renderStopper, analyzer.AnalysisOptions)
+		// go render.Run()
+		// for !stop {
+		// 	time.Sleep(time.Second * 1)
+		// }
 	} else {
 		watch.RunWatchRender(ctx, recordsChannel, options.WatchOptions)
 	}
-	common.AgentLog.Infoln("Kyanos Stopped")
+	common.AgentLog.Infoln("Kyanos Stopped: ", stop)
+
 	return
 }
