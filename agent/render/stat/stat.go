@@ -1,6 +1,7 @@
 package stat
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"kyanos/agent/analysis"
@@ -8,8 +9,13 @@ import (
 	rc "kyanos/agent/render/common"
 	"kyanos/agent/render/watch"
 	"os"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,30 +24,101 @@ import (
 
 var lock *sync.Mutex = &sync.Mutex{}
 
+type SortBy int8
+type statTableKeyMap rc.KeyMap
+
+var sortByKeyMap = statTableKeyMap{
+	"1": key.NewBinding(
+		key.WithKeys("1"),
+		key.WithHelp("1", "sort by name"),
+	),
+	"2": key.NewBinding(
+		key.WithKeys("2"),
+		key.WithHelp("2", "sort by max"),
+	),
+	"3": key.NewBinding(
+		key.WithKeys("3"),
+		key.WithHelp("3", "sort by avg"),
+	),
+	"4": key.NewBinding(
+		key.WithKeys("4"),
+		key.WithHelp("4", "sort by p50"),
+	),
+	"5": key.NewBinding(
+		key.WithKeys("5"),
+		key.WithHelp("5", "sort by p90"),
+	),
+	"6": key.NewBinding(
+		key.WithKeys("6"),
+		key.WithHelp("6", "sort by p99"),
+	),
+	"7": key.NewBinding(
+		key.WithKeys("7"),
+		key.WithHelp("7", "sort by count"),
+	),
+	"8": key.NewBinding(
+		key.WithKeys("8"),
+		key.WithHelp("8", "sort by total"),
+	),
+}
+
+func (k statTableKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{sortByKeyMap["1"], sortByKeyMap["2"],
+		sortByKeyMap["3"], sortByKeyMap["4"],
+		sortByKeyMap["5"], sortByKeyMap["6"],
+		sortByKeyMap["7"], sortByKeyMap["8"],
+	}
+}
+
+func (k statTableKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{sortByKeyMap["1"], sortByKeyMap["2"],
+		sortByKeyMap["3"], sortByKeyMap["4"],
+		sortByKeyMap["5"], sortByKeyMap["6"],
+		sortByKeyMap["7"], sortByKeyMap["8"],
+	}}
+}
+
+const (
+	none SortBy = iota
+	name
+	max
+	avg
+	p50
+	p90
+	p99
+	count
+	total
+	end
+)
+
 type model struct {
-	statTable   table.Model
-	sampleModel tea.Model
-	spinner     spinner.Model
+	statTable    table.Model
+	sampleModel  tea.Model
+	spinner      spinner.Model
+	additionHelp help.Model
 
 	connstats    *[]*analysis.ConnStat
 	curConnstats *[]*analysis.ConnStat
 
 	options common.AnalysisOptions
 
-	chosenStat    bool
-	chosenClassId string
+	chosenStat bool
 
 	windownSizeMsg tea.WindowSizeMsg
+
+	sortBy  SortBy
+	reverse bool
 }
 
 func NewModel(options common.AnalysisOptions) tea.Model {
 	return &model{
-		statTable:   initTable(options),
-		sampleModel: nil,
-		spinner:     spinner.New(spinner.WithSpinner(spinner.Dot)),
-		connstats:   nil,
-		options:     options,
-		chosenStat:  false,
+		statTable:    initTable(options),
+		sampleModel:  nil,
+		spinner:      spinner.New(spinner.WithSpinner(spinner.Dot)),
+		additionHelp: help.New(),
+		connstats:    nil,
+		options:      options,
+		chosenStat:   false,
 	}
 }
 
@@ -86,38 +163,116 @@ func initTable(options common.AnalysisOptions) table.Model {
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick)
 }
+
+func (m *model) updateRowsInTable() {
+	lock.Lock()
+	defer lock.Unlock()
+	rows := make([]table.Row, 0)
+	if m.connstats != nil && m.curConnstats != m.connstats {
+		m.curConnstats = m.connstats
+		m.sortConnstats(m.curConnstats)
+		metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
+		records := (*m.curConnstats)
+		var row table.Row
+		for i, record := range records {
+			pCalc := record.PercentileCalculators[metric]
+			p50, p90, p99 := pCalc.CalculatePercentile(0.5), pCalc.CalculatePercentile(0.9), pCalc.CalculatePercentile(0.99)
+			row = table.Row{
+				fmt.Sprintf("%d", i),
+				record.ClassIdAsHumanReadable(record.ClassId),
+				fmt.Sprintf("%.2f", record.MaxMap[metric]),
+				fmt.Sprintf("%.2f", record.SumMap[metric]/float64(record.Count)),
+				fmt.Sprintf("%.2f", p50),
+				fmt.Sprintf("%.2f", p90),
+				fmt.Sprintf("%.2f", p99),
+				fmt.Sprintf("%d", record.Count),
+			}
+			if metric.IsTotalMeaningful() {
+				row = append(row, fmt.Sprintf("%.1f", record.SumMap[metric]))
+			}
+			rows = append(rows, row)
+		}
+		m.statTable.SetRows(rows)
+	}
+}
+func connstatPercentileSortFunc(c1, c2 *analysis.ConnStat, line float64, m common.MetricType, reverse bool) int {
+	pCalc1 := c1.PercentileCalculators[m]
+	value1 := pCalc1.CalculatePercentile(line)
+	pCalc2 := c2.PercentileCalculators[m]
+	value2 := pCalc2.CalculatePercentile(line)
+	if reverse {
+		return cmp.Compare(value2, value1)
+	} else {
+		return cmp.Compare(value1, value2)
+
+	}
+}
+func (m *model) sortConnstats(connstats *[]*analysis.ConnStat) {
+	metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
+	switch m.sortBy {
+	case max:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			if m.reverse {
+				return cmp.Compare(c2.MaxMap[metric], c1.MaxMap[metric])
+			} else {
+				return cmp.Compare(c1.MaxMap[metric], c2.MaxMap[metric])
+			}
+		})
+	case avg:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			if m.reverse {
+				return cmp.Compare(c2.SumMap[metric]/float64(c2.Count), c1.SumMap[metric]/float64(c1.Count))
+			} else {
+				return cmp.Compare(c1.SumMap[metric]/float64(c1.Count), c2.SumMap[metric]/float64(c2.Count))
+			}
+		})
+	case p50:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			return connstatPercentileSortFunc(c1, c2, 0.5, metric, m.reverse)
+		})
+	case p90:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			return connstatPercentileSortFunc(c1, c2, 0.9, metric, m.reverse)
+		})
+	case p99:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			return connstatPercentileSortFunc(c1, c2, 0.99, metric, m.reverse)
+		})
+	case count:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			if m.reverse {
+				return cmp.Compare(c2.Count, c1.Count)
+			} else {
+				return cmp.Compare(c1.Count, c2.Count)
+			}
+		})
+	case total:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			if m.reverse {
+				return cmp.Compare(c2.SumMap[metric], c1.SumMap[metric])
+			} else {
+				return cmp.Compare(c1.SumMap[metric], c2.SumMap[metric])
+			}
+		})
+	case name:
+		fallthrough
+	default:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			if m.reverse {
+				return cmp.Compare(c2.ClassId, c1.ClassId)
+			} else {
+				return cmp.Compare(c1.ClassId, c2.ClassId)
+			}
+		})
+
+	}
+}
+
 func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
-		rows := make([]table.Row, 0)
-		lock.Lock()
-		defer lock.Unlock()
-		if m.connstats != nil && m.curConnstats != m.connstats {
-			m.curConnstats = m.connstats
-			metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
-			records := (*m.curConnstats)
-			var row table.Row
-			for i, record := range records {
-				pCalc := record.PercentileCalculators[metric]
-				p50, p90, p99 := pCalc.CalculatePercentile(0.5), pCalc.CalculatePercentile(0.9), pCalc.CalculatePercentile(0.99)
-				row = table.Row{
-					fmt.Sprintf("%d", i),
-					record.ClassIdAsHumanReadable(record.ClassId),
-					fmt.Sprintf("%.2f", record.MaxMap[metric]),
-					fmt.Sprintf("%.2f", record.SumMap[metric]/float64(record.Count)),
-					fmt.Sprintf("%.2f", p50),
-					fmt.Sprintf("%.2f", p90),
-					fmt.Sprintf("%.2f", p99),
-					fmt.Sprintf("%d", record.Count),
-				}
-				if metric.IsTotalMeaningful() {
-					row = append(row, fmt.Sprintf("%.1f", record.SumMap[metric]))
-				}
-				rows = append(rows, row)
-			}
-			m.statTable.SetRows(rows)
-		}
+		m.updateRowsInTable()
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	case tea.WindowSizeMsg:
@@ -126,9 +281,30 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc", "q", "ctrl+c":
 			return m, tea.Quit
+		case "1", "2", "3", "4", "5", "6", "7", "8":
+			i, err := strconv.Atoi(strings.TrimPrefix(msg.String(), "ctrl+"))
+			if err == nil && (i >= int(none) && i < int(end)) &&
+				(i >= 0 && i < len(m.statTable.Columns())) {
+				prevSortBy := m.sortBy
+				m.sortBy = SortBy(i)
+				m.reverse = !m.reverse
+				cols := m.statTable.Columns()
+				if prevSortBy != none {
+					col := &cols[prevSortBy]
+					col.Title = strings.TrimRight(col.Title, "↑")
+					col.Title = strings.TrimRight(col.Title, "↓")
+				}
+				col := &cols[m.sortBy]
+				if m.reverse {
+					col.Title = col.Title + "↓"
+				} else {
+					col.Title = col.Title + "↑"
+				}
+				m.statTable.SetColumns(cols)
+				m.updateRowsInTable()
+			}
 		case "enter":
 			m.chosenStat = true
-			// TODO 考虑sort
 			cursor := m.statTable.Cursor()
 			metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
 			if m.curConnstats != nil {
@@ -184,7 +360,7 @@ func (m *model) viewStatTable() string {
 	}
 	s := fmt.Sprintf("\n %s Events received: %d\n\n", m.spinner.View(), totalCount)
 
-	return s + rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n"
+	return s + rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n" + m.additionHelp.View(sortByKeyMap)
 }
 
 func (m *model) viewSampleTable() string {
