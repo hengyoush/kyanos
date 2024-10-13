@@ -184,7 +184,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					idx, _ := strconv.Atoi(selected[0])
 					r := (*m.records)[idx-1]
 					line := strings.Repeat("+", m.viewport.Width)
-					m.viewport.SetContent("[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
+					timeDetail := ViewRecordTimeDetailAsFlowChart(r)
+					// m.viewport.SetContent("[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
+					// 	c.TruncateString(r.Resp.FormatToString(), 10240))
+					m.viewport.SetContent(timeDetail + "\n" + line + "\n" +
+						"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
 						c.TruncateString(r.Resp.FormatToString(), 10240))
 				} else {
 					panic("!")

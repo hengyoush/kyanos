@@ -164,8 +164,11 @@ func InitLog() {
 	case logrus.InfoLevel:
 		fallthrough
 	case logrus.DebugLevel:
+		break
+	default:
 		klog.SetLogger(logr.Discard())
 	}
+
 	for _, l := range common.Loggers {
 		l.SetOut(io.Discard)
 		logdir := "/tmp"

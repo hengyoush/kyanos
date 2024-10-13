@@ -1,6 +1,6 @@
 module kyanos
 
-go 1.22.0
+go 1.22.2
 
 toolchain go1.22.6
 
@@ -26,6 +26,7 @@ require (
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0 // indirect
+	github.com/Ha4sh-447/flowcharts v0.0.0-20240802124452-44516e0e7dc8 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/Microsoft/hcsshim v0.11.7 // indirect
 	github.com/airbrake/gobrake v3.7.4+incompatible // indirect

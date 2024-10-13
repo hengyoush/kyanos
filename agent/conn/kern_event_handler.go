@@ -93,7 +93,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 			if err != nil {
 				ifname = "unknown"
 			}
-			kernEvent.UpdateIfTimestampAttr(ifname, event.Ts)
+			kernEvent.UpdateIfTimestampAttr(ifname, int64(event.Ts))
 		} else if found {
 			return
 			// panic("found duplicate kern event on same seq")
@@ -218,8 +218,8 @@ func (kernevent *KernEvent) GetAttributes() map[string]any {
 	return kernevent.attributes
 }
 
-func (kernevent *KernEvent) UpdateIfTimestampAttr(ifname string, time uint64) {
-	kernevent.attributes[fmt.Sprintf("time-%s", ifname)] = time
+func (kernevent *KernEvent) UpdateIfTimestampAttr(ifname string, time int64) {
+	kernevent.attributes["time-"+ifname] = time
 }
 
 type SslEvent struct {

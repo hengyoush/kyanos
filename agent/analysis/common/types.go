@@ -120,6 +120,7 @@ type AnnotatedRecord struct {
 	RespSize                     int
 	TotalDuration                float64
 	BlackBoxDuration             float64
+	CopyToSocketBufferDuration   float64
 	ReadFromSocketBufferDuration float64
 	ReqSyscallEventDetails       []SyscallEventDetail
 	RespSyscallEventDetails      []SyscallEventDetail
@@ -139,8 +140,19 @@ func (a *AnnotatedRecord) GetReadFromSocketBufferDurationMills() float64 {
 	return common.NanoToMills(int32(a.ReadFromSocketBufferDuration))
 }
 
+func (a *AnnotatedRecord) GetLastRespSyscallTime() int64 {
+	if len(a.RespSyscallEventDetails) == 0 {
+		return 0
+	} else {
+		return int64(a.RespSyscallEventDetails[len(a.RespSyscallEventDetails)-1].Timestamp)
+	}
+}
+
 type SyscallEventDetail PacketEventDetail
-type NicEventDetail PacketEventDetail
+type NicEventDetail struct {
+	PacketEventDetail
+	Attributes map[string]any
+}
 type PacketEventDetail struct {
 	ByteSize  int
 	Timestamp uint64
