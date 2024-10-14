@@ -75,3 +75,10 @@ func ColorGrid(xSteps, ySteps int) [][]string {
 
 	return grid
 }
+
+type SortBy int8
+
+type SortOption struct {
+	sortBy  SortBy
+	reverse bool
+}

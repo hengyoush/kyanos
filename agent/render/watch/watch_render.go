@@ -1,6 +1,7 @@
 package watch
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"kyanos/agent/analysis/common"
@@ -24,9 +25,132 @@ import (
 
 var lock *sync.Mutex = &sync.Mutex{}
 
-type WatchRender struct {
-	model *model
+type watchCol struct {
+	name       string
+	cmp        func(c1 *common.AnnotatedRecord, c2 *common.AnnotatedRecord, reverse bool) int
+	data       func(c *common.AnnotatedRecord) string
+	width      int
+	metricType common.MetricType
 }
+
+var (
+	cols       []watchCol
+	sortKeyMap watchKeyMap
+	idCol      watchCol = watchCol{
+		name:  "id",
+		cmp:   nil,
+		width: 5,
+	}
+	connCol watchCol = watchCol{
+		name: "Connection",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.ConnDesc.SimpleString(), c1.ConnDesc.SimpleString())
+			} else {
+				return cmp.Compare(c1.ConnDesc.SimpleString(), c2.ConnDesc.SimpleString())
+			}
+		},
+		data:  func(c *common.AnnotatedRecord) string { return c.ConnDesc.SimpleString() },
+		width: 40,
+	}
+	protoCol watchCol = watchCol{
+		name: "Proto",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.Protocol, c1.Protocol)
+			} else {
+				return cmp.Compare(c1.Protocol, c2.Protocol)
+			}
+		},
+		data: func(c *common.AnnotatedRecord) string {
+			return bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(c.ConnDesc.Protocol)]
+		},
+		width: 6,
+	}
+	totalTimeCol watchCol = watchCol{
+		name: "TotalTime",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.TotalDuration, c1.TotalDuration)
+			} else {
+				return cmp.Compare(c1.TotalDuration, c2.TotalDuration)
+			}
+		},
+		data: func(r *common.AnnotatedRecord) string {
+			return fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(r.TotalDuration, false))
+		},
+		width:      10,
+		metricType: common.TotalDuration,
+	}
+	reqSizeCol watchCol = watchCol{
+		name: "ReqSize",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.ReqSize, c1.ReqSize)
+			} else {
+				return cmp.Compare(c1.ReqSize, c2.ReqSize)
+			}
+		},
+		data:       func(c *common.AnnotatedRecord) string { return fmt.Sprintf("%d", c.ReqSize) },
+		width:      10,
+		metricType: common.RequestSize,
+	}
+	respSizeCol watchCol = watchCol{
+		name: "RespSize",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.RespSize, c1.RespSize)
+			} else {
+				return cmp.Compare(c1.RespSize, c2.RespSize)
+			}
+		},
+		data:       func(c *common.AnnotatedRecord) string { return fmt.Sprintf("%d", c.RespSize) },
+		width:      10,
+		metricType: common.ResponseSize,
+	}
+	processCol watchCol = watchCol{
+		name: "Process",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.Pid, c1.Pid)
+			} else {
+				return cmp.Compare(c1.Pid, c2.Pid)
+			}
+		},
+		data:  func(r *common.AnnotatedRecord) string { return c.GetPidCmdString(int32(r.Pid)) },
+		width: 15,
+	}
+	netInternalCol watchCol = watchCol{
+		name: "Net/Internal",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.BlackBoxDuration, c1.BlackBoxDuration)
+			} else {
+				return cmp.Compare(c1.BlackBoxDuration, c2.BlackBoxDuration)
+			}
+		},
+		data: func(r *common.AnnotatedRecord) string {
+			return fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(r.BlackBoxDuration, false))
+		},
+		width:      13,
+		metricType: common.BlackBoxDuration,
+	}
+	readSocketCol watchCol = watchCol{
+		name: "ReadSocketTime",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.ReadFromSocketBufferDuration, c1.ReadFromSocketBufferDuration)
+			} else {
+				return cmp.Compare(c1.ReadFromSocketBufferDuration, c2.ReadFromSocketBufferDuration)
+			}
+		},
+		data: func(r *common.AnnotatedRecord) string {
+			return fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(r.ReadFromSocketBufferDuration, false))
+		},
+		width:      15,
+		metricType: common.ReadFromSocketBufferDuration,
+	}
+)
 
 type model struct {
 	table                 table.Model
@@ -39,9 +163,12 @@ type model struct {
 	wide                  bool
 	staticRecord          bool
 	initialWindownSizeMsg tea.WindowSizeMsg
+	sortBy                rc.SortBy
+	reverse               bool
 }
 
-func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialWindownSizeMsg tea.WindowSizeMsg) tea.Model {
+func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialWindownSizeMsg tea.WindowSizeMsg,
+	sortBy common.MetricType, reverse bool) tea.Model {
 	var m tea.Model = &model{
 		table:                 initTable(options),
 		viewport:              viewport.New(100, 100),
@@ -54,31 +181,54 @@ func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialW
 		staticRecord:          options.StaticRecord,
 		initialWindownSizeMsg: initialWindownSizeMsg,
 	}
+	if sortBy != common.NoneType {
+		for idx, col := range cols {
+			if col.metricType == sortBy {
+				m.(*model).sortBy = rc.SortBy(idx)
+				m.(*model).reverse = !reverse
+				m.(*model).updateTableSortBy(idx)
+				break
+			}
+		}
+	}
 	return m
 }
 
+func initWatchCols(wide bool) {
+	cols = make([]watchCol, 0)
+	cols = []watchCol{idCol, connCol, protoCol, totalTimeCol, reqSizeCol, respSizeCol}
+	if wide {
+		cols = slices.Insert(cols, 1, processCol)
+	}
+	cols = append(cols, netInternalCol, readSocketCol)
+}
+
+func initDetailViewKeyMap(cols []watchCol) {
+	sortKeyMap = watchKeyMap{}
+	for idx, col := range cols {
+		if idx == 0 {
+			continue
+		}
+		idxStr := fmt.Sprintf("%d", idx)
+		sortKeyMap[idxStr] = key.NewBinding(
+			key.WithKeys(idxStr),
+			key.WithHelp(idxStr, fmt.Sprintf("sort by %s", col.name)),
+		)
+	}
+}
+
 func initTable(options WatchOptions) table.Model {
-	columns := []table.Column{
-		{Title: "id", Width: 3},
-		{Title: "Connection", Width: 40},
-		{Title: "Proto", Width: 5},
-		{Title: "TotalTime", Width: 10},
-		{Title: "ReqSize", Width: 7},
-		{Title: "RespSize", Width: 8},
-	}
-	if options.WideOutput {
-		columns = slices.Insert(columns, 1, table.Column{
-			Title: "Proc", Width: 20,
+	initWatchCols(options.WideOutput)
+	columns := []table.Column{}
+	for _, eachCol := range cols {
+		columns = append(columns, table.Column{
+			Title: eachCol.name,
+			Width: eachCol.width,
 		})
-		columns = append(columns, []table.Column{
-			{Title: "Net/Internal", Width: 15},
-			{Title: "ReadSocket", Width: 12},
-		}...)
 	}
-	rows := []table.Row{}
 	t := table.New(
 		table.WithColumns(columns),
-		table.WithRows(rows),
+		table.WithRows([]table.Row{}),
 		table.WithFocused(true),
 		table.WithHeight(7),
 		// table.WithWidth(96),
@@ -107,35 +257,31 @@ func (m *model) Init() tea.Cmd {
 	}
 }
 
+func (m *model) sortConnstats(connstats *[]*common.AnnotatedRecord) {
+	slices.SortFunc(*connstats, func(c1, c2 *common.AnnotatedRecord) int {
+		col := cols[m.sortBy]
+		return col.cmp(c1, c2, m.reverse)
+	})
+}
 func (m *model) updateRowsInTable() {
-	rows := m.table.Rows()
+	lock.Lock()
+	defer lock.Unlock()
+	rows := make([]table.Row, 0)
 	if len(rows) < len(*m.records) {
-		records := (*m.records)[len(rows):]
-		idx := len(rows) + 1
+		// records := (*m.records)[len(rows):]
+		m.sortConnstats(m.records)
+		records := (*m.records)
+		idx := 1
 		for i, record := range records {
 			var row table.Row
-			if m.wide {
-				row = table.Row{
-					fmt.Sprintf("%d", i+idx),
-					c.GetPidCmdString(int32(record.Pid)),
-					record.ConnDesc.SimpleString(),
-					bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(record.ConnDesc.Protocol)],
-					fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.TotalDuration, false)),
-					fmt.Sprintf("%d", record.ReqSize),
-					fmt.Sprintf("%d", record.RespSize),
-					fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.BlackBoxDuration, false)),
-					fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.ReadFromSocketBufferDuration, false)),
-				}
-			} else {
-				row = table.Row{
-					fmt.Sprintf("%d", i+idx),
-					record.ConnDesc.SimpleString(),
-					bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(record.ConnDesc.Protocol)],
-					fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(record.TotalDuration, false)),
-					fmt.Sprintf("%d", record.ReqSize),
-					fmt.Sprintf("%d", record.RespSize),
+			for colIdx := range m.table.Columns() {
+				if colIdx == 0 {
+					row = append(row, fmt.Sprintf("%d", i+idx))
+				} else {
+					row = append(row, cols[colIdx].data(record))
 				}
 			}
+
 			rows = append(rows, row)
 		}
 		m.table.SetRows(rows)
@@ -146,8 +292,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case spinner.TickMsg, rc.TickMsg:
-		lock.Lock()
-		defer lock.Unlock()
 		m.updateRowsInTable()
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
@@ -165,6 +309,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "1", "2", "3", "4", "5", "6", "7", "8":
+			i, err := strconv.Atoi(msg.String())
+			if !m.chosen {
+				if err == nil {
+					m.updateTableSortBy(i)
+				}
+			}
 		case "n", "p":
 			if !m.chosen {
 				break
@@ -211,6 +362,28 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd = rc.DoTick()
 		}
 		return m, cmd
+	}
+}
+
+func (m *model) updateTableSortBy(newSortBy int) {
+	if newSortBy > 0 && newSortBy < len(cols) {
+		prevSortBy := m.sortBy
+		m.sortBy = rc.SortBy(newSortBy)
+		m.reverse = !m.reverse
+		cols := m.table.Columns()
+		if prevSortBy != 0 {
+			col := &cols[prevSortBy]
+			col.Title = strings.TrimRight(col.Title, "↑")
+			col.Title = strings.TrimRight(col.Title, "↓")
+		}
+		col := &cols[m.sortBy]
+		if m.reverse {
+			col.Title = col.Title + "↓"
+		} else {
+			col.Title = col.Title + "↑"
+		}
+		m.table.SetColumns(cols)
+		m.updateRowsInTable()
 	}
 }
 
@@ -297,12 +470,22 @@ func (k watchKeyMap) ShortHelp() []key.Binding {
 }
 
 func (k watchKeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{{detailViewKeyMap["n"], detailViewKeyMap["p"]}}
+	result := [][]key.Binding{}
+	result = append(result, []key.Binding{detailViewKeyMap["n"], detailViewKeyMap["p"]})
+	sortkeys := []key.Binding{}
+	for idx := range cols {
+		if idx == 0 {
+			continue
+		}
+		sortkeys = append(sortkeys, sortKeyMap[fmt.Sprintf("%d", idx)])
+	}
+	result = append(result, sortkeys)
+	return result
 }
 
 func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, options WatchOptions) {
 	records := &[]*common.AnnotatedRecord{}
-	m := NewModel(options, records, tea.WindowSizeMsg{}).(*model)
+	m := NewModel(options, records, tea.WindowSizeMsg{}, common.NoneType, false).(*model)
 	if !options.StaticRecord {
 		go func(mod *model, channel chan *common.AnnotatedRecord) {
 			for {
@@ -322,4 +505,8 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
+}
+
+func (m *model) SortBy() rc.SortBy {
+	return m.sortBy
 }

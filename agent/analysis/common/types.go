@@ -116,7 +116,8 @@ func (m MetricTypeSet) GetFirstEnabledMetricType() MetricType {
 type MetricExtract[T MetricValueType] func(*AnnotatedRecord) T
 
 const (
-	ResponseSize MetricType = iota
+	Start MetricType = iota
+	ResponseSize
 	RequestSize
 	TotalDuration
 	BlackBoxDuration

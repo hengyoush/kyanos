@@ -142,6 +142,7 @@ func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, opts
 }
 
 func (a *Analyzer) Run() {
+	defer close(a.resultChannel)
 	for {
 		select {
 		// case <-a.stopper:

@@ -24,7 +24,6 @@ import (
 
 var lock *sync.Mutex = &sync.Mutex{}
 
-type SortBy int8
 type statTableKeyMap rc.KeyMap
 
 var sortByKeyMap = statTableKeyMap{
@@ -79,7 +78,7 @@ func (k statTableKeyMap) FullHelp() [][]key.Binding {
 }
 
 const (
-	none SortBy = iota
+	none rc.SortBy = iota
 	name
 	max
 	avg
@@ -107,7 +106,7 @@ type model struct {
 
 	windownSizeMsg tea.WindowSizeMsg
 
-	sortBy  SortBy
+	sortBy  rc.SortBy
 	reverse bool
 }
 
@@ -284,8 +283,10 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.statTable.Rows()) == 0 {
 					m.options.HavestSignal <- struct{}{}
 					connstats := <-m.resultChannel
-					m.connstats = &connstats
-					m.updateRowsInTable()
+					if connstats != nil {
+						m.connstats = &connstats
+						m.updateRowsInTable()
+					}
 				}
 				break
 			}
@@ -297,7 +298,7 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err == nil && (i >= int(none) && i < int(end)) &&
 				(i >= 0 && i < len(m.statTable.Columns())) {
 				prevSortBy := m.sortBy
-				m.sortBy = SortBy(i)
+				m.sortBy = rc.SortBy(i)
 				m.reverse = !m.reverse
 				cols := m.statTable.Columns()
 				if prevSortBy != none {
@@ -323,7 +324,7 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sampleModel = watch.NewModel(watch.WatchOptions{
 					WideOutput:   true,
 					StaticRecord: true,
-				}, &records, m.windownSizeMsg)
+				}, &records, m.windownSizeMsg, metric, true)
 			}
 
 			return m, m.sampleModel.Init()
@@ -418,12 +419,14 @@ func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, option
 			case <-ctx.Done():
 				return
 			case r := <-ch:
-				lock.Lock()
-				m.connstats = &r
-				lock.Unlock()
-				prog.Send(rc.TickMsg{})
-				if options.EnableBatchModel() {
-					return
+				if r != nil {
+					lock.Lock()
+					m.connstats = &r
+					lock.Unlock()
+					prog.Send(rc.TickMsg{})
+					if options.EnableBatchModel() {
+						return
+					}
 				}
 			}
 		}
@@ -436,4 +439,8 @@ func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, option
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
+}
+
+func (m *model) SortBy() rc.SortBy {
+	return m.sortBy
 }
