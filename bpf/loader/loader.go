@@ -12,6 +12,7 @@ import (
 	"kyanos/agent/uprobe"
 	"kyanos/bpf"
 	"kyanos/common"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
@@ -326,7 +327,7 @@ var socketFilterSpec = &ebpf.ProgramSpec{
 func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) bool {
 	var controlValues *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "ControlValues")
 	var enabledRemotePortMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "EnabledRemotePortMap")
-	var enabledRemoteIpv4Map *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "EnabledRemoteIpv4Map")
+	var enabledRemoteIpMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "EnabledRemoteIpMap")
 	var enabledLocalPortMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "EnabledLocalPortMap")
 	var filterPidMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap")
 
@@ -387,22 +388,22 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 	remoteIps := viper.GetStringSlice(common.RemoteIpsVarName)
 	if len(remoteIps) > 0 {
 		common.AgentLog.Infoln("filter for remote ips: ", remoteIps)
-		oneKeyU32 := uint32(1)
-		err := enabledRemoteIpv4Map.Update(&oneKeyU32, &zeroValue, ebpf.UpdateAny)
+		oneKeyU32 := bpf.AgentIn6Addr{}
+		oneKeyU32.In6U.U6Addr8[0] = 1
+		err := enabledRemoteIpMap.Update(&oneKeyU32, &zeroValue, ebpf.UpdateAny)
 		if err != nil {
 			common.AgentLog.Errorln("Update EnabledRemoteIpv4Map failed: ", err)
 		}
 		for _, each := range remoteIps {
-			ipInt32, err := common.IPv4ToUint32(each)
+			ipBytes := common.NetIPToBytes(net.ParseIP(each), false)
+			common.AgentLog.Debugln("Update EnabledRemoteIpv4Map, key: ", ipBytes, common.BytesToNetIP(ipBytes, false))
+			key := bpf.AgentIn6Addr{}
+			for i := range ipBytes {
+				key.In6U.U6Addr8[i] = ipBytes[i]
+			}
+			err = enabledRemoteIpMap.Update(&key, &zeroValue, ebpf.UpdateAny)
 			if err != nil {
-				common.AgentLog.Errorf("IPv4ToUint32 parse failed, ip string is: %s, err: %v", each, err)
-				return false
-			} else {
-				common.AgentLog.Debugln("Update EnabledRemoteIpv4Map, key: ", ipInt32, common.IntToIP(ipInt32))
-				err = enabledRemoteIpv4Map.Update(&ipInt32, &zeroValue, ebpf.UpdateAny)
-				if err != nil {
-					common.AgentLog.Errorln("Update EnabledRemoteIpv4Map failed: ", err)
-				}
+				common.AgentLog.Errorln("Update EnabledRemoteIpv4Map failed: ", err)
 			}
 		}
 	}

@@ -45,7 +45,7 @@ type AgentConnInfoT struct {
 			Sin6Family   uint16
 			Sin6Port     uint16
 			Sin6Flowinfo uint32
-			Sin6Addr     struct{ In6U struct{ U6Addr8 [16]uint8 } }
+			Sin6Addr     AgentIn6Addr
 			Sin6ScopeId  uint32
 		}
 	}
@@ -54,7 +54,7 @@ type AgentConnInfoT struct {
 			Sin6Family   uint16
 			Sin6Port     uint16
 			Sin6Flowinfo uint32
-			Sin6Addr     struct{ In6U struct{ U6Addr8 [16]uint8 } }
+			Sin6Addr     AgentIn6Addr
 			Sin6ScopeId  uint32
 		}
 	}
@@ -96,6 +96,8 @@ const (
 	AgentEndpointRoleTKRoleServer  AgentEndpointRoleT = 2
 	AgentEndpointRoleTKRoleUnknown AgentEndpointRoleT = 4
 )
+
+type AgentIn6Addr struct{ In6U struct{ U6Addr8 [16]uint8 } }
 
 type AgentKernEvt struct {
 	FuncName [16]int8
@@ -287,7 +289,7 @@ type AgentMapSpecs struct {
 	ControlValues         *ebpf.MapSpec `ebpf:"control_values"`
 	EnabledLocalIpv4Map   *ebpf.MapSpec `ebpf:"enabled_local_ipv4_map"`
 	EnabledLocalPortMap   *ebpf.MapSpec `ebpf:"enabled_local_port_map"`
-	EnabledRemoteIpv4Map  *ebpf.MapSpec `ebpf:"enabled_remote_ipv4_map"`
+	EnabledRemoteIpMap    *ebpf.MapSpec `ebpf:"enabled_remote_ip_map"`
 	EnabledRemotePortMap  *ebpf.MapSpec `ebpf:"enabled_remote_port_map"`
 	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
 	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
@@ -339,7 +341,7 @@ type AgentMaps struct {
 	ControlValues         *ebpf.Map `ebpf:"control_values"`
 	EnabledLocalIpv4Map   *ebpf.Map `ebpf:"enabled_local_ipv4_map"`
 	EnabledLocalPortMap   *ebpf.Map `ebpf:"enabled_local_port_map"`
-	EnabledRemoteIpv4Map  *ebpf.Map `ebpf:"enabled_remote_ipv4_map"`
+	EnabledRemoteIpMap    *ebpf.Map `ebpf:"enabled_remote_ip_map"`
 	EnabledRemotePortMap  *ebpf.Map `ebpf:"enabled_remote_port_map"`
 	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
 	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
@@ -374,7 +376,7 @@ func (m *AgentMaps) Close() error {
 		m.ControlValues,
 		m.EnabledLocalIpv4Map,
 		m.EnabledLocalPortMap,
-		m.EnabledRemoteIpv4Map,
+		m.EnabledRemoteIpMap,
 		m.EnabledRemotePortMap,
 		m.FilterMntnsMap,
 		m.FilterNetnsMap,
