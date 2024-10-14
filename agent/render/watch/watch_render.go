@@ -258,10 +258,12 @@ func (m *model) Init() tea.Cmd {
 }
 
 func (m *model) sortConnstats(connstats *[]*common.AnnotatedRecord) {
-	slices.SortFunc(*connstats, func(c1, c2 *common.AnnotatedRecord) int {
-		col := cols[m.sortBy]
-		return col.cmp(c1, c2, m.reverse)
-	})
+	col := cols[m.sortBy]
+	if m.sortBy > 0 && col.cmp != nil {
+		slices.SortFunc(*connstats, func(c1, c2 *common.AnnotatedRecord) int {
+			return col.cmp(c1, c2, m.reverse)
+		})
+	}
 }
 func (m *model) updateRowsInTable() {
 	lock.Lock()
