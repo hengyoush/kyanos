@@ -15,24 +15,24 @@ type ConnStat struct {
 	SumMap map[anc.MetricType]float64
 	Side   common.SideEnum
 
-	ClassId             ClassId
+	ClassId             anc.ClassId
 	HumanReadbleClassId string
 	ClassfierType       anc.ClassfierType
 }
 
-func (c *ConnStat) ClassIdAsHumanReadable(classId ClassId) string {
+func (c *ConnStat) ClassIdAsHumanReadable(classId anc.ClassId) string {
 	switch c.ClassfierType {
-	case None:
+	case anc.None:
 		return "All"
-	case Conn:
+	case anc.Conn:
 		return c.HumanReadbleClassId
-	case RemotePort:
+	case anc.RemotePort:
 		fallthrough
-	case LocalPort:
+	case anc.LocalPort:
 		fallthrough
-	case RemoteIp:
+	case anc.RemoteIp:
 		return string(classId)
-	case Protocol:
+	case anc.Protocol:
 		return c.HumanReadbleClassId
 	default:
 		return string(classId)

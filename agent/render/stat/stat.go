@@ -97,8 +97,9 @@ type model struct {
 	spinner      spinner.Model
 	additionHelp help.Model
 
-	connstats    *[]*analysis.ConnStat
-	curConnstats *[]*analysis.ConnStat
+	connstats     *[]*analysis.ConnStat
+	curConnstats  *[]*analysis.ConnStat
+	resultChannel <-chan []*analysis.ConnStat
 
 	options common.AnalysisOptions
 
@@ -127,7 +128,7 @@ func initTable(options common.AnalysisOptions) table.Model {
 	unit := rc.MetricTypeUnit[metric]
 	columns := []table.Column{
 		{Title: "id", Width: 3},
-		{Title: "name", Width: 40},
+		{Title: common.ClassfierTypeNames[options.ClassfierType], Width: 40},
 		{Title: fmt.Sprintf("max(%s)", unit), Width: 10},
 		{Title: fmt.Sprintf("avg(%s)", unit), Width: 10},
 		{Title: fmt.Sprintf("p50(%s)", unit), Width: 10},
@@ -264,14 +265,13 @@ func (m *model) sortConnstats(connstats *[]*analysis.ConnStat) {
 				return cmp.Compare(c1.ClassId, c2.ClassId)
 			}
 		})
-
 	}
 }
 
 func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
-	case spinner.TickMsg:
+	case spinner.TickMsg, rc.TickMsg:
 		m.updateRowsInTable()
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
@@ -279,6 +279,17 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windownSizeMsg = msg
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "c":
+			if m.options.EnableBatchModel() {
+				if len(m.statTable.Rows()) == 0 {
+					m.options.HavestSignal <- struct{}{}
+					connstats := <-m.resultChannel
+					m.connstats = &connstats
+					m.updateRowsInTable()
+				}
+				break
+			}
+			fallthrough
 		case "esc", "q", "ctrl+c":
 			return m, tea.Quit
 		case "1", "2", "3", "4", "5", "6", "7", "8":
@@ -358,9 +369,32 @@ func (m *model) viewStatTable() string {
 			totalCount += each.Count
 		}
 	}
-	s := fmt.Sprintf("\n %s Events received: %d\n\n", m.spinner.View(), totalCount)
+	var s string
 
-	return s + rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n" + m.additionHelp.View(sortByKeyMap)
+	// s = fmt.Sprintf("\n %s Events received: %d\n\n", m.spinner.View(), totalCount)
+	// s += rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n" + m.additionHelp.View(sortByKeyMap)
+	if m.options.EnableBatchModel() {
+
+		var titleStyle = lipgloss.NewStyle().
+			MarginLeft(1).
+			MarginRight(5).
+			Padding(0, 1).
+			Italic(true).
+			Bold(false).
+			Foreground(lipgloss.Color("#FFF7DB")).Background(lipgloss.Color(rc.ColorGrid(1, 5)[2][0]))
+
+		if len(m.statTable.Rows()) > 0 {
+			s += fmt.Sprintf("\n %s \n\n", titleStyle.Render(" Colleted events are here! "))
+			s += rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
+		} else {
+			s += fmt.Sprintf("\n %s Collecting %d/%d\n\n %s\n\n", m.spinner.View(), m.options.CurrentReceivedSamples(), m.options.TargetSamples,
+				titleStyle.Render("Press `c` to display collected events"))
+		}
+	} else {
+		s = fmt.Sprintf("\n %s Events received: %d\n\n", m.spinner.View(), totalCount)
+		s += rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
+	}
+	return s
 }
 
 func (m *model) viewSampleTable() string {
@@ -376,6 +410,8 @@ func (m *model) View() string {
 }
 func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, options common.AnalysisOptions) {
 	m := NewModel(options).(*model)
+
+	prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen())
 	go func(mod *model, channel <-chan []*analysis.ConnStat) {
 		for {
 			select {
@@ -385,11 +421,17 @@ func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, option
 				lock.Lock()
 				m.connstats = &r
 				lock.Unlock()
+				prog.Send(rc.TickMsg{})
+				if options.EnableBatchModel() {
+					return
+				}
 			}
 		}
 	}(m, ch)
+	m.resultChannel = ch
+	m.sortBy = avg
+	m.reverse = true
 
-	prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen())
 	if _, err := prog.Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)

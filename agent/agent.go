@@ -104,7 +104,6 @@ func SetupAgent(options ac.AgentOptions) {
 		renderStopper := make(chan int)
 		analyzer := analysis.CreateAnalyzer(recordsChannel, &options.AnalysisOptions, resultChannel, renderStopper, options.Ctx)
 		go analyzer.Run()
-
 		stat.StartStatRender(ctx, resultChannel, options.AnalysisOptions)
 		// render := render.CreateRender(resultChannel, renderStopper, analyzer.AnalysisOptions)
 		// go render.Run()

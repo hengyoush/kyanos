@@ -15,12 +15,64 @@ type AnalysisOptions struct {
 	Side                 ac.SideEnum
 	ClassfierType
 	CleanWhenHarvest bool
+
+	// Fast Inspect Options
+	SlowMode               bool
+	BigRespMode            bool
+	BigReqMode             bool
+	TargetSamples          int
+	CurrentReceivedSamples func() int
+	HavestSignal           chan struct{}
 }
 
 func (a *AnalysisOptions) Init() {
 	if a.SampleLimit <= 0 {
 		a.SampleLimit = 10
 	}
+	a.HavestSignal = make(chan struct{}, 10)
+
+	if a.EnableBatchModel() {
+		a.CleanWhenHarvest = true
+	} else {
+		a.CleanWhenHarvest = false
+	}
+	if a.SlowMode {
+		a.EnabledMetricTypeSet = MetricTypeSet{
+			TotalDuration: true,
+		}
+		if a.ClassfierType == Default {
+			a.ClassfierType = RemoteIp
+		}
+	} else if a.BigReqMode || a.BigRespMode {
+		if a.BigRespMode {
+			a.EnabledMetricTypeSet = MetricTypeSet{
+				ResponseSize: true,
+			}
+		} else {
+			a.EnabledMetricTypeSet = MetricTypeSet{
+				RequestSize: true,
+			}
+		}
+		if a.ClassfierType == Default {
+			a.ClassfierType = RemoteIp
+		}
+	} else {
+		if a.ClassfierType == Default {
+			a.ClassfierType = Conn
+		}
+	}
+	// temp disable batch model
+	// a.disableBatchModel()
+}
+
+func (a AnalysisOptions) EnableBatchModel() bool {
+	return a.SlowMode || a.BigReqMode || a.BigRespMode
+}
+
+func (a *AnalysisOptions) disableBatchModel() {
+	a.SlowMode = false
+	a.BigReqMode = false
+	a.BigRespMode = false
 	a.CleanWhenHarvest = false
 }
 

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"kyanos/agent/analysis"
 	anc "kyanos/agent/analysis/common"
 	"slices"
 
@@ -47,6 +46,10 @@ sudo kyanos stat http --metrics tqp
 var enabledMetricsString string
 var sampleCount int
 var groupBy string
+var slowMode bool
+var bigRespModel bool
+var bigReqModel bool
+var targetSamples int
 var SUPPORTED_METRICS = []byte{'t', 'q', 'p', 'n', 's'}
 
 func validateEnabledMetricsString() error {
@@ -82,11 +85,16 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 	}
 	options.SampleLimit = sampleCount
 
-	for key, value := range analysis.ClassfierTypeNames {
+	for key, value := range anc.ClassfierTypeNames {
 		if value == groupBy {
 			options.ClassfierType = key
 		}
 	}
+	options.SlowMode = slowMode
+	options.BigReqMode = bigReqModel
+	options.BigRespMode = bigRespModel
+	options.TargetSamples = targetSamples
+
 	return options, nil
 }
 func init() {
@@ -96,14 +104,20 @@ func init() {
 	p:  response size,
 	n:  network device latency,
 	s:  time spent reading from the socket buffer`)
-	statCmd.PersistentFlags().IntVarP(&sampleCount, "samples", "s", 0,
+	statCmd.PersistentFlags().IntVarP(&sampleCount, "samples-limit", "s", 0,
 		"Specify the number of samples to be attached for each result.\n"+
 			"By default, only a summary  is output.\n"+
 			"refer to the '--full-body' option.")
-	statCmd.PersistentFlags().StringVarP(&groupBy, "group-by", "g", "remote-ip",
+	statCmd.PersistentFlags().StringVarP(&groupBy, "group-by", "g", "default",
 		"Specify aggregation dimension: \n"+
 			"('conn', 'local-port', 'remote-port', 'remote-ip', 'protocol', 'http-path', 'none')\n"+
 			"note: 'none' is aggregate all req-resp pair together")
+
+	// inspect options
+	statCmd.PersistentFlags().BoolVar(&slowMode, "slow", false, "Find slowest records")
+	statCmd.PersistentFlags().BoolVar(&bigReqModel, "bigreq", false, "Find biggest request size records")
+	statCmd.PersistentFlags().BoolVar(&bigRespModel, "bigresp", false, "Find biggest response size records")
+	statCmd.PersistentFlags().IntVar(&targetSamples, "target", 10, "")
 
 	// common
 	statCmd.PersistentFlags().Float64("latency", 0, "Filter based on request response time")
