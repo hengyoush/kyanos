@@ -219,6 +219,7 @@ func initDetailViewKeyMap(cols []watchCol) {
 
 func initTable(options WatchOptions) table.Model {
 	initWatchCols(options.WideOutput)
+	initDetailViewKeyMap(cols)
 	columns := []table.Column{}
 	for _, eachCol := range cols {
 		columns = append(columns, table.Column{
