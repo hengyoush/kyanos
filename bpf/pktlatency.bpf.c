@@ -111,11 +111,18 @@ static __always_inline enum target_tgid_match_result_t match_trace_tgid(const ui
 	if (bpf_map_lookup_elem(&filter_pid_map, &tgid)) {
 		return TARGET_TGID_MATCHED;
 	}
+	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+	struct task_struct *parent = BPF_CORE_READ(task, real_parent);
+	uint32_t parent_tgid = BPF_CORE_READ(parent, tgid);
+	if (parent && bpf_map_lookup_elem(&filter_pid_map, &parent_tgid)) {
+    	u8 u8_zero = 0;
+        bpf_map_update_elem(&filter_pid_map, &tgid, &u8_zero, BPF_NOEXIST);
+		return TARGET_TGID_MATCHED;
+	}
 #ifdef LAGACY_KERNEL_310
 
 	return TARGET_TGID_UNMATCHED;
 #else
-	struct task_struct *task = (struct task_struct *)bpf_get_current_task();
 
     bool should_filter = false;
     u32 pidns_id = BPF_CORE_READ(task, nsproxy, pid_ns_for_children, ns.inum);
@@ -904,7 +911,9 @@ static  __always_inline bool filter_conn_info(struct conn_info_t *conn_info) {
 	test.in6_u.u6_addr8[0] = 1;
 	uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ip_map, &test);
 	if (enable_remote_ipv4_filter != NULL) {
+		test.in6_u.u6_addr8[0] = 0;
 		test = conn_info->raddr.in6.sin6_addr;
+		// test.in6_u.u6_addr32[0] = conn_info->raddr.in6.sin6_addr.in6_u.u6_addr32[0];
 		uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ip_map, &test);
 		if (enabled_remote_ipv4 == NULL) {
 			return false;
@@ -929,7 +938,7 @@ static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn
 static __always_inline void submit_new_conn(void* ctx, uint32_t tgid, int32_t fd,
 const struct sockaddr* addr, const struct socket* socket,
 enum endpoint_role_t role, uint64_t start_ts) {
-	struct conn_info_t conn_info = {};
+	struct conn_info_t conn_info = {0};
 	uint64_t tgid_fd = gen_tgid_fd(tgid, fd);
 	init_conn_info(tgid, fd, &conn_info);
 	if (socket != NULL) {
@@ -937,9 +946,9 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		// bpf_printk("read_sockaddr_kernel laddr: port:%u", conn_info.laddr.in4.sin_port);
 		// bpf_printk("read_sockaddr_kernel raddr: port:%u", conn_info.raddr.in4.sin_port);
 	} else if (addr != NULL) {
-		bpf_probe_read_user(&conn_info.raddr, sizeof(union sockaddr_t), addr);
-		struct sockaddr_in* addr4 = (struct sockaddr_in*)addr;
-		conn_info.raddr.in6.sin6_port = bpf_ntohs(conn_info.raddr.in6.sin6_port);
+		// bpf_probe_read_user(&conn_info.raddr, sizeof(union sockaddr_t), addr);
+		// struct sockaddr_in* addr4 = (struct sockaddr_in*)addr;
+		// conn_info.raddr.in6.sin6_port = bpf_ntohs(conn_info.raddr.in6.sin6_port);
 		// conn_info.raddr = *((union sockaddr_t*)addr);
 	} else {
 		// pr_bpf_debug("raddr: null");
