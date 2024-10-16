@@ -346,7 +346,10 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 				common.AgentLog.Errorf("Invalid pid : %s\n", each)
 				return false
 			}
-			filterPidMap.Update(pidInt, one, ebpf.UpdateAny)
+			err = filterPidMap.Update(uint32(pidInt), int8(one), ebpf.UpdateAny)
+			if err != nil {
+				common.AgentLog.Errorf("Failed update  FilterPidMap: %s\n", err)
+			}
 		}
 	}
 
