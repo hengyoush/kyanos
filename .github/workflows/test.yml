@@ -135,7 +135,7 @@ jobs:
             set -ex
             uname -a
             cat /etc/issue
-            if [ -f "$file_path" ]; then  
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
                 bash /host/testdata/test_base.sh /host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf
             else  
                 bash /host/testdata/test_base.sh /host/kyanos/kyanos
