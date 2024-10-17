@@ -14,6 +14,7 @@ function test_containerd_filter_by_container_name() {
         IMAGE_NAME=$DOCKER_REGISTRY"/busybox:1"
     fi
     nerdctl pull "$IMAGE_NAME"
+    nerdctl container prune -f
 
     cname='test-kyanos'
     cid1=$(nerdctl run  --name $cname -d "$IMAGE_NAME" sh -c 'sleep 10; wget -T 10 http://www.baidu.com')

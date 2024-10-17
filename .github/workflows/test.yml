@@ -1,0 +1,111 @@
+name: Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "dev","feature/*" ]
+  pull_request:
+    branches: [ "main", "dev","feature/*" ]
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      with:
+        submodules: recursive
+
+    - name: Set up Go
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+      with:
+        go-version: '1.22.4'
+
+    - name: Build
+      run: |
+        sudo apt update
+        sudo apt install -y git
+        sudo apt-get -y install pkg-config
+        sudo apt install -y libelf-dev
+        
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+        sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
+        sudo apt update
+        
+        sudo apt install -y llvm
+        sudo apt install -y clang
+        pwd
+        ls -l
+        make clean && make
+
+    # - name: Test
+    #   run: make test
+
+    - name: Store executable
+      uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4
+      with:
+        name: kyanos
+        path: kyanos
+
+
+  e2e-test:
+    name: e2e-test
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        kernel:
+          # renovate: datasource=docker depName=quay.io/lvh-images/kernel-images
+          - '4.19-20240912.022020'
+          # renovate: datasource=docker depName=quay.io/lvh-images/kernel-images
+          - '5.4-20240912.022020'
+          # renovate: datasource=docker depName=quay.io/lvh-images/kernel-images
+          - '5.10-20240912.022020'
+          # renovate: datasource=docker depName=quay.io/lvh-images/kernel-images
+          - '5.15-20240912.022020'
+          # renovate: datasource=docker depName=quay.io/lvh-images/kernel-images
+          - '6.1-20240912.022020'
+          # renovate: datasource=docker depName=quay.io/lvh-images/kernel-images
+          - '6.6-20240912.022020'
+          # renovate: datasource=docker depName=quay.io/lvh-images/kernel-images
+          - 'bpf-20240912.022020'
+          # renovate: datasource=docker depName=quay.io/lvh-images/kernel-images
+          - 'bpf-next-20240912.022020'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+        with:
+          submodules: recursive
+
+      - name: Retrieve stored kyanos executable
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: kyanos
+          path: kyanos
+
+      - name: Provision LVH VMs
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          test-name: kyanos-test
+          image-version: ${{ matrix.kernel }}
+          cpu: 2
+          mem: '4G'
+          host-mount: ./
+          install-dependencies: 'true'
+          cmd: |
+            chmod +x /host/kyanos/kyanos
+
+      - name: Test base
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+
+            bash /host/testdata/test_base.sh /host/kyanos/kyanos
