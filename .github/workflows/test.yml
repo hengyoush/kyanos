@@ -98,6 +98,34 @@ jobs:
           install-dependencies: 'true'
           cmd: |
             chmod +x /host/kyanos/kyanos
+      
+      - name: download btf file
+        if: ${{ startsWith(matrix.kernel, '4.') }}
+        run: |
+          img=quay.io/lvh-images/kernel-images:${{ matrix.kernel }} 
+          docker pull $img
+          id=$(docker create $img)
+          mkdir data/
+          docker cp $id:/data/kernels data/
+          ls -la data/
+          find data/ -path "*vmlinuz*" -type f
+          find data/ -path "*btf*" -type f
+      
+      - name: copy btf file
+        if: ${{ startsWith(matrix.kernel, '4.') }}
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            uname -a
+            cat /etc/issue
+            cat /etc/os-release
+
+            sudo mkdir -p /var/lib/kyanos/btf/
+             
+            sudo cp /host/data/kernels/4.*/boot/btf-4.* /var/lib/kyanos/btf/current.btf
+            # btf_file=$(find /host/ -path "*btf*" -type f)
+            # sudo cp $btf_file /var/lib/ptcpdump/btf/vmlinux
 
       - name: Test base
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
@@ -107,5 +135,9 @@ jobs:
             set -ex
             uname -a
             cat /etc/issue
-
-            bash /host/testdata/test_base.sh /host/kyanos/kyanos
+            if [ -f "$file_path" ]; then  
+                bash /host/testdata/test_base.sh /host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf
+            else  
+                bash /host/testdata/test_base.sh /host/kyanos/kyanos
+            fi
+            
