@@ -134,6 +134,10 @@ jobs:
           cmd: |
             apt-get update
             apt-get install -y dnsutils
+            # install btf
+            if [ -f "/sys/kernel/btf/vmlinux" ]; then  
+              cp -f /sys/kernel/btf/vmlinux /var/lib/kyanos/btf/current.btf
+            fi
 
       - name: Test base
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
