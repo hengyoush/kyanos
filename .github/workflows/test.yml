@@ -136,6 +136,7 @@ jobs:
             apt-get install -y dnsutils
             # install btf
             if [ -f "/sys/kernel/btf/vmlinux" ]; then  
+              mkdir -p /var/lib/kyanos/btf
               cp -f /sys/kernel/btf/vmlinux /var/lib/kyanos/btf/current.btf
             fi
 
