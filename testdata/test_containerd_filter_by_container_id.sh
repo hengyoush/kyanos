@@ -25,7 +25,7 @@ function test_containerd_filter_by_container_id() {
     echo $cid2
 
     timeout 30 ${CMD} watch --debug-output http --container-id=${cid1} 2>&1 | tee "${LNAME}" &
-    sleep 3
+    sleep 10
     wait
 
     cat "${LNAME}"

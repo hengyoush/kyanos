@@ -7,8 +7,8 @@ FILE_PREFIX="/tmp/kyanos"
 LNAME="${FILE_PREFIX}_base.log"
 
 function test_kyanos() {
-    timeout 10 ${CMD} watch --debug-output http 2>&1 | tee "${LNAME}" &
-    sleep 3
+    timeout 20 ${CMD} watch --debug-output http 2>&1 | tee "${LNAME}" &
+    sleep 10
     curl http://www.baidu.com &>/dev/null || true
     wait
 

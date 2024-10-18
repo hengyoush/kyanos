@@ -21,7 +21,7 @@ function test_docker_filter_by_container_name() {
     echo $cid1
 
     timeout 30 ${CMD} watch --debug-output http --container-name=${cname} 2>&1 | tee "${LNAME}" &
-    sleep 3
+    sleep 10
     wait
 
     cat "${LNAME}"

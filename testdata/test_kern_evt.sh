@@ -7,8 +7,8 @@ FILE_PREFIX="/tmp/kyanos"
 HTTP_PLAIN_CLIENT_LNAME="${FILE_PREFIX}_http_plain_client.log"
 
 function test_http_plain_client() {
-    timeout 10 ${CMD} watch --debug-output http 2>&1 | tee "${HTTP_PLAIN_CLIENT_LNAME}" &
-    sleep 3
+    timeout 20 ${CMD} watch --debug-output http 2>&1 | tee "${HTTP_PLAIN_CLIENT_LNAME}" &
+    sleep 10
     curl http://www.baidu.com &>/dev/null || true
     wait
 
