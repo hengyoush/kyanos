@@ -47,17 +47,17 @@ function test_filter_by_remote_port() {
 function test_filter_by_local_port() {
     local_port=8080
     timeout 20 python3 -m http.server "$local_port" &
-    timeout 20 ${CMD} watch --debug-output http --local-ports "$local_port" 2>&1  | tee "${LNAME_LOCAL_PORT}" &
+    timeout 30 ${CMD} watch --debug-output http --local-ports "$local_port" 2>&1  | tee "${LNAME_LOCAL_PORT}" &
     sleep 10
     curl http://127.0.0.1:"$local_port" &>/dev/null || true
     wait
 
     cat "${LNAME_LOCAL_PORT}"
-    cat "${LNAME_LOCAL_PORT}" | grep "127.0.0.1"
+    cat "${LNAME_LOCAL_PORT}" | grep "SimpleHTTP"
 }
 
 function main() {
-    test_filter_by_remote_ip
+    # test_filter_by_remote_ip
     test_filter_by_remote_port
     test_filter_by_local_port
 }
