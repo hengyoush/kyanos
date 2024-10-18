@@ -33,7 +33,7 @@ function main() {
   # kubectl delete pod test-ptcpdump | true
   CMD="./kyanos"
   has_files "/var/lib/kyanos/btf"
-  if [ $? -eq 0 ]; then 
+  if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
     CMD="./kyanos --btf /var/lib/kyanos/btf/current.btf "
   fi
   set -ex
