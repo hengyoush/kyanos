@@ -127,6 +127,14 @@ jobs:
             # btf_file=$(find /host/ -path "*btf*" -type f)
             # sudo cp $btf_file /var/lib/ptcpdump/btf/vmlinux
 
+      - name: Install dependencies
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            apt-get update
+            apt-get install -y dnsutils
+
       - name: Test base
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
         with:
