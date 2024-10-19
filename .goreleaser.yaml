@@ -61,7 +61,7 @@ builds:
 
 archives:
   - builds:
-      - kyanos-arm64
+      # - kyanos-arm64
       - kyanos-amd64
 
 checksum:
