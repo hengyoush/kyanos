@@ -100,7 +100,7 @@ jobs:
           host-mount: ./
           install-dependencies: 'true'
           cmd: |
-            chmod +x /host/kyanos/kyanos $kyanos_log_option
+            chmod +x /host/kyanos/kyanos
       
       - name: download btf file
         if: ${{ startsWith(matrix.kernel, '4.') }}
