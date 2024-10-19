@@ -60,6 +60,7 @@ builds:
         - bash -c 'sudo make clean || true'
         - bash -c 'sudo make build-bpf || true'
         - bash -c 'sudo make btfgen || true' 
+        - bash -c 'ls ./bpf/custom-archive/centos/7/x86_64'
 
 archives:
   - builds:
