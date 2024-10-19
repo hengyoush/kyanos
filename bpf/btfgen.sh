@@ -8,7 +8,7 @@ BTFHUB_REPO="https://github.com/aquasecurity/btfhub.git"
 BTFHUB_ARCH_REPO="https://github.com/aquasecurity/btfhub-archive.git"
 
 
-KYANOS_BPF_CORE="${BASEDIR}/bpf/agent_$1_bpfel.o"
+KYANOS_BPF_CORE="${BASEDIR}/bpf/agent_$2_bpfel.o"
 
 BTFHUB_DIR="${BASEDIR}/deps/btfhub"
 BTFHUB_ARCH_DIR="${BASEDIR}/deps/btfhub-archive"
@@ -39,12 +39,12 @@ branch_clean() {
     # small sanity check
     [ ! -d ./.git ] && die "$(basename $(pwd)) not a repo dir"
 
-    git fetch -a || die "could not fetch ${1}" # make sure its updated
-    git clean -fdX                             # clean leftovers
-    git reset --hard                           # reset letfovers
-    git checkout origin/main -b main-$$
-    git branch -D main
-    git branch -m main-$$ main # origin/main == main
+    # git fetch -a || die "could not fetch ${1}" # make sure its updated
+    # git clean -fdX                             # clean leftovers
+    # git reset --hard                           # reset letfovers
+    # git checkout origin/main -b main-$$
+    # git branch -D main
+    # git branch -m main-$$ main # origin/main == main
 
     cd ${BASEDIR}
 }
@@ -82,7 +82,7 @@ rsync -avz \
 # generate tailored BTFs
 
 [ ! -f ./tools/btfgen.sh ] && die "could not find btfgen.sh"
-./tools/btfgen.sh -a $2 -o ${KYANOS_BPF_CORE}
+./tools/btfgen.sh -a $1 -o ${KYANOS_BPF_CORE}
 
 
 # move tailored BTFs to dist
