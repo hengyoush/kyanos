@@ -42,7 +42,7 @@ jobs:
         sudo apt install -y clang
         pwd
         ls -l
-        make clean && make
+        make clean && make build-bpf && make
 
     # - name: Test
     #   run: make test
