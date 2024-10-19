@@ -106,6 +106,7 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 	existedConn := c.FindConnection4Exactly(TgidFd)
 	if existedConn != nil {
 		if !existedConn.IsIpPortEqualsWith(conn) {
+			common.ConntrackLog.Debugf("[AddConnection4] %s find existed conn with same tgidfd but ip port not same: %s", conn.ToString(), existedConn.ToString())
 			prevConn := existedConn.prevConn
 			deleteEndIdx := -1
 			for idx := len(prevConn) - 1; idx >= 0; idx-- {
@@ -126,9 +127,11 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 			atomic.AddInt64(&c.connectionAdded, 1)
 			return nil
 		} else {
+			common.ConntrackLog.Debugf("[AddConnection4] %s find existed conn with same tgidfd and same ip port", conn.ToString())
 			return nil
 		}
 	} else {
+		common.ConntrackLog.Debugf("[AddConnection4] %s store into map because no existed conn", conn.ToString())
 		c.connMap.Store(TgidFd, conn)
 		atomic.AddInt64(&c.connectionAdded, 1)
 		return nil
@@ -241,10 +244,10 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 }
 
 func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
-	key, revKey := c.extractSockKeys()
+	key, _ := c.extractSockKeys()
 	sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
 	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap, traceable)
-	c.doUpdateConnIdMapProtocolToUnknwon(revKey, sockKeyConnIdMap, traceable)
+	// c.doUpdateConnIdMapProtocolToUnknwon(revKey, sockKeyConnIdMap, traceable)
 
 	connInfoMap := bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap")
 	connInfo := bpf.AgentConnInfoT{}
@@ -264,6 +267,7 @@ func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m
 	if err == nil {
 		connIds.NoTrace = !traceable
 		m.Update(&key, &connIds, ebpf.UpdateExist)
+		common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, success, sock key: %v", c.ToString(), traceable, key)
 	} else {
 		common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, but no entry in map found! key: %v", c.ToString(), traceable, key)
 	}

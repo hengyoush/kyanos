@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"kyanos/agent/analysis/common"
+	"kyanos/agent/protocol"
 	rc "kyanos/agent/render/common"
 	"kyanos/bpf"
 	c "kyanos/common"
@@ -487,27 +488,54 @@ func (k watchKeyMap) FullHelp() [][]key.Binding {
 }
 
 func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, options WatchOptions) {
-	records := &[]*common.AnnotatedRecord{}
-	m := NewModel(options, records, tea.WindowSizeMsg{}, common.NoneType, false).(*model)
-	if !options.StaticRecord {
-		go func(mod *model, channel chan *common.AnnotatedRecord) {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case r := <-ch:
-					lock.Lock()
-					*m.records = append(*m.records, r)
-					lock.Unlock()
-				}
+	if options.DebugOutput {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case r := <-ch:
+				c.BPFEventLog.Warnln(r.String(common.AnnotatedRecordToStringOptions{
+					Nano: false,
+					MetricTypeSet: common.MetricTypeSet{
+						common.ResponseSize:                 false,
+						common.RequestSize:                  false,
+						common.ReadFromSocketBufferDuration: true,
+						common.BlackBoxDuration:             true,
+						common.TotalDuration:                true,
+					}, IncludeSyscallStat: true,
+					IncludeConnDesc: true,
+					RecordToStringOptions: protocol.RecordToStringOptions{
+						IncludeReqBody:     true,
+						IncludeRespBody:    true,
+						RecordMaxDumpBytes: 1024,
+					},
+				}))
 			}
-		}(m, ch)
+		}
+	} else {
+		records := &[]*common.AnnotatedRecord{}
+		m := NewModel(options, records, tea.WindowSizeMsg{}, common.NoneType, false).(*model)
+		if !options.StaticRecord {
+			go func(mod *model, channel chan *common.AnnotatedRecord) {
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case r := <-ch:
+						lock.Lock()
+						*m.records = append(*m.records, r)
+						lock.Unlock()
+					}
+				}
+			}(m, ch)
+		}
+		prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen())
+		if _, err := prog.Run(); err != nil {
+			fmt.Println("Error running program:", err)
+			os.Exit(1)
+		}
 	}
-	prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen())
-	if _, err := prog.Run(); err != nil {
-		fmt.Println("Error running program:", err)
-		os.Exit(1)
-	}
+
 }
 
 func (m *model) SortBy() rc.SortBy {

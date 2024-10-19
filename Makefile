@@ -64,9 +64,15 @@ $(BPFTOOL): | $(BPFTOOL_OUTPUT)
 
 GO_FILES := $(shell find $(SRC_DIR) -type f -name '*.go' | sort)  
 
-kyanos: $(LIBBPF_OBJ) $(GO_FILES) $(wildcard bpf/*.[ch]) | $(OUTPUT)
+.PHONY: build-bpf
+build-bpf: $(LIBBPF_OBJ) $(wildcard bpf/*.[ch]) | $(OUTPUT)
+	TARGET=amd64 go generate ./bpf/
+	TARGET=arm64 go generate ./bpf/
+
+kyanos: $(GO_FILES)
 	$(call msg,BINARY,$@)
-	./build.sh
+	export CGO_LDFLAGS="-Xlinker -rpath=. -static" && go build
+    
 # delete failed targets
 .DELETE_ON_ERROR:
 

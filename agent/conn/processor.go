@@ -145,7 +145,7 @@ func (p *Processor) run() {
 			var conn *Connection4
 			isIpv6 := event.ConnInfo.Laddr.In6.Sin6Family == common.AF_INET6
 			if isIpv6 {
-				common.DefaultLog.Debugf("ipv6: %x", event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:])
+				common.ConntrackLog.Debugf("ipv6: %x", event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:])
 			}
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
 				conn = &Connection4{
@@ -212,11 +212,11 @@ func (p *Processor) run() {
 				if isProtocolInterested {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
-							common.BPFEventLog.Debugf("%s process temp syscall events before infer\n", conn.ToString())
+							common.BPFEventLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
 							conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 						}
 						for _, sslEvent := range conn.TempSslEvents {
-							common.BPFEventLog.Debugf("%s process temp ssl events before infer\n", conn.ToString())
+							common.BPFEventLog.Debugf("%s process %d temp ssl events before infer\n", conn.ToString(), len(conn.TempSslEvents))
 							conn.OnSslDataEvent(sslEvent.Buf, sslEvent, recordChannel)
 						}
 						conn.UpdateConnectionTraceable(true)
@@ -312,6 +312,8 @@ func (p *Processor) run() {
 				conn.OnKernEvent(event)
 			} else if conn == nil {
 				common.BPFEventLog.Debugf("[no-conn]%s\n", FormatKernEvt(event, conn))
+			} else {
+				common.BPFEventLog.Debugf("[other]%s\n", FormatKernEvt(event, conn))
 			}
 		}
 	}

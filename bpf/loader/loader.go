@@ -168,7 +168,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 	common.AgentLog.Debugf("[sys info] vendor: %s, os_arch: %s, kernel_arch: %s", si.OS.Vendor, si.OS.Architecture, si.Kernel.Architecture)
 
 	if si.OS.Vendor != "ubuntu" && si.OS.Vendor != "centos" {
-		common.AgentLog.Fatal("Current only support centos and ubuntu")
+		common.AgentLog.Fatalf("Current only support centos and ubuntu, current is %s\n completed OS info is: %v", si.OS.Vendor, si.OS)
 	}
 	if si.OS.Architecture != "amd64" {
 		common.AgentLog.Fatal("Current only support amd64")
@@ -346,7 +346,10 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 				common.AgentLog.Errorf("Invalid pid : %s\n", each)
 				return false
 			}
-			filterPidMap.Update(pidInt, one, ebpf.UpdateAny)
+			err = filterPidMap.Update(uint32(pidInt), int8(one), ebpf.UpdateAny)
+			if err != nil {
+				common.AgentLog.Errorf("Failed update  FilterPidMap: %s\n", err)
+			}
 		}
 	}
 

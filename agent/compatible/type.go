@@ -136,6 +136,7 @@ func init() {
 	v4d14.Version = "4.14.0"
 	v4d14.InstrumentFunctions[bpf.AgentStepTIP_OUT] =
 		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "IpQueueXmit"}}
+	v4d14.addBackupInstrumentFunction(bpf.AgentStepTIP_OUT, InstrumentFunction{"kprobe/__ip_queue_xmit", "IpQueueXmit"})
 	v4d14.InstrumentFunctions[bpf.AgentStepTIP_IN] =
 		[]InstrumentFunction{{"kprobe/ip_rcv", "IpRcvCore"}}
 	v4d14.InstrumentFunctions[bpf.AgentStepTUSER_COPY] =

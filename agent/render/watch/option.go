@@ -6,6 +6,7 @@ type WatchOptions struct {
 	WideOutput   bool
 	StaticRecord bool
 	Opts         string
+	DebugOutput  bool
 }
 
 func (w *WatchOptions) Init() {

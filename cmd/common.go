@@ -7,6 +7,7 @@ import (
 	ac "kyanos/agent/common"
 	"kyanos/agent/protocol"
 	"kyanos/common"
+	"os"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -129,6 +130,7 @@ func initSizeFilter(cmd *cobra.Command) protocol.SizeFilter {
 }
 
 func InitLog() {
+	logrus.SetOutput(os.Stdout)
 	if viper.GetBool("debug") {
 		DefaultLogLevel = int32(logrus.DebugLevel)
 	}
@@ -168,18 +170,19 @@ func InitLog() {
 	default:
 		klog.SetLogger(logr.Discard())
 	}
-
-	for _, l := range common.Loggers {
-		l.SetOut(io.Discard)
-		logdir := "/tmp"
-		if logdir != "" {
-			hook, err := rotatelog.NewHook(
-				logdir+"/kyanos.log.%Y%m%d",
-				rotatelog.WithMaxAge(time.Hour*24),
-				rotatelog.WithRotationTime(time.Hour),
-			)
-			if err == nil {
-				l.Hooks.Add(hook)
+	if !options.WatchOptions.DebugOutput {
+		for _, l := range common.Loggers {
+			l.SetOut(io.Discard)
+			logdir := "/tmp"
+			if logdir != "" {
+				hook, err := rotatelog.NewHook(
+					logdir+"/kyanos.log.%Y%m%d",
+					rotatelog.WithMaxAge(time.Hour*24),
+					rotatelog.WithRotationTime(time.Hour),
+				)
+				if err == nil {
+					l.Hooks.Add(hook)
+				}
 			}
 		}
 	}

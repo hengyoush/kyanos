@@ -1,0 +1,52 @@
+name: release-test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master", "dev", "feature/e2e" ]
+  pull_request:
+    branches: [ "master", "dev" ]
+
+permissions:
+  contents: read
+
+jobs:
+
+  release-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+        with:
+          go-version: '1.22.4'
+
+      - name: Run GoReleaser Draft
+        uses: goreleaser/goreleaser-action@286f3b13b1b49da4ac219696163fb8c1c93e1200 # v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --snapshot --clean --skip=publish -p 1
+
+      - name: Test binary
+        run: |
+          ls dist/
+          mkdir amd64 && tar zxvf dist/kyanos_v0.0.0-next_linux_amd64.tar.gz -C amd64
+          mkdir arm64 && tar zxvf dist/kyanos_v0.0.0-next_linux_arm64.tar.gz -C arm64
+          file ./amd64/kyanos
+          file ./arm64/kyanos
+          file ./amd64/kyanos |grep x86-64 |grep 'statically linked'
+          file ./arm64/kyanos |grep aarch64 |grep 'statically linked'
+
+      - name: Store Releases
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4
+        with:
+          name: kyanos_v0.0.0-next_linux_amd64.tar.gz
+          path: dist/kyanos.0.0-next_linux_amd64.tar.gz
+
+      - name: Store Releases
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4
+        with:
+          name: kyanos_v0.0.0-next_linux_arm64.tar.gz
+          path: dist/kyanos_v0.0.0-next_linux_arm64.tar.gz

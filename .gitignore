@@ -9,7 +9,6 @@
 *.dylib
 *.o
 __debug**
-agent/agent_x86_bpfel.o
 
 # Test binary, built with `go test -c`
 *.test
@@ -28,3 +27,5 @@ deps/**
 
 eapm-ebpf
 kyanos
+
+dist/

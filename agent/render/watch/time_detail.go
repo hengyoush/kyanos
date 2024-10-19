@@ -71,7 +71,11 @@ func addNicEventsDiagram(events []common.NicEventDetail, prevNicArrow *diagrams.
 		prevTs = nicEvent.ts
 
 	}
-	return lastShape, nicEvents[len(nicEvents)-1].ts
+	if len(nicEvents) > 0 {
+		return lastShape, nicEvents[len(nicEvents)-1].ts
+	} else {
+		return lastShape, 0
+	}
 }
 
 func addSocketBufferDiagram(duration int64, prevDiagram *diagrams.Shape, shapes *[]*diagrams.Shape, isReq bool) *diagrams.Shape {
@@ -181,7 +185,7 @@ func ViewRecordTimeDetailAsFlowChartForClientSide(r *common.AnnotatedRecord) str
 		Type:    diagrams.DownArrow,
 	}
 	diagrams.AddToBottom(lastNicShape, &lastNicToBottomArrow)
-	lastNicShape, lastNicTs = addNicEventsDiagram(r.RespNicEventDetails, &lastNicToBottomArrow, lastNicTs, &shapes, false)
+	lastNicShape, _ = addNicEventsDiagram(r.RespNicEventDetails, &lastNicToBottomArrow, lastNicTs, &shapes, false)
 	socketBufferToLeftArrow := addSocketBufferDiagram(int64(r.CopyToSocketBufferDuration), lastNicShape, &shapes, false)
 
 	applicationEnd := diagrams.Shape{
