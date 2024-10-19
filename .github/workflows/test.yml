@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [ "main", "dev","feature/*" ]
 
+env:
+  kyanos_log_option: --bpf-event-log-level 5 --conntrack-log-level 5
+
 permissions:
   contents: read
 
@@ -97,7 +100,7 @@ jobs:
           host-mount: ./
           install-dependencies: 'true'
           cmd: |
-            chmod +x /host/kyanos/kyanos
+            chmod +x /host/kyanos/kyanos $kyanos_log_option
       
       - name: download btf file
         if: ${{ startsWith(matrix.kernel, '4.') }}
@@ -149,9 +152,9 @@ jobs:
             uname -a
             cat /etc/issue
             if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-                bash /host/testdata/test_base.sh '/host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf'
+                bash /host/testdata/test_base.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
             else  
-                bash /host/testdata/test_base.sh /host/kyanos/kyanos
+                bash /host/testdata/test_base.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
 
       - name: Test filter by l3/l4 info
@@ -163,9 +166,9 @@ jobs:
             uname -a
             cat /etc/issue
             if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-                bash /host/testdata/test_filter_by_l4.sh '/host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf'
+                bash /host/testdata/test_filter_by_l4.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
             else  
-                bash /host/testdata/test_filter_by_l4.sh /host/kyanos/kyanos
+                bash /host/testdata/test_filter_by_l4.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
 
       - name: Test kern evt
@@ -177,9 +180,9 @@ jobs:
             uname -a
             cat /etc/issue
             if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-                bash /host/testdata/test_kern_evt.sh '/host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf'
+                bash /host/testdata/test_kern_evt.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
             else  
-                bash /host/testdata/test_kern_evt.sh /host/kyanos/kyanos
+                bash /host/testdata/test_kern_evt.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
             
       - name: Test test docker filter by container id
@@ -191,9 +194,9 @@ jobs:
             uname -a
             cat /etc/issue
             if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-                bash /host/testdata/test_docker_filter_by_container_id.sh '/host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf'
+                bash /host/testdata/test_docker_filter_by_container_id.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
             else  
-                bash /host/testdata/test_docker_filter_by_container_id.sh /host/kyanos/kyanos
+                bash /host/testdata/test_docker_filter_by_container_id.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
 
       - name: Test test docker filter by container name
@@ -205,9 +208,9 @@ jobs:
             uname -a
             cat /etc/issue
             if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-                bash /host/testdata/test_docker_filter_by_container_name.sh '/host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf'
+                bash /host/testdata/test_docker_filter_by_container_name.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
             else  
-                bash /host/testdata/test_docker_filter_by_container_name.sh /host/kyanos/kyanos
+                bash /host/testdata/test_docker_filter_by_container_name.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
 
       - name: Test filter by pid
@@ -219,7 +222,7 @@ jobs:
             uname -a
             cat /etc/issue
             if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-                bash /host/testdata/test_docker_filter_by_pid.sh '/host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf'
+                bash /host/testdata/test_docker_filter_by_pid.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
             else  
-                bash /host/testdata/test_docker_filter_by_pid.sh /host/kyanos/kyanos
+                bash /host/testdata/test_docker_filter_by_pid.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
