@@ -140,19 +140,19 @@ jobs:
               cp -f /sys/kernel/btf/vmlinux /var/lib/kyanos/btf/current.btf
             fi
 
-      # - name: Test base
-      #   uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
-      #   with:
-      #     provision: 'false'
-      #     cmd: |
-      #       set -ex
-      #       uname -a
-      #       cat /etc/issue
-      #       if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-      #           bash /host/testdata/test_base.sh '/host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf'
-      #       else  
-      #           bash /host/testdata/test_base.sh /host/kyanos/kyanos
-      #       fi
+      - name: Test base
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
+                bash /host/testdata/test_base.sh '/host/kyanos/kyanos --btf /var/lib/kyanos/btf/current.btf'
+            else  
+                bash /host/testdata/test_base.sh /host/kyanos/kyanos
+            fi
 
       - name: Test filter by l3/l4 info
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19

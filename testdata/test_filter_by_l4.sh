@@ -59,8 +59,8 @@ function test_filter_by_local_port() {
 }
 
 function main() {
-    # test_filter_by_remote_ip
-    # test_filter_by_remote_port
+    test_filter_by_remote_ip
+    test_filter_by_remote_port
     test_filter_by_local_port
 }
 
