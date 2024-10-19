@@ -2,7 +2,8 @@
 
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /* Copyright (c) 2021 Sartura */
-#include "../vmlinux/vmlinux.h"
+// #include "../vmlinux/vmlinux.h"
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h> 
@@ -624,7 +625,12 @@ int BPF_KPROBE(ip_rcv_core, struct sk_buff *skb) {
 SEC("kprobe/dev_hard_start_xmit")
 int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 	struct sk_buff *skb = {0};
+#ifdef ARCH_amd64
 	BPF_CORE_READ_INTO(&skb, ctx, di);
+#else
+    skb = PT_REGS_PARM1_CORE(ctx);
+#endif
+	// BPF_CORE_READ_INTO(&skb, ctx, di);
 	// skb = PT_REGS_PARM1_CORE(ctx);
 #pragma unroll
 	for (int i = 0; i < 2; i++) {
@@ -955,7 +961,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 	}
 	struct tcp_sock * tcp_sk = get_socket_from_fd(fd);
 	if (!tcp_sk) {
-		tcp_sk = _C(socket, sk);
+		tcp_sk = (struct tcp_sock *) _C(socket, sk);
 	}
 	// s => d
 	struct sock_key key = {0};
@@ -1723,7 +1729,12 @@ int BPF_KRETPROBE(sock_alloc_ret)
 	}
 	if (!args->sock_alloc_socket) {
 		struct socket *sk = {0};
+
+#ifdef ARCH_amd64
 		BPF_CORE_READ_INTO(&sk, ctx, ax);
+#else
+		sk = PT_REGS_RC_CORE(ctx);
+#endif
 		// args->sock_alloc_socket = (struct socket*) PT_REGS_RC_CORE(ctx);
 		args->sock_alloc_socket = sk;
 	}
