@@ -87,3 +87,4 @@ rsync -avz \
 [ ! -d ${BASEDIR}/bpf/custom-archive ] && mkdir -p ${BASEDIR}/bpf/custom-archive
 rm -rf ${BASEDIR}/bpf/custom-archive/* || true
 mv ./custom-archive/* ${BASEDIR}/bpf/custom-archive
+ls -l  ${BASEDIR}/bpf/custom-archive/centos/7/x86_64
