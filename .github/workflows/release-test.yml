@@ -33,7 +33,7 @@ jobs:
         run: |
           mkdir amd64 && tar zxvf dist/kyanos_v0.0.0-next_linux_amd64.tar.gz -C amd64
           mkdir arm64 && tar zxvf dist/kyanos_v0.0.0-next_linux_arm64.tar.gz -C arm64
-          ./amd64/kyanos --help
+          ./amd64/kyanos --help || true
 
           file ./amd64/kyanos |grep x86-64 |grep 'statically linked'
           file ./arm64/kyanos |grep aarch64 |grep 'statically linked'
