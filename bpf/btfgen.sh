@@ -56,7 +56,7 @@ done
 [ ! -f ${KYANOS_BPF_CORE} ] && die "kyanos CO-RE obj not found: ${KYANOS_BPF_CORE}"
 
 [ ! -d ${BTFHUB_DIR} ] && git clone "${BTFHUB_REPO}" ${BTFHUB_DIR}
-[ ! -d ${BTFHUB_ARCH_DIR} ] && git clone "${BTFHUB_ARCH_REPO}" ${BTFHUB_ARCH_DIR}
+[ ! -d ${BTFHUB_ARCH_DIR} ] && git clone --depth=1 "${BTFHUB_ARCH_REPO}" ${BTFHUB_ARCH_DIR}
 
 if [ -z ${SKIP_FETCH} ]; then
     branch_clean ${BTFHUB_DIR}
@@ -74,6 +74,9 @@ rsync -avz \
     --exclude=.git* \
     --exclude=README.md \
     --exclude=${ARCH_EXCLUDE} \
+    --include='*ubuntu*' \
+    --include='*centos*' \
+    --include='*debian*' \
     ./archive/
 
 # generate tailored BTFs
