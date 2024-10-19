@@ -35,7 +35,7 @@ builds:
     hooks:
       pre:
         - bash -c 'sudo make clean || true'
-        - bash -c 'sudo make build-bpf || true' 
+        - bash -c 'sudo make build-bpf' 
         - bash -c 'sudo make btfgen BUILD_ARCH=arm64 ARCH_BPF_NAME=arm64' 
 
   - id: kyanos-amd64
@@ -56,7 +56,7 @@ builds:
     hooks:
       pre:
         - bash -c 'sudo make clean || true'
-        - bash -c 'sudo make build-bpf || true'
+        - bash -c 'sudo make build-bpf'
         - bash -c 'sudo make btfgen BUILD_ARCH=x86_64 ARCH_BPF_NAME=x86' 
 
 archives:
