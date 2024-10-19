@@ -12,6 +12,7 @@ before:
   hooks:
     - wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
     - sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
+    - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 15CF4D18AF4F7421
     - sudo apt update
     - sudo apt-get install -y gcc flex bison make autoconf libelf-dev gcc-aarch64-linux-gnu libc6-dev-arm64-cross pkg-config llvm clang
     - git submodule update --init --recursive
@@ -48,7 +49,7 @@ builds:
       - amd64
     hooks:
       pre:
-        # - bash -c 'sudo make clean || true'
+        - bash -c 'sudo make clean || true'
         - bash -c 'sudo make build-bpf || true'
 
 archives:
