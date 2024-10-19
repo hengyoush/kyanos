@@ -43,6 +43,11 @@ builds:
       - CGO_ENABLED=1
       - CC=clang
       - CGO_LDFLAGS="-Xlinker -rpath=. -static"
+    flags:
+      - -tags=static
+    ldflags:
+      - -linkmode 'external'
+      - -extldflags "-static"
     goos:
       - linux
     goarch:
