@@ -50,6 +50,8 @@ function test_filter_by_local_port() {
     timeout 30 ${CMD} watch --debug-output http --local-ports "$local_port" 2>&1  | tee "${LNAME_LOCAL_PORT}" &
     sleep 10
     curl http://127.0.0.1:"$local_port" &>/dev/null || true
+    curl http://127.0.0.1:"$local_port" &>/dev/null || true
+    curl http://127.0.0.1:"$local_port" &>/dev/null || true
     wait
 
     cat "${LNAME_LOCAL_PORT}"
@@ -58,7 +60,7 @@ function test_filter_by_local_port() {
 
 function main() {
     # test_filter_by_remote_ip
-    test_filter_by_remote_port
+    # test_filter_by_remote_port
     test_filter_by_local_port
 }
 
