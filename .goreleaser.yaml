@@ -44,7 +44,7 @@ builds:
     env:
       - CGO_ENABLED=1
       - CC=gcc
-      - CGO_LDFLAGS="-Xlinker -rpath=. -static"
+      # - CGO_LDFLAGS="-Xlinker -rpath=. -static"
       - BUILD_ARCH=x86_64
     flags:
       - -tags=static
