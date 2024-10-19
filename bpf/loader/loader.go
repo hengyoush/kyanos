@@ -158,6 +158,54 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	return bf, nil
 }
 
+var osReleaseFiles = []string{
+	"/etc/os-release",
+	"/usr/lib/os-release",
+}
+
+type Release struct {
+	Id        string
+	VersionId string
+}
+
+func getRelease() (*Release, error) {
+	var errors []error
+	for _, path := range osReleaseFiles {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			errors = append(errors, err)
+			continue
+		}
+
+		var release Release
+		for _, line := range strings.Split(string(data), "\n") {
+			line := strings.TrimSpace(line)
+			parts := strings.Split(line, "=")
+			if len(parts) < 2 {
+				continue
+			}
+			key, value := parts[0], parts[1]
+			key = strings.TrimSpace(key)
+			switch key {
+			case "ID":
+				release.Id = strings.TrimSpace(value)
+				break
+			case "VERSION_ID":
+				release.VersionId = strings.TrimSpace(value)
+				break
+			}
+		}
+		if release.Id != "" {
+			return &release, nil
+		}
+	}
+
+	if len(errors) != 0 {
+		return nil, fmt.Errorf("%v", errors)
+	}
+
+	return nil, fmt.Errorf("can't get release info from %v", osReleaseFiles)
+}
 func getBestMatchedBTFFile() ([]uint8, error) {
 	if bpf.IsKernelSupportHasBTF() {
 		return nil, nil
@@ -167,25 +215,13 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 	si.GetSysInfo()
 	common.AgentLog.Debugf("[sys info] vendor: %s, os_arch: %s, kernel_arch: %s", si.OS.Vendor, si.OS.Architecture, si.Kernel.Architecture)
 
-	if si.OS.Vendor != "ubuntu" && si.OS.Vendor != "centos" {
-		common.AgentLog.Fatalf("Current only support centos and ubuntu, current is %s\n completed OS info is: %v", si.OS.Vendor, si.OS)
-	}
-	if si.OS.Architecture != "amd64" {
-		common.AgentLog.Fatal("Current only support amd64")
-	}
-	if si.Kernel.Architecture != "x86_64" {
-		common.AgentLog.Fatal("Current only support x86_64")
-	}
+	osInfo, err := common.GetOSInfo()
+	osId := osInfo.GetOSReleaseFieldValue(common.OS_ID)
+	versionId := strings.Replace(osInfo.GetOSReleaseFieldValue(common.OS_VERSION_ID), "\"", "", -1)
+	kernelRelease := osInfo.GetOSReleaseFieldValue(common.OS_KERNEL_RELEASE)
+	arch := osInfo.GetOSReleaseFieldValue(common.OS_ARCH)
 
-	var btfFileDir string
-	btfFileDir += "custom-archive"
-	btfFileDir += "/" + si.OS.Vendor
-	if si.OS.Vendor == "centos" {
-		btfFileDir += "/" + si.OS.Release[:1]
-	} else {
-		btfFileDir += "/" + si.OS.Release[:5]
-	}
-	btfFileDir += "/" + si.Kernel.Architecture
+	btfFileDir := fmt.Sprintf("custom-archive/%s/%s/%s/%s.btf", osId, versionId, arch, kernelRelease)
 	dir, err := bpf.BtfFiles.ReadDir(btfFileDir)
 	if err != nil {
 		common.AgentLog.Warnf("btf file not exists, path: %s", btfFileDir)
