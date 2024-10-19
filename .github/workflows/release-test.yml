@@ -32,17 +32,17 @@ jobs:
           dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 100
           df -h
           echo "Removing large packages"
-          sudo apt-get remove -y '^ghc-8.*'
-          sudo apt-get remove -y '^dotnet-.*'
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y azure-cli google-cloud-sdk hhvm google-chrome-stable firefox powershell mono-devel
-          sudo apt-get autoremove -y
-          sudo apt-get clean
+          sudo apt-get remove -y '^ghc-8.*' || true
+          sudo apt-get remove -y '^dotnet-.*' || true
+          sudo apt-get remove -y 'php.*' || true
+          sudo apt-get remove -y azure-cli google-cloud-sdk hhvm google-chrome-stable firefox powershell mono-devel || true
+          sudo apt-get autoremove -y || true
+          sudo apt-get clean || true
           df -h
           echo "Removing large directories"
           # deleting 15GB
-          rm -rf /usr/share/dotnet/
-          rm -rf /opt/hostedtoolcache
+          rm -rf /usr/share/dotnet/ || true
+          rm -rf /opt/hostedtoolcache || true
           df -h
       - name: Run GoReleaser Draft
         uses: goreleaser/goreleaser-action@286f3b13b1b49da4ac219696163fb8c1c93e1200 # v6
