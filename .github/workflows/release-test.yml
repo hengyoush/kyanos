@@ -19,7 +19,8 @@ jobs:
       - name: Remove large directories
         run: |
           df -h
-          rm -rf /opt/hostedtoolcache || true
+          cd /opt/hostedtoolcache
+          find . -mindepth 1 -maxdepth 1 -type d -not -name 'go' -exec rm -rf {} +
           df -h
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 

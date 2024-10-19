@@ -81,12 +81,11 @@ rsync -avz \
 
 # generate tailored BTFs
 
+[ ! -d ${BASEDIR}/bpf/custom-archive ] && mkdir -p ${BASEDIR}/bpf/custom-archive
+rm -rf ${BASEDIR}/bpf/custom-archive/* || true
+
 [ ! -f ./tools/btfgen.sh ] && die "could not find btfgen.sh"
 ./tools/btfgen.sh -a $1 -o ${KYANOS_BPF_CORE}
 
-
 # move tailored BTFs to dist
-
-[ ! -d ${BASEDIR}/bpf/custom-archive ] && mkdir -p ${BASEDIR}/bpf/custom-archive
-rm -rf ${BASEDIR}/bpf/custom-archive/* || true
 mv ./custom-archive/* ${BASEDIR}/bpf/custom-archive
