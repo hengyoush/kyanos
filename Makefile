@@ -75,7 +75,7 @@ kyanos: $(GO_FILES)
 
 .PHONY: btfgen
 btfgen:
-	./btfgen.sh
+	./btfgen.sh $(BUILD_ARCH) $(ARCH_BPF_NAME)
 
 # delete failed targets
 .DELETE_ON_ERROR:

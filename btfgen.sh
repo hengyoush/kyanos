@@ -8,7 +8,7 @@ BTFHUB_REPO="https://github.com/aquasecurity/btfhub.git"
 BTFHUB_ARCH_REPO="https://github.com/aquasecurity/btfhub-archive.git"
 
 
-KYANOS_BPF_CORE="${BASEDIR}/bpf/agent_x86_bpfel.o"
+KYANOS_BPF_CORE="${BASEDIR}/bpf/agent_$1_bpfel.o"
 
 BTFHUB_DIR="${BASEDIR}/deps/btfhub"
 BTFHUB_ARCH_DIR="${BASEDIR}/deps/btfhub-archive"
@@ -53,7 +53,7 @@ CMDS="rsync git cp rm mv"
 for cmd in ${CMDS}; do
     command -v $cmd 2>&1 >/dev/null || die "cmd ${cmd} not found"
 done
-[ ! -f ${KYANOS_BPF_CORE} ] && die "tracee CO-RE obj not found"
+[ ! -f ${KYANOS_BPF_CORE} ] && die "kyanos CO-RE obj not found: ${KYANOS_BPF_CORE}"
 
 [ ! -d ${BTFHUB_DIR} ] && git clone "${BTFHUB_REPO}" ${BTFHUB_DIR}
 [ ! -d ${BTFHUB_ARCH_DIR} ] && git clone "${BTFHUB_ARCH_REPO}" ${BTFHUB_ARCH_DIR}
@@ -79,7 +79,7 @@ rsync -avz \
 # generate tailored BTFs
 
 [ ! -f ./tools/btfgen.sh ] && die "could not find btfgen.sh"
-./tools/btfgen.sh -a ${BUILD_ARCH} -o ${KYANOS_BPF_CORE}
+./tools/btfgen.sh -a $2 -o ${KYANOS_BPF_CORE}
 
 
 # move tailored BTFs to dist

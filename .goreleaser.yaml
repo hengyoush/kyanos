@@ -23,7 +23,6 @@ builds:
     env:
       - CGO_ENABLED=1
       - CC=aarch64-linux-gnu-gcc
-      - BUILD_ARCH=arm64
     flags:
       - -tags=static
     ldflags:
@@ -37,7 +36,7 @@ builds:
       pre:
         - bash -c 'sudo make clean || true'
         - bash -c 'sudo make build-bpf || true' 
-        - bash -c 'sudo make btfgen' 
+        - bash -c 'sudo make btfgen BUILD_ARCH=arm64 ARCH_BPF_NAME=arm64' 
 
   - id: kyanos-amd64
     binary: kyanos
@@ -45,7 +44,6 @@ builds:
       - CGO_ENABLED=1
       - CC=gcc
       # - CGO_LDFLAGS="-Xlinker -rpath=. -static"
-      - BUILD_ARCH=x86_64
     flags:
       - -tags=static
     ldflags:
@@ -59,7 +57,7 @@ builds:
       pre:
         - bash -c 'sudo make clean || true'
         - bash -c 'sudo make build-bpf || true'
-        - bash -c 'sudo make btfgen' 
+        - bash -c 'sudo make btfgen BUILD_ARCH=x86_64 ARCH_BPF_NAME=x86' 
 
 archives:
   - builds:
