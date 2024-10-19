@@ -17,19 +17,19 @@ type aggregator struct {
 }
 
 func createAggregatorWithHumanReadableClassId(humanReadableClassId string,
-	classId ClassId, aggregateOption *analysis_common.AnalysisOptions) *aggregator {
+	classId analysis_common.ClassId, aggregateOption *analysis_common.AnalysisOptions) *aggregator {
 	aggregator := createAggregator(classId, aggregateOption)
 	aggregator.HumanReadbleClassId = humanReadableClassId
 	return aggregator
 }
 
-func createAggregator(classId ClassId, aggregateOption *analysis_common.AnalysisOptions) *aggregator {
+func createAggregator(classId analysis_common.ClassId, aggregateOption *analysis_common.AnalysisOptions) *aggregator {
 	aggregator := aggregator{}
 	aggregator.reset(classId, aggregateOption)
 	return &aggregator
 }
 
-func (a *aggregator) reset(classId ClassId, aggregateOption *analysis_common.AnalysisOptions) {
+func (a *aggregator) reset(classId analysis_common.ClassId, aggregateOption *analysis_common.AnalysisOptions) {
 	a.AnalysisOptions = aggregateOption
 	a.ConnStat = &ConnStat{
 		ClassId:       classId,
@@ -104,7 +104,7 @@ type Analyzer struct {
 	Classfier
 	*analysis_common.AnalysisOptions
 	common.SideEnum // 那一边的统计指标TODO 根据参数自动推断
-	Aggregators     map[ClassId]*aggregator
+	Aggregators     map[analysis_common.ClassId]*aggregator
 	recordsChannel  <-chan *analysis_common.AnnotatedRecord
 	stopper         <-chan int
 	resultChannel   chan<- []*ConnStat
@@ -112,42 +112,55 @@ type Analyzer struct {
 	ticker          *time.Ticker
 	tickerC         <-chan time.Time
 	ctx             context.Context
+	recordReceived  int
 }
 
-func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, showOption *analysis_common.AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int, ctx context.Context) *Analyzer {
+func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, opts *analysis_common.AnalysisOptions, resultChannel chan<- []*ConnStat, renderStopper chan int, ctx context.Context) *Analyzer {
 	stopper := make(chan int)
 	// ac.AddToFastStopper(stopper)
+	opts.Init()
 	analyzer := &Analyzer{
-		Classfier:       getClassfier(showOption.ClassfierType),
+		Classfier:       getClassfier(opts.ClassfierType),
 		recordsChannel:  recordsChannel,
-		Aggregators:     make(map[ClassId]*aggregator),
-		AnalysisOptions: showOption,
+		Aggregators:     make(map[analysis_common.ClassId]*aggregator),
+		AnalysisOptions: opts,
 		stopper:         stopper,
 		resultChannel:   resultChannel,
 		renderStopper:   renderStopper,
+		ctx:             ctx,
 	}
-	if showOption.Interval > 0 {
-		analyzer.ticker = time.NewTicker(time.Second * time.Duration(showOption.Interval))
-		analyzer.tickerC = analyzer.ticker.C
-	} else {
+	opts.CurrentReceivedSamples = func() int {
+		return analyzer.recordReceived
+	}
+	if analyzer.AnalysisOptions.EnableBatchModel() {
 		analyzer.tickerC = make(<-chan time.Time)
+	} else {
+		analyzer.ticker = time.NewTicker(time.Second * 1)
+		analyzer.tickerC = analyzer.ticker.C
 	}
 	return analyzer
 }
 
 func (a *Analyzer) Run() {
+	defer close(a.resultChannel)
 	for {
 		select {
 		// case <-a.stopper:
 		case <-a.ctx.Done():
-			if a.AnalysisOptions.Interval == 0 {
-				a.resultChannel <- a.harvest()
-				time.Sleep(1 * time.Second)
-			}
 			a.renderStopper <- 1
 			return
 		case record := <-a.recordsChannel:
 			a.analyze(record)
+			a.recordReceived++
+			if a.EnableBatchModel() && a.recordReceived == a.TargetSamples {
+				a.resultChannel <- a.harvest()
+				return
+			}
+		case <-a.AnalysisOptions.HavestSignal:
+			a.resultChannel <- a.harvest()
+			if a.AnalysisOptions.EnableBatchModel() {
+				return
+			}
 		case <-a.tickerC:
 			a.resultChannel <- a.harvest()
 		}
@@ -161,7 +174,9 @@ func (a *Analyzer) harvest() []*ConnStat {
 		// aggregator.reset(classId, a.analysis_common.AnalysisOptions)
 		result = append(result, connstat)
 	}
-	a.Aggregators = make(map[ClassId]*aggregator)
+	if a.AnalysisOptions.CleanWhenHarvest {
+		a.Aggregators = make(map[analysis_common.ClassId]*aggregator)
+	}
 	return result
 }
 

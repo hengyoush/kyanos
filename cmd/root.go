@@ -2,17 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	ac "kyanos/agent/common"
 	"kyanos/agent/metadata/k8s"
 	"kyanos/common"
 	"strings"
 
-	"github.com/jefurry/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var logger *logrus.Logger = common.DefaultLog
+var logger *common.Klogger = common.DefaultLog
 
 var rootCmd = &cobra.Command{
 	Use: `kyanos <command> [flags]`,
@@ -35,7 +33,7 @@ sudo kyanos stat http --metrics t --group-by remote-ip
 sudo kyanos stat http --metrics t --samples 3 --full-body
 sudo kyanos stat http --metrics tq --sort-by avg --group-by remote-ip`,
 	Run: func(cmd *cobra.Command, args []string) {
-		startAgent(ac.AgentOptions{})
+		startAgent()
 	},
 }
 

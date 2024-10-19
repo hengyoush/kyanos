@@ -105,3 +105,8 @@ func TestBytesToIpv6(t *testing.T) {
 	addr2, _ := common.IPv6ToBytes(ip.String())
 	assert.Equal(t, addr, addr2)
 }
+
+func TestIpv4ToBytes(t *testing.T) {
+	bytes, _ := common.IPv4ToBytes("127.0.0.1")
+	fmt.Println(bytes)
+}

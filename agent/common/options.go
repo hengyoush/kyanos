@@ -9,6 +9,7 @@ import (
 	"kyanos/agent/conn"
 	"kyanos/agent/metadata"
 	"kyanos/agent/protocol"
+	"kyanos/agent/render/watch"
 	"kyanos/bpf"
 	"kyanos/common"
 	"os"
@@ -45,6 +46,7 @@ type AgentOptions struct {
 	PerfEventBufferSizeForData  int
 	PerfEventBufferSizeForEvent int
 	DisableOpensslUprobe        bool
+	WatchOptions                watch.WatchOptions
 
 	DockerEndpoint     string
 	ContainerdEndpoint string
@@ -115,5 +117,6 @@ func ValidateAndRepairOptions(options AgentOptions) AgentOptions {
 	if newOptions.CriRuntimeEndpoint != "" {
 		newOptions.CriRuntimeEndpoint = getEndpoint(newOptions.CriRuntimeEndpoint)
 	}
+	newOptions.WatchOptions.Init()
 	return newOptions
 }

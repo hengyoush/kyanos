@@ -63,6 +63,19 @@ func BytesToNetIP(addr []uint8, isIpv6 bool) net.IP {
 	return net.IP(result)
 }
 
+func NetIPToBytes(ip net.IP, isIpv6 bool) []byte {
+	bytes := [16]byte{}
+	if isIpv6 {
+		return []byte(ip)
+	} else {
+		ipv4 := ip.To4()
+		for i, a := range ipv4 {
+			bytes[i] = a
+		}
+		return bytes[:]
+	}
+}
+
 func SockKeyIpToNetIP(addr []uint64, isIpv6 bool) net.IP {
 	if isIpv6 {
 		result := make([]byte, 0)
@@ -204,6 +217,21 @@ func IPv4ToUint32(ipStr string) (uint32, error) {
 	}
 
 	return result, nil
+}
+
+func IPv4ToBytes(ipStr string) ([]byte, error) {
+	// 解析IPv4地址
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP address: %s", ipStr)
+	}
+
+	// 检查是否为IPv4地址
+	ip16 := ip.To16()
+	if ip16 == nil {
+		return nil, fmt.Errorf("not an IPv4 address: %s", ipStr)
+	}
+	return ip16, nil
 }
 
 // ipv6ToBytes converts an IPv6 address string to a []byte.

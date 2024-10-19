@@ -12,12 +12,68 @@ import (
 type AnalysisOptions struct {
 	EnabledMetricTypeSet MetricTypeSet
 	SampleLimit          int
-	DisplayLimit         int
-	Interval             int
 	Side                 ac.SideEnum
 	ClassfierType
-	SortBy         LatencyMetric
-	FullRecordBody bool
+	CleanWhenHarvest bool
+
+	// Fast Inspect Options
+	SlowMode               bool
+	BigRespMode            bool
+	BigReqMode             bool
+	TargetSamples          int
+	CurrentReceivedSamples func() int
+	HavestSignal           chan struct{}
+}
+
+func (a *AnalysisOptions) Init() {
+	if a.SampleLimit <= 0 {
+		a.SampleLimit = 10
+	}
+	a.HavestSignal = make(chan struct{}, 10)
+
+	if a.EnableBatchModel() {
+		a.CleanWhenHarvest = true
+	} else {
+		a.CleanWhenHarvest = false
+	}
+	if a.SlowMode {
+		a.EnabledMetricTypeSet = MetricTypeSet{
+			TotalDuration: true,
+		}
+		if a.ClassfierType == Default {
+			a.ClassfierType = RemoteIp
+		}
+	} else if a.BigReqMode || a.BigRespMode {
+		if a.BigRespMode {
+			a.EnabledMetricTypeSet = MetricTypeSet{
+				ResponseSize: true,
+			}
+		} else {
+			a.EnabledMetricTypeSet = MetricTypeSet{
+				RequestSize: true,
+			}
+		}
+		if a.ClassfierType == Default {
+			a.ClassfierType = RemoteIp
+		}
+	} else {
+		if a.ClassfierType == Default {
+			a.ClassfierType = Conn
+		}
+	}
+	// temp disable batch model
+	// a.disableBatchModel()
+}
+
+func (a AnalysisOptions) EnableBatchModel() bool {
+	return a.SlowMode || a.BigReqMode || a.BigRespMode
+}
+
+func (a *AnalysisOptions) disableBatchModel() {
+	a.SlowMode = false
+	a.BigReqMode = false
+	a.BigRespMode = false
+	a.CleanWhenHarvest = false
 }
 
 type ClassfierType int
@@ -60,7 +116,8 @@ func (m MetricTypeSet) GetFirstEnabledMetricType() MetricType {
 type MetricExtract[T MetricValueType] func(*AnnotatedRecord) T
 
 const (
-	ResponseSize MetricType = iota
+	Start MetricType = iota
+	ResponseSize
 	RequestSize
 	TotalDuration
 	BlackBoxDuration
@@ -68,6 +125,14 @@ const (
 	NoneType
 )
 
+func (m MetricType) IsTotalMeaningful() bool {
+	switch m {
+	case ResponseSize, RequestSize:
+		return true
+	default:
+		return false
+	}
+}
 func GetMetricExtractFunc[T MetricValueType](t MetricType) MetricExtract[T] {
 	switch t {
 	case ResponseSize:
@@ -108,6 +173,7 @@ type AnnotatedRecord struct {
 	RespSize                     int
 	TotalDuration                float64
 	BlackBoxDuration             float64
+	CopyToSocketBufferDuration   float64
 	ReadFromSocketBufferDuration float64
 	ReqSyscallEventDetails       []SyscallEventDetail
 	RespSyscallEventDetails      []SyscallEventDetail
@@ -127,8 +193,19 @@ func (a *AnnotatedRecord) GetReadFromSocketBufferDurationMills() float64 {
 	return common.NanoToMills(int32(a.ReadFromSocketBufferDuration))
 }
 
+func (a *AnnotatedRecord) GetLastRespSyscallTime() int64 {
+	if len(a.RespSyscallEventDetails) == 0 {
+		return 0
+	} else {
+		return int64(a.RespSyscallEventDetails[len(a.RespSyscallEventDetails)-1].Timestamp)
+	}
+}
+
 type SyscallEventDetail PacketEventDetail
-type NicEventDetail PacketEventDetail
+type NicEventDetail struct {
+	PacketEventDetail
+	Attributes map[string]any
+}
 type PacketEventDetail struct {
 	ByteSize  int
 	Timestamp uint64

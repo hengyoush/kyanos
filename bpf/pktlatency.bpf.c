@@ -14,6 +14,7 @@
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
+const struct in6_addr *in6_addr_unused __attribute__((unused));
 const struct kern_evt *kern_evt_unused __attribute__((unused));
 const struct kern_evt_ssl_data *kern_evt_ssl_data_unused __attribute__((unused));
 const struct conn_evt_t *conn_evt_t_unused __attribute__((unused));
@@ -795,7 +796,7 @@ MY_BPF_HASH(write_args_map, uint64_t, struct data_args)
 MY_BPF_HASH(read_args_map, uint64_t, struct data_args)
 MY_BPF_HASH(enabled_remote_port_map, uint16_t, uint8_t)
 MY_BPF_HASH(enabled_local_port_map, uint16_t, uint8_t)
-MY_BPF_HASH(enabled_remote_ipv4_map, uint32_t, uint8_t)
+MY_BPF_HASH(enabled_remote_ip_map, struct in6_addr , uint8_t)
 MY_BPF_HASH(enabled_local_ipv4_map, uint32_t, uint8_t)
 
 
@@ -899,16 +900,16 @@ static  __always_inline bool filter_conn_info(struct conn_info_t *conn_info) {
 		}
 	}
 	uint32_t one32 = 1;
-	// if (conn_info->raddr.in6.sin6_family == AF_INET) { // TODO @ipv6
-	// 	uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &one32);
-	// 	if (enable_remote_ipv4_filter != NULL) {
-	// 		u32 addr = conn_info->raddr.in4.sin_addr.s_addr;
-	// 		uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ipv4_map, &addr);
-	// 		if (enabled_remote_ipv4 == NULL || conn_info->raddr.in4.sin_addr.s_addr == 0) {
-	// 			return false;
-	// 		}
-	// 	}
-	// }
+	struct in6_addr test = {0};
+	test.in6_u.u6_addr8[0] = 1;
+	uint8_t* enable_remote_ipv4_filter = bpf_map_lookup_elem(&enabled_remote_ip_map, &test);
+	if (enable_remote_ipv4_filter != NULL) {
+		test = conn_info->raddr.in6.sin6_addr;
+		uint8_t* enabled_remote_ipv4 = bpf_map_lookup_elem(&enabled_remote_ip_map, &test);
+		if (enabled_remote_ipv4 == NULL) {
+			return false;
+		}
+	}
 	return true;
 }
 static __always_inline bool create_conn_info(void* ctx, struct conn_info_t *conn_info, uint64_t tgid_fd, const struct sock_key *key, enum endpoint_role_t role, uint64_t start_ts) {

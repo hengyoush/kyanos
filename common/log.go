@@ -1,12 +1,36 @@
 package common
 
-import "github.com/jefurry/logrus"
+import (
+	"io"
 
-var DefaultLog *logrus.Logger = logrus.New()
-var AgentLog *logrus.Logger = logrus.New()
-var BPFLog *logrus.Logger = logrus.New()
+	"github.com/jefurry/logrus"
+)
 
-var BPFEventLog *logrus.Logger = logrus.New()
-var UprobeLog *logrus.Logger = logrus.New()
-var ConntrackLog *logrus.Logger = logrus.New()
-var ProtocolParserLog *logrus.Logger = logrus.New()
+type Klogger struct {
+	*logrus.Logger
+}
+
+/**
+type LogOptionsSetter interface {
+	SetOutput(io.Writer)
+	SetPrefix(string)
+}**/
+
+func (k *Klogger) SetOutput(w io.Writer) {
+	k.SetOut(w)
+}
+
+func (k *Klogger) SetPrefix(p string) {
+
+}
+
+var DefaultLog *Klogger = &Klogger{logrus.New()}
+var AgentLog *Klogger = &Klogger{logrus.New()}
+var BPFLog *Klogger = &Klogger{logrus.New()}
+
+var BPFEventLog *Klogger = &Klogger{logrus.New()}
+var UprobeLog *Klogger = &Klogger{logrus.New()}
+var ConntrackLog *Klogger = &Klogger{logrus.New()}
+var ProtocolParserLog *Klogger = &Klogger{logrus.New()}
+
+var Loggers []*Klogger = []*Klogger{DefaultLog, AgentLog, BPFLog, BPFEventLog, UprobeLog, ConntrackLog, ProtocolParserLog}
