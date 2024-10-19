@@ -49,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4
         with:
           name: kyanos_v0.0.0-next_linux_amd64.tar.gz
-          path: dist/kyanos.0.0-next_linux_amd64.tar.gz
+          path: dist/kyanos_v0.0.0-next_linux_amd64.tar.gz
 
       - name: Store Releases
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4
