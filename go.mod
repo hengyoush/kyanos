@@ -24,7 +24,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
-	github.com/zcalusic/sysinfo v1.1.0
+	github.com/zcalusic/sysinfo v1.1.2
 	k8s.io/cri-api v0.31.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.24.17
