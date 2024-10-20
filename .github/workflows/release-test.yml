@@ -46,13 +46,13 @@ jobs:
           file ./arm64/kyanos |grep aarch64 |grep 'statically linked'
 
       - name: Store Releases
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         with:
           name: kyanos_v0.0.0-next_linux_amd64.tar.gz
           path: dist/kyanos_v0.0.0-next_linux_amd64.tar.gz
 
       - name: Store Releases
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         with:
           name: kyanos_v0.0.0-next_linux_arm64.tar.gz
           path: dist/kyanos_v0.0.0-next_linux_arm64.tar.gz
