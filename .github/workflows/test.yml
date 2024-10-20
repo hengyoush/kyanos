@@ -142,6 +142,12 @@ jobs:
               mkdir -p /var/lib/kyanos/btf
               cp -f /sys/kernel/btf/vmlinux /var/lib/kyanos/btf/current.btf
             fi
+            # install nerdctl
+            wget https://github.com/containerd/nerdctl/releases/download/v1.7.6/nerdctl-1.7.6-linux-amd64.tar.gz
+            sudo tar Cxzvvf /usr/local/bin nerdctl-1.7.6-linux-amd64.tar.gz
+            wget https://github.com/containernetworking/plugins/releases/download/v1.5.0/cni-plugins-linux-amd64-v1.5.0.tgz
+            sudo mkdir -p /opt/cni/bin
+            sudo tar Cxzvvf /opt/cni/bin cni-plugins-linux-amd64-v1.5.0.tgz
 
       - name: Test base
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
@@ -225,4 +231,32 @@ jobs:
                 bash /host/testdata/test_docker_filter_by_pid.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
             else  
                 bash /host/testdata/test_docker_filter_by_pid.sh '/host/kyanos/kyanos $kyanos_log_option'
+            fi
+
+      - name: Test test containerd filter by container name
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
+                bash /host/testdata/test_containerd_filter_by_container_name.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else  
+                bash /host/testdata/test_containerd_filter_by_container_name.sh '/host/kyanos/kyanos $kyanos_log_option'
+            fi
+
+      - name: Test test containerd filter by container id
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
+                bash /host/testdata/test_containerd_filter_by_container_id.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else  
+                bash /host/testdata/test_containerd_filter_by_container_id.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
