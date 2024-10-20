@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"kyanos/agent/protocol"
+	"kyanos/bpf"
 	"kyanos/common"
 	ac "kyanos/common"
 
@@ -14,8 +15,9 @@ type AnalysisOptions struct {
 	SampleLimit          int
 	Side                 ac.SideEnum
 	ClassfierType
-	SubClassfierType ClassfierType
-	CleanWhenHarvest bool
+	SubClassfierType           ClassfierType
+	ProtocolSpecificClassfiers map[bpf.AgentTrafficProtocolT]ClassfierType
+	CleanWhenHarvest           bool
 
 	// Fast Inspect Options
 	SlowMode               bool
@@ -24,6 +26,9 @@ type AnalysisOptions struct {
 	TargetSamples          int
 	CurrentReceivedSamples func() int
 	HavestSignal           chan struct{}
+
+	// overview mode
+	Overview bool
 }
 
 func (a *AnalysisOptions) Init() {

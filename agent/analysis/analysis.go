@@ -73,10 +73,12 @@ func (a *aggregator) receive(record *analysis_common.AnnotatedRecord) error {
 
 		if enabled {
 			MetricExtract := analysis_common.GetMetricExtractFunc[float64](metricType)
+			samples := a.SamplesMap[metricType]
 			// only sample if aggregator is sub or no sub classfier
 			if a.isSub || a.SubClassfierType == analysis_common.None {
-				samples := a.SamplesMap[metricType]
 				a.SamplesMap[metricType] = AddToSamples(samples, record, MetricExtract, a.AnalysisOptions.SampleLimit)
+			} else {
+				a.SamplesMap[metricType] = AddToSamples(samples, record, MetricExtract, 1)
 			}
 
 			metricValue := MetricExtract(record)
@@ -131,7 +133,7 @@ func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, opts
 	// ac.AddToFastStopper(stopper)
 	opts.Init()
 	analyzer := &Analyzer{
-		Classfier:       getClassfier(opts.ClassfierType),
+		Classfier:       getClassfier(opts.ClassfierType, *opts),
 		recordsChannel:  recordsChannel,
 		Aggregators:     make(map[analysis_common.ClassId]*aggregator),
 		AnalysisOptions: opts,
@@ -141,7 +143,7 @@ func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, opts
 		ctx:             ctx,
 	}
 	if opts.SubClassfierType != analysis_common.None {
-		analyzer.subClassfier = getClassfier(opts.SubClassfierType)
+		analyzer.subClassfier = getClassfier(opts.SubClassfierType, *opts)
 	}
 	opts.CurrentReceivedSamples = func() int {
 		return analyzer.recordReceived
@@ -218,7 +220,7 @@ func (a *Analyzer) analyze(record *analysis_common.AnnotatedRecord) {
 				fullClassId := class + "||" + subClassId
 				subAggregator, exists := a.Aggregators[fullClassId]
 				if !exists {
-					subHumanReadableFunc, ok := classIdHumanReadableMap[a.AnalysisOptions.SubClassfierType]
+					subHumanReadableFunc, ok := getClassIdHumanReadableFunc(a.AnalysisOptions.SubClassfierType, *a.AnalysisOptions)
 					if ok {
 						subHumanReadableClassId := subHumanReadableFunc(record)
 						a.Aggregators[fullClassId] = createAggregatorWithHumanReadableClassId(subHumanReadableClassId, fullClassId, a.AnalysisOptions, true)
