@@ -14,7 +14,7 @@ require (
 	github.com/containerd/containerd/api v1.7.19
 	github.com/containerd/errdefs v0.3.0
 	github.com/containerd/typeurl/v2 v2.2.0
-	github.com/docker/docker v26.1.5+incompatible
+	github.com/docker/docker v27.3.1+incompatible
 	github.com/emirpasic/gods v1.18.1
 	github.com/go-logr/logr v1.4.2
 	github.com/hashicorp/go-version v1.7.0
