@@ -48,6 +48,15 @@ func init() {
 	}
 
 	classIdHumanReadableMap = make(map[anc.ClassfierType]ClassIdAsHumanReadable)
+	classIdHumanReadableMap[anc.RemoteIp] = func(ar *anc.AnnotatedRecord) string {
+		return ar.ConnDesc.RemoteAddr.String()
+	}
+	classIdHumanReadableMap[anc.RemotePort] = func(ar *anc.AnnotatedRecord) string {
+		return fmt.Sprintf("%d", ar.ConnDesc.RemotePort)
+	}
+	classIdHumanReadableMap[anc.LocalPort] = func(ar *anc.AnnotatedRecord) string {
+		return fmt.Sprintf("%d", ar.ConnDesc.LocalPort)
+	}
 	classIdHumanReadableMap[anc.Conn] = func(ar *anc.AnnotatedRecord) string {
 		return ar.ConnDesc.SimpleString()
 	}

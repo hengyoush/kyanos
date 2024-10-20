@@ -18,6 +18,7 @@ type ConnStat struct {
 	ClassId             anc.ClassId
 	HumanReadbleClassId string
 	ClassfierType       anc.ClassfierType
+	IsSub               bool
 }
 
 func (c *ConnStat) ClassIdAsHumanReadable(classId anc.ClassId) string {
@@ -31,10 +32,13 @@ func (c *ConnStat) ClassIdAsHumanReadable(classId anc.ClassId) string {
 	case anc.LocalPort:
 		fallthrough
 	case anc.RemoteIp:
-		return string(classId)
+		return c.HumanReadbleClassId
 	case anc.Protocol:
 		return c.HumanReadbleClassId
 	default:
+		if c.HumanReadbleClassId != "" {
+			return c.HumanReadbleClassId
+		}
 		return string(classId)
 	}
 }
