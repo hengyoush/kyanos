@@ -4,6 +4,7 @@ import (
 	"fmt"
 	anc "kyanos/agent/analysis/common"
 	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -46,6 +47,7 @@ sudo kyanos stat http --metrics tqp
 var enabledMetricsString string
 var sampleCount int
 var groupBy string
+var subGroupBy string
 var slowMode bool
 var bigRespModel bool
 var bigReqModel bool
@@ -84,10 +86,19 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 		sampleCount = 0
 	}
 	options.SampleLimit = sampleCount
-
+	if strings.Contains(groupBy, "/") {
+		split := strings.Split(groupBy, "/")
+		groupBy = split[0]
+		subGroupBy = split[1]
+	} else {
+		subGroupBy = "none"
+	}
 	for key, value := range anc.ClassfierTypeNames {
 		if value == groupBy {
 			options.ClassfierType = key
+		}
+		if value == subGroupBy && subGroupBy != "" {
+			options.SubClassfierType = key
 		}
 	}
 	options.SlowMode = slowMode
@@ -112,6 +123,8 @@ func init() {
 		"Specify aggregation dimension: \n"+
 			"('conn', 'local-port', 'remote-port', 'remote-ip', 'protocol', 'http-path', 'none')\n"+
 			"note: 'none' is aggregate all req-resp pair together")
+	// statCmd.PersistentFlags().StringVar(&subGroupBy, "sub-group-by", "default",
+	// 	"Specify sub aggregation dimension: like `group-by`, but before set this option you must specify `group-by`")
 
 	// inspect options
 	statCmd.PersistentFlags().BoolVar(&slowMode, "slow", false, "Find slowest records")

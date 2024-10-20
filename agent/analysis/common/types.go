@@ -14,6 +14,7 @@ type AnalysisOptions struct {
 	SampleLimit          int
 	Side                 ac.SideEnum
 	ClassfierType
+	SubClassfierType ClassfierType
 	CleanWhenHarvest bool
 
 	// Fast Inspect Options

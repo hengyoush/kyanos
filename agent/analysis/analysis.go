@@ -14,17 +14,20 @@ import (
 type aggregator struct {
 	*analysis_common.AnalysisOptions
 	*ConnStat
+	isSub bool
 }
 
 func createAggregatorWithHumanReadableClassId(humanReadableClassId string,
-	classId analysis_common.ClassId, aggregateOption *analysis_common.AnalysisOptions) *aggregator {
-	aggregator := createAggregator(classId, aggregateOption)
+	classId analysis_common.ClassId,
+	aggregateOption *analysis_common.AnalysisOptions, isSub bool) *aggregator {
+	aggregator := createAggregator(classId, aggregateOption, isSub)
 	aggregator.HumanReadbleClassId = humanReadableClassId
 	return aggregator
 }
 
-func createAggregator(classId analysis_common.ClassId, aggregateOption *analysis_common.AnalysisOptions) *aggregator {
+func createAggregator(classId analysis_common.ClassId, aggregateOption *analysis_common.AnalysisOptions, isSub bool) *aggregator {
 	aggregator := aggregator{}
+	aggregator.isSub = isSub
 	aggregator.reset(classId, aggregateOption)
 	return &aggregator
 }
@@ -34,6 +37,10 @@ func (a *aggregator) reset(classId analysis_common.ClassId, aggregateOption *ana
 	a.ConnStat = &ConnStat{
 		ClassId:       classId,
 		ClassfierType: aggregateOption.ClassfierType,
+		IsSub:         a.isSub,
+	}
+	if a.isSub {
+		a.ConnStat.ClassfierType = aggregateOption.SubClassfierType
 	}
 	a.SamplesMap = make(map[analysis_common.MetricType][]*analysis_common.AnnotatedRecord)
 	a.PercentileCalculators = make(map[analysis_common.MetricType]*PercentileCalculator)
@@ -65,9 +72,12 @@ func (a *aggregator) receive(record *analysis_common.AnnotatedRecord) error {
 		metricType := analysis_common.MetricType(rawMetricType)
 
 		if enabled {
-			samples := a.SamplesMap[metricType]
 			MetricExtract := analysis_common.GetMetricExtractFunc[float64](metricType)
-			a.SamplesMap[metricType] = AddToSamples(samples, record, MetricExtract, a.AnalysisOptions.SampleLimit)
+			// only sample if aggregator is sub or no sub classfier
+			if a.isSub || a.SubClassfierType == analysis_common.None {
+				samples := a.SamplesMap[metricType]
+				a.SamplesMap[metricType] = AddToSamples(samples, record, MetricExtract, a.AnalysisOptions.SampleLimit)
+			}
 
 			metricValue := MetricExtract(record)
 
@@ -102,6 +112,7 @@ func AddToSamples[T analysis_common.MetricValueType](samples []*analysis_common.
 
 type Analyzer struct {
 	Classfier
+	subClassfier Classfier
 	*analysis_common.AnalysisOptions
 	common.SideEnum // 那一边的统计指标TODO 根据参数自动推断
 	Aggregators     map[analysis_common.ClassId]*aggregator
@@ -128,6 +139,9 @@ func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, opts
 		resultChannel:   resultChannel,
 		renderStopper:   renderStopper,
 		ctx:             ctx,
+	}
+	if opts.SubClassfierType != analysis_common.None {
+		analyzer.subClassfier = getClassfier(opts.SubClassfierType)
 	}
 	opts.CurrentReceivedSamples = func() int {
 		return analyzer.recordReceived
@@ -189,14 +203,33 @@ func (a *Analyzer) analyze(record *analysis_common.AnnotatedRecord) {
 			if ok {
 				humanReadableClassId := humanReadableFunc(record)
 				a.Aggregators[class] = createAggregatorWithHumanReadableClassId(humanReadableClassId,
-					class, a.AnalysisOptions)
+					class, a.AnalysisOptions, false)
 			} else {
-				a.Aggregators[class] = createAggregator(class, a.AnalysisOptions)
+				a.Aggregators[class] = createAggregator(class, a.AnalysisOptions, false)
 			}
 
 			aggregator = a.Aggregators[class]
 		}
 		aggregator.receive(record)
+
+		if a.subClassfier != nil {
+			subClassId, err := a.subClassfier(record)
+			if err == nil {
+				fullClassId := class + "||" + subClassId
+				subAggregator, exists := a.Aggregators[fullClassId]
+				if !exists {
+					subHumanReadableFunc, ok := classIdHumanReadableMap[a.AnalysisOptions.SubClassfierType]
+					if ok {
+						subHumanReadableClassId := subHumanReadableFunc(record)
+						a.Aggregators[fullClassId] = createAggregatorWithHumanReadableClassId(subHumanReadableClassId, fullClassId, a.AnalysisOptions, true)
+					} else {
+						a.Aggregators[fullClassId] = createAggregator(fullClassId, a.AnalysisOptions, true)
+					}
+					subAggregator = a.Aggregators[fullClassId]
+				}
+				subAggregator.receive(record)
+			}
+		}
 	} else {
 		common.DefaultLog.Warnf("classify error: %v\n", err)
 	}

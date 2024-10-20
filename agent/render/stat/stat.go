@@ -92,17 +92,22 @@ const (
 
 type model struct {
 	statTable    table.Model
+	subStatTable table.Model
 	sampleModel  tea.Model
 	spinner      spinner.Model
 	additionHelp help.Model
 
-	connstats     *[]*analysis.ConnStat
-	curConnstats  *[]*analysis.ConnStat
-	resultChannel <-chan []*analysis.ConnStat
+	connstats       *[]*analysis.ConnStat // receive from upstream, don't modify it
+	curConnstats    *[]*analysis.ConnStat // after sort&filter, used to display
+	curSubConnstats *[]*analysis.ConnStat // after sort&filter, used to display
+	resultChannel   <-chan []*analysis.ConnStat
 
 	options common.AnalysisOptions
 
-	chosenStat bool
+	enableSubGroup bool
+	chosenSub      bool
+	curClassId     common.ClassId
+	chosenStat     bool
 
 	windownSizeMsg tea.WindowSizeMsg
 
@@ -112,17 +117,20 @@ type model struct {
 
 func NewModel(options common.AnalysisOptions) tea.Model {
 	return &model{
-		statTable:    initTable(options),
-		sampleModel:  nil,
-		spinner:      spinner.New(spinner.WithSpinner(spinner.Dot)),
-		additionHelp: help.New(),
-		connstats:    nil,
-		options:      options,
-		chosenStat:   false,
+		statTable:      initTable(options, false),
+		subStatTable:   initTable(options, true),
+		sampleModel:    nil,
+		spinner:        spinner.New(spinner.WithSpinner(spinner.Dot)),
+		additionHelp:   help.New(),
+		connstats:      nil,
+		options:        options,
+		chosenStat:     false,
+		chosenSub:      false,
+		enableSubGroup: options.SubClassfierType != common.None,
 	}
 }
 
-func initTable(options common.AnalysisOptions) table.Model {
+func initTable(options common.AnalysisOptions, isSub bool) table.Model {
 	metric := options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
 	unit := rc.MetricTypeUnit[metric]
 	columns := []table.Column{
@@ -134,6 +142,9 @@ func initTable(options common.AnalysisOptions) table.Model {
 		{Title: fmt.Sprintf("p90(%s)", unit), Width: 10},
 		{Title: fmt.Sprintf("p99(%s)", unit), Width: 10},
 		{Title: "count", Width: 5},
+	}
+	if isSub {
+		columns[1] = table.Column{Title: common.ClassfierTypeNames[options.SubClassfierType], Width: 40}
 	}
 	if metric.IsTotalMeaningful() {
 		columns = append(columns, table.Column{Title: fmt.Sprintf("total(%s)", unit), Width: 12})
@@ -163,36 +174,56 @@ func initTable(options common.AnalysisOptions) table.Model {
 func (m *model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick)
 }
-
+func (m *model) updateConnStats() {
+	var topStats, subStats []*analysis.ConnStat
+	for _, each := range *m.connstats {
+		if each.IsSub && m.curClassId != "" {
+			if strings.HasPrefix(string(each.ClassId), string(m.curClassId)+"||") {
+				subStats = append(subStats, each)
+			}
+		} else if !each.IsSub {
+			topStats = append(topStats, each)
+		}
+	}
+	m.sortConnstats(&topStats)
+	m.sortConnstats(&subStats)
+	m.curConnstats = &topStats
+	m.curSubConnstats = &subStats
+}
+func renderToTable(connstats *[]*analysis.ConnStat, t *table.Model, metric common.MetricType, isSub bool) {
+	records := (*connstats)
+	var row table.Row
+	rows := make([]table.Row, 0)
+	for i, record := range records {
+		pCalc := record.PercentileCalculators[metric]
+		p50, p90, p99 := pCalc.CalculatePercentile(0.5), pCalc.CalculatePercentile(0.9), pCalc.CalculatePercentile(0.99)
+		row = table.Row{
+			fmt.Sprintf("%d", i),
+			record.ClassIdAsHumanReadable(record.ClassId),
+			fmt.Sprintf("%.2f", record.MaxMap[metric]),
+			fmt.Sprintf("%.2f", record.SumMap[metric]/float64(record.Count)),
+			fmt.Sprintf("%.2f", p50),
+			fmt.Sprintf("%.2f", p90),
+			fmt.Sprintf("%.2f", p99),
+			fmt.Sprintf("%d", record.Count),
+		}
+		if metric.IsTotalMeaningful() {
+			row = append(row, fmt.Sprintf("%.1f", record.SumMap[metric]))
+		}
+		rows = append(rows, row)
+	}
+	t.SetRows(rows)
+}
 func (m *model) updateRowsInTable() {
 	lock.Lock()
 	defer lock.Unlock()
-	rows := make([]table.Row, 0)
-	if m.connstats != nil && m.curConnstats != m.connstats {
-		m.curConnstats = m.connstats
-		m.sortConnstats(m.curConnstats)
+	if m.connstats != nil {
+		m.updateConnStats()
 		metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
-		records := (*m.curConnstats)
-		var row table.Row
-		for i, record := range records {
-			pCalc := record.PercentileCalculators[metric]
-			p50, p90, p99 := pCalc.CalculatePercentile(0.5), pCalc.CalculatePercentile(0.9), pCalc.CalculatePercentile(0.99)
-			row = table.Row{
-				fmt.Sprintf("%d", i),
-				record.ClassIdAsHumanReadable(record.ClassId),
-				fmt.Sprintf("%.2f", record.MaxMap[metric]),
-				fmt.Sprintf("%.2f", record.SumMap[metric]/float64(record.Count)),
-				fmt.Sprintf("%.2f", p50),
-				fmt.Sprintf("%.2f", p90),
-				fmt.Sprintf("%.2f", p99),
-				fmt.Sprintf("%d", record.Count),
-			}
-			if metric.IsTotalMeaningful() {
-				row = append(row, fmt.Sprintf("%.1f", record.SumMap[metric]))
-			}
-			rows = append(rows, row)
+		renderToTable(m.curConnstats, &m.statTable, metric, false)
+		if m.enableSubGroup {
+			renderToTable(m.curSubConnstats, &m.subStatTable, metric, true)
 		}
-		m.statTable.SetRows(rows)
 	}
 }
 func connstatPercentileSortFunc(c1, c2 *analysis.ConnStat, line float64, m common.MetricType, reverse bool) int {
@@ -294,15 +325,22 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			fallthrough
 		case "esc", "q":
-			return m, tea.Quit
+			if m.chosenSub {
+				m.chosenSub = false
+				m.curClassId = ""
+				return m, nil
+			} else {
+				return m, tea.Quit
+			}
 		case "1", "2", "3", "4", "5", "6", "7", "8":
 			i, err := strconv.Atoi(strings.TrimPrefix(msg.String(), "ctrl+"))
+			curTable := m.curTable()
 			if err == nil && (i >= int(none) && i < int(end)) &&
-				(i >= 0 && i < len(m.statTable.Columns())) {
+				(i >= 0 && i < len(curTable.Columns())) {
 				prevSortBy := m.sortBy
 				m.sortBy = rc.SortBy(i)
 				m.reverse = !m.reverse
-				cols := m.statTable.Columns()
+				cols := curTable.Columns()
 				if prevSortBy != none {
 					col := &cols[prevSortBy]
 					col.Title = strings.TrimRight(col.Title, "↑")
@@ -314,26 +352,55 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					col.Title = col.Title + "↑"
 				}
-				m.statTable.SetColumns(cols)
+				curTable.SetColumns(cols)
 				m.updateRowsInTable()
 			}
 		case "enter":
-			m.chosenStat = true
-			cursor := m.statTable.Cursor()
-			metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
-			if m.curConnstats != nil {
-				records := ((*m.curConnstats)[cursor].SamplesMap[metric])
+			cursor := m.curTable().Cursor()
+			if m.enableSubGroup && !m.chosenSub {
+				// select sub
+				m.curClassId = (*m.curConnstats)[cursor].ClassId
+				m.chosenSub = true
+			} else {
+				m.chosenStat = true
+				metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
+				var records []*common.AnnotatedRecord
+				if m.enableSubGroup && m.chosenSub {
+					if m.curSubConnstats != nil {
+						records = ((*m.curSubConnstats)[cursor].SamplesMap[metric])
+					}
+				} else {
+					if m.curConnstats != nil {
+						records = ((*m.curConnstats)[cursor].SamplesMap[metric])
+					}
+				}
+
 				m.sampleModel = watch.NewModel(watch.WatchOptions{
 					WideOutput:   true,
 					StaticRecord: true,
 				}, &records, m.windownSizeMsg, metric, true)
-			}
 
-			return m, m.sampleModel.Init()
+				return m, m.sampleModel.Init()
+			}
 		}
 	}
-	m.statTable, cmd = m.statTable.Update(msg)
+	*m.curTable(), cmd = m.curTable().Update(msg)
 	return m, cmd
+}
+
+func (m *model) curTable() *table.Model {
+	if m.enableSubGroup && m.chosenSub {
+		return &m.subStatTable
+	} else {
+		return &m.statTable
+	}
+}
+func (m *model) curConnstatsSlice() *[]*analysis.ConnStat {
+	if m.enableSubGroup && m.chosenSub {
+		return m.curSubConnstats
+	} else {
+		return m.curConnstats
+	}
 }
 
 func (m *model) updateSampleTable(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -366,9 +433,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) viewStatTable() string {
+	curConnstats := m.curConnstatsSlice()
+	curTable := m.curTable()
 	totalCount := 0
-	if m.curConnstats != nil {
-		for _, each := range *m.curConnstats {
+	if curConnstats != nil {
+		for _, each := range *curConnstats {
 			totalCount += each.Count
 		}
 	}
@@ -386,16 +455,16 @@ func (m *model) viewStatTable() string {
 			Bold(false).
 			Foreground(lipgloss.Color("#FFF7DB")).Background(lipgloss.Color(rc.ColorGrid(1, 5)[2][0]))
 
-		if len(m.statTable.Rows()) > 0 {
+		if len(curTable.Rows()) > 0 {
 			s += fmt.Sprintf("\n %s \n\n", titleStyle.Render(" Colleted events are here! "))
-			s += rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
+			s += rc.BaseTableStyle.Render(curTable.View()) + "\n  " + curTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
 		} else {
 			s += fmt.Sprintf("\n %s Collecting %d/%d\n\n %s\n\n", m.spinner.View(), m.options.CurrentReceivedSamples(), m.options.TargetSamples,
 				titleStyle.Render("Press `Ctrl+C` to display collected events"))
 		}
 	} else {
 		s = fmt.Sprintf("\n %s Events received: %d\n\n", m.spinner.View(), totalCount)
-		s += rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
+		s += rc.BaseTableStyle.Render(curTable.View()) + "\n  " + curTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
 	}
 	return s
 }
@@ -415,6 +484,7 @@ func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, option
 	m := NewModel(options).(*model)
 
 	prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen())
+
 	go func(mod *model, channel <-chan []*analysis.ConnStat) {
 		for {
 			select {
