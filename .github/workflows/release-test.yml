@@ -3,7 +3,7 @@ name: release-test
 on:
   workflow_dispatch:
   push:
-    branches: [ "master", "dev", "feature/e2e" ]
+    branches: [ "master", "dev" ]
   pull_request:
     branches: [ "master", "dev" ]
 
@@ -15,13 +15,19 @@ jobs:
   release-test:
     runs-on: ubuntu-latest
     steps:
+
+      - name: Remove large directories
+        run: |
+          df -h
+          cd /opt/hostedtoolcache
+          find . -mindepth 1 -maxdepth 1 -type d -not -name 'go' -exec rm -rf {} +
+          df -h
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
 
       - name: Set up Go
         uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
         with:
-          go-version: '1.22.4'
-
+          go-version: '1.22.6'
       - name: Run GoReleaser Draft
         uses: goreleaser/goreleaser-action@286f3b13b1b49da4ac219696163fb8c1c93e1200 # v6
         with:
@@ -43,7 +49,7 @@ jobs:
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4
         with:
           name: kyanos_v0.0.0-next_linux_amd64.tar.gz
-          path: dist/kyanos.0.0-next_linux_amd64.tar.gz
+          path: dist/kyanos_v0.0.0-next_linux_amd64.tar.gz
 
       - name: Store Releases
         uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4

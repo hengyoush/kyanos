@@ -72,7 +72,12 @@ build-bpf: $(LIBBPF_OBJ) $(wildcard bpf/*.[ch]) | $(OUTPUT)
 kyanos: $(GO_FILES)
 	$(call msg,BINARY,$@)
 	export CGO_LDFLAGS="-Xlinker -rpath=. -static" && go build
-    
+
+
+.PHONY: btfgen
+btfgen:
+	./bpf/btfgen.sh $(BUILD_ARCH) $(ARCH_BPF_NAME)
+
 # delete failed targets
 .DELETE_ON_ERROR:
 

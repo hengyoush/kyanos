@@ -1,0 +1,38 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - v*
+
+permissions:
+  contents: read
+
+jobs:
+
+  release-test:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Remove large directories
+        run: |
+          df -h
+          cd /opt/hostedtoolcache
+          find . -mindepth 1 -maxdepth 1 -type d -not -name 'go' -exec rm -rf {} +
+          df -h
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5
+        with:
+          go-version: '1.22.6'
+
+      - name: Run GoReleaser Draft
+        uses: goreleaser/goreleaser-action@286f3b13b1b49da4ac219696163fb8c1c93e1200 # v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean --draft=true -p 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GORELEASE_TOKEN }}
