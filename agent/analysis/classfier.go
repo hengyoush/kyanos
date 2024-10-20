@@ -30,6 +30,22 @@ func init() {
 	classfierMap[anc.Protocol] = func(ar *anc.AnnotatedRecord) (anc.ClassId, error) {
 		return anc.ClassId(fmt.Sprintf("%d", ar.Protocol)), nil
 	}
+	classfierMap[anc.HttpPath] = func(ar *anc.AnnotatedRecord) (anc.ClassId, error) {
+		httpReq, ok := ar.Record.Request().(*protocol.ParsedHttpRequest)
+		if !ok {
+			return "_not_a_http_req_", nil
+		} else {
+			return anc.ClassId(httpReq.Path), nil
+		}
+	}
+	classfierMap[anc.RedisCommand] = func(ar *anc.AnnotatedRecord) (anc.ClassId, error) {
+		redisReq, ok := ar.Record.Request().(*protocol.RedisMessage)
+		if !ok {
+			return "_not_a_redis_req_", nil
+		} else {
+			return anc.ClassId(redisReq.Command()), nil
+		}
+	}
 
 	classIdHumanReadableMap = make(map[anc.ClassfierType]ClassIdAsHumanReadable)
 	classIdHumanReadableMap[anc.Conn] = func(ar *anc.AnnotatedRecord) string {
@@ -38,9 +54,17 @@ func init() {
 	classIdHumanReadableMap[anc.HttpPath] = func(ar *anc.AnnotatedRecord) string {
 		httpReq, ok := ar.Record.Request().(*protocol.ParsedHttpRequest)
 		if !ok {
-			return "__not_a_http_req__"
+			return "_not_a_http_req_"
 		} else {
 			return httpReq.Path
+		}
+	}
+	classIdHumanReadableMap[anc.RedisCommand] = func(ar *anc.AnnotatedRecord) string {
+		redisReq, ok := ar.Record.Request().(*protocol.RedisMessage)
+		if !ok {
+			return "_not_a_redis_req_"
+		} else {
+			return redisReq.Command()
 		}
 	}
 
