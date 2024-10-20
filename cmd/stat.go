@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	anc "kyanos/agent/analysis/common"
+	"kyanos/bpf"
 	"slices"
 	"strings"
 
@@ -105,7 +106,13 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 	options.BigReqMode = bigReqModel
 	options.BigRespMode = bigRespModel
 	options.TargetSamples = targetSamples
+	options.ProtocolSpecificClassfiers = make(map[bpf.AgentTrafficProtocolT]anc.ClassfierType)
+	// currently only set it hardly
+	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolHTTP] = anc.HttpPath
+	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolRedis] = anc.RedisCommand
+	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolMySQL] = anc.RemoteIp
 
+	options.Overview = overview
 	return options, nil
 }
 func init() {

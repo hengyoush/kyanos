@@ -8,6 +8,7 @@ import (
 	"kyanos/agent/analysis/common"
 	rc "kyanos/agent/render/common"
 	"kyanos/agent/render/watch"
+	"kyanos/bpf"
 	"os"
 	"slices"
 	"strconv"
@@ -143,6 +144,9 @@ func initTable(options common.AnalysisOptions, isSub bool) table.Model {
 		{Title: fmt.Sprintf("p99(%s)", unit), Width: 10},
 		{Title: "count", Width: 5},
 	}
+	if options.Overview {
+		columns = slices.Insert(columns, 2, table.Column{Title: "Protocol", Width: 10})
+	}
 	if isSub {
 		columns[1] = table.Column{Title: common.ClassfierTypeNames[options.SubClassfierType], Width: 40}
 	}
@@ -190,7 +194,7 @@ func (m *model) updateConnStats() {
 	m.curConnstats = &topStats
 	m.curSubConnstats = &subStats
 }
-func renderToTable(connstats *[]*analysis.ConnStat, t *table.Model, metric common.MetricType, isSub bool) {
+func renderToTable(connstats *[]*analysis.ConnStat, t *table.Model, metric common.MetricType, isSub bool, overview bool) {
 	records := (*connstats)
 	var row table.Row
 	rows := make([]table.Row, 0)
@@ -210,6 +214,15 @@ func renderToTable(connstats *[]*analysis.ConnStat, t *table.Model, metric commo
 		if metric.IsTotalMeaningful() {
 			row = append(row, fmt.Sprintf("%.1f", record.SumMap[metric]))
 		}
+		if overview {
+			var protocol string
+			if records, ok := record.SamplesMap[metric]; ok && len(records) > 0 {
+				protocol = bpf.ProtocolNamesMap[bpf.AgentTrafficProtocolT(records[0].Protocol)]
+			} else {
+				protocol = "unknown"
+			}
+			row = slices.Insert(row, 2, protocol)
+		}
 		rows = append(rows, row)
 	}
 	t.SetRows(rows)
@@ -220,9 +233,9 @@ func (m *model) updateRowsInTable() {
 	if m.connstats != nil {
 		m.updateConnStats()
 		metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
-		renderToTable(m.curConnstats, &m.statTable, metric, false)
+		renderToTable(m.curConnstats, &m.statTable, metric, false, m.options.Overview)
 		if m.enableSubGroup {
-			renderToTable(m.curSubConnstats, &m.subStatTable, metric, true)
+			renderToTable(m.curSubConnstats, &m.subStatTable, metric, true, m.options.Overview)
 		}
 	}
 }
