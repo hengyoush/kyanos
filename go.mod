@@ -25,7 +25,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
 	github.com/zcalusic/sysinfo v1.1.2
-	k8s.io/cri-api v0.31.0
+	k8s.io/cri-api v0.31.1
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.24.17
 )
@@ -147,6 +147,6 @@ require (
 )
 
 replace (
-	k8s.io/apiserver => k8s.io/apiserver v0.24.17
+	k8s.io/apiserver => k8s.io/apiserver v0.31.1
 	k8s.io/cri-api => k8s.io/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20230824000246-2cb31c9333ad
 )
