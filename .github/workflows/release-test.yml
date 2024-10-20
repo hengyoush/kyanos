@@ -3,7 +3,7 @@ name: release-test
 on:
   workflow_dispatch:
   push:
-    branches: [ "master", "dev", "feature/e2e" ]
+    branches: [ "master", "dev" ]
   pull_request:
     branches: [ "master", "dev" ]
 

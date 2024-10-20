@@ -3,9 +3,8 @@ name: release
 on:
   workflow_dispatch:
   push:
-    branches: [ "master", "dev" ]
-  pull_request:
-    branches: [ "master", "dev" ]
+    tags:
+      - v*
 
 permissions:
   contents: read
@@ -35,3 +34,5 @@ jobs:
           distribution: goreleaser
           version: latest
           args: release --clean --draft=true -p 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GORELEASE_TOKEN }}
