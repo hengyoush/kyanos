@@ -9,8 +9,8 @@ require (
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.1
 	github.com/charmbracelet/lipgloss v0.13.0
-	github.com/cilium/ebpf v0.14.0
-	github.com/containerd/containerd v1.7.22
+	github.com/cilium/ebpf v0.16.0
+	github.com/containerd/containerd v1.7.23
 	github.com/containerd/containerd/api v1.7.19
 	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/typeurl/v2 v2.2.0
