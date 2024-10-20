@@ -228,8 +228,9 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 	OnCloseRecordFunc(c)
 	c.Status = Closed
 	if needClearBpfMap {
-		connInfoMap := bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap")
-		err := connInfoMap.Delete(c.TgidFd)
+		var err error
+		// connInfoMap := bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap")
+		// err = connInfoMap.Delete(c.TgidFd)
 		key, revKey := c.extractSockKeys()
 		sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
 		err = sockKeyConnIdMap.Delete(key)
