@@ -5,6 +5,10 @@ go 1.22.2
 toolchain go1.22.6
 
 require (
+	github.com/Ha4sh-447/flowcharts v0.0.0-20240802124452-44516e0e7dc8
+	github.com/charmbracelet/bubbles v0.20.0
+	github.com/charmbracelet/bubbletea v1.1.1
+	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/cilium/ebpf v0.14.0
 	github.com/containerd/containerd v1.7.22
 	github.com/containerd/containerd/api v1.7.19
@@ -12,21 +16,23 @@ require (
 	github.com/containerd/typeurl/v2 v2.2.0
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/emirpasic/gods v1.18.1
+	github.com/go-logr/logr v1.4.2
 	github.com/hashicorp/go-version v1.7.0
 	github.com/jefurry/logrus v2.0.6+incompatible
+	github.com/lucasb-eyer/go-colorful v1.2.0
 	github.com/sevlyar/go-daemon v0.1.6
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
 	github.com/zcalusic/sysinfo v1.1.0
 	k8s.io/cri-api v0.31.0
+	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.24.17
 )
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0 // indirect
-	github.com/Ha4sh-447/flowcharts v0.0.0-20240802124452-44516e0e7dc8 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/Microsoft/hcsshim v0.11.7 // indirect
 	github.com/airbrake/gobrake v3.7.4+incompatible // indirect
@@ -36,9 +42,6 @@ require (
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/caio/go-tdigest v3.1.0+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/charmbracelet/bubbles v0.20.0 // indirect
-	github.com/charmbracelet/bubbletea v1.1.1 // indirect
-	github.com/charmbracelet/lipgloss v0.13.0 // indirect
 	github.com/charmbracelet/x/ansi v0.2.3 // indirect
 	github.com/charmbracelet/x/term v0.2.0 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
@@ -55,7 +58,6 @@ require (
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -66,7 +68,6 @@ require (
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.17.0 // indirect
 	github.com/lestrrat-go/strftime v1.1.0 // indirect
-	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
@@ -134,7 +135,6 @@ require (
 	k8s.io/apimachinery v0.31.1 // indirect
 	k8s.io/apiserver v0.31.1 // indirect
 	k8s.io/component-base v0.31.1 // indirect
-	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 )
 
@@ -142,7 +142,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.18.2
-	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	golang.org/x/sys v0.25.0
 )
 
