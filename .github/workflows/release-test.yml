@@ -3,9 +3,9 @@ name: release-test
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "prerelease" ]
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "prerelease" ]
 
 permissions:
   contents: read
