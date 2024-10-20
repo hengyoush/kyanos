@@ -215,11 +215,13 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 	si.GetSysInfo()
 	common.AgentLog.Debugf("[sys info] vendor: %s, os_arch: %s, kernel_arch: %s", si.OS.Vendor, si.OS.Architecture, si.Kernel.Architecture)
 
+
 	osInfo, err := common.GetOSInfo()
 	osId := osInfo.GetOSReleaseFieldValue(common.OS_ID)
 	versionId := strings.Replace(osInfo.GetOSReleaseFieldValue(common.OS_VERSION_ID), "\"", "", -1)
 	kernelRelease := osInfo.GetOSReleaseFieldValue(common.OS_KERNEL_RELEASE)
 	arch := osInfo.GetOSReleaseFieldValue(common.OS_ARCH)
+
 
 	btfFileDir := fmt.Sprintf("custom-archive/%s/%s/%s/%s.btf", osId, versionId, arch, kernelRelease)
 	dir, err := bpf.BtfFiles.ReadDir(btfFileDir)

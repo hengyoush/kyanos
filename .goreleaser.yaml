@@ -38,6 +38,7 @@ builds:
         - bash -c 'sudo make build-bpf' 
         - bash -c 'sudo make btfgen BUILD_ARCH=arm64 ARCH_BPF_NAME=arm64' 
 
+
   - id: kyanos-amd64
     binary: kyanos
     env:
