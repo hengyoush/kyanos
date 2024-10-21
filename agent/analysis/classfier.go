@@ -47,7 +47,25 @@ func init() {
 		}
 	}
 
+	classfierMap[anc.ProtocolAdaptive] = func(ar *anc.AnnotatedRecord) (anc.ClassId, error) {
+		redisReq, ok := ar.Record.Request().(*protocol.RedisMessage)
+		if !ok {
+			return "_not_a_redis_req_", nil
+		} else {
+			return anc.ClassId(redisReq.Command()), nil
+		}
+	}
+
 	classIdHumanReadableMap = make(map[anc.ClassfierType]ClassIdAsHumanReadable)
+	classIdHumanReadableMap[anc.RemoteIp] = func(ar *anc.AnnotatedRecord) string {
+		return ar.ConnDesc.RemoteAddr.String()
+	}
+	classIdHumanReadableMap[anc.RemotePort] = func(ar *anc.AnnotatedRecord) string {
+		return fmt.Sprintf("%d", ar.ConnDesc.RemotePort)
+	}
+	classIdHumanReadableMap[anc.LocalPort] = func(ar *anc.AnnotatedRecord) string {
+		return fmt.Sprintf("%d", ar.ConnDesc.LocalPort)
+	}
 	classIdHumanReadableMap[anc.Conn] = func(ar *anc.AnnotatedRecord) string {
 		return ar.ConnDesc.SimpleString()
 	}
@@ -73,6 +91,33 @@ func init() {
 	}
 }
 
-func getClassfier(classfierType anc.ClassfierType) Classfier {
-	return classfierMap[classfierType]
+func getClassfier(classfierType anc.ClassfierType, options anc.AnalysisOptions) Classfier {
+	if classfierType == anc.ProtocolAdaptive {
+		return func(ar *anc.AnnotatedRecord) (anc.ClassId, error) {
+			c, ok := options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolT(ar.Protocol)]
+			if !ok {
+				return classfierMap[anc.RemoteIp](ar)
+			} else {
+				return classfierMap[c](ar)
+			}
+		}
+	} else {
+		return classfierMap[classfierType]
+	}
+}
+
+func getClassIdHumanReadableFunc(classfierType anc.ClassfierType, options anc.AnalysisOptions) (ClassIdAsHumanReadable, bool) {
+	if classfierType == anc.ProtocolAdaptive {
+		return func(ar *anc.AnnotatedRecord) string {
+			c, ok := options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolT(ar.Protocol)]
+			if !ok {
+				return classIdHumanReadableMap[anc.RemoteIp](ar)
+			} else {
+				return classIdHumanReadableMap[c](ar)
+			}
+		}, true
+	} else {
+		f, ok := classIdHumanReadableMap[classfierType]
+		return f, ok
+	}
 }
