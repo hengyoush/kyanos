@@ -285,8 +285,10 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 					connstats := <-m.resultChannel
 					if connstats != nil {
 						m.connstats = &connstats
-						m.updateRowsInTable()
+					} else {
+						return m, tea.Quit
 					}
+					m.updateRowsInTable()
 					break
 				}
 			}
