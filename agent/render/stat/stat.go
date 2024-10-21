@@ -278,7 +278,7 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.windownSizeMsg = msg
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "c":
+		case "ctrl+c":
 			if m.options.EnableBatchModel() {
 				if len(m.statTable.Rows()) == 0 {
 					m.options.HavestSignal <- struct{}{}
@@ -287,11 +287,11 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.connstats = &connstats
 						m.updateRowsInTable()
 					}
+					break
 				}
-				break
 			}
 			fallthrough
-		case "esc", "q", "ctrl+c":
+		case "esc", "q":
 			return m, tea.Quit
 		case "1", "2", "3", "4", "5", "6", "7", "8":
 			i, err := strconv.Atoi(strings.TrimPrefix(msg.String(), "ctrl+"))
@@ -389,7 +389,7 @@ func (m *model) viewStatTable() string {
 			s += rc.BaseTableStyle.Render(m.statTable.View()) + "\n  " + m.statTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
 		} else {
 			s += fmt.Sprintf("\n %s Collecting %d/%d\n\n %s\n\n", m.spinner.View(), m.options.CurrentReceivedSamples(), m.options.TargetSamples,
-				titleStyle.Render("Press `c` to display collected events"))
+				titleStyle.Render("Press `Ctrl+C` to display collected events"))
 		}
 	} else {
 		s = fmt.Sprintf("\n %s Events received: %d\n\n", m.spinner.View(), totalCount)
