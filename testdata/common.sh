@@ -42,9 +42,9 @@ function check_patterns_in_file_with_last_lines() {
 
 function check_time_detail_completed_with_last_lines() {
     filename=$1
-    check_patterns_not_in_file "$filename" '\-0\.000' $2 
-    check_patterns_not_in_file "$filename" '1970\-01' $2 
-    check_patterns_not_in_file "$filename" 'count]=0' $2 
+    check_patterns_not_in_file_with_last_lines "$filename" '\-0\.000' $2 
+    check_patterns_not_in_file_with_last_lines "$filename" '1970\-01' $2 
+    check_patterns_not_in_file_with_last_lines "$filename" 'count]=0' $2 
 }
 
 function check_time_detail_completed() {
