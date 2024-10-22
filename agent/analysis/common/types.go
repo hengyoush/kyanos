@@ -249,6 +249,18 @@ type AnnotatedRecordToStringOptions struct {
 	IncludeConnDesc    bool
 }
 
+func (r *AnnotatedRecord) TimeDetailInfo() string {
+	return r.String(AnnotatedRecordToStringOptions{
+		IncludeConnDesc: false,
+		MetricTypeSet: MetricTypeSet{
+			TotalDuration:                true,
+			ReadFromSocketBufferDuration: true,
+			BlackBoxDuration:             true,
+		},
+		IncludeSyscallStat: true,
+	})
+}
+
 func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string {
 	nano := options.Nano
 	var result string
