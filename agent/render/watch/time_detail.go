@@ -122,9 +122,9 @@ func getFlowChartString(diagram *diagrams.Diagram) string {
 	canvasRow := 200
 	canvas := draw.NewCanvas(canvasRow, canvasRow)
 	canvas.Cursor.X = canvasRow / 4
-	c.DefaultLog.Warningf("shapes: %v", diagram.S)
+	c.DefaultLog.Debugf("shapes: %v", diagram.S)
 	for _, shape := range diagram.S {
-		c.DefaultLog.Warningf("shape: %v", shape)
+		c.DefaultLog.Debugf("shape: %v", shape)
 		diagrams.RenderD(&shape, canvas, s)
 	}
 	myCanvas := ToMyCanvas(canvas)
