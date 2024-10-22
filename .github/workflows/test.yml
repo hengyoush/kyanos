@@ -152,6 +152,9 @@ jobs:
             #install redis-cli
             sudo apt install -y redis-tools
 
+            #install python pip
+            sudo apt install -y python3 python3-pip
+
       - name: Test base
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
         with:

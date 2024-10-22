@@ -19,6 +19,7 @@ function test_mysql() {
     touch  my.cnf
     printf "[mysqld]\nskip_ssl" > my.cnf
     popd
+    pip install mysql-connector-python || true
 
     cname='test-mysql'
     docker rm -f $cname || true
