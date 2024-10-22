@@ -52,7 +52,8 @@ var subGroupBy string
 var slowMode bool
 var bigRespModel bool
 var bigReqModel bool
-var targetSamples int
+var timeLimit int
+var duration int
 var SUPPORTED_METRICS = []byte{'t', 'q', 'p', 'n', 's'}
 
 func validateEnabledMetricsString() error {
@@ -105,12 +106,12 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 	options.SlowMode = slowMode
 	options.BigReqMode = bigReqModel
 	options.BigRespMode = bigRespModel
-	options.TargetSamples = targetSamples
 	options.ProtocolSpecificClassfiers = make(map[bpf.AgentTrafficProtocolT]anc.ClassfierType)
 	// currently only set it hardly
 	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolHTTP] = anc.HttpPath
 	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolRedis] = anc.RedisCommand
 	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolMySQL] = anc.RemoteIp
+	options.TimeLimit = timeLimit
 
 	options.Overview = overview
 	return options, nil
@@ -137,7 +138,8 @@ func init() {
 	statCmd.PersistentFlags().BoolVar(&slowMode, "slow", false, "Find slowest records")
 	statCmd.PersistentFlags().BoolVar(&bigReqModel, "bigreq", false, "Find biggest request size records")
 	statCmd.PersistentFlags().BoolVar(&bigRespModel, "bigresp", false, "Find biggest response size records")
-	statCmd.PersistentFlags().IntVar(&targetSamples, "target", 10, "")
+	statCmd.PersistentFlags().IntVar(&timeLimit, "time", 10, "")
+	// statCmd.PersistentFlags().IntVarP(&duration, "duration", "d", 10, "")
 
 	// common
 	statCmd.PersistentFlags().Float64("latency", 0, "Filter based on request response time")

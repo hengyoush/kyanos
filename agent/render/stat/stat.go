@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -102,6 +103,7 @@ type model struct {
 	curConnstats    *[]*analysis.ConnStat // after sort&filter, used to display
 	curSubConnstats *[]*analysis.ConnStat // after sort&filter, used to display
 	resultChannel   <-chan []*analysis.ConnStat
+	startTimeMills  int64
 
 	options common.AnalysisOptions
 
@@ -122,6 +124,7 @@ func NewModel(options common.AnalysisOptions) tea.Model {
 		subStatTable:   initTable(options, true),
 		sampleModel:    nil,
 		spinner:        spinner.New(spinner.WithSpinner(spinner.Dot)),
+		startTimeMills: time.Now().UnixMilli(),
 		additionHelp:   help.New(),
 		connstats:      nil,
 		options:        options,
@@ -310,12 +313,31 @@ func (m *model) sortConnstats(connstats *[]*analysis.ConnStat) {
 		})
 	}
 }
-
+func (m *model) timeLimitReached() bool {
+	return time.Now().UnixMilli()-m.startTimeMills > int64(m.options.TimeLimit*1000)
+}
+func (m *model) getAnalysisResult() (noresult bool) {
+	m.options.HavestSignal <- struct{}{}
+	connstats := <-m.resultChannel
+	if connstats != nil {
+		m.connstats = &connstats
+	}
+	if m.connstats != nil {
+		m.updateRowsInTable()
+		return false
+	} else {
+		return true
+	}
+}
 func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case spinner.TickMsg, rc.TickMsg:
-		m.updateRowsInTable()
+		if m.options.EnableBatchModel() && m.timeLimitReached() && len(m.statTable.Rows()) == 0 {
+			m.getAnalysisResult()
+		} else {
+			m.updateRowsInTable()
+		}
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	case tea.WindowSizeMsg:
@@ -323,16 +345,11 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
-			if m.options.EnableBatchModel() {
+			if m.options.EnableBatchModel() && !m.timeLimitReached() {
 				if len(m.statTable.Rows()) == 0 {
-					m.options.HavestSignal <- struct{}{}
-					connstats := <-m.resultChannel
-					if connstats != nil {
-						m.connstats = &connstats
-					} else {
+					if m.getAnalysisResult() {
 						return m, tea.Quit
 					}
-					m.updateRowsInTable()
 					break
 				}
 			}
@@ -468,11 +485,12 @@ func (m *model) viewStatTable() string {
 			Bold(false).
 			Foreground(lipgloss.Color("#FFF7DB")).Background(lipgloss.Color(rc.ColorGrid(1, 5)[2][0]))
 
-		if len(curTable.Rows()) > 0 {
+		if m.options.EnableBatchModel() && m.timeLimitReached() {
 			s += fmt.Sprintf("\n %s \n\n", titleStyle.Render(" Colleted events are here! "))
 			s += rc.BaseTableStyle.Render(curTable.View()) + "\n  " + curTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
 		} else {
-			s += fmt.Sprintf("\n %s Collecting %d/%d\n\n %s\n\n", m.spinner.View(), m.options.CurrentReceivedSamples(), m.options.TargetSamples,
+			s += fmt.Sprintf("\n %s Collected %d events, %d seconds left\n\n %s\n\n", m.spinner.View(), m.options.CurrentReceivedSamples(),
+				int64(m.options.TimeLimit)-((time.Now().UnixMilli()-m.startTimeMills)/1000),
 				titleStyle.Render("Press `Ctrl+C` to display collected events"))
 		}
 	} else {

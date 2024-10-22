@@ -20,10 +20,10 @@ type AnalysisOptions struct {
 	CleanWhenHarvest           bool
 
 	// Fast Inspect Options
+	TimeLimit              int
 	SlowMode               bool
 	BigRespMode            bool
 	BigReqMode             bool
-	TargetSamples          int
 	CurrentReceivedSamples func() int
 	HavestSignal           chan struct{}
 
