@@ -82,6 +82,7 @@ func (k statTableKeyMap) FullHelp() [][]key.Binding {
 const (
 	none rc.SortBy = iota
 	name
+	protocol // only valid when in overview mode
 	max
 	avg
 	p50
@@ -145,7 +146,7 @@ func initTable(options common.AnalysisOptions, isSub bool) table.Model {
 		{Title: fmt.Sprintf("p50(%s)", unit), Width: 10},
 		{Title: fmt.Sprintf("p90(%s)", unit), Width: 10},
 		{Title: fmt.Sprintf("p99(%s)", unit), Width: 10},
-		{Title: "count", Width: 5},
+		{Title: "count", Width: 10},
 	}
 	if options.Overview {
 		columns = slices.Insert(columns, 2, table.Column{Title: "Protocol", Width: 10})
@@ -265,6 +266,14 @@ func (m *model) sortConnstats(connstats *[]*analysis.ConnStat) {
 				return cmp.Compare(c1.MaxMap[metric], c2.MaxMap[metric])
 			}
 		})
+	case protocol:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			if m.reverse {
+				return cmp.Compare(c2.SamplesMap[metric][0].Protocol, c1.SamplesMap[metric][0].Protocol)
+			} else {
+				return cmp.Compare(c1.SamplesMap[metric][0].Protocol, c2.SamplesMap[metric][0].Protocol)
+			}
+		})
 	case avg:
 		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
 			if m.reverse {
@@ -365,6 +374,9 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "1", "2", "3", "4", "5", "6", "7", "8":
 			i, err := strconv.Atoi(strings.TrimPrefix(msg.String(), "ctrl+"))
 			curTable := m.curTable()
+			if i >= 2 && !m.options.Overview {
+				i++
+			}
 			if err == nil && (i >= int(none) && i < int(end)) &&
 				(i >= 0 && i < len(curTable.Columns())) {
 				prevSortBy := m.sortBy
