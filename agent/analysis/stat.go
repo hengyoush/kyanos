@@ -231,8 +231,14 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		if hasNicInEvents && hasDevOutEvents {
 			annotatedRecord.BlackBoxDuration = float64(events.nicIngressEvents[len(events.nicIngressEvents)-1].GetTimestamp()) - float64(events.devOutEvents[0].GetTimestamp())
 		}
-		if hasUserCopyEvents && hasTcpInEvents {
-			annotatedRecord.ReadFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp()) - float64(events.tcpInEvents[0].GetTimestamp())
+		if (hasUserCopyEvents || hasReadSyscallEvents) && hasTcpInEvents {
+			var readFromEndTime float64
+			if hasUserCopyEvents {
+				readFromEndTime = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp())
+			} else {
+				readFromEndTime = float64(events.readSyscallEvents[len(events.readSyscallEvents)-1].GetTimestamp())
+			}
+			annotatedRecord.ReadFromSocketBufferDuration = readFromEndTime - float64(events.tcpInEvents[0].GetTimestamp())
 		}
 		if hasTcpInEvents && hasNicInEvents {
 			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetTimestamp() - events.nicIngressEvents[0].GetTimestamp())
