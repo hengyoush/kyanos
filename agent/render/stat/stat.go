@@ -389,8 +389,16 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cursor := m.curTable().Cursor()
 			if m.enableSubGroup && !m.chosenSub {
 				// select sub
-				m.curClassId = (*m.curConnstats)[cursor].ClassId
+				curConnStat := (*m.curConnstats)[cursor]
+				m.curClassId = curConnStat.ClassId
 				m.chosenSub = true
+
+				// update sub table col name
+				cols := m.subStatTable.Columns()
+				metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
+				cType := analysis.GetClassfierType(m.options.SubClassfierType, m.options, curConnStat.SamplesMap[metric][0])
+				cols[1].Title = common.ClassfierTypeNames[cType]
+				m.subStatTable.SetColumns(cols)
 			} else {
 				m.chosenStat = true
 				metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
