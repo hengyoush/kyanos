@@ -71,11 +71,15 @@ static __always_inline void process_ssl_data(struct pt_regs* ctx, uint64_t id,
     //SSL_write_ex and SSL_read_ex will return 1 on success
     if (bytes_count == 1 && args->ssl_ex_len != NULL) {
         size_t ex_bytes;
-        bpf_probe_read_kernel(&ex_bytes, sizeof(size_t), &args->ssl_ex_len);
+        bpf_probe_read_user(&ex_bytes, sizeof(size_t), args->ssl_ex_len);
         bytes_count = ex_bytes;
+        // bpf_printk("exlen: %d ,bc :%d", ex_bytes, bytes_count);
     } else if (bytes_count < 0) {
+        // bpf_printk("bc<0 :%d", bytes_count);
         return ;
-    }         
+    } else {
+        // bpf_printk("bc>0 :%d", bytes_count);
+    }
     uint64_t tgid_fd = gen_tgid_fd(id>>32, args->fd);
     struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
     if (conn_info) {
@@ -275,41 +279,49 @@ int BPF_URETPROBE(SSL_read_ex_ret_nested_syscall) {
 
 SEC("uprobe/dummy:SSL_write")
 int BPF_UPROBE(SSL_write_entry_nested_syscall) {
+    // bpf_printk("SSL_write_entry_nested_syscall");
     return do_SSL_write_entry(ctx, false);
 }
 
 SEC("uretprobe/dummy:SSL_write")
 int BPF_URETPROBE(SSL_write_ret_nested_syscall) {
+    // bpf_printk("SSL_write_ret_nested_syscall");
     return do_SSL_write_ret(ctx, false);
 }
 
 SEC("uprobe/dummy:SSL_write_ex")
 int BPF_UPROBE(SSL_write_ex_entry_nested_syscall) {
+    // bpf_printk("SSL_write_ex_entry_nested_syscall");
     return do_SSL_write_entry(ctx, true);
 }
 
 SEC("uretprobe/dummy:SSL_write_ex")
 int BPF_URETPROBE(SSL_write_ex_ret_nested_syscall) {
+    // bpf_printk("SSL_write_ex_ret_nested_syscall");
     return do_SSL_write_ret(ctx, true);
 }
 
 SEC("uprobe/dummy:SSL_write")
 int BPF_UPROBE(SSL_write_entry_offset) {
+    // bpf_printk("SSL_write_entry_offset");
     return do_SSL_write_entry_offset(ctx, false);
 }
 
 SEC("uretprobe/dummy:SSL_write")
 int BPF_URETPROBE(SSL_write_ret_offset) {
+    // bpf_printk("SSL_write_ret_offset");
     return do_SSL_write_ret_offset(ctx);
 }
 
 SEC("uprobe/dummy:SSL_read")
 int BPF_UPROBE(SSL_read_entry_offset) {
+    // bpf_printk("SSL_read_entry_offset");
     return do_SSL_read_entry_offset(ctx, false);
 }
 
 SEC("uretprobe/dummy:SSL_read")
 int BPF_URETPROBE(SSL_read_ret_offset) {
+    // bpf_printk("SSL_read_ret_offset");
     return do_SSL_read_ret_offset(ctx);
 }
 
