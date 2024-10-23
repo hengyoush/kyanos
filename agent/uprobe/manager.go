@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -22,7 +23,14 @@ func StartHandleSchedExecEvent() chan *bpf.AgentProcessExecEvent {
 	ch := make(chan *bpf.AgentProcessExecEvent)
 	go func() {
 		for event := range ch {
-			handleSchedExecEvent(event)
+			go func(e *bpf.AgentProcessExecEvent) {
+				// delay some time to give the process time to map ssl lib
+				// but still have chances that the process doesn't mapping ssl lib
+				// at start time.
+				// TODO may be there is a better way to handle this
+				time.Sleep(500 * time.Millisecond)
+				handleSchedExecEvent(e)
+			}(event)
 		}
 	}()
 	return ch
