@@ -166,6 +166,7 @@ type model struct {
 	initialWindownSizeMsg tea.WindowSizeMsg
 	sortBy                rc.SortBy
 	reverse               bool
+	options               WatchOptions
 }
 
 func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialWindownSizeMsg tea.WindowSizeMsg,
@@ -181,6 +182,7 @@ func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialW
 		wide:                  options.WideOutput,
 		staticRecord:          options.StaticRecord,
 		initialWindownSizeMsg: initialWindownSizeMsg,
+		options:               options,
 	}
 	if sortBy != common.NoneType {
 		for idx, col := range cols {
@@ -343,8 +345,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// m.viewport.SetContent("[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
 					// 	c.TruncateString(r.Resp.FormatToString(), 10240))
 					m.viewport.SetContent(timeDetail + "\n" + line + "\n" +
-						"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
-						c.TruncateString(r.Resp.FormatToString(), 10240))
+						"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), m.options.MaxRecordContentDisplayBytes) + "\n" + line + "\n[Response]\n\n" +
+						c.TruncateString(r.Resp.FormatToString(), m.options.MaxRecordContentDisplayBytes))
 				} else {
 					panic("!")
 				}
