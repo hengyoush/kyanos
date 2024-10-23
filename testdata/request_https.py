@@ -28,7 +28,7 @@ for i in range(count):
         print(f'请求 {i+1}：发生错误', e)
     
     # 休眠
-    time.sleep(0.1)
+    time.sleep(0.5)
 
 # 关闭Session对象
 session.close()
