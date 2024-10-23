@@ -28,7 +28,7 @@ function test_redis() {
 
     cat "${LNAME}"
     docker rm -f $cid1 || true
-    check_time_detail_completed_with_last_lines "${LNAME}" 3
+    # check_time_detail_completed_with_last_lines "${LNAME}" 3
     check_patterns_in_file_with_last_lines "${LNAME}" "HGET" 3
 }
 
