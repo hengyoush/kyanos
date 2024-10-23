@@ -273,6 +273,7 @@ func (m *model) updateRowsInTable() {
 	lock.Lock()
 	defer lock.Unlock()
 	rows := make([]table.Row, 0)
+	colMaxWidth := make(map[int]int)
 	if len(rows) < len(*m.records) {
 		// records := (*m.records)[len(rows):]
 		m.sortConnstats(m.records)
@@ -284,13 +285,32 @@ func (m *model) updateRowsInTable() {
 				if colIdx == 0 {
 					row = append(row, fmt.Sprintf("%d", i+idx))
 				} else {
-					row = append(row, cols[colIdx].data(record))
+					rowData := cols[colIdx].data(record)
+					row = append(row, rowData)
+					cur, ok := colMaxWidth[colIdx]
+					if ok {
+						if len(rowData) > cur {
+							cur = len(rowData)
+						}
+					} else {
+						cur = len(rowData)
+					}
+					colMaxWidth[colIdx] = cur
 				}
 			}
 
 			rows = append(rows, row)
 		}
 		m.table.SetRows(rows)
+		curCols := m.table.Columns()
+		for colIdx := 1; colIdx < len(m.table.Columns()); colIdx++ {
+			curWidth := curCols[colIdx].Width
+			maxWidth, ok := colMaxWidth[colIdx]
+			if ok && curWidth < maxWidth {
+				curCols[colIdx].Width = min(maxWidth, rc.MaxColWidth)
+			}
+		}
+		m.table.SetColumns(curCols)
 	}
 }
 
