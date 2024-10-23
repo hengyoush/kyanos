@@ -28,7 +28,7 @@ func StartHandleSchedExecEvent() chan *bpf.AgentProcessExecEvent {
 				// but still have chances that the process doesn't mapping ssl lib
 				// at start time.
 				// TODO may be there is a better way to handle this
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(1000 * time.Millisecond)
 				handleSchedExecEvent(e)
 			}(event)
 		}

@@ -10,7 +10,7 @@ function test_http_plain_client() {
     pip install --break-system-packages requests || true
     timeout 20 ${CMD} watch --debug-output http --remote-ports 443 2>&1 | tee "${HTTPS_LNAME}" &
     sleep 10
-    python3 ./testdata/request_https.py 4 || true
+    python3 ./testdata/request_https.py 15 || true
     wait
 
     cat "${HTTPS_LNAME}"
