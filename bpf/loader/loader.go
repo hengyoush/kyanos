@@ -12,6 +12,7 @@ import (
 	"kyanos/agent/uprobe"
 	"kyanos/bpf"
 	"kyanos/common"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -261,7 +262,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 			commonPrefixLength = len(prefix)
 		}
 	}
-	if result != "" {
+	if commonPrefixLength != 0 && result != "" {
 		value, _ := btfFileNames.Get(result)
 		dirEntry := value.(fs.DirEntry)
 		fileName := dirEntry.Name()
@@ -271,6 +272,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 			return file, nil
 		}
 	}
+	log.Fatalln("can't start kyanos because no available btf file, please refer this url:  for solutions.")
 	return nil, errors.New("no btf file found to load")
 }
 
