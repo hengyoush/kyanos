@@ -54,7 +54,6 @@ func (b *BPF) Close() {
 }
 
 func LoadBPF(options ac.AgentOptions) (*BPF, error) {
-	var links *list.List
 	var objs *bpf.AgentObjects
 	var spec *ebpf.CollectionSpec
 	var collectionOptions *ebpf.CollectionOptions
@@ -145,24 +144,41 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	}
 
 	var validateResult = setAndValidateParameters(options.Ctx, &options)
+	if !validateResult {
+		return nil, fmt.Errorf("validate param failed!")
+	}
 
+	// var links *list.List
+	// if options.LoadBpfProgramFunction != nil {
+	// 	links = options.LoadBpfProgramFunction()
+	// } else {
+	// 	links = attachBpfProgs(options.IfName, options.Kv, &options)
+	// }
+
+	// if !options.DisableOpensslUprobe {
+	// 	attachOpenSslUprobes(links, options, options.Kv, objs)
+	// }
+	// attachNfFunctions(links)
+	bpf.PullProcessExitEvents(options.Ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.Ctx)})
+
+	// bf.links = links
+	return bf, nil
+}
+
+func (bf *BPF) AttachProgs(options ac.AgentOptions) error {
+	var links *list.List
 	if options.LoadBpfProgramFunction != nil {
 		links = options.LoadBpfProgramFunction()
 	} else {
 		links = attachBpfProgs(options.IfName, options.Kv, &options)
 	}
 
-	if !validateResult {
-		return nil, fmt.Errorf("validate param failed!")
-	}
 	if !options.DisableOpensslUprobe {
-		attachOpenSslUprobes(links, options, options.Kv, objs)
+		attachOpenSslUprobes(links, options, options.Kv, bf.objs)
 	}
 	attachNfFunctions(links)
-	bpf.PullProcessExitEvents(options.Ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.Ctx)})
-
 	bf.links = links
-	return bf, nil
+	return nil
 }
 
 var osReleaseFiles = []string{
