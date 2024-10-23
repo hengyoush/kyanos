@@ -7,9 +7,9 @@ FILE_PREFIX="/tmp/kyanos"
 HTTPS_LNAME="${FILE_PREFIX}_https.log"
 
 function test_http_plain_client() {
+    pip install --break-system-packages requests || true
     timeout 30 python3 ./testdata/request_https.py 60 &
     sleep 10
-    pip install --break-system-packages requests || true
     timeout 30 ${CMD} watch --debug-output http --remote-ports 443 2>&1 | tee "${HTTPS_LNAME}" &
     wait
 
