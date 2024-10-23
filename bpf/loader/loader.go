@@ -23,6 +23,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/features"
 	"github.com/cilium/ebpf/link"
 	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/spf13/viper"
@@ -59,6 +60,11 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	var collectionOptions *ebpf.CollectionOptions
 	var err error
 	var bf *BPF = &BPF{}
+
+	if err := features.HaveProgramType(ebpf.Kprobe); errors.Is(err, ebpf.ErrNotSupported) {
+		common.AgentLog.Fatalf("Require oldest kernel version is 3.10.0-957, pls check your kernel version by `uname -r`")
+	}
+
 	if options.BTFFilePath != "" {
 		btfPath, err := btf.LoadSpec(options.BTFFilePath)
 		if err != nil {
