@@ -27,7 +27,7 @@ require (
 	github.com/zcalusic/sysinfo v1.1.2
 	k8s.io/cri-api v0.31.0
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kubernetes v1.24.17
+	k8s.io/kubernetes v1.31.2
 )
 
 require (
