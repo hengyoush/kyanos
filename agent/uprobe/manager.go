@@ -64,7 +64,7 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 		return []link.Link{}, nil
 	}
 
-	matcher, libSslPath, err := findLibSslPath(pid)
+	matcher, libSslPath, _, err := findLibSslPath(pid)
 	if err != nil || libSslPath == "" {
 		return nil, err
 	}
@@ -165,11 +165,16 @@ func buildBPFFuncName(baseName string, isEx bool, isRet bool, socketFDAccess SSL
 }
 
 func detectOpenSsl(pid int) (string, error) {
-	_, libSslPath, err := findLibSslPath(pid)
+	_, libSslPath, libcryptopath, err := findLibSslPath(pid)
 	if err != nil || libSslPath == "" {
 		return "", err
 	}
 	if result, err := getOpenSslVersionKey(libSslPath); err == nil {
+		common.UprobeLog.Debugf("getOpenSslVersionKey return libSslPath: %s", result)
+		return result, nil
+	}
+	if result, err := getOpenSslVersionKey(libcryptopath); err == nil {
+		common.UprobeLog.Debugf("getOpenSslVersionKey return libcryptopath: %s", result)
 		return result, nil
 	}
 	libSslLibName := libSslPath[strings.LastIndex(libSslPath, "/")+1:]
@@ -180,16 +185,20 @@ func detectOpenSsl(pid int) (string, error) {
 	}
 }
 
-func findLibSslPath(pid int) (SSLLibMatcher, string, error) {
+func findLibSslPath(pid int) (SSLLibMatcher, string, string, error) {
 	for _, matcher := range kLibSSLMatchers {
-		libnames := []string{matcher.Libssl}
+		libnames := []string{matcher.Libssl, matcher.Libcrypto}
 		libnameToPath := findHostPathForPidLibs(libnames, pid, matcher.SearchType)
-		path, found := libnameToPath[matcher.Libssl]
-		if found {
-			return matcher, path, nil
+		libsslpath, sslfound := libnameToPath[matcher.Libssl]
+		libcryptopath, cryptofound := libnameToPath[matcher.Libcrypto]
+		if sslfound && cryptofound {
+			common.UprobeLog.Debugf("[findLibSslPath] matcher: %s  matched for pid: %d", matcher.Libssl, pid)
+			return matcher, libsslpath, libcryptopath, nil
+		} else {
+			common.UprobeLog.Debugf("[findLibSslPath] matcher: %s doesn't match for pid: %d", matcher.Libssl, pid)
 		}
 	}
-	return SSLLibMatcher{}, "", nil
+	return SSLLibMatcher{}, "", "", nil
 }
 
 func findHostPathForPidLibs(libnames []string, pid int, searchType HostPathForPIDPathSearchType) map[string]string {
