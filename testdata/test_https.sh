@@ -8,7 +8,7 @@ HTTPS_LNAME="${FILE_PREFIX}_https.log"
 
 function test_http_plain_client() {
     pip install --break-system-packages requests || true
-    timeout 20 ${CMD} watch --debug-output http --remote-ports 443 2>&1 | tee "${HTTPS_LNAME}" &
+    timeout 60 ${CMD} watch --debug-output http --remote-ports 443 2>&1 | tee "${HTTPS_LNAME}" &
     sleep 10
     python3 ./testdata/request_https.py 15 || true
     wait
