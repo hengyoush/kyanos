@@ -1,6 +1,8 @@
 package bpf
 
-import "reflect"
+import (
+	"reflect"
+)
 
 var ProtocolNamesMap = map[AgentTrafficProtocolT]string{
 	AgentTrafficProtocolTKProtocolHTTP:  "HTTP",

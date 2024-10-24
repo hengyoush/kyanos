@@ -512,13 +512,17 @@ func (c *Connection4) IsServerSide() bool {
 func (c *Connection4) IsSsl() bool {
 	return c.ssl
 }
-
-func (c *Connection4) Side() common.SideEnum {
-	if c.Role == bpf.AgentEndpointRoleTKRoleClient {
+func endpointRoleAsSideEnum(role bpf.AgentEndpointRoleT) common.SideEnum {
+	if role == bpf.AgentEndpointRoleTKRoleClient {
 		return common.ClientSide
-	} else {
+	} else if role == bpf.AgentEndpointRoleTKRoleServer {
 		return common.ServerSide
+	} else {
+		return common.AllSide
 	}
+}
+func (c *Connection4) Side() common.SideEnum {
+	return endpointRoleAsSideEnum(c.Role)
 }
 func (c *Connection4) Identity() string {
 	cd := common.ConnDesc{
