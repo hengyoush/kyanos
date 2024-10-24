@@ -290,7 +290,7 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		} else if (with_data) {
 			report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
 		} else {
-			report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, 0, args->source_fn);
+			report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->ts, args->source_fn);
 		}
 	}
 }
