@@ -405,6 +405,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			pos := parser.FindBoundary(streamBuffer, messageType, 1)
 			if pos != -1 {
 				streamBuffer.RemovePrefix(pos)
+				common.ConntrackLog.Debugf("Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue(found boundary)", c.ToString(), pos, messageType.String())
 				stop = false
 			} else if c.progressIsStucked(streamBuffer) {
 				if streamBuffer.Head().Len() > int(ke.Len) {
@@ -422,6 +423,8 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 				}
 			} else {
 				stop = true
+
+				common.ConntrackLog.Debugf("Invalid, %s stop process %s queue", c.ToString(), messageType.String())
 			}
 		case protocol.NeedsMoreData:
 			removed := c.checkProgress(streamBuffer)
@@ -467,7 +470,7 @@ func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 		return false
 	}
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
-	if !ok || time.Now().UnixMilli()-int64(common.NanoToMills(headTime)) > 5000 {
+	if !ok || time.Now().UnixMilli()-int64(common.NanoToMills(headTime)) > 1000 {
 		return true
 	}
 	return false
