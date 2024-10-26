@@ -546,6 +546,9 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 					case r := <-ch:
 						lock.Lock()
 						*m.records = append(*m.records, r)
+						if len(*m.records) > m.options.MaxRecords {
+							*m.records = (*m.records)[(len(*m.records) - m.options.MaxRecords):]
+						}
 						lock.Unlock()
 					}
 				}

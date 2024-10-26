@@ -8,6 +8,7 @@ type WatchOptions struct {
 	Opts                         string
 	DebugOutput                  bool
 	MaxRecordContentDisplayBytes int
+	MaxRecords                   int
 }
 
 func (w *WatchOptions) Init() {
@@ -18,5 +19,8 @@ func (w *WatchOptions) Init() {
 	}
 	if w.MaxRecordContentDisplayBytes <= 0 {
 		w.MaxRecordContentDisplayBytes = 1024
+	}
+	if w.MaxRecords <= 0 {
+		w.MaxRecords = 100
 	}
 }

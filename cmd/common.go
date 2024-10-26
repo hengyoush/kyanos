@@ -59,6 +59,8 @@ func startAgent() {
 		}
 		options.AnalysisOptions = analysisOptions
 		options.Side = side
+	} else {
+		options.WatchOptions.MaxRecords = maxRecords
 	}
 	options.IfName = IfName
 	options.BTFFilePath = BTFFilePath
