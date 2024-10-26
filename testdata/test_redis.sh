@@ -24,7 +24,7 @@ function test_redis_client() {
 
     timeout 30 ${CMD} watch --debug-output redis --remote-ports 6379 2>&1 | tee "${CLIENT_LNAME}" &
     sleep 10
-    redis-cli -r 5 hget a key
+    redis-cli -r 5 -i 0.3 hget a key
     wait
 
     cat "${CLIENT_LNAME}"
@@ -50,7 +50,7 @@ function test_redis_server() {
 
     timeout 30 ${CMD} watch --debug-output redis --local-ports 6379 2>&1 | tee "${SERVER_LNAME}" &
     sleep 10
-    redis-cli -r 5 hget a key
+    redis-cli -r 50 -i 0.3 hget a key
     wait
 
     cat "${SERVER_LNAME}"
