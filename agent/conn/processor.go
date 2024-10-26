@@ -159,6 +159,7 @@ func (p *Processor) run() {
 					Role:       event.ConnInfo.Role,
 					TgidFd:     TgidFd,
 					Status:     Connected,
+					tracable:   true,
 
 					MessageFilter: p.messageFilter,
 					LatencyFilter: p.latencyFilter,
@@ -173,12 +174,15 @@ func (p *Processor) run() {
 
 					protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),
 				}
-				conn.StreamEvents = NewKernEventStream(conn, 300)
-				if p.side != common.AllSide && p.side != conn.Side() {
-					// conn.OnClose(true)
-					conn.UpdateConnectionTraceable(false)
-					continue
+				conn.onRoleChanged = func() {
+					onRoleChanged(p, conn)
 				}
+				conn.StreamEvents = NewKernEventStream(conn, 300)
+				// if p.side != common.AllSide && p.side != conn.Side() {
+				// 	// conn.OnClose(true)
+				// 	conn.UpdateConnectionTraceable(false)
+				// 	continue
+				// }
 				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
 				p.connManager.AddConnection4(TgidFd, conn)
 			} else if event.ConnType == bpf.AgentConnTypeTKClose {
@@ -204,19 +208,20 @@ func (p *Processor) run() {
 
 				if conn.Role == bpf.AgentEndpointRoleTKRoleUnknown && event.ConnInfo.Role != bpf.AgentEndpointRoleTKRoleUnknown {
 					conn.Role = event.ConnInfo.Role
+					onRoleChanged(p, conn)
 				}
 
 				isProtocolInterested := conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset ||
 					conn.MessageFilter.FilterByProtocol(conn.Protocol)
 
-				if isProtocolInterested {
+				if isProtocolInterested && !isSideNotMatched(p, conn) {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
-							common.BPFEventLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
+							common.ConntrackLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
 							conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 						}
 						for _, sslEvent := range conn.TempSslEvents {
-							common.BPFEventLog.Debugf("%s process %d temp ssl events before infer\n", conn.ToString(), len(conn.TempSslEvents))
+							common.ConntrackLog.Debugf("%s process %d temp ssl events before infer\n", conn.ToString(), len(conn.TempSslEvents))
 							conn.OnSslDataEvent(sslEvent.Buf, sslEvent, recordChannel)
 						}
 						conn.UpdateConnectionTraceable(true)
@@ -224,7 +229,7 @@ func (p *Processor) run() {
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
 					conn.TempConnEvents = conn.TempConnEvents[0:0]
 				} else {
-					common.BPFEventLog.Debugf("%s discarded due to not interested", conn.ToString())
+					common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
 					conn.UpdateConnectionTraceable(false)
 					// conn.OnClose(true)
 				}
@@ -241,9 +246,9 @@ func (p *Processor) run() {
 			}
 
 			if event.ConnType == bpf.AgentConnTypeTKProtocolInfer && conn.ProtocolInferred() {
-				common.BPFEventLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
+				common.ConntrackLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
 			} else {
-				common.BPFEventLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
+				common.ConntrackLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
 			}
 		case event := <-p.syscallEvents:
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
@@ -253,16 +258,16 @@ func (p *Processor) run() {
 				continue
 			}
 			if conn != nil && conn.ProtocolInferred() {
-				common.BPFEventLog.Debugf("[syscall][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
 
 				conn.OnSyscallEvent(event.Buf, event, recordChannel)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
-				common.BPFEventLog.Debugf("[syscall][protocol unset][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][protocol unset][ts=%d][len=%d]%s | %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
-				common.BPFEventLog.Debugf("[syscall][protocol unknown][len=%d]%s | %s", event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][protocol unknown][ts=%d][len=%d]%s | %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 			} else {
-				common.BPFEventLog.Debugf("[syscall][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][no conn][ts=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 			}
 		case event := <-p.sslEvents:
 			tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
@@ -272,7 +277,7 @@ func (p *Processor) run() {
 				continue
 			}
 			if conn != nil && conn.ProtocolInferred() {
-				common.BPFEventLog.Debugf("[ssl][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+				common.BPFEventLog.Debugf("[ssl][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
 
 				conn.OnSslDataEvent(event.Buf, event, recordChannel)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
@@ -316,6 +321,18 @@ func (p *Processor) run() {
 				common.BPFEventLog.Debugf("[other]%s\n", FormatKernEvt(event, conn))
 			}
 		}
+	}
+}
+func isSideNotMatched(p *Processor, conn *Connection4) bool {
+	return (p.side != common.AllSide) && ((conn.Role == bpf.AgentEndpointRoleTKRoleClient) != (p.side == common.ClientSide))
+}
+func onRoleChanged(p *Processor, conn *Connection4) {
+	if isSideNotMatched(p, conn) {
+		common.ConntrackLog.Debugf("[onRoleChanged] %s discarded due to not matched by side", conn.ToString())
+		conn.UpdateConnectionTraceable(false)
+	} else {
+		common.ConntrackLog.Debugf("[onRoleChanged] %s actived due to matched by side", conn.ToString())
+		conn.UpdateConnectionTraceable(true)
 	}
 }
 

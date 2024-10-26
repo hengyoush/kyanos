@@ -12,12 +12,19 @@ import (
 	"github.com/Ha4sh-447/flowcharts/draw"
 )
 
-func ViewRecordTimeDetailAsFlowChart(r *common.AnnotatedRecord) string {
+func ViewRecordTimeDetailAsFlowChart(r *common.AnnotatedRecord) (result string) {
+	defer func() {
+		if err := recover(); err != nil {
+			c.DefaultLog.Errorln(err)
+			result = r.TimeDetailInfo()
+		}
+	}()
 	if r.Side == c.ServerSide {
-		return ViewRecordTimeDetailAsFlowChartForServer(r)
+		result = ViewRecordTimeDetailAsFlowChartForServer(r)
 	} else {
-		return ViewRecordTimeDetailAsFlowChartForClientSide(r)
+		result = ViewRecordTimeDetailAsFlowChartForClientSide(r)
 	}
+	return result
 }
 
 func addNicEventsDiagram(events []common.NicEventDetail, prevNicArrow *diagrams.Shape, prevTs int64, shapes *[]*diagrams.Shape, isReq bool) (*diagrams.Shape, int64) {
@@ -115,9 +122,9 @@ func getFlowChartString(diagram *diagrams.Diagram) string {
 	canvasRow := 200
 	canvas := draw.NewCanvas(canvasRow, canvasRow)
 	canvas.Cursor.X = canvasRow / 4
-	c.DefaultLog.Warningf("shapes: %v", diagram.S)
+	c.DefaultLog.Debugf("shapes: %v", diagram.S)
 	for _, shape := range diagram.S {
-		c.DefaultLog.Warningf("shape: %v", shape)
+		c.DefaultLog.Debugf("shape: %v", shape)
 		diagrams.RenderD(&shape, canvas, s)
 	}
 	myCanvas := ToMyCanvas(canvas)

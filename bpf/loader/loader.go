@@ -12,6 +12,7 @@ import (
 	"kyanos/agent/uprobe"
 	"kyanos/bpf"
 	"kyanos/common"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/features"
 	"github.com/cilium/ebpf/link"
 	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/spf13/viper"
@@ -52,12 +54,16 @@ func (b *BPF) Close() {
 }
 
 func LoadBPF(options ac.AgentOptions) (*BPF, error) {
-	var links *list.List
 	var objs *bpf.AgentObjects
 	var spec *ebpf.CollectionSpec
 	var collectionOptions *ebpf.CollectionOptions
 	var err error
 	var bf *BPF = &BPF{}
+
+	if err := features.HaveProgramType(ebpf.Kprobe); errors.Is(err, ebpf.ErrNotSupported) {
+		common.AgentLog.Fatalf("Require oldest kernel version is 3.10.0-957, pls check your kernel version by `uname -r`")
+	}
+
 	if options.BTFFilePath != "" {
 		btfPath, err := btf.LoadSpec(options.BTFFilePath)
 		if err != nil {
@@ -138,24 +144,41 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	}
 
 	var validateResult = setAndValidateParameters(options.Ctx, &options)
+	if !validateResult {
+		return nil, fmt.Errorf("validate param failed!")
+	}
 
+	// var links *list.List
+	// if options.LoadBpfProgramFunction != nil {
+	// 	links = options.LoadBpfProgramFunction()
+	// } else {
+	// 	links = attachBpfProgs(options.IfName, options.Kv, &options)
+	// }
+
+	// if !options.DisableOpensslUprobe {
+	// 	attachOpenSslUprobes(links, options, options.Kv, objs)
+	// }
+	// attachNfFunctions(links)
+	bpf.PullProcessExitEvents(options.Ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.Ctx)})
+
+	// bf.links = links
+	return bf, nil
+}
+
+func (bf *BPF) AttachProgs(options ac.AgentOptions) error {
+	var links *list.List
 	if options.LoadBpfProgramFunction != nil {
 		links = options.LoadBpfProgramFunction()
 	} else {
 		links = attachBpfProgs(options.IfName, options.Kv, &options)
 	}
 
-	if !validateResult {
-		return nil, fmt.Errorf("validate param failed!")
-	}
 	if !options.DisableOpensslUprobe {
-		attachOpenSslUprobes(links, options, options.Kv, objs)
+		attachOpenSslUprobes(links, options, options.Kv, bf.objs)
 	}
 	attachNfFunctions(links)
-	bpf.PullProcessExitEvents(options.Ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.Ctx)})
-
 	bf.links = links
-	return bf, nil
+	return nil
 }
 
 var osReleaseFiles = []string{
@@ -215,19 +238,16 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 	si.GetSysInfo()
 	common.AgentLog.Debugf("[sys info] vendor: %s, os_arch: %s, kernel_arch: %s", si.OS.Vendor, si.OS.Architecture, si.Kernel.Architecture)
 
-
 	osInfo, err := common.GetOSInfo()
 	osId := osInfo.GetOSReleaseFieldValue(common.OS_ID)
 	versionId := strings.Replace(osInfo.GetOSReleaseFieldValue(common.OS_VERSION_ID), "\"", "", -1)
 	kernelRelease := osInfo.GetOSReleaseFieldValue(common.OS_KERNEL_RELEASE)
 	arch := osInfo.GetOSReleaseFieldValue(common.OS_ARCH)
 
-
-	btfFileDir := fmt.Sprintf("custom-archive/%s/%s/%s/%s.btf", osId, versionId, arch, kernelRelease)
+	btfFileDir := fmt.Sprintf("custom-archive/%s/%s/%s", osId, versionId, arch)
 	dir, err := bpf.BtfFiles.ReadDir(btfFileDir)
 	if err != nil {
 		common.AgentLog.Warnf("btf file not exists, path: %s", btfFileDir)
-		return nil, err
 	}
 	btfFileNames := treemap.NewWithStringComparator()
 	for _, entry := range dir {
@@ -238,7 +258,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 		}
 	}
 
-	release := si.Kernel.Release
+	release := kernelRelease
 	if value, found := btfFileNames.Get(release); found {
 		common.AgentLog.Debug("find btf file exactly!")
 		dirEntry := value.(fs.DirEntry)
@@ -248,7 +268,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 			return file, nil
 		}
 	} else {
-		common.AgentLog.Debug("find btf file exactly failed, try to find a lower version btf file...")
+		common.AgentLog.Warnf("find btf file exactly failed, try to find a lower version btf file...")
 	}
 
 	sortedBtfFileNames := btfFileNames.Keys()
@@ -264,7 +284,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 			commonPrefixLength = len(prefix)
 		}
 	}
-	if result != "" {
+	if commonPrefixLength != 0 && result != "" {
 		value, _ := btfFileNames.Get(result)
 		dirEntry := value.(fs.DirEntry)
 		fileName := dirEntry.Name()
@@ -274,6 +294,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 			return file, nil
 		}
 	}
+	log.Fatalln("can't start kyanos because no available btf file, please refer this url: https://hengyoush.github.io/kyanos/quickstart.html for more info.")
 	return nil, errors.New("no btf file found to load")
 }
 
@@ -368,6 +389,8 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 	var enabledRemoteIpMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "EnabledRemoteIpMap")
 	var enabledLocalPortMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "EnabledLocalPortMap")
 	var filterPidMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap")
+
+	controlValues.Update(bpf.AgentControlValueIndexTKSideFilter, int64(options.TraceSide), ebpf.UpdateAny)
 
 	// if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
 	// 	common.AgentLog.Infoln("filter for pid: ", targetPid)

@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var maxRecords int
 var watchCmd = &cobra.Command{
 	Use: "watch [http|redis|mysql [flags]]",
 	Example: `
@@ -37,8 +38,10 @@ func init() {
 	watchCmd.PersistentFlags().Float64("latency", 0, "Filter based on request response time")
 	watchCmd.PersistentFlags().Int64("req-size", 0, "Filter based on request bytes size")
 	watchCmd.PersistentFlags().Int64("resp-size", 0, "Filter based on response bytes size")
+	watchCmd.PersistentFlags().IntVar(&maxRecords, "max-records", 100, "Limit the max number of table records")
 	watchCmd.PersistentFlags().BoolVar(&options.WatchOptions.DebugOutput, "debug-output", false, "Print output to console instead display ui")
 	watchCmd.PersistentFlags().StringVarP(&options.WatchOptions.Opts, "output", "o", "", "Can be `wide`")
+	watchCmd.PersistentFlags().IntVar(&options.WatchOptions.MaxRecordContentDisplayBytes, "max-print-bytes", 1024, "Control how may bytes of record's req/resp can be printed, \n exceeded part are truncated")
 	watchCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "Filter based on connection side. can be: server | client")
 	watchCmd.Flags().SortFlags = false
 	watchCmd.PersistentFlags().SortFlags = false

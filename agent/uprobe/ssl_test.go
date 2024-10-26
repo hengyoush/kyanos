@@ -15,7 +15,7 @@ func TestDetectOpenSsl(t *testing.T) {
 }
 
 func TestFindLibSslPath(t *testing.T) {
-	matcher, path, err := findLibSslPath(1262837)
+	matcher, path, _, err := findLibSslPath(1262837)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, path)
 	assert.NotNil(t, matcher)
@@ -27,7 +27,7 @@ func TestFindHostPathForPidLibs(t *testing.T) {
 }
 
 func TestGetOpenSslVersionKey(t *testing.T) {
-	path, err := getOpenSslVersionKey("/root/workspace/pktlatency/libssl.so.1.0.2k")
+	path, err := getOpenSslVersionKey("/root/workspace/pktlatency/deps/openssl/libcrypto.so.3")
 	assert.Nil(t, err)
 	fmt.Println(path)
 }

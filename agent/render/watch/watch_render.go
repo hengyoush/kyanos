@@ -166,6 +166,7 @@ type model struct {
 	initialWindownSizeMsg tea.WindowSizeMsg
 	sortBy                rc.SortBy
 	reverse               bool
+	options               WatchOptions
 }
 
 func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialWindownSizeMsg tea.WindowSizeMsg,
@@ -181,6 +182,7 @@ func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialW
 		wide:                  options.WideOutput,
 		staticRecord:          options.StaticRecord,
 		initialWindownSizeMsg: initialWindownSizeMsg,
+		options:               options,
 	}
 	if sortBy != common.NoneType {
 		for idx, col := range cols {
@@ -271,6 +273,7 @@ func (m *model) updateRowsInTable() {
 	lock.Lock()
 	defer lock.Unlock()
 	rows := make([]table.Row, 0)
+	colMaxWidth := make(map[int]int)
 	if len(rows) < len(*m.records) {
 		// records := (*m.records)[len(rows):]
 		m.sortConnstats(m.records)
@@ -282,13 +285,32 @@ func (m *model) updateRowsInTable() {
 				if colIdx == 0 {
 					row = append(row, fmt.Sprintf("%d", i+idx))
 				} else {
-					row = append(row, cols[colIdx].data(record))
+					rowData := cols[colIdx].data(record)
+					row = append(row, strings.Replace(rowData, "-0.000", "-", -1))
+					cur, ok := colMaxWidth[colIdx]
+					if ok {
+						if len(rowData) > cur {
+							cur = len(rowData)
+						}
+					} else {
+						cur = len(rowData)
+					}
+					colMaxWidth[colIdx] = cur
 				}
 			}
 
 			rows = append(rows, row)
 		}
 		m.table.SetRows(rows)
+		curCols := m.table.Columns()
+		for colIdx := 1; colIdx < len(m.table.Columns()); colIdx++ {
+			curWidth := curCols[colIdx].Width
+			maxWidth, ok := colMaxWidth[colIdx]
+			if ok && curWidth < maxWidth {
+				curCols[colIdx].Width = min(maxWidth, rc.MaxColWidth)
+			}
+		}
+		m.table.SetColumns(curCols)
 	}
 }
 
@@ -343,8 +365,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// m.viewport.SetContent("[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
 					// 	c.TruncateString(r.Resp.FormatToString(), 10240))
 					m.viewport.SetContent(timeDetail + "\n" + line + "\n" +
-						"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
-						c.TruncateString(r.Resp.FormatToString(), 10240))
+						"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), m.options.MaxRecordContentDisplayBytes) + "\n" + line + "\n[Response]\n\n" +
+						c.TruncateString(r.Resp.FormatToString(), m.options.MaxRecordContentDisplayBytes))
 				} else {
 					panic("!")
 				}
@@ -513,6 +535,7 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 			}
 		}
 	} else {
+		c.SetLogToFile()
 		records := &[]*common.AnnotatedRecord{}
 		m := NewModel(options, records, tea.WindowSizeMsg{}, common.NoneType, false).(*model)
 		if !options.StaticRecord {
@@ -524,6 +547,9 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 					case r := <-ch:
 						lock.Lock()
 						*m.records = append(*m.records, r)
+						if len(*m.records) > m.options.MaxRecords {
+							*m.records = (*m.records)[(len(*m.records) - m.options.MaxRecords):]
+						}
 						lock.Unlock()
 					}
 				}

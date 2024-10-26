@@ -10,12 +10,17 @@
 *.o
 __debug**
 node_modules/
+docs/.vitepress/dist
+docs/.vitepress/cache
 
 # Test binary, built with `go test -c`
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# asciinema files
+*.cast
 
 # Dependency directories (remove the comment below to include it)
 # vendor/

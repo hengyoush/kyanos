@@ -4,6 +4,7 @@ import (
 	"fmt"
 	anc "kyanos/agent/analysis/common"
 	"kyanos/bpf"
+	"kyanos/common"
 	"slices"
 	"strings"
 
@@ -52,13 +53,15 @@ var subGroupBy string
 var slowMode bool
 var bigRespModel bool
 var bigReqModel bool
-var targetSamples int
-var SUPPORTED_METRICS = []byte{'t', 'q', 'p', 'n', 's'}
+var timeLimit int
+var duration int
+var SUPPORTED_METRICS_SHORT = []byte{'t', 'q', 'p', 'n', 's', 'i'}
+var SUPPORTED_METRICS = []string{"total-time", "reqsize", "respsize", "network-time", "internal-time", "socket-time"}
 
 func validateEnabledMetricsString() error {
 	for _, m := range []byte(enabledMetricsString) {
-		if !slices.Contains(SUPPORTED_METRICS, m) {
-			return fmt.Errorf("invalid parameter: '-m %s', only support: %s", enabledMetricsString, SUPPORTED_METRICS)
+		if !slices.Contains(SUPPORTED_METRICS_SHORT, m) {
+			return fmt.Errorf("invalid parameter: '-m %s', only support: %s", enabledMetricsString, SUPPORTED_METRICS_SHORT)
 		}
 	}
 	return nil
@@ -68,19 +71,23 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 	options := anc.AnalysisOptions{
 		EnabledMetricTypeSet: make(anc.MetricTypeSet),
 	}
-	switch enabledMetricsString {
-	case "t":
+	switch strings.ToLower(enabledMetricsString) {
+	case "t", "total-time":
 		options.EnabledMetricTypeSet[anc.TotalDuration] = true
-	case "q":
+	case "q", "reqsize":
 		options.EnabledMetricTypeSet[anc.RequestSize] = true
-	case "p":
+	case "p", "respsize":
 		options.EnabledMetricTypeSet[anc.ResponseSize] = true
-	case "n":
+	case "n", "network-time":
 		options.EnabledMetricTypeSet[anc.BlackBoxDuration] = true
-	case "s":
+		options.Side = common.ClientSide
+	case "i", "internal-time":
+		options.EnabledMetricTypeSet[anc.BlackBoxDuration] = true
+		options.Side = common.ServerSide
+	case "s", "socket-time":
 		options.EnabledMetricTypeSet[anc.ReadFromSocketBufferDuration] = true
 	default:
-		logger.Fatalf("invalid parameter: '-m %s', only support: %s", enabledMetricsString, SUPPORTED_METRICS)
+		logger.Fatalf("invalid parameter: '-m %s', only support: `%s` and %s", enabledMetricsString, SUPPORTED_METRICS_SHORT, SUPPORTED_METRICS)
 	}
 
 	if sampleCount < 0 {
@@ -105,23 +112,23 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 	options.SlowMode = slowMode
 	options.BigReqMode = bigReqModel
 	options.BigRespMode = bigRespModel
-	options.TargetSamples = targetSamples
 	options.ProtocolSpecificClassfiers = make(map[bpf.AgentTrafficProtocolT]anc.ClassfierType)
 	// currently only set it hardly
 	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolHTTP] = anc.HttpPath
 	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolRedis] = anc.RedisCommand
 	options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolTKProtocolMySQL] = anc.RemoteIp
+	options.TimeLimit = timeLimit
 
 	options.Overview = overview
 	return options, nil
 }
 func init() {
-	statCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metrics", "m", "t", `Specify the statistical dimensions, including:
-	t:  total time taken for request response,
-	q:  request size,
-	p:  response size,
-	n:  network device latency,
-	s:  time spent reading from the socket buffer`)
+	statCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metric", "m", "t", `Specify the statistical dimensions, including:
+	t/total-time:  total time taken for request response,
+	q/reqsize:  request size,
+	p/respsize:  response size,
+	n/network-time:  network device latency,
+	s/socket-time:  time spent reading from the socket buffer`)
 	statCmd.PersistentFlags().IntVarP(&sampleCount, "samples-limit", "s", 0,
 		"Specify the number of samples to be attached for each result.\n"+
 			"By default, only a summary  is output.\n"+
@@ -137,7 +144,8 @@ func init() {
 	statCmd.PersistentFlags().BoolVar(&slowMode, "slow", false, "Find slowest records")
 	statCmd.PersistentFlags().BoolVar(&bigReqModel, "bigreq", false, "Find biggest request size records")
 	statCmd.PersistentFlags().BoolVar(&bigRespModel, "bigresp", false, "Find biggest response size records")
-	statCmd.PersistentFlags().IntVar(&targetSamples, "target", 10, "")
+	statCmd.PersistentFlags().IntVar(&timeLimit, "time", 10, "")
+	// statCmd.PersistentFlags().IntVarP(&duration, "duration", "d", 10, "")
 
 	// common
 	statCmd.PersistentFlags().Float64("latency", 0, "Filter based on request response time")

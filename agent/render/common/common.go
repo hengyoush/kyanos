@@ -10,6 +10,8 @@ import (
 	"github.com/lucasb-eyer/go-colorful"
 )
 
+const MaxColWidth = 70
+
 type KeyMap map[string]key.Binding
 
 type TickMsg time.Time

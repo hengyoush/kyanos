@@ -134,6 +134,9 @@ func (f *FrameBase) TimestampNs() uint64 {
 func (f *FrameBase) ByteSize() int {
 	return f.byteSize
 }
+func (f *FrameBase) IncrByteSize(incr int) {
+	f.byteSize += incr
+}
 
 func (f *FrameBase) Seq() uint64 {
 	return f.seq

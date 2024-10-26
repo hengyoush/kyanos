@@ -9,11 +9,13 @@ import (
 	rc "kyanos/agent/render/common"
 	"kyanos/agent/render/watch"
 	"kyanos/bpf"
+	c "kyanos/common"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -81,6 +83,7 @@ func (k statTableKeyMap) FullHelp() [][]key.Binding {
 const (
 	none rc.SortBy = iota
 	name
+	protocol // only valid when in overview mode
 	max
 	avg
 	p50
@@ -102,6 +105,7 @@ type model struct {
 	curConnstats    *[]*analysis.ConnStat // after sort&filter, used to display
 	curSubConnstats *[]*analysis.ConnStat // after sort&filter, used to display
 	resultChannel   <-chan []*analysis.ConnStat
+	startTimeMills  int64
 
 	options common.AnalysisOptions
 
@@ -122,6 +126,7 @@ func NewModel(options common.AnalysisOptions) tea.Model {
 		subStatTable:   initTable(options, true),
 		sampleModel:    nil,
 		spinner:        spinner.New(spinner.WithSpinner(spinner.Dot)),
+		startTimeMills: time.Now().UnixMilli(),
 		additionHelp:   help.New(),
 		connstats:      nil,
 		options:        options,
@@ -142,7 +147,7 @@ func initTable(options common.AnalysisOptions, isSub bool) table.Model {
 		{Title: fmt.Sprintf("p50(%s)", unit), Width: 10},
 		{Title: fmt.Sprintf("p90(%s)", unit), Width: 10},
 		{Title: fmt.Sprintf("p99(%s)", unit), Width: 10},
-		{Title: "count", Width: 5},
+		{Title: "count", Width: 10},
 	}
 	if options.Overview {
 		columns = slices.Insert(columns, 2, table.Column{Title: "Protocol", Width: 10})
@@ -262,6 +267,14 @@ func (m *model) sortConnstats(connstats *[]*analysis.ConnStat) {
 				return cmp.Compare(c1.MaxMap[metric], c2.MaxMap[metric])
 			}
 		})
+	case protocol:
+		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
+			if m.reverse {
+				return cmp.Compare(c2.SamplesMap[metric][0].Protocol, c1.SamplesMap[metric][0].Protocol)
+			} else {
+				return cmp.Compare(c1.SamplesMap[metric][0].Protocol, c2.SamplesMap[metric][0].Protocol)
+			}
+		})
 	case avg:
 		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
 			if m.reverse {
@@ -310,32 +323,48 @@ func (m *model) sortConnstats(connstats *[]*analysis.ConnStat) {
 		})
 	}
 }
-
+func (m *model) timeLimitReached() bool {
+	return time.Now().UnixMilli()-m.startTimeMills > int64(m.options.TimeLimit*1000)
+}
+func (m *model) getAnalysisResult() (noresult bool) {
+	m.options.HavestSignal <- struct{}{}
+	connstats := <-m.resultChannel
+	if connstats != nil {
+		m.connstats = &connstats
+	}
+	if m.connstats != nil {
+		m.updateRowsInTable()
+		return false
+	} else {
+		return true
+	}
+}
 func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case spinner.TickMsg, rc.TickMsg:
-		m.updateRowsInTable()
+		if m.options.EnableBatchModel() && m.timeLimitReached() && len(m.statTable.Rows()) == 0 {
+			m.getAnalysisResult()
+		} else {
+			m.updateRowsInTable()
+		}
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	case tea.WindowSizeMsg:
 		m.windownSizeMsg = msg
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "c":
-			if m.options.EnableBatchModel() {
+		case "ctrl+c":
+			if m.options.EnableBatchModel() && !m.timeLimitReached() {
 				if len(m.statTable.Rows()) == 0 {
-					m.options.HavestSignal <- struct{}{}
-					connstats := <-m.resultChannel
-					if connstats != nil {
-						m.connstats = &connstats
-						m.updateRowsInTable()
+					if m.getAnalysisResult() {
+						return m, tea.Quit
 					}
+					break
 				}
-				break
 			}
 			fallthrough
-		case "esc", "q", "ctrl+c":
+		case "esc", "q":
 			if m.chosenSub {
 				m.chosenSub = false
 				m.curClassId = ""
@@ -346,6 +375,9 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "1", "2", "3", "4", "5", "6", "7", "8":
 			i, err := strconv.Atoi(strings.TrimPrefix(msg.String(), "ctrl+"))
 			curTable := m.curTable()
+			if i >= 2 && !m.options.Overview {
+				i++
+			}
 			if err == nil && (i >= int(none) && i < int(end)) &&
 				(i >= 0 && i < len(curTable.Columns())) {
 				prevSortBy := m.sortBy
@@ -370,8 +402,16 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cursor := m.curTable().Cursor()
 			if m.enableSubGroup && !m.chosenSub {
 				// select sub
-				m.curClassId = (*m.curConnstats)[cursor].ClassId
+				curConnStat := (*m.curConnstats)[cursor]
+				m.curClassId = curConnStat.ClassId
 				m.chosenSub = true
+
+				// update sub table col name
+				cols := m.subStatTable.Columns()
+				metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
+				cType := analysis.GetClassfierType(m.options.SubClassfierType, m.options, curConnStat.SamplesMap[metric][0])
+				cols[1].Title = common.ClassfierTypeNames[cType]
+				m.subStatTable.SetColumns(cols)
 			} else {
 				m.chosenStat = true
 				metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
@@ -385,11 +425,12 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 						records = ((*m.curConnstats)[cursor].SamplesMap[metric])
 					}
 				}
-
-				m.sampleModel = watch.NewModel(watch.WatchOptions{
+				watchOpts := watch.WatchOptions{
 					WideOutput:   true,
 					StaticRecord: true,
-				}, &records, m.windownSizeMsg, metric, true)
+				}
+				watchOpts.Init()
+				m.sampleModel = watch.NewModel(watchOpts, &records, m.windownSizeMsg, metric, true)
 
 				return m, m.sampleModel.Init()
 			}
@@ -466,12 +507,13 @@ func (m *model) viewStatTable() string {
 			Bold(false).
 			Foreground(lipgloss.Color("#FFF7DB")).Background(lipgloss.Color(rc.ColorGrid(1, 5)[2][0]))
 
-		if len(curTable.Rows()) > 0 {
+		if m.options.EnableBatchModel() && m.timeLimitReached() {
 			s += fmt.Sprintf("\n %s \n\n", titleStyle.Render(" Colleted events are here! "))
 			s += rc.BaseTableStyle.Render(curTable.View()) + "\n  " + curTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
 		} else {
-			s += fmt.Sprintf("\n %s Collecting %d/%d\n\n %s\n\n", m.spinner.View(), m.options.CurrentReceivedSamples(), m.options.TargetSamples,
-				titleStyle.Render("Press `c` to display collected events"))
+			s += fmt.Sprintf("\n %s Collected %d events, %d seconds left\n\n %s\n\n", m.spinner.View(), m.options.CurrentReceivedSamples(),
+				int64(m.options.TimeLimit)-((time.Now().UnixMilli()-m.startTimeMills)/1000),
+				titleStyle.Render("Press `Ctrl+C` to display collected events"))
 		}
 	} else {
 		s = fmt.Sprintf("\n %s Events received: %d\n\n", m.spinner.View(), totalCount)
@@ -492,6 +534,7 @@ func (m *model) View() string {
 	}
 }
 func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, options common.AnalysisOptions) {
+	c.SetLogToFile()
 	m := NewModel(options).(*model)
 
 	prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen())

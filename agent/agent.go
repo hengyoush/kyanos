@@ -84,6 +84,8 @@ func SetupAgent(options ac.AgentOptions) {
 		return
 	}
 
+	bf.AttachProgs(options)
+
 	stop := false
 	go func() {
 		<-stopper

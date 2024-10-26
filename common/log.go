@@ -2,8 +2,10 @@ package common
 
 import (
 	"io"
+	"time"
 
 	"github.com/jefurry/logrus"
+	"github.com/jefurry/logrus/hooks/rotatelog"
 )
 
 type Klogger struct {
@@ -34,3 +36,20 @@ var ConntrackLog *Klogger = &Klogger{logrus.New()}
 var ProtocolParserLog *Klogger = &Klogger{logrus.New()}
 
 var Loggers []*Klogger = []*Klogger{DefaultLog, AgentLog, BPFLog, BPFEventLog, UprobeLog, ConntrackLog, ProtocolParserLog}
+
+func SetLogToFile() {
+	for _, l := range Loggers {
+		l.SetOut(io.Discard)
+		logdir := "/tmp"
+		if logdir != "" {
+			hook, err := rotatelog.NewHook(
+				logdir+"/kyanos.log.%Y%m%d",
+				rotatelog.WithMaxAge(time.Hour*24),
+				rotatelog.WithRotationTime(time.Hour),
+			)
+			if err == nil {
+				l.Hooks.Add(hook)
+			}
+		}
+	}
+}

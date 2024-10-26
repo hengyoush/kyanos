@@ -243,6 +243,7 @@ func HandleResultsetResponse(reqPacket *MysqlPacket, binaryResultset bool, multi
 			respView = respView[1:]
 			var row ResultsetRow = ResultsetRow{msg: rowPacket.msg}
 			results = append(results, row)
+			record.Resp.(*MysqlResponse).FrameBase.IncrByteSize(rowPacket.ByteSize())
 		} else if isLastPacket(rowPacket) {
 			break
 		} else {

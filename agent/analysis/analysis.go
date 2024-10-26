@@ -168,10 +168,10 @@ func (a *Analyzer) Run() {
 		case record := <-a.recordsChannel:
 			a.analyze(record)
 			a.recordReceived++
-			if a.EnableBatchModel() && a.recordReceived == a.TargetSamples {
-				a.resultChannel <- a.harvest()
-				return
-			}
+			// if a.EnableBatchModel() && a.recordReceived == a.TargetSamples {
+			// 	a.resultChannel <- a.harvest()
+			// 	return
+			// }
 		case <-a.AnalysisOptions.HavestSignal:
 			a.resultChannel <- a.harvest()
 			if a.AnalysisOptions.EnableBatchModel() {

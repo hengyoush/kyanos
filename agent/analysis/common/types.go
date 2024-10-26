@@ -20,10 +20,10 @@ type AnalysisOptions struct {
 	CleanWhenHarvest           bool
 
 	// Fast Inspect Options
+	TimeLimit              int
 	SlowMode               bool
 	BigRespMode            bool
 	BigReqMode             bool
-	TargetSamples          int
 	CurrentReceivedSamples func() int
 	HavestSignal           chan struct{}
 
@@ -247,6 +247,18 @@ type AnnotatedRecordToStringOptions struct {
 	MetricTypeSet
 	IncludeSyscallStat bool
 	IncludeConnDesc    bool
+}
+
+func (r *AnnotatedRecord) TimeDetailInfo() string {
+	return r.String(AnnotatedRecordToStringOptions{
+		IncludeConnDesc: false,
+		MetricTypeSet: MetricTypeSet{
+			TotalDuration:                true,
+			ReadFromSocketBufferDuration: true,
+			BlackBoxDuration:             true,
+		},
+		IncludeSyscallStat: true,
+	})
 }
 
 func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string {

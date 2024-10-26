@@ -45,6 +45,9 @@ function main() {
   bash testdata/test_docker_filter_by_pid.sh "$CMD"
   bash testdata/test_containerd_filter_by_container_id.sh "$CMD" "$DOCKER_REGISTRY"
   bash testdata/test_containerd_filter_by_container_name.sh "$CMD" "$DOCKER_REGISTRY"
+  bash testdata/test_redis.sh "$CMD" "$DOCKER_REGISTRY"
+  bash testdata/test_mysql.sh "$CMD" "$DOCKER_REGISTRY"
+  bash testdata/test_https.sh "$CMD"
   echo "success!"
 }
 

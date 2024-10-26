@@ -106,6 +106,19 @@ func getClassfier(classfierType anc.ClassfierType, options anc.AnalysisOptions) 
 	}
 }
 
+func GetClassfierType(classfierType anc.ClassfierType, options anc.AnalysisOptions, r *anc.AnnotatedRecord) anc.ClassfierType {
+	if classfierType == anc.ProtocolAdaptive {
+		c, ok := options.ProtocolSpecificClassfiers[bpf.AgentTrafficProtocolT(r.Protocol)]
+		if ok {
+			return c
+		} else {
+			return anc.RemoteIp
+		}
+	} else {
+		return classfierType
+	}
+}
+
 func getClassIdHumanReadableFunc(classfierType anc.ClassfierType, options anc.AnalysisOptions) (ClassIdAsHumanReadable, bool) {
 	if classfierType == anc.ProtocolAdaptive {
 		return func(ar *anc.AnnotatedRecord) string {
