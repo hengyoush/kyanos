@@ -268,7 +268,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 			return file, nil
 		}
 	} else {
-		common.AgentLog.Debug("find btf file exactly failed, try to find a lower version btf file...")
+		common.AgentLog.Warnf("find btf file exactly failed, try to find a lower version btf file...")
 	}
 
 	sortedBtfFileNames := btfFileNames.Keys()
@@ -294,7 +294,7 @@ func getBestMatchedBTFFile() ([]uint8, error) {
 			return file, nil
 		}
 	}
-	log.Fatalln("can't start kyanos because no available btf file, please refer this url:  for solutions.")
+	log.Fatalln("can't start kyanos because no available btf file, please refer this url: https://hengyoush.github.io/kyanos/quickstart.html for more info.")
 	return nil, errors.New("no btf file found to load")
 }
 
