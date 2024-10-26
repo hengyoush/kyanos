@@ -10,7 +10,6 @@ export default defineConfig({
     root: { label: 'English', lang: 'en' },
   },
   appearance: 'dark',
-  base: '/kyanos/',
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     logo: "/kyanos.png",
