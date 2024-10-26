@@ -424,11 +424,12 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 						records = ((*m.curConnstats)[cursor].SamplesMap[metric])
 					}
 				}
-
-				m.sampleModel = watch.NewModel(watch.WatchOptions{
+				watchOpts := watch.WatchOptions{
 					WideOutput:   true,
 					StaticRecord: true,
-				}, &records, m.windownSizeMsg, metric, true)
+				}
+				watchOpts.Init()
+				m.sampleModel = watch.NewModel(watchOpts, &records, m.windownSizeMsg, metric, true)
 
 				return m, m.sampleModel.Init()
 			}
