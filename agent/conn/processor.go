@@ -214,7 +214,7 @@ func (p *Processor) run() {
 				isProtocolInterested := conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset ||
 					conn.MessageFilter.FilterByProtocol(conn.Protocol)
 
-				if conn.tracable && isProtocolInterested {
+				if isProtocolInterested && !isSideNotMatched(p, conn) {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
 							common.ConntrackLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
@@ -229,7 +229,7 @@ func (p *Processor) run() {
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
 					conn.TempConnEvents = conn.TempConnEvents[0:0]
 				} else {
-					common.ConntrackLog.Debugf("%s discarded due to not interested", conn.ToString())
+					common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
 					conn.UpdateConnectionTraceable(false)
 					// conn.OnClose(true)
 				}
@@ -323,9 +323,11 @@ func (p *Processor) run() {
 		}
 	}
 }
-
+func isSideNotMatched(p *Processor, conn *Connection4) bool {
+	return (p.side != common.AllSide) && ((conn.Role == bpf.AgentEndpointRoleTKRoleClient) != (p.side == common.ClientSide))
+}
 func onRoleChanged(p *Processor, conn *Connection4) {
-	if (p.side != common.AllSide) && ((conn.Role == bpf.AgentEndpointRoleTKRoleClient) != (p.side == common.ClientSide)) {
+	if isSideNotMatched(p, conn) {
 		common.ConntrackLog.Debugf("[onRoleChanged] %s discarded due to not matched by side", conn.ToString())
 		conn.UpdateConnectionTraceable(false)
 	} else {

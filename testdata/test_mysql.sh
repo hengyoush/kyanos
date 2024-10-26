@@ -35,7 +35,7 @@ function test_mysql_server() {
     wait
 
     cat "${SERVER_LNAME}"
-    # docker rm -f $cid1 || true
+    docker rm -f $cid1 || true
     cat "${SERVER_LNAME}" | grep 'SELECT' | grep  'rows = 1'
     # check_time_detail_completed_with_last_lines "${LNAME}" 1
     # check_patterns_in_file_with_last_lines "${LNAME}" "Resultset rows = 1" 1
