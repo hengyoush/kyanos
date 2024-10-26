@@ -4,6 +4,7 @@ import (
 	"fmt"
 	anc "kyanos/agent/analysis/common"
 	"kyanos/bpf"
+	"kyanos/common"
 	"slices"
 	"strings"
 
@@ -54,7 +55,7 @@ var bigRespModel bool
 var bigReqModel bool
 var timeLimit int
 var duration int
-var SUPPORTED_METRICS_SHORT = []byte{'t', 'q', 'p', 'n', 's'}
+var SUPPORTED_METRICS_SHORT = []byte{'t', 'q', 'p', 'n', 's', 'i'}
 var SUPPORTED_METRICS = []string{"total-time", "reqsize", "respsize", "network-time", "internal-time", "socket-time"}
 
 func validateEnabledMetricsString() error {
@@ -77,8 +78,12 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 		options.EnabledMetricTypeSet[anc.RequestSize] = true
 	case "p", "respsize":
 		options.EnabledMetricTypeSet[anc.ResponseSize] = true
-	case "n", "network-time", "internal-time":
+	case "n", "network-time":
 		options.EnabledMetricTypeSet[anc.BlackBoxDuration] = true
+		options.Side = common.ClientSide
+	case "i", "internal-time":
+		options.EnabledMetricTypeSet[anc.BlackBoxDuration] = true
+		options.Side = common.ServerSide
 	case "s", "socket-time":
 		options.EnabledMetricTypeSet[anc.ReadFromSocketBufferDuration] = true
 	default:

@@ -535,6 +535,7 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 			}
 		}
 	} else {
+		c.SetLogToFile()
 		records := &[]*common.AnnotatedRecord{}
 		m := NewModel(options, records, tea.WindowSizeMsg{}, common.NoneType, false).(*model)
 		if !options.StaticRecord {

@@ -9,6 +9,7 @@ import (
 	rc "kyanos/agent/render/common"
 	"kyanos/agent/render/watch"
 	"kyanos/bpf"
+	c "kyanos/common"
 	"os"
 	"slices"
 	"strconv"
@@ -533,6 +534,7 @@ func (m *model) View() string {
 	}
 }
 func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, options common.AnalysisOptions) {
+	c.SetLogToFile()
 	m := NewModel(options).(*model)
 
 	prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen())
