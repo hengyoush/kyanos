@@ -54,12 +54,13 @@ var bigRespModel bool
 var bigReqModel bool
 var timeLimit int
 var duration int
-var SUPPORTED_METRICS = []byte{'t', 'q', 'p', 'n', 's'}
+var SUPPORTED_METRICS_SHORT = []byte{'t', 'q', 'p', 'n', 's'}
+var SUPPORTED_METRICS = []string{"total-time", "reqsize", "respsize", "network-time", "internal-time", "socket-time"}
 
 func validateEnabledMetricsString() error {
 	for _, m := range []byte(enabledMetricsString) {
-		if !slices.Contains(SUPPORTED_METRICS, m) {
-			return fmt.Errorf("invalid parameter: '-m %s', only support: %s", enabledMetricsString, SUPPORTED_METRICS)
+		if !slices.Contains(SUPPORTED_METRICS_SHORT, m) {
+			return fmt.Errorf("invalid parameter: '-m %s', only support: %s", enabledMetricsString, SUPPORTED_METRICS_SHORT)
 		}
 	}
 	return nil
@@ -69,19 +70,19 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 	options := anc.AnalysisOptions{
 		EnabledMetricTypeSet: make(anc.MetricTypeSet),
 	}
-	switch enabledMetricsString {
-	case "t":
+	switch strings.ToLower(enabledMetricsString) {
+	case "t", "total-time":
 		options.EnabledMetricTypeSet[anc.TotalDuration] = true
-	case "q":
+	case "q", "reqsize":
 		options.EnabledMetricTypeSet[anc.RequestSize] = true
-	case "p":
+	case "p", "respsize":
 		options.EnabledMetricTypeSet[anc.ResponseSize] = true
-	case "n":
+	case "n", "network-time", "internal-time":
 		options.EnabledMetricTypeSet[anc.BlackBoxDuration] = true
-	case "s":
+	case "s", "socket-time":
 		options.EnabledMetricTypeSet[anc.ReadFromSocketBufferDuration] = true
 	default:
-		logger.Fatalf("invalid parameter: '-m %s', only support: %s", enabledMetricsString, SUPPORTED_METRICS)
+		logger.Fatalf("invalid parameter: '-m %s', only support: `%s` and %s", enabledMetricsString, SUPPORTED_METRICS_SHORT, SUPPORTED_METRICS)
 	}
 
 	if sampleCount < 0 {
@@ -117,12 +118,12 @@ func createAnalysisOptions() (anc.AnalysisOptions, error) {
 	return options, nil
 }
 func init() {
-	statCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metrics", "m", "t", `Specify the statistical dimensions, including:
-	t:  total time taken for request response,
-	q:  request size,
-	p:  response size,
-	n:  network device latency,
-	s:  time spent reading from the socket buffer`)
+	statCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metric", "m", "t", `Specify the statistical dimensions, including:
+	t/total-time:  total time taken for request response,
+	q/reqsize:  request size,
+	p/respsize:  response size,
+	n/network-time:  network device latency,
+	s/socket-time:  time spent reading from the socket buffer`)
 	statCmd.PersistentFlags().IntVarP(&sampleCount, "samples-limit", "s", 0,
 		"Specify the number of samples to be attached for each result.\n"+
 			"By default, only a summary  is output.\n"+
