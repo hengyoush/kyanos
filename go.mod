@@ -12,7 +12,7 @@ require (
 	github.com/cilium/ebpf v0.16.0
 	github.com/containerd/containerd v1.7.23
 	github.com/containerd/containerd/api v1.7.19
-	github.com/containerd/errdefs v0.1.0
+	github.com/containerd/errdefs v0.3.0
 	github.com/containerd/typeurl/v2 v2.2.0
 	github.com/docker/docker v26.1.5+incompatible
 	github.com/emirpasic/gods v1.18.1
