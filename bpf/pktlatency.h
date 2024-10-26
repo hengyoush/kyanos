@@ -98,6 +98,7 @@ enum control_value_index_t {
   kEnableFilterByLocalPort,
   kEnableFilterByRemotePort,
   kEnableFilterByRemoteHost,
+  kSideFilter, // 0-all 1-server 2-client
   kNumControlValues,
 };
 

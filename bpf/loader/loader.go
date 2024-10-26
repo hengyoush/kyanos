@@ -390,6 +390,8 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 	var enabledLocalPortMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "EnabledLocalPortMap")
 	var filterPidMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap")
 
+	controlValues.Update(bpf.AgentControlValueIndexTKSideFilter, int64(options.TraceSide), ebpf.UpdateAny)
+
 	// if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
 	// 	common.AgentLog.Infoln("filter for pid: ", targetPid)
 	// 	controlValues.Update(bpf.AgentControlValueIndexTKTargetTGIDIndex, targetPid, ebpf.UpdateAny)

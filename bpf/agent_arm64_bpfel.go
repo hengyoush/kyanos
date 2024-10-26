@@ -86,7 +86,8 @@ const (
 	AgentControlValueIndexTKEnableFilterByLocalPort  AgentControlValueIndexT = 4
 	AgentControlValueIndexTKEnableFilterByRemotePort AgentControlValueIndexT = 5
 	AgentControlValueIndexTKEnableFilterByRemoteHost AgentControlValueIndexT = 6
-	AgentControlValueIndexTKNumControlValues         AgentControlValueIndexT = 7
+	AgentControlValueIndexTKSideFilter               AgentControlValueIndexT = 7
+	AgentControlValueIndexTKNumControlValues         AgentControlValueIndexT = 8
 )
 
 type AgentEndpointRoleT uint32

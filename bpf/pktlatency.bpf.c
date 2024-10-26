@@ -895,6 +895,16 @@ static __always_inline struct tcp_sock *get_socket_from_fd(int fd_num) {
 	return NULL;
 }
 static  __always_inline bool filter_conn_info(struct conn_info_t *conn_info) {
+	if (conn_info->role != kRoleUnknown) {
+		uint32_t idx = kSideFilter;
+		uint64_t* side_filter_p = bpf_map_lookup_elem(&control_values, &idx);
+		if (side_filter_p != NULL && *side_filter_p != 0) {
+			if ((*side_filter_p == 1) != (conn_info->role==kRoleServer)) {
+				return false;
+			}
+		}
+	}
+
 	uint16_t one = 1;
 	uint8_t* enable_local_port_filter = bpf_map_lookup_elem(&enabled_local_port_map, &one);
 	if (enable_local_port_filter != NULL) {

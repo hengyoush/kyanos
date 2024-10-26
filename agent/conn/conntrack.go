@@ -32,6 +32,9 @@ type Connection4 struct {
 
 	ssl bool
 
+	tracable      bool
+	onRoleChanged func()
+
 	TempKernEvents    []*bpf.AgentKernEvt
 	TempConnEvents    []*bpf.AgentConnEvtT
 	TempSyscallEvents []*bpf.SyscallEventData
@@ -245,6 +248,10 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 }
 
 func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
+	if c.tracable == traceable {
+		return
+	}
+	c.tracable = traceable
 	key, _ := c.extractSockKeys()
 	sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
 	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap, traceable)
@@ -390,6 +397,9 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 					c.Role = bpf.AgentEndpointRoleTKRoleServer
 				} else {
 					c.Role = bpf.AgentEndpointRoleTKRoleClient
+				}
+				if c.onRoleChanged != nil {
+					c.onRoleChanged()
 				}
 				common.ConntrackLog.Debugf("Update %s role", c.ToString())
 				c.resetParseProgress()
