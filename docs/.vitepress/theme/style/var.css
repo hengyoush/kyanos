@@ -1,0 +1,19 @@
+:root {
+    /* 标题 */
+    --vp-home-hero-name-color: transparent;
+    /* 渐变色 */
+    --vp-home-hero-name-background: linear-gradient(
+      135deg,
+      #76fddd 10%,
+      #bbe2fe 100%
+    );
+    /* 纯色 */
+    /* --vp-home-hero-name-background: red; */
+    --vp-home-hero-image-background-image: linear-gradient(
+        135deg,
+        #bbe2fe 10%,
+        #76fddd 100%
+    );
+    /* 设置模糊度 */
+    --vp-home-hero-image-filter: blur(150px);
+  }
