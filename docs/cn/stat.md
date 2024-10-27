@@ -49,6 +49,34 @@ m 是 metric的缩写，t 是 total-time 的缩写，g 是 group-by 的缩写。
 按下 `enter` 即可进入这个 `remote-ip` 下具体的请求响应，这里其实就是 watch 命令的结果，操作方式和 watch 完全相同，你可以选择具体的请求响应，然后查看其耗时和请求响应内容，这里不再赘述。
 
 
+
+## 目前支持的指标
+kyanos目前支持通过 `--metric` 指定的指标如下：
+
+| 观测指标            | short flag |long flag |
+| :-------------- | :--- |:--- |
+| 总耗时             | t    |total-time    |
+| 响应数据大小          | p    | respsize    |
+| 请求数据大小          | q    | reqsize    |
+| 在网络中的耗时         | n    | network-time    |
+| 在服务进程中的耗时         | i    | internal-time    |
+| 从Socket缓冲区读取的耗时 | s    |socket-time    |
+
+## 目前支持的聚合方式
+kyanos目前支持通过 `--group-by` 指定的指标如下：
+
+| 聚合维度          | 值 |
+| :-------------- | :--- |
+| 聚合到单个连接             |  conn   |
+| 远程ip          | remote-ip    |
+| 远程端口          | remote-port    |
+| 本地端口         | local-port    |
+| L7协议 | protocol    |
+| HTTP PATH | http-path    |
+| Redis命令 | redis-command    |
+| 聚合所有的请求响应 | none    |
+
+
 ## 这些选项记不住怎么办？
 如果你记不得这些选项，stat 同样提供了三个选项用于快速分析：
 
@@ -87,31 +115,3 @@ m 是 metric的缩写，t 是 total-time 的缩写，g 是 group-by 的缩写。
 ```bash
 ./kyanos stat http --bigresp
 ```
-
-
-## 目前支持的指标
-kyanos目前支持通过 `--metric` 指定的指标如下：
-
-| 观测指标            | short flag |long flag |
-| :-------------- | :--- |:--- |
-| 总耗时             | t    |total-time    |
-| 响应数据大小          | p    | respsize    |
-| 请求数据大小          | q    | reqsize    |
-| 在网络中的耗时         | n    | network-time    |
-| 在服务进程中的耗时         | i    | internal-time    |
-| 从Socket缓冲区读取的耗时 | s    |socket-time    |
-
-## 目前支持的聚合方式
-kyanos目前支持通过 `--group-by` 指定的指标如下：
-
-| 聚合维度          | 值 |
-| :-------------- | :--- |
-| 聚合到单个连接             |  conn   |
-| 远程ip          | remote-ip    |
-| 远程端口          | remote-port    |
-| 本地端口         | local-port    |
-| L7协议 | protocol    |
-| HTTP PATH | http-path    |
-| Redis命令 | redis-command    |
-| 聚合所有的请求响应 | none    |
-
