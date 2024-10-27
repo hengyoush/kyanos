@@ -260,7 +260,7 @@ func (p *Processor) run() {
 			if conn != nil && conn.Status == Closed {
 				continue
 			}
-			if !conn.tracable {
+			if conn != nil && !conn.tracable {
 				common.BPFEventLog.Debugf("[syscall][no-trace][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
 				continue
 			}
@@ -283,7 +283,7 @@ func (p *Processor) run() {
 			if conn != nil && conn.Status == Closed {
 				continue
 			}
-			if !conn.tracable {
+			if conn != nil && !conn.tracable {
 				common.BPFEventLog.Debugf("[ssl][no-trace][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
 				continue
 			}
