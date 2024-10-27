@@ -25,7 +25,7 @@ kyanos watch
 ```
 
  如果显示了下面的表格：
-![kyanos quick start success](quickstart-success.png)
+![kyanos quick start success](/quickstart-success.png)
 🎉 恭喜你，kyanos启动成功了。
 
 > [!TIP]

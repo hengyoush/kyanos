@@ -1,63 +1,69 @@
 ---
 next:
-  text: 'Watch 使用方法'
+  text: 'Watch Usage'
   link: './watch'
 prev: false
 ---
 
-# 5 分钟学会使用 kyanos
+# Learn Kyanos in 5 Minutes
 
-kyanos 共有三个子命令：watch、stat、overview。每个命令的作用如下：
-1. watch：根据你指定的条件抓取网络流量并自动解析为请求响应记录。
-2. stat：根据你指定的条件抓取请求响应记录并且聚合这些记录，得到更高维度的统计信息。
-3. overview：一键展示当前机器依赖的外部资源。
+Kyanos has three main subcommands: `watch`, `stat`, and `overview`. Here’s what each command does:
+1. **watch**: Captures network traffic according to specified options and automatically parses it into request-response records.
+2. **stat**: Gathers and aggregates request-response records based on specified conditions, providing higher-level statistical information.
+3. **overview**: Displays external resources that the current machine relies on in a single command.
 
-## `watch` 流量采集简单用法
+## Basic Usage of Traffic Capture with `watch`
 
-最简单的用法如下，抓取所有 kyanos 当前能够识别的协议
+The simplest usage captures all protocols currently supported by Kyanos:
 
 ```bash
 ./kyanos watch
 ```
-每个请求响应记录会记录在表格中的一行，每列记录这个请求的基本信息。你可以通过方向键或者j/k上下移动来选择记录：
+
+Each request-response record is stored as a row in a table, with each column capturing basic information about that request. You can use the arrow keys or `j/k` to move up and down through the records:
 ![kyanos watch result](/watch-result.jpg)  
 
-按下`enter`进入详情界面：
+Press `Enter` to access the details view:
 
 ![kyanos watch result detail](/watch-result-detail.jpg)  
 
-详情界面里第一部分是 **耗时详情**，每一个方块代表数据包经过的节点，比如这里有进程、网卡、Socket缓冲区等。  
-每个方块下面有一个耗时，这里的耗时指从上个节点到这个节点经过的时间。
-可以清楚的看到请求从进程发送到网卡，响应再从网卡复制到Socket缓冲区并且被进程读取的流程和每一个步骤的耗时。
+In the details view, the first section shows **Latency Details**. Each block represents a "node" that the data packet passes through, such as the process, network card, and socket buffer.  
+Each block includes a time value indicating the time elapsed from the previous node to this node, showing the process flow from the process sending the request to the network card, to the response being copied to the socket buffer, and finally read by the process, with each step’s duration displayed.
 
-第二部分是 **请求响应的具体内容**，分为 Request 和 Response 两部分，超过 1024 字节会截断展示。
+The second section provides **Detailed Request and Response Content**, split into Request and Response parts, and truncates content over 1024 bytes.
 
-
-抓取流量时一般会更有针对性，比如抓取HTTP流量：
+For targeted traffic capture, such as HTTP traffic:
 
 ```bash
 ./kyanos watch http
 ```
-更进一步，你可能只想抓取某个HTTP Path的流量：
+
+You can narrow it further to capture traffic for a specific HTTP path:
 
 ```bash
 ./kyanos watch http --path /abc 
 ```
-每种协议都具有不同的过滤条件，而且watch还可以根据很多其他条件过滤，详情参考：[如何抓取请求响应和耗时细节](./watch)
 
-## `stat` 聚合分析简单用法
+Each protocol has different filtering options, and `watch` supports various other filtering options. For more details, see: [How to Capture Request-Response and Latency Details](./watch)
 
-在真实场景中，watch 输出的结果过于细粒度，因此 kyanos 提供了 stat 命令用于 **统计分析**。
+## Basic Usage of Aggregated Analysis with `stat`
 
-简单来说 stat 可以用来回答这些问题：哪些连接的请求数最多？哪些远程服务端上的平均耗时最高？哪些客户端发送的请求带宽占比最高？
+In real-world scenarios, `watch` output is often too granular. Therefore, Kyanos offers the `stat` command for **statistical analysis**.
 
-现在让我们来尝试找到哪些远程服务端上的平均耗时最高，我们只需指定 `--slow` 选项代表我们关心的指标是耗时，和 watch 一样，stat 也可以使用所有的过滤条件，这里我们只收集 PATH=/abc 的 HTTP 请求 ：
+In short, `stat` can help answer questions like: Which connections have the highest request count? Which remote servers have the highest average latency? Which clients consume the most bandwidth?
+
+To identify remote servers with the highest average latency, simply use the `--slow` option to focus on latency. Like `watch`, `stat` can apply all filtering options. Here, we’ll collect only HTTP requests with `PATH=/abc`:
+
 ```bash
 ./kyanos stat http --slow --path /abc
 ```
-kyanos 默认会收集 10s（可以通过 `--time` 参数指定收集时间，当然，你也可以按下 `ctrl+c` 提前结束收集）：
+
+By default, Kyanos will collect data for 10 seconds (modifiable with the `--time` option, or press `ctrl+c` to stop early):
 ![kyanos stat slow result](/qs-stat-slow.jpg)  
-10s 结束后收集结果展示在表格里：
+
+After 10 seconds, the collected results are displayed in a table:
+
+
 ```js{6-8}
     Colleted events are here!        
 
@@ -75,13 +81,15 @@ kyanos 默认会收集 10s（可以通过 `--time` 参数指定收集时间，�
 
   1 sort by name • 2 sort by max • 3 sort by avg • 4 sort by p50 • 5 sort by p90 • 6 sort by p99 • 7 sort by count • 8 sort by total
 ```
-watch 展示的每一行是一次请求响应，而 stat 会按照某个维度聚合请求响应。
 
-在这个例子中没有指定，默认采用 **请求的服务端地址（remote-ip）** 作为聚合维度（第二列就是聚合维度列），相同远程服务 IP 的请求响应结果会聚合起来（当然不止这一种聚合方式，了解更多请参考：[流量分析](./stat)）。
+Each row in the `watch` output represents a single request-response, while `stat` aggregates request-responses by a specified dimension.
 
-后面的 `max` 列就是这些相同 remote-ip 的请求响应中的最大耗时，`avg` 就是平均耗时等等。所以如果某个远程服务端出现了异常，你可以很快的通过比对不同 remote-ip 的指标发现异常的服务端是 169.254.0.4。
+In this example, since no specific dimension was set, **the remote server address (remote-ip)** is used as the default aggregation dimension (displayed in the second column). This means that request-responses from the same remote IP are aggregated together (though this is just one way to aggregate; for more options, refer to [Traffic Analysis](./stat)).
 
-如果想查看这个 remote-ip 上的请求响应的详细信息，可以移动到这行记录上按下 `enter`，进入这个 remote-ip 上的请求响应列表中：
+The `max` column shows the maximum latency among the aggregated request-responses for each remote IP, while the `avg` column shows the average latency, and so on. If an issue arises with a remote server, you can quickly identify the problematic server by comparing metrics for different remote IPs, such as noticing an anomaly for IP `169.254.0.4`.
+
+To view detailed request-response information for a specific remote IP, move cursor to that row and press `Enter` to access the list of request-responses for that remote-ip:
+
 ```js
  Events Num: 3
 
@@ -95,16 +103,13 @@ watch 展示的每一行是一次请求响应，而 stat 会按照某个维度�
 └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
   ↑/k up • ↓/j down
 ```
-这里实际和 watch 命令展示的结果是相同的形式，每一行代表请求响应记录，之后你可以通过 `enter` 继续选择你感兴趣的一行记录，查看它的耗时细节和具体内容。
 
+The format of the display here is actually the same as that shown by the `watch` command—each row represents a request-response record. You can further explore each record by pressing `Enter` to view detailed latency and content information for the selected request.
 
 > [!TIP]
-> stat的功能十分强大，推荐你阅读：[如何聚合分析](./stat) 查看 stat 命令的其它用法。
+> The `stat` command offers powerful capabilities, so it’s highly recommended to explore other use cases in [How to Aggregate and Analyze](./stat).
 
-
-## 下一步
-了解每个命令的详细使用方法：
-- watch 命令请查看：[如何抓取请求响应和耗时细节](./watch)
-- stat 命令请查看：[如何聚合分析](./stat)
-
-
+## Next Steps
+To learn the details for each command:
+- For the `watch` command, see: [How to Capture Request-Response and Latency Details](./watch)
+- For the `stat` command, see: [How to Aggregate and Analyze](./stat)
