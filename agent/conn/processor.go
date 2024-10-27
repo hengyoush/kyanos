@@ -178,9 +178,6 @@ func (p *Processor) run() {
 					onRoleChanged(p, conn)
 				}
 				conn.StreamEvents = NewKernEventStream(conn, 300)
-				if !isSideNotMatched(p, conn) {
-					continue
-				}
 				// if p.side != common.AllSide && p.side != conn.Side() {
 				// 	// conn.OnClose(true)
 				// 	conn.UpdateConnectionTraceable(false)
