@@ -48,6 +48,7 @@ function main() {
   bash testdata/test_redis.sh "$CMD" "$DOCKER_REGISTRY"
   bash testdata/test_mysql.sh "$CMD" "$DOCKER_REGISTRY"
   bash testdata/test_https.sh "$CMD"
+  bash testdata/test_side.sh "$CMD" "$DOCKER_REGISTRY"
   echo "success!"
 }
 
