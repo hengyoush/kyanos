@@ -135,7 +135,7 @@ func (h HTTPStreamParser) ParseResponse(buf string, messageType MessageType, tim
 			}
 		}
 	} else {
-		_, err := io.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {
 				return ParseResult{
@@ -148,6 +148,13 @@ func (h HTTPStreamParser) ParseResponse(buf string, messageType MessageType, tim
 			}
 		}
 		readIndex := common.GetBufioReaderReadIndex(bufioReader)
+		if readIndex == 0 && len(respBody) > 0 {
+			readIndex = len(buf)
+		} else if readIndex == 0 {
+			return ParseResult{
+				ParseState: NeedsMoreData,
+			}
+		}
 		parseResult.ReadBytes = readIndex
 		parseResult.ParsedMessages = []ParsedMessage{
 			&ParsedHttpResponse{

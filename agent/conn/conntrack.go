@@ -391,7 +391,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		// parseState = parseResult.ParseState
 		switch parseResult.ParseState {
 		case protocol.Success:
-			common.ConntrackLog.Debugf("[parseStreamBuffer] Success, %s(%s)", c.ToString(), messageType.String())
+			// common.ConntrackLog.Debugf("[parseStreamBuffer] Success, %s(%s) read bytes: %d, headsize: %d", c.ToString(), messageType.String(), parseResult.ReadBytes, streamBuffer.Head().Len())
 			if c.Role == bpf.AgentEndpointRoleTKRoleUnknown && len(parseResult.ParsedMessages) > 0 {
 				parsedMessage := parseResult.ParsedMessages[0]
 				if (bpf.IsIngressStep(ke.Step) && parsedMessage.IsReq()) || (bpf.IsEgressStep(ke.Step) && !parsedMessage.IsReq()) {
@@ -444,6 +444,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 				common.ConntrackLog.Debugf("[parseStreamBuffer] Needs more data, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
 				stop = false
 			} else {
+				// common.ConntrackLog.Debugf("[parseStreamBuffer] Needs more data, %s stop processing %s queue, headsize: %d", c.ToString(), messageType.String(), streamBuffer.Head().Len())
 				stop = true
 			}
 		case protocol.Ignore:
