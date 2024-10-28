@@ -18,26 +18,14 @@ var statCmd = &cobra.Command{
 # Basic Usage, only count HTTP connections, print results when press 'ctlc+c' 
 sudo kyanos stat http
 
-# Print results 5 seconds periodically
-sudo kyanos stat http -i 5
-
 # Find the most slowly remote http server with '/example' api
-sudo kyanos stat http --metrics t --group-by remote-ip --side client --path /example
+sudo kyanos stat http --metrics tolal-time --group-by remote-ip --side client --path /example
 
-# Same as above but also prints 3 slowest samples with full body
-sudo kyanos stat http --metrics t --samples 3 --full-body ...
+# Same as above but shorter
+sudo kyanos stat http --slow --path /example
 
-# Specify two metrics total duration & request size
-sudo kyanos stat http --metrics tq --group-by remote-ip
-
-# Sort by p99 of total duration's  (default is 'avg')
-sudo kyanos stat http --metrics t --sort-by p99
-
-# Limit the number of output connection results to 1.
-sudo kyanos stat http --metrics t --limit 1
-
-# In addition to request-response time, also track request-response size.
-sudo kyanos stat http --metrics tqp 
+# find the the remote client which requests big keys
+sudo kyanos stat redis --bigresp
 	`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) { Mode = AnalysisMode },
 	Run: func(cmd *cobra.Command, args []string) {

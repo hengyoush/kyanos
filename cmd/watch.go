@@ -8,14 +8,14 @@ import (
 
 var maxRecords int
 var watchCmd = &cobra.Command{
-	Use: "watch [http|redis|mysql [flags]]",
+	Use: "watch [http|redis|mysql] [flags]",
 	Example: `
 sudo kyanos watch
 sudo kyanos watch http --side server --pid 1234 --path /foo/bar --host ubuntu.com
 sudo kyanos watch redis --comands GET,SET --keys foo,bar --key-prefix app1:
 sudo kyanos watch mysql --latency 100 --req-size 1024 --resp-size 2048
 	`,
-	Short:            "Watch the request/response pair and print body to the console",
+	Short:            "Capture the request/response recrods",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) { Mode = WatchMode },
 	Run: func(cmd *cobra.Command, args []string) {
 		list, err := cmd.Flags().GetBool("list")

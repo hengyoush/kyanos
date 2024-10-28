@@ -20,12 +20,12 @@ sudo kyanos overview
 var overview bool
 
 func init() {
-	overviewCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metrics", "m", "t", `Specify the statistical dimensions, including:
-	t:  total time taken for request response,
-	q:  request size,
-	p:  response size,
-	n:  network device latency,
-	s:  time spent reading from the socket buffer`)
+	overviewCmd.PersistentFlags().StringVarP(&enabledMetricsString, "metric", "m", "t", `Specify the statistical dimensions, including:
+	t/total-time:  total time taken for request response,
+	q/reqsize:  request size,
+	p/respsize:  response size,
+	n/network-time:  network device latency,
+	s/socket-time:  time spent reading from the socket buffer`)
 
 	overviewCmd.Flags().SortFlags = false
 	overviewCmd.PersistentFlags().SortFlags = false
