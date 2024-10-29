@@ -22,9 +22,9 @@ class KeepAliveHandler(http.server.SimpleHTTPRequestHandler):
 # 服务器地址和端口
 server_address = ('localhost', 4443)
 httpd = ThreadedHTTPServer(server_address, KeepAliveHandler)
-
-# 加载 SSL 证书
-httpd.socket = ssl.wrap_socket(httpd.socket, certfile='server.pem', server_side=True)
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.load_cert_chain(certfile='server.pem', keyfile='server.pem')
+httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
 print("HTTPS server running on https://localhost:4443 with keep-alive support")
 httpd.serve_forever()
