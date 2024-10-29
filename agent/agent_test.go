@@ -634,20 +634,20 @@ func TestSslEventsCanRelatedToKernEvents(t *testing.T) {
 	sslEvent := sslEvents[0]
 	conn := connManager.FindConnection4Exactly(sslEvent.SslEventHeader.Ke.ConnIdS.TgidFd)
 	se := conn.StreamEvents
-	sslOutEvents := se.FindAndRemoveSslEventsBySeqAndLen(bpf.AgentStepTSSL_OUT, 1, 1000)
+	sslOutEvents := se.FindSslEventsBySeqAndLen(bpf.AgentStepTSSL_OUT, 1, 1000)
 	assert.True(t, len(sslOutEvents) > 0)
-	sslInEvents := se.FindAndRemoveSslEventsBySeqAndLen(bpf.AgentStepTSSL_IN, 1, 10000)
+	sslInEvents := se.FindSslEventsBySeqAndLen(bpf.AgentStepTSSL_IN, 1, 10000)
 	assert.True(t, len(sslInEvents) > 0)
 
 	kernSeq := sslInEvents[0].KernSeq
 	kernLen := sslInEvents[0].KernLen
-	devinEvents := se.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_IN, kernSeq, kernLen)
+	devinEvents := se.FindEventsBySeqAndLen(bpf.AgentStepTDEV_IN, kernSeq, kernLen)
 	assert.True(t, len(devinEvents) > 0)
-	ipinEvents := se.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTIP_IN, kernSeq, kernLen)
+	ipinEvents := se.FindEventsBySeqAndLen(bpf.AgentStepTIP_IN, kernSeq, kernLen)
 	assert.True(t, len(ipinEvents) > 0)
-	usercopyEvents := se.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, kernSeq, kernLen)
+	usercopyEvents := se.FindEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, kernSeq, kernLen)
 	assert.True(t, len(usercopyEvents) > 0)
-	syscallInEvents := se.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, kernSeq, kernLen)
+	syscallInEvents := se.FindEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, kernSeq, kernLen)
 	assert.True(t, len(syscallInEvents) > 0)
 }
 

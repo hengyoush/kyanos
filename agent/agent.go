@@ -107,11 +107,6 @@ func SetupAgent(options ac.AgentOptions) {
 		analyzer := analysis.CreateAnalyzer(recordsChannel, &options.AnalysisOptions, resultChannel, renderStopper, options.Ctx)
 		go analyzer.Run()
 		stat.StartStatRender(ctx, resultChannel, options.AnalysisOptions)
-		// render := render.CreateRender(resultChannel, renderStopper, analyzer.AnalysisOptions)
-		// go render.Run()
-		// for !stop {
-		// 	time.Sleep(time.Second * 1)
-		// }
 	} else {
 		watch.RunWatchRender(ctx, recordsChannel, options.WatchOptions)
 	}
