@@ -229,7 +229,7 @@ func (p *Processor) run() {
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
 					conn.TempConnEvents = conn.TempConnEvents[0:0]
 				} else {
-					common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
+					common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideNotMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
 					conn.UpdateConnectionTraceable(false)
 					// conn.OnClose(true)
 				}
@@ -257,6 +257,10 @@ func (p *Processor) run() {
 			if conn != nil && conn.Status == Closed {
 				continue
 			}
+			if conn != nil && !conn.tracable {
+				common.BPFEventLog.Debugf("[syscall][no-trace][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+				continue
+			}
 			if conn != nil && conn.ProtocolInferred() {
 				common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
 
@@ -274,6 +278,10 @@ func (p *Processor) run() {
 			conn := p.connManager.FindConnection4Or(tgidFd, event.SslEventHeader.Ke.Ts+common.LaunchEpochTime)
 			event.SslEventHeader.Ke.Ts += common.LaunchEpochTime
 			if conn != nil && conn.Status == Closed {
+				continue
+			}
+			if conn != nil && !conn.tracable {
+				common.BPFEventLog.Debugf("[ssl][no-trace][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
 				continue
 			}
 			if conn != nil && conn.ProtocolInferred() {

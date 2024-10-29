@@ -15,7 +15,7 @@ hero:
       link: ./what-is-kyanos
     - theme: alt
       text: Quickstart
-      link: /quickstart
+      link: ./quickstart
     - theme: alt
       text: Star me at Github!
       link: https://github.com/hengyoush/kyanos
