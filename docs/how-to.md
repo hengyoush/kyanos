@@ -9,42 +9,42 @@ prev: false
 
 Kyanos has three main subcommands: `watch`, `stat`, and `overview`. Here’s what each command does:
 1. **watch**: Captures network traffic according to specified options and automatically parses it into request-response records.
-2. **stat**: Gathers and aggregates request-response records based on specified conditions, providing higher-level statistical information.
+2. **stat**: Aggregates request-response records based on specified conditions, providing higher-level statistical information.
 3. **overview**: Displays external resources that the current machine relies on in a single command.
 
 ## Basic Usage of Traffic Capture with `watch`
 
-The simplest usage captures all protocols currently supported by Kyanos:
+The simplest usage captures all protocols traffic currently supported by Kyanos:
 
 ```bash
 ./kyanos watch
 ```
 
-Each request-response record is stored as a row in a table, with each column capturing basic information about that request. You can use the arrow keys or `j/k` to move up and down through the records:
+Each request-response record is displayed as a row in a table. You can use the arrow keys or `j/k` to move up and down through the records:
 ![kyanos watch result](/watch-result.jpg)  
 
 Press `Enter` to access the details view:
 
 ![kyanos watch result detail](/watch-result-detail.jpg)  
 
-In the details view, the first section shows **Latency Details**. Each block represents a "node" that the data packet passes through, such as the process, network card, and socket buffer.  
-Each block includes a time value indicating the time elapsed from the previous node to this node, showing the process flow from the process sending the request to the network card, to the response being copied to the socket buffer, and finally read by the process, with each step’s duration displayed.
+In the details view, the first section is **Latency Details**. Each block represents a "node" that the data packet passes through, such as the process, network interface, and socket buffer.  
+Each block includes a time value indicating the time elapsed from the previous node to this node, showing the process flow from the process sending the request to the network interface, to the response being copied to the socket buffer, and finally read by the process, with each step’s duration displayed.
 
-The second section provides **Detailed Request and Response Content**, split into Request and Response parts, and truncates content over 1024 bytes.
+The second section provides **Detailed Request and Response Content**, split into Request and Response parts, and truncates content over `1024` bytes.
 
-For targeted traffic capture, such as HTTP traffic:
+For more precise traffic capture, such as HTTP traffic:
 
 ```bash
 ./kyanos watch http
 ```
 
-You can narrow it further to capture traffic for a specific HTTP path:
+You can narrow it down further to capture traffic for a specific HTTP path:
 
 ```bash
 ./kyanos watch http --path /abc 
 ```
 
-Each protocol has different filtering options, and `watch` supports various other filtering options. For more details, see: [How to Capture Request-Response and Latency Details](./watch)
+Each protocol has different filtering options. For more details, see: [How to Capture Request-Response and Latency Details](./watch)
 
 ## Basic Usage of Aggregated Analysis with `stat`
 
@@ -52,7 +52,7 @@ In real-world scenarios, `watch` output is often too granular. Therefore, Kyanos
 
 In short, `stat` can help answer questions like: Which connections have the highest request count? Which remote servers have the highest average latency? Which clients consume the most bandwidth?
 
-To identify remote servers with the highest average latency, simply use the `--slow` option to focus on latency. Like `watch`, `stat` can apply all filtering options. Here, we’ll collect only HTTP requests with `PATH=/abc`:
+For example, to find remote servers with the highest average latency, use the `--slow` option to focus on latency. Like `watch`, `stat` can apply all filtering options supported by `watch`. Here, we’ll collect only HTTP requests with `PATH=/abc`:
 
 ```bash
 ./kyanos stat http --slow --path /abc
@@ -86,7 +86,7 @@ Each row in the `watch` output represents a single request-response, while `stat
 
 In this example, since no specific dimension was set, **the remote server address (remote-ip)** is used as the default aggregation dimension (displayed in the second column). This means that request-responses from the same remote IP are aggregated together (though this is just one way to aggregate; for more options, refer to [Traffic Analysis](./stat)).
 
-The `max` column shows the maximum latency among the aggregated request-responses for each remote IP, while the `avg` column shows the average latency, and so on. If an issue arises with a remote server, you can quickly identify the problematic server by comparing metrics for different remote IPs, such as noticing an anomaly for IP `169.254.0.4`.
+Let's shift our focus to each column of the table: the `max` column shows the maximum latency among the aggregated request-responses for each remote IP, while the `avg` column shows the average latency, and so on. If an issue arises with a remote server, you can quickly identify the problematic server by comparing metrics for different remote IPs, such as noticing an anomaly for IP `169.254.0.4`. 
 
 To view detailed request-response information for a specific remote IP, move cursor to that row and press `Enter` to access the list of request-responses for that remote-ip:
 

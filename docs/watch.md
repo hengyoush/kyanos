@@ -9,10 +9,10 @@ next:
 
 # Capturing Request-Response and Latency Details
 
-Using the `watch` command, you can collect specific request-response traffic, allowing you to:
+Using the `watch` command, you can collect specific network traffic and parse them into request-response pairs, allowing you to:
 
 - View detailed request-response content.
-- Observe latency details, including key timestamps for when a request reaches the network card, when a response reaches the network card, when it arrives at the Socket buffer, and when the application process reads the response.
+- Observe latency details, including key timestamps for when a request reaches the network interface, when a response reaches the network interface, when it arrives at the Socket buffer, and when the application process reads the response.
 
 Let's start with a basic example:
 
@@ -29,7 +29,7 @@ Each column represents:
 
 | Column Name       | Description                                                                                                 | Example                               |
 |-------------------|-------------------------------------------------------------------------------------------------------------|---------------------------------------|
-| id                | Sequence number                                                                                             |                                       |
+| id                | Table's Sequence number                                                                                             |                                       |
 | Connection        | The connection for this request-response                                                                    | "10.0.4.9:44526 => 169.254.0.4:80"   |
 | Proto             | Protocol used for the request-response                                                                      | "HTTP"                                |
 | TotalTime         | Total time for this request-response, in milliseconds                                                       |                                       |
@@ -48,9 +48,10 @@ Each block displays the time taken between these points, allowing you to trace t
 The second section contains the **request and response content**, split into Request and Response parts. Content exceeding 1024 bytes is truncated, but you can adjust this limit using the `--max-print-bytes` option.
 
 
-## How to Discover Requests and Responses of Interest {#how-to-filter}
+## How to Filter Requests and Responses ? {#how-to-filter}
 
-By default, `kyanos` captures all request-responses for the protocols it currently supports. However, in many scenarios, you might need to filter more precisely. For example, you may want to focus on requests sent to a specific remote port, those related to a certain process or container, or queries tied to specific Redis commands or HTTP paths. Below are the ways to use `kyanos` options to find the request-responses you're interested in.
+By default, `kyanos` captures all traffic for the protocols it currently supports. However, in many scenarios, you might need to filter more precisely. For example, you may want to focus on requests sent to a specific remote port, or related to a certain process or container, or queries tied to specific Redis commands or HTTP paths.   
+Below are the ways to use `kyanos` options to filter request-responses you're interested in.
 
 ### Filtering by IP and Port
 
@@ -84,7 +85,7 @@ It's worth mentioning that `kyanos` also displays latency between the container 
 
 ### Filtering by Protocol-Specific Information
 
-You can choose to capture only request-responses for a specific protocol by adding the protocol name after the `watch` command. The currently supported protocols are:
+You can choose to capture only request-responses for a specific protocol by adding the protocol name as subcommand. The currently supported protocols are:
 
 - `http`
 - `redis`
