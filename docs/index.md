@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "Kyanos"
   text: "A Simple & Powerful Network Tracing Tool"
-  tagline: Analyze and locate network problems in seconds
+  tagline: Provides real-time, packet-level to protocol-level visibility into a host's internal network
   image:
     src: /kyanos.png
     alt: Kyanos

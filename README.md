@@ -20,6 +20,7 @@
 - [Examples](#-examples)
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
+- [Documentation](#-documentation)
 - [Usage](#-usage)
 - [Feedback and Contributions](#-feedback-and-contributions)
 - [Contacts](#%EF%B8%8F-contacts)
@@ -110,7 +111,11 @@ If the following table appears:
 ![kyanos quick start success](docs/public/quickstart-success.png)
 🎉 Congratulations! Kyanos has started successfully.
 
-## 📝 Usage
+## 📝 Documentation
+
+[English Document](https://kyanos.pages.dev/)
+
+## ⚙ Usage
 
 The simplest usage captures all protocols currently supported by Kyanos:
 

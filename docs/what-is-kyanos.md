@@ -7,8 +7,7 @@ prev: false
 
 # What is kyanos ？{#what-is-kyanos}
 
-Kyanos is an **eBPF-based** network issue analysis tool that enables you to capture network requests, such as HTTP, Redis, and MySQL requests.   
-It also helps you analyze abnormal network issues and quickly troubleshooting without the complex steps of packet capturing, downloading, and analysis. It is also highly compatible, allowing you to start analyzing with a single command in most cases without any dependencies.
+Kyanos is a Network Traffic Analyzer that provides real-time, packet-level to protocol-level visibility into a host's internal network, capturing and analyzing all inbound and outbound traffic.
 
 ## Why Should You Use Kyanos?
 
@@ -16,11 +15,11 @@ It also helps you analyze abnormal network issues and quickly troubleshooting wi
 
 ### Drawbacks of Traditional Packet Capture with tcpdump
 
-1. Difficulty filtering based on protocol-specific information. For example, in the case of the HTTP protocol, it's challenging to capture packets based on a specific HTTP path, requiring tools like Wireshark/tshark for secondary filtering.
-2. Difficulty filtering packets based on the sending or receiving process/container, especially when multiple processes or containers are deployed on a single machine and you only need to capture packets for a specific  process/container.
-3. Low troubleshooting efficiency. The typical troubleshooting process involves using tcpdump in the production environment to capture packets and generate a pcap file, then downloading it locally for analysis with tools like Wireshark/tshark, often consuming a significant amount of time.
-4. Limited analysis capabilities. Tcpdump only provides basic packet capture capabilities with minimal advanced analysis, requiring pairing with Wireshark. Traditional network monitoring tools like iftop and netstat offer only coarse-grained monitoring, making it challenging to identify root causes.
-5. Encrypted traffic, such as SSL protocol requests, cannot be viewed in plain text.
+1. **Difficulty filtering based on protocol-specific information**: For example, in the case of the HTTP protocol, it's challenging to capture packets based on a specific HTTP path, requiring tools like Wireshark/tshark for secondary filtering.
+2. **Difficulty filtering packets based on the sending or receiving process/container**: especially when multiple processes or containers are deployed on a single machine and you only need to capture packets for a specific  process/container.
+3. **Low troubleshooting efficiency**: The typical troubleshooting process involves using tcpdump in the production environment to capture packets and generate a pcap file, then downloading it locally for analysis with tools like Wireshark/tshark, often consuming a significant amount of time.
+4. **Limited analysis capabilities**: Tcpdump only provides basic packet capture capabilities with minimal advanced analysis, requiring pairing with Wireshark. Traditional network monitoring tools like iftop and netstat offer only coarse-grained monitoring, making it challenging to identify root causes.
+5. **Lacking the functionality to analyze encrypted traffic**: such as SSL protocol requests, cannot be viewed in plain text.
 
 ### What Kyanos Can Offer You
 
