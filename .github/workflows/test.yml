@@ -167,7 +167,7 @@ jobs:
             uname -a
             cat /etc/issue
             pushd /host
-            bash /host/testdata/test_k8s.sh "" 1
+            bash /host/testdata/run_k8s_test.sh "" 1
             popd
             
       - name: Test https
