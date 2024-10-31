@@ -23,7 +23,8 @@ function test() {
     kubectl apply -f "${NEW_TEST_YAML}" 
     kubectl wait --for condition=Ready pod/test-kyanos
     kubectl wait --for condition=Ready=False --timeout=20s pod/test-kyanos
-    timeout 20 sudo ${CMD} watch --debug-output http --pod-name test-kyanos  2>&1 | tee "${LNAME}" &
+    chmod a+x /kyanos
+    timeout 20 ${CMD} watch --debug-output http --pod-name test-kyanos  2>&1 | tee "${LNAME}" &
     wait
 
     cat "${LNAME}"
