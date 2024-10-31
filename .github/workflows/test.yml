@@ -156,6 +156,35 @@ jobs:
             sudo apt install -y python3 python3-pip pipx
 
       
+            
+      - name: Test k8s
+        if: ${{ startsWith(matrix.kernel, '6.') }}
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            pushd /host
+            bash /host/testdata/test_k8s.sh "" 1
+            popd
+            
+      - name: Test https
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            pushd /host
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
+                bash /host/testdata/test_https.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else  
+                bash /host/testdata/test_https.sh '/host/kyanos/kyanos $kyanos_log_option'
+            fi
+            popd
       
       - name: Test side
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
@@ -186,22 +215,6 @@ jobs:
                 bash /host/testdata/test_mysql.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
             else  
                 bash /host/testdata/test_mysql.sh '/host/kyanos/kyanos $kyanos_log_option'
-            fi
-            popd
-            
-      - name: Test https
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
-        with:
-          provision: 'false'
-          cmd: |
-            set -ex
-            uname -a
-            cat /etc/issue
-            pushd /host
-            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-                bash /host/testdata/test_https.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
-            else  
-                bash /host/testdata/test_https.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
             popd
 
