@@ -57,6 +57,39 @@ type Connection4 struct {
 
 	prevConn []*Connection4
 }
+
+func NewConnFromEvent(event *bpf.AgentConnEvtT, p *Processor) *Connection4 {
+	TgidFd := uint64(event.ConnInfo.ConnId.Upid.Pid)<<32 | uint64(event.ConnInfo.ConnId.Fd)
+	isIpv6 := event.ConnInfo.Laddr.In6.Sin6Family == common.AF_INET6
+	conn := &Connection4{
+		LocalIp: common.BytesToNetIP(event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:], isIpv6),
+		// LocalIp:    common.IntToBytes(event.ConnInfo.Laddr.In4.SinAddr.S_addr),
+		RemoteIp: common.BytesToNetIP(event.ConnInfo.Raddr.In6.Sin6Addr.In6U.U6Addr8[:], isIpv6),
+		// RemoteIp:   common.IntToBytes(event.ConnInfo.Raddr.In4.SinAddr.S_addr),
+		LocalPort:  common.Port(event.ConnInfo.Laddr.In6.Sin6Port),
+		RemotePort: common.Port(event.ConnInfo.Raddr.In6.Sin6Port),
+		Protocol:   event.ConnInfo.Protocol,
+		Role:       event.ConnInfo.Role,
+		TgidFd:     TgidFd,
+		Status:     Connected,
+		tracable:   true,
+
+		MessageFilter: p.messageFilter,
+		LatencyFilter: p.latencyFilter,
+		SizeFilter:    p.SizeFilter,
+
+		reqStreamBuffer:  buffer.New(1024 * 1024),
+		respStreamBuffer: buffer.New(1024 * 1024),
+		ReqQueue:         make([]protocol.ParsedMessage, 0),
+		RespQueue:        make([]protocol.ParsedMessage, 0),
+
+		prevConn: []*Connection4{},
+
+		protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),
+	}
+	return conn
+}
+
 type ConnStatus uint8
 
 type TCPHandshakeStatus struct {

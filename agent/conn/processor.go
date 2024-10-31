@@ -3,12 +3,13 @@ package conn
 import (
 	"context"
 	"fmt"
-	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
 	"kyanos/common"
 	"sync"
 	"time"
+
+	"github.com/jefurry/logrus"
 )
 
 type ProcessorManager struct {
@@ -148,32 +149,7 @@ func (p *Processor) run() {
 				common.ConntrackLog.Debugf("ipv6: %x", event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:])
 			}
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
-				conn = &Connection4{
-					LocalIp: common.BytesToNetIP(event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:], isIpv6),
-					// LocalIp:    common.IntToBytes(event.ConnInfo.Laddr.In4.SinAddr.S_addr),
-					RemoteIp: common.BytesToNetIP(event.ConnInfo.Raddr.In6.Sin6Addr.In6U.U6Addr8[:], isIpv6),
-					// RemoteIp:   common.IntToBytes(event.ConnInfo.Raddr.In4.SinAddr.S_addr),
-					LocalPort:  common.Port(event.ConnInfo.Laddr.In6.Sin6Port),
-					RemotePort: common.Port(event.ConnInfo.Raddr.In6.Sin6Port),
-					Protocol:   event.ConnInfo.Protocol,
-					Role:       event.ConnInfo.Role,
-					TgidFd:     TgidFd,
-					Status:     Connected,
-					tracable:   true,
-
-					MessageFilter: p.messageFilter,
-					LatencyFilter: p.latencyFilter,
-					SizeFilter:    p.SizeFilter,
-
-					reqStreamBuffer:  buffer.New(1024 * 1024),
-					respStreamBuffer: buffer.New(1024 * 1024),
-					ReqQueue:         make([]protocol.ParsedMessage, 0),
-					RespQueue:        make([]protocol.ParsedMessage, 0),
-
-					prevConn: []*Connection4{},
-
-					protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),
-				}
+				conn = NewConnFromEvent(event, p)
 				conn.onRoleChanged = func() {
 					onRoleChanged(p, conn)
 				}
@@ -203,6 +179,10 @@ func (p *Processor) run() {
 				if conn != nil && conn.Status != Closed {
 					conn.Protocol = event.ConnInfo.Protocol
 				} else {
+					if common.ConntrackLog.Level == logrus.DebugLevel {
+						missedConn := NewConnFromEvent(event, p)
+						common.ConntrackLog.Debugf("[no conn][%s]no conn found for infer event", missedConn.ToString())
+					}
 					continue
 				}
 
