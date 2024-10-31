@@ -33,3 +33,4 @@ sudo docker cp /host/kyanos/kyanos kind-control-plane:/
 sudo docker cp ./testdata/test_k8s.yaml kind-control-plane:/
 sudo docker cp ./testdata/test_k8s.sh kind-control-plane:/
 sudo docker exec kind-control-plane sh -c  'bash /test_k8s.sh /kyanos /test_k8s.yaml '$DOCKER_REGISTRY
+kind delete cluster || true
