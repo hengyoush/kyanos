@@ -29,7 +29,7 @@ kind create cluster --image $DOCKER_REGISTRY'kindest/node:v1.27.3' || true
 docker pull $DOCKER_REGISTRY'alpine:3.18' || true
 kind load docker-image $DOCKER_REGISTRY'alpine:3.18' || true
 # 启动测试脚本
-sudo docker cp ./kyanos kind-control-plane:/
+sudo docker cp /host/kyanos/kyanos kind-control-plane:/
 sudo docker cp ./testdata/test_k8s.yaml kind-control-plane:/
 sudo docker cp ./testdata/test_k8s.sh kind-control-plane:/
 sudo docker exec kind-control-plane sh -c  'bash /test_k8s.sh /kyanos /test_k8s.yaml '$DOCKER_REGISTRY
