@@ -517,7 +517,12 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 		}
 	}
 
-	for _, functions := range kernelVersion.InstrumentFunctions {
+	nonCriticalSteps := getNonCriticalSteps()
+	for step, functions := range kernelVersion.InstrumentFunctions {
+		_, isNonCriticalStep := nonCriticalSteps[step]
+		if options.PerformanceMode && isNonCriticalStep {
+			continue
+		}
 		for idx, function := range functions {
 			var err error
 			var l link.Link
@@ -533,7 +538,11 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 			}
 			if err != nil {
 				if idx == len(functions)-1 {
-					common.AgentLog.Fatalf("Attach failed: %v, functions: %v", err, functions)
+					if isNonCriticalStep {
+						common.AgentLog.Debugf("Attach failed: %v, functions: %v skip it because it's a non-criticalstep", err, functions)
+					} else {
+						common.AgentLog.Fatalf("Attach failed: %v, functions: %v", err, functions)
+					}
 				} else {
 					common.AgentLog.Debugf("Attach failed but has fallback: %v, functions: %v", err, functions)
 				}
@@ -645,5 +654,13 @@ func attachNfFunctions(links *list.List) {
 		common.AgentLog.Warnf("Attahc kprobe/nf_nat_packet failed: %v", err)
 	} else {
 		links.PushBack(l)
+	}
+}
+
+func getNonCriticalSteps() map[bpf.AgentStepT]bool {
+	return map[bpf.AgentStepT]bool{
+		bpf.AgentStepTIP_OUT:    true,
+		bpf.AgentStepTQDISC_OUT: true,
+		bpf.AgentStepTIP_IN:     true,
 	}
 }

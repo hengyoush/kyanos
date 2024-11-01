@@ -47,6 +47,7 @@ type AgentOptions struct {
 	PerfEventBufferSizeForEvent int
 	DisableOpensslUprobe        bool
 	WatchOptions                watch.WatchOptions
+	PerformanceMode             bool
 
 	DockerEndpoint     string
 	ContainerdEndpoint string
