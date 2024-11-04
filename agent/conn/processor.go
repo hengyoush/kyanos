@@ -8,8 +8,6 @@ import (
 	"kyanos/common"
 	"sync"
 	"time"
-
-	"github.com/jefurry/logrus"
 )
 
 type ProcessorManager struct {
@@ -150,17 +148,12 @@ func (p *Processor) run() {
 			}
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
 				conn = NewConnFromEvent(event, p)
-				conn.onRoleChanged = func() {
-					onRoleChanged(p, conn)
-				}
-				conn.StreamEvents = NewKernEventStream(conn, 300)
+				p.connManager.AddConnection4(TgidFd, conn)
 				// if p.side != common.AllSide && p.side != conn.Side() {
 				// 	// conn.OnClose(true)
 				// 	conn.UpdateConnectionTraceable(false)
 				// 	continue
 				// }
-				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
-				p.connManager.AddConnection4(TgidFd, conn)
 			} else if event.ConnType == bpf.AgentConnTypeTKClose {
 				conn = p.connManager.FindConnection4Exactly(TgidFd)
 				if conn == nil {
@@ -179,11 +172,13 @@ func (p *Processor) run() {
 				if conn != nil && conn.Status != Closed {
 					conn.Protocol = event.ConnInfo.Protocol
 				} else {
-					if common.ConntrackLog.Level == logrus.DebugLevel {
+					if conn == nil {
 						missedConn := NewConnFromEvent(event, p)
 						common.ConntrackLog.Debugf("[no conn][%s]no conn found for infer event", missedConn.ToString())
+						p.connManager.AddConnection4(TgidFd, missedConn)
+					} else {
+						continue
 					}
-					continue
 				}
 
 				if conn.Role == bpf.AgentEndpointRoleTKRoleUnknown && event.ConnInfo.Role != bpf.AgentEndpointRoleTKRoleUnknown {

@@ -87,6 +87,11 @@ func NewConnFromEvent(event *bpf.AgentConnEvtT, p *Processor) *Connection4 {
 
 		protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),
 	}
+	conn.onRoleChanged = func() {
+		onRoleChanged(p, conn)
+	}
+	conn.StreamEvents = NewKernEventStream(conn, 300)
+	conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
 	return conn
 }
 
