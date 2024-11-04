@@ -242,7 +242,7 @@ func (p *Processor) run() {
 				continue
 			}
 			if conn != nil && conn.ProtocolInferred() {
-				common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
 
 				conn.OnSyscallEvent(event.Buf, event, recordChannel)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {

@@ -296,6 +296,8 @@ type AgentMapSpecs struct {
 	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
+	GoCommonSymaddrsMap   *ebpf.MapSpec `ebpf:"go_common_symaddrs_map"`
+	GoSslUserSpaceCallMap *ebpf.MapSpec `ebpf:"go_ssl_user_space_call_map"`
 	KernEvtT_map          *ebpf.MapSpec `ebpf:"kern_evt_t_map"`
 	NatFlowMap            *ebpf.MapSpec `ebpf:"nat_flow_map"`
 	ProcExecEvents        *ebpf.MapSpec `ebpf:"proc_exec_events"`
@@ -348,6 +350,8 @@ type AgentMaps struct {
 	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
+	GoCommonSymaddrsMap   *ebpf.Map `ebpf:"go_common_symaddrs_map"`
+	GoSslUserSpaceCallMap *ebpf.Map `ebpf:"go_ssl_user_space_call_map"`
 	KernEvtT_map          *ebpf.Map `ebpf:"kern_evt_t_map"`
 	NatFlowMap            *ebpf.Map `ebpf:"nat_flow_map"`
 	ProcExecEvents        *ebpf.Map `ebpf:"proc_exec_events"`
@@ -383,6 +387,8 @@ func (m *AgentMaps) Close() error {
 		m.FilterNetnsMap,
 		m.FilterPidMap,
 		m.FilterPidnsMap,
+		m.GoCommonSymaddrsMap,
+		m.GoSslUserSpaceCallMap,
 		m.KernEvtT_map,
 		m.NatFlowMap,
 		m.ProcExecEvents,

@@ -596,16 +596,21 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 
 func attachOpenSslUprobes(links *list.List, options ac.AgentOptions, kernelVersion *compatible.KernelVersion, objs any) {
 	if attachOpensslToSpecificProcess() {
-		uprobeLinks, err := uprobe.AttachSslUprobe(int(viper.GetInt64(common.FilterPidVarName)))
+		sslUprobeLinks, err := uprobe.AttachSslUprobe(int(viper.GetInt64(common.FilterPidVarName)))
 		if err == nil {
-			for _, l := range uprobeLinks {
+			for _, l := range sslUprobeLinks {
 				links.PushBack(l)
 			}
 		} else {
 			common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, viper.GetInt64(common.FilterPidVarName))
 		}
+
 	} else {
 		pids, err := common.GetAllPids()
+		loadGoTlsErr := uprobe.LoadGoTlsUprobe()
+		if loadGoTlsErr != nil {
+			common.AgentLog.Warnf("Load GoTls Probe failed: %+v", loadGoTlsErr)
+		}
 		if err == nil {
 			for _, pid := range pids {
 				uprobeLinks, err := uprobe.AttachSslUprobe(int(pid))
@@ -618,6 +623,20 @@ func attachOpenSslUprobes(links *list.List, options ac.AgentOptions, kernelVersi
 					common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
 				} else if len(uprobeLinks) == 0 {
 					common.AgentLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
+				}
+				if loadGoTlsErr == nil {
+					gotlsUprobeLinks, err := uprobe.AttachGoTlsProbes(int(pid))
+
+					if err == nil && len(gotlsUprobeLinks) > 0 {
+						for _, l := range gotlsUprobeLinks {
+							links.PushBack(l)
+						}
+						common.AgentLog.Infof("Attach GoTls uprobes success for pid: %d", pid)
+					} else if err != nil {
+						common.AgentLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d", err, pid)
+					} else {
+						common.AgentLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d links is empty %v", err, pid, gotlsUprobeLinks)
+					}
 				}
 			}
 		} else {
