@@ -51,10 +51,25 @@ struct {
 	__uint(map_flags, 0);
 } go_ssl_user_space_call_map SEC(".maps");
 
+#if defined(ARCH_amd64)
+struct thread_struct___v46 {
+	/* Cached TLS descriptors: */
+	struct desc_struct	tls_array[3];
+	unsigned long		sp0;
+	unsigned long		sp;
+	unsigned long		usersp;	/* Copy from PDA */
+	unsigned short		es;
+	unsigned short		ds;
+	unsigned short		fsindex;
+	unsigned short		gsindex;
+	unsigned long		fs;
+};
+#endif
 // Gets the ID of the go routine currently scheduled on the current tgid and pid.
 // We do that by accessing the thread local storage (fsbase) of the current pid from the
 // task_struct. From the tls, we find a pointer to the g struct and access the goid.
 static inline uint64_t get_goid(struct pt_regs* ctx) {
+  // return 0;
   uint64_t id = bpf_get_current_pid_tgid();
   uint32_t tgid = id >> 32;
   struct go_common_symaddrs_t* common_symaddrs = bpf_map_lookup_elem(&go_common_symaddrs_map, &tgid);
@@ -67,10 +82,15 @@ static inline uint64_t get_goid(struct pt_regs* ctx) {
   if (!task_ptr) {
     return 0;
   }
-#ifdef ARCH_amd64
-  const void* fs_base = (void*)_C(task_ptr,thread.fsbase);
+  int offsetof_thread = bpf_core_field_offset(task_ptr->thread);
+  struct thread_struct *thr = (void*)task_ptr + offsetof_thread;
+
+#if defined(LAGACY_KERNEL_310) && defined(ARCH_amd64)
+  const void* fs_base = (void*)BPF_CORE_READ((struct thread_struct___v46 *)thr, fs);
+#elif defined(ARCH_amd64)
+  const void* fs_base = (void*)_C(thr,fsbase);
 #elif defined(ARCH_arm64)
-  const void* fs_base = (void*)_C(task_ptr,thread.uw.tp_value);
+  const void* fs_base = (void*)_C(thr,uw.tp_value);
 #else
 #error Target architecture not supported
 #endif

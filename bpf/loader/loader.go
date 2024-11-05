@@ -53,6 +53,40 @@ func (b *BPF) Close() {
 	common.AgentLog.Debugln("All links closed!")
 }
 
+func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
+	if bpf.IsKernelSupportHasBTF() {
+		return nil
+	}
+
+	var spec *btf.Spec
+	if options.BTFFilePath != "" {
+		btfPath, err := btf.LoadSpec(options.BTFFilePath)
+		if err != nil {
+			common.AgentLog.Fatalf("can't load btf spec: %v", err)
+		}
+		spec = btfPath
+	} else {
+		fileBytes, err := getBestMatchedBTFFile()
+		if err != nil {
+			common.AgentLog.Fatalln(err)
+		}
+		needGenerateBTF := fileBytes != nil
+		if needGenerateBTF {
+			btfFilePath, err := writeToFile(fileBytes, ".kyanos.btf")
+			if err != nil {
+				common.AgentLog.Fatalln(err)
+			}
+			defer os.Remove(btfFilePath)
+			btfPath, err := btf.LoadSpec(btfFilePath)
+			if err != nil {
+				common.AgentLog.Fatalf("can't load btf spec: %v (embedded in kyanos)", err)
+			}
+			spec = btfPath
+		}
+	}
+	return spec
+}
+
 func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	var objs *bpf.AgentObjects
 	var spec *ebpf.CollectionSpec
@@ -64,48 +98,10 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 		common.AgentLog.Fatalf("Require oldest kernel version is 3.10.0-957, pls check your kernel version by `uname -r`")
 	}
 
-	if options.BTFFilePath != "" {
-		btfPath, err := btf.LoadSpec(options.BTFFilePath)
-		if err != nil {
-			common.AgentLog.Fatalf("can't load btf spec: %v", err)
-		}
-		collectionOptions = &ebpf.CollectionOptions{
-			Programs: ebpf.ProgramOptions{
-				KernelTypes: btfPath,
-				LogSize:     options.BPFVerifyLogSize,
-			},
-		}
-	} else {
-		fileBytes, err := getBestMatchedBTFFile()
-		if err != nil {
-			common.AgentLog.Fatalln(err)
-		}
-		needGenerateBTF := fileBytes != nil
-
-		if needGenerateBTF {
-			btfFilePath, err := writeToFile(fileBytes, ".kyanos.btf")
-			if err != nil {
-				common.AgentLog.Fatalln(err)
-			}
-			defer os.Remove(btfFilePath)
-
-			btfPath, err := btf.LoadSpec(btfFilePath)
-			if err != nil {
-				common.AgentLog.Fatalf("can't load btf spec: %v", err)
-			}
-			collectionOptions = &ebpf.CollectionOptions{
-				Programs: ebpf.ProgramOptions{
-					KernelTypes: btfPath,
-					LogSize:     options.BPFVerifyLogSize,
-				},
-			}
-		} else {
-			collectionOptions = &ebpf.CollectionOptions{
-				Programs: ebpf.ProgramOptions{
-					LogSize: options.BPFVerifyLogSize,
-				},
-			}
-		}
+	collectionOptions = &ebpf.CollectionOptions{
+		Programs: ebpf.ProgramOptions{
+			KernelTypes: loadBTFSpec(options),
+		},
 	}
 
 	ac.CollectionOpts = collectionOptions
@@ -230,9 +226,6 @@ func getRelease() (*Release, error) {
 	return nil, fmt.Errorf("can't get release info from %v", osReleaseFiles)
 }
 func getBestMatchedBTFFile() ([]uint8, error) {
-	if bpf.IsKernelSupportHasBTF() {
-		return nil, nil
-	}
 
 	var si sysinfo.SysInfo
 	si.GetSysInfo()

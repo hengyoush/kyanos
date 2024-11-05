@@ -46,37 +46,6 @@ struct go_regabi_regs {
   uint64_t regs[9];
 };
 
-
-// // A set of symbols that are useful for various different uprobes.
-// // Currently, this includes mostly connection related items,
-// // which applies to any network protocol tracing (HTTP2, TLS, etc.).
-// struct go_common_symaddrs_t {
-//   // ---- itable symbols ----
-
-//   // net.Conn interface types.
-//   // go.itab.*google.golang.org/grpc/credentials/internal.syscallConn,net.Conn
-//   int64_t internal_syscallConn;
-//   int64_t tls_Conn;     // go.itab.*crypto/tls.Conn,net.Conn
-//   int64_t net_TCPConn;  // go.itab.*net.TCPConn,net.Conn
-
-//   // ---- struct member offsets ----
-
-//   // Members of internal/poll.FD.
-//   int32_t FD_Sysfd_offset;  // 16
-
-//   // Members of crypto/tls.Conn.
-//   int32_t tlsConn_conn_offset;  // 0
-
-//   // Members of google.golang.org/grpc/credentials/internal.syscallConn
-//   int32_t syscallConn_conn_offset;  // 0
-
-//   // Member of runtime.g.
-//   int32_t g_goid_offset;  // 152
-
-//   // Offset of the ptr to struct g from the address in %fsbase.
-//   int32_t g_addr_offset;  // -8
-// };
-
 struct go_tls_symaddrs_t {
   // ---- function argument locations ----
 

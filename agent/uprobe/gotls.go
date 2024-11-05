@@ -13,6 +13,7 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/hashicorp/go-version"
 )
 
 var fileAttachedGoTlsProbeMap = make(map[string]bool)
@@ -27,14 +28,35 @@ func LoadGoTlsUprobe() error {
 		},
 		MapReplacements: getMapReplacementsForGoTls(),
 	}
-	spec, err := bpf.LoadGoTls()
-	if err != nil {
-		return err
+	var spec *ebpf.CollectionSpec
+	var err error
+	v4, _ := version.NewVersion("4.0.0")
+	var objs any
+	if common.GetKernelVersion().LessThan(v4) {
+		spec, err = bpf.LoadGoTlsLagacyKernel310()
+		if err != nil {
+			return err
+		}
+		common.UprobeLog.Debugf("less than 4.x use legacy objects")
+		objs = &bpf.GoTlsLagacyKernel310Objects{}
+		err = spec.LoadAndAssign(objs, collectionOptions)
+	} else {
+		spec, err = bpf.LoadGoTls()
+		if err != nil {
+			return err
+		}
+		objs = &bpf.GoTlsObjects{}
+		err = spec.LoadAndAssign(objs, collectionOptions)
 	}
-	objs := &bpf.GoTlsObjects{}
-	err = spec.LoadAndAssign(objs, collectionOptions)
+
 	if err != nil {
-		common.UprobeLog.Warnf("load openssl uprobe failed : %v", err)
+		err = errors.Unwrap(errors.Unwrap(err))
+		inner_err, ok := err.(*ebpf.VerifierError)
+		if ok {
+			common.UprobeLog.Errorf("load gotls uprobe failed: %+v", inner_err)
+		} else {
+			common.UprobeLog.Errorf("load gotls uprobe failed: %+v", err)
+		}
 		return err
 	}
 	goTlsObjs = objs
@@ -128,7 +150,7 @@ func getGoRetOffset(elfFile *elf.File, execPath string, symbolName string) (uint
 	}
 	if err != nil {
 		common.UprobeLog.Infof("get offsets via symbol table failed: %+v", err)
-		symbolOffset, retOffsets, err = common.GetFuncRetOffsetsViaPclntab(execPath, elfFile, symbolName)
+		// symbolOffset, retOffsets, err = common.GetFuncRetOffsetsViaPclntab(execPath, elfFile, symbolName)
 	}
 	if err == nil && len(retOffsets) == 0 {
 		err = errors.New("not found any RET instruction")
