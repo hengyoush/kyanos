@@ -176,6 +176,7 @@ func (p *Processor) run() {
 						missedConn := NewConnFromEvent(event, p)
 						common.ConntrackLog.Debugf("[no conn][%s]no conn found for infer event", missedConn.ToString())
 						p.connManager.AddConnection4(TgidFd, missedConn)
+						conn = missedConn
 					} else {
 						continue
 					}
