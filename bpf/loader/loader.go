@@ -22,7 +22,6 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
-	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/features"
 	"github.com/cilium/ebpf/link"
 	"github.com/emirpasic/gods/maps/treemap"
@@ -51,40 +50,6 @@ func (b *BPF) Close() {
 		}
 	}
 	common.AgentLog.Debugln("All links closed!")
-}
-
-func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
-	if bpf.IsKernelSupportHasBTF() {
-		return nil
-	}
-
-	var spec *btf.Spec
-	if options.BTFFilePath != "" {
-		btfPath, err := btf.LoadSpec(options.BTFFilePath)
-		if err != nil {
-			common.AgentLog.Fatalf("can't load btf spec: %v", err)
-		}
-		spec = btfPath
-	} else {
-		fileBytes, err := getBestMatchedBTFFile()
-		if err != nil {
-			common.AgentLog.Fatalln(err)
-		}
-		needGenerateBTF := fileBytes != nil
-		if needGenerateBTF {
-			btfFilePath, err := writeToFile(fileBytes, ".kyanos.btf")
-			if err != nil {
-				common.AgentLog.Fatalln(err)
-			}
-			defer os.Remove(btfFilePath)
-			btfPath, err := btf.LoadSpec(btfFilePath)
-			if err != nil {
-				common.AgentLog.Fatalf("can't load btf spec: %v (embedded in kyanos)", err)
-			}
-			spec = btfPath
-		}
-	}
-	return spec
 }
 
 func LoadBPF(options ac.AgentOptions) (*BPF, error) {
@@ -177,54 +142,6 @@ func (bf *BPF) AttachProgs(options ac.AgentOptions) error {
 	return nil
 }
 
-var osReleaseFiles = []string{
-	"/etc/os-release",
-	"/usr/lib/os-release",
-}
-
-type Release struct {
-	Id        string
-	VersionId string
-}
-
-func getRelease() (*Release, error) {
-	var errors []error
-	for _, path := range osReleaseFiles {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			errors = append(errors, err)
-			continue
-		}
-
-		var release Release
-		for _, line := range strings.Split(string(data), "\n") {
-			line := strings.TrimSpace(line)
-			parts := strings.Split(line, "=")
-			if len(parts) < 2 {
-				continue
-			}
-			key, value := parts[0], parts[1]
-			key = strings.TrimSpace(key)
-			switch key {
-			case "ID":
-				release.Id = strings.TrimSpace(value)
-				break
-			case "VERSION_ID":
-				release.VersionId = strings.TrimSpace(value)
-				break
-			}
-		}
-		if release.Id != "" {
-			return &release, nil
-		}
-	}
-
-	if len(errors) != 0 {
-		return nil, fmt.Errorf("%v", errors)
-	}
-
-	return nil, fmt.Errorf("can't get release info from %v", osReleaseFiles)
-}
 func getBestMatchedBTFFile() ([]uint8, error) {
 
 	var si sysinfo.SysInfo
