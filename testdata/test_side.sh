@@ -62,7 +62,7 @@ function test_side_client_nonmatch() {
 
     timeout 30 ${CMD} watch --debug-output mysql --side server 2>&1 | tee "${CLIENT_NONMATCH_LNAME}" &
     sleep 10
-    python3 ./testdata/query_mysql.py 5
+    python3 ./testdata/query_mysql.py 20
     wait
 
     cat "${CLIENT_NONMATCH_LNAME}"
