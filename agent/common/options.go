@@ -57,10 +57,11 @@ type AgentOptions struct {
 	PodName            string
 	PodNameSpace       string
 
-	Cc   *metadata.ContainerCache
-	Objs any
-	Ctx  context.Context
-	Kv   *compatible.KernelVersion
+	Cc                  *metadata.ContainerCache
+	Objs                any
+	Ctx                 context.Context
+	Kv                  *compatible.KernelVersion
+	LoadPorgressChannel chan string
 }
 
 func (o AgentOptions) FilterByContainer() bool {
@@ -119,5 +120,6 @@ func ValidateAndRepairOptions(options AgentOptions) AgentOptions {
 		newOptions.CriRuntimeEndpoint = getEndpoint(newOptions.CriRuntimeEndpoint)
 	}
 	newOptions.WatchOptions.Init()
+	newOptions.LoadPorgressChannel = make(chan string, 10)
 	return newOptions
 }

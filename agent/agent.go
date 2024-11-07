@@ -8,6 +8,7 @@ import (
 	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
+	loader_render "kyanos/agent/render/loader"
 	"kyanos/agent/render/stat"
 	"kyanos/agent/render/watch"
 	"kyanos/bpf"
@@ -15,7 +16,9 @@ import (
 	"kyanos/common"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/cilium/ebpf/rlimit"
 )
@@ -56,35 +59,51 @@ func SetupAgent(options ac.AgentOptions) {
 		common.AgentLog.Warn("Remove memlock:", err)
 	}
 
-	kernelVersion := compatible.GetCurrentKernelVersion()
-	options.Kv = &kernelVersion
-	var err error
-	bf, err := loader.LoadBPF(options)
-	if err != nil {
-		if bf != nil {
-			bf.Close()
-		}
-		return
-	}
-	defer bf.Close()
-	err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), 2048, options.CustomSyscallEventHook)
-	if err != nil {
-		return
-	}
-	err = bpf.PullSslDataEvents(ctx, pm.GetSslEventsChannels(), 512, options.CustomSslEventHook)
-	if err != nil {
-		return
-	}
-	err = bpf.PullConnDataEvents(ctx, pm.GetConnEventsChannels(), 4, options.CustomConnEventHook)
-	if err != nil {
-		return
-	}
-	err = bpf.PullKernEvents(ctx, pm.GetKernEventsChannels(), 32, options.CustomKernEventHook)
-	if err != nil {
-		return
-	}
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
 
-	bf.AttachProgs(options)
+	var _bf loader.BPF
+	go func(_bf *loader.BPF) {
+		options.LoadPorgressChannel <- "🍩 Kyanos starting..."
+		kernelVersion := compatible.GetCurrentKernelVersion()
+		options.Kv = &kernelVersion
+		var err error
+		bf, err := loader.LoadBPF(options)
+		if err != nil {
+			if bf != nil {
+				bf.Close()
+			}
+			return
+		}
+		*_bf = *bf
+		err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), 2048, options.CustomSyscallEventHook)
+		if err != nil {
+			return
+		}
+		err = bpf.PullSslDataEvents(ctx, pm.GetSslEventsChannels(), 512, options.CustomSslEventHook)
+		if err != nil {
+			return
+		}
+		err = bpf.PullConnDataEvents(ctx, pm.GetConnEventsChannels(), 4, options.CustomConnEventHook)
+		if err != nil {
+			return
+		}
+		err = bpf.PullKernEvents(ctx, pm.GetKernEventsChannels(), 32, options.CustomKernEventHook)
+		if err != nil {
+			return
+		}
+		bf.AttachProgs(options)
+		options.LoadPorgressChannel <- "🍹 All programs attached"
+		options.LoadPorgressChannel <- "🍭 Waiting for events.."
+		time.Sleep(500 * time.Millisecond)
+		options.LoadPorgressChannel <- "quit"
+	}(&_bf)
+	defer func() {
+		_bf.Close()
+	}()
+	if !options.WatchOptions.DebugOutput {
+		loader_render.Start(ctx, options)
+	}
 
 	stop := false
 	go func() {
@@ -95,7 +114,7 @@ func SetupAgent(options ac.AgentOptions) {
 		stop = true
 	}()
 
-	common.AgentLog.Info("Waiting for events..")
+	// common.AgentLog.Info("Waiting for events..")
 
 	if options.InitCompletedHook != nil {
 		options.InitCompletedHook()

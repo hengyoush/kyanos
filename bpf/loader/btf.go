@@ -40,6 +40,7 @@ func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
 		return nil
 	}
 
+	options.LoadPorgressChannel <- "starting load BTF file"
 	var spec *btf.Spec
 	if options.BTFFilePath != "" {
 		btfPath, err := btf.LoadSpec(options.BTFFilePath)
@@ -47,6 +48,7 @@ func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
 			common.AgentLog.Fatalf("can't load btf spec: %v", err)
 		}
 		spec = btfPath
+		options.LoadPorgressChannel <- "starting load BTF file: success!"
 	} else {
 		fileBytes, err := getBestMatchedBTFFile()
 		if err == nil {
@@ -71,6 +73,7 @@ func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
 
 	if spec == nil {
 		// try download
+		options.LoadPorgressChannel <- "starting load BTF from network..."
 		btfSpec, _, err := loadBTFSpecFallback("")
 		if err != nil {
 			common.AgentLog.Warnf("failed to get btf file from network: %+v", err)

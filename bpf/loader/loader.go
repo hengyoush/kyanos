@@ -36,16 +36,17 @@ type BPF struct {
 
 func (b *BPF) Close() {
 	b.objs.Close()
-
-	for e := b.links.Front(); e != nil; e = e.Next() {
-		if e.Value == nil {
-			continue
-		}
-		if l, ok := e.Value.(link.Link); ok {
-			err := l.Close()
-			if err != nil {
-				info, _ := l.Info()
-				common.AgentLog.Errorf("Fail to close link for: %v\n", info)
+	if b.links != nil {
+		for e := b.links.Front(); e != nil; e = e.Next() {
+			if e.Value == nil {
+				continue
+			}
+			if l, ok := e.Value.(link.Link); ok {
+				err := l.Close()
+				if err != nil {
+					info, _ := l.Info()
+					common.AgentLog.Errorf("Fail to close link for: %v\n", info)
+				}
 			}
 		}
 	}
@@ -91,12 +92,12 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	}
 	bf.objs = objs
 	bpf.Objs = objs
+	options.LoadPorgressChannel <- "🍎 Loaded eBPF maps & programs."
 
 	if err != nil {
 		err = errors.Unwrap(errors.Unwrap(err))
 		inner_err, ok := err.(*ebpf.VerifierError)
 		if ok {
-			inner_err.Truncated = false
 			common.AgentLog.Errorf("loadAgentObjects: %+v", inner_err)
 		} else {
 			common.AgentLog.Errorf("loadAgentObjects: %+v", err)
@@ -108,6 +109,7 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	if !validateResult {
 		return nil, fmt.Errorf("validate param failed!")
 	}
+	options.LoadPorgressChannel <- "🍓 Setup traffic filters"
 
 	// var links *list.List
 	// if options.LoadBpfProgramFunction != nil {
@@ -134,10 +136,14 @@ func (bf *BPF) AttachProgs(options ac.AgentOptions) error {
 		links = attachBpfProgs(options.IfName, options.Kv, &options)
 	}
 
+	options.LoadPorgressChannel <- "🍆 Attached base eBPF programs."
+
 	if !options.DisableOpensslUprobe {
 		attachOpenSslUprobes(links, options, options.Kv, bf.objs)
+		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
 	attachNfFunctions(links)
+	options.LoadPorgressChannel <- "🥪 Attached conntrack eBPF programs."
 	bf.links = links
 	return nil
 }
