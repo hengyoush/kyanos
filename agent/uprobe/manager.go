@@ -51,6 +51,16 @@ func handleSchedExecEvent(event *bpf.AgentProcessExecEvent) {
 	} else {
 		common.UprobeLog.Debugf("AttachSslUprobe failed for exec event(pid: %d %s): %v", event.Pid, procName, err)
 	}
+	links, err = AttachGoTlsProbes(int(event.Pid))
+	if err == nil {
+		if len(links) > 0 {
+			uprobeLinks = append(uprobeLinks, links...)
+		} else {
+			common.UprobeLog.Debugf("Attach GoTls uprobes success for pid: %d (%s) use previous libssl path", event.Pid, procName)
+		}
+	} else {
+		common.UprobeLog.Debugf("Attach GoTls Uprobe failed for exec event(pid: %d %s): %v", event.Pid, procName, err)
+	}
 }
 
 func AttachSslUprobe(pid int) ([]link.Link, error) {
@@ -90,22 +100,7 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 			LogSize:     10 * 1024,
 			KernelTypes: ac.CollectionOpts.Programs.KernelTypes,
 		},
-		MapReplacements: map[string]*ebpf.Map{
-			"active_ssl_read_args_map":  bpf.GetMapFromObjs(bpf.Objs, "ActiveSslReadArgsMap"),
-			"active_ssl_write_args_map": bpf.GetMapFromObjs(bpf.Objs, "ActiveSslWriteArgsMap"),
-			"conn_evt_rb":               bpf.GetMapFromObjs(bpf.Objs, "ConnEvtRb"),
-			"conn_info_map":             bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap"),
-			"rb":                        bpf.GetMapFromObjs(bpf.Objs, "Rb"),
-			"ssl_data_map":              bpf.GetMapFromObjs(bpf.Objs, "SslDataMap"),
-			"ssl_rb":                    bpf.GetMapFromObjs(bpf.Objs, "SslRb"),
-			"ssl_user_space_call_map":   bpf.GetMapFromObjs(bpf.Objs, "SslUserSpaceCallMap"),
-			"syscall_data_map":          bpf.GetMapFromObjs(bpf.Objs, "SyscallDataMap"),
-			"syscall_rb":                bpf.GetMapFromObjs(bpf.Objs, "SyscallRb"),
-			"filter_mntns_map":          bpf.GetMapFromObjs(bpf.Objs, "FilterMntnsMap"),
-			"filter_netns_map":          bpf.GetMapFromObjs(bpf.Objs, "FilterNetnsMap"),
-			"filter_pid_map":            bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap"),
-			"filter_pidns_map":          bpf.GetMapFromObjs(bpf.Objs, "FilterPidnsMap"),
-		},
+		MapReplacements: getMapReplacementsForOpenssl(),
 	}
 	err = spec.LoadAndAssign(objs, collectionOptions)
 	if err != nil {

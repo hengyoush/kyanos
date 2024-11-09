@@ -100,8 +100,8 @@ func prepareEvents(r protocol.Record, connection *conn.Connection4) *events {
 	if ssl {
 		ingressSeq = ingressMessage.Seq()
 		egressSeq = egressMessage.Seq()
-		sslWriteSyscallEvents = streamEvents.FindAndRemoveSslEventsBySeqAndLen(bpf.AgentStepTSSL_OUT, egressMessage.Seq(), egressMessage.ByteSize())
-		sslReadSyscallEvents = streamEvents.FindAndRemoveSslEventsBySeqAndLen(bpf.AgentStepTSSL_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
+		sslWriteSyscallEvents = streamEvents.FindSslEventsBySeqAndLen(bpf.AgentStepTSSL_OUT, egressMessage.Seq(), egressMessage.ByteSize())
+		sslReadSyscallEvents = streamEvents.FindSslEventsBySeqAndLen(bpf.AgentStepTSSL_IN, ingressMessage.Seq(), ingressMessage.ByteSize())
 
 		egressKernSeq, egressKernLen = getKernSeqAndLen(sslWriteSyscallEvents)
 		ingressKernSeq, ingressKernLen = getKernSeqAndLen(sslReadSyscallEvents)
@@ -114,16 +114,16 @@ func prepareEvents(r protocol.Record, connection *conn.Connection4) *events {
 		egressKernSeq = egressSeq
 		egressKernLen = egressMessage.ByteSize()
 	}
-	writeSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_OUT, egressKernSeq, egressKernLen)
-	readSyscallEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, ingressKernSeq, ingressKernLen)
+	writeSyscallEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTSYSCALL_OUT, egressKernSeq, egressKernLen)
+	readSyscallEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, ingressKernSeq, ingressKernLen)
 
-	devOutEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_OUT, egressKernSeq, egressKernLen)
-	nicIngressEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTNIC_IN, ingressKernSeq, ingressKernLen)
-	userCopyEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, ingressKernSeq, ingressKernLen)
-	tcpInEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTTCP_IN, ingressKernSeq, ingressKernLen)
+	devOutEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTDEV_OUT, egressKernSeq, egressKernLen)
+	nicIngressEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTNIC_IN, ingressKernSeq, ingressKernLen)
+	userCopyEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, ingressKernSeq, ingressKernLen)
+	tcpInEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTTCP_IN, ingressKernSeq, ingressKernLen)
 
 	if len(nicIngressEvents) == 0 {
-		nicIngressEvents = streamEvents.FindAndRemoveEventsBySeqAndLen(bpf.AgentStepTDEV_IN, ingressKernSeq, ingressKernLen)
+		nicIngressEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTDEV_IN, ingressKernSeq, ingressKernLen)
 	}
 	events.sslReadSyscallEvents = sslReadSyscallEvents
 	events.sslWriteSyscallEvents = sslWriteSyscallEvents
@@ -248,8 +248,14 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.ReqNicEventDetails = KernEventsToNicEventDetails(events.devOutEvents)
 		annotatedRecord.RespNicEventDetails = KernEventsToNicEventDetails(events.nicIngressEvents)
 	}
-	streamEvents.DiscardEventsBySeq(events.egressKernSeq+uint64(events.egressKernLen), true)
-	streamEvents.DiscardEventsBySeq(events.ingressKernSeq+uint64(events.ingressKernLen), false)
+	streamEvents.MarkNeedDiscardSeq(events.egressKernSeq+uint64(events.egressKernLen), true)
+	streamEvents.MarkNeedDiscardSeq(events.ingressKernSeq+uint64(events.ingressKernLen), false)
+	if connection.IsSsl() {
+		streamEvents.MarkNeedDiscardSslSeq(events.egressSeq+uint64(events.egressMessage.ByteSize()), true)
+		streamEvents.MarkNeedDiscardSslSeq(events.ingressSeq+uint64(events.ingressMessage.ByteSize()), false)
+	}
+	// streamEvents.DiscardEventsBySeq(events.egressKernSeq+uint64(events.egressKernLen), true)
+	// streamEvents.DiscardEventsBySeq(events.ingressKernSeq+uint64(events.ingressKernLen), false)
 	if recordsChannel == nil {
 		outputLog.Infoln(annotatedRecord.String(analysisCommon.AnnotatedRecordToStringOptions{
 			Nano: false,

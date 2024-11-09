@@ -5,11 +5,11 @@ prev:
   link: './watch'
 ---
 
-# Using the Stat Command for Analyzing Anomalous Traffic
+# Use Stat Command to Analyze Traffic
 
-The `watch` command provides a granular view of request-response pairs, which is useful for analyzing issues at an individual level. However, some scenarios require a broader analysis, such as:
+The `watch` command provides a granular view of request-response pairs, which is useful for analyzing issues at a low level. However, some scenarios require a broader analysis, such as:
 
-- If my HTTP requests are slow, can I tell if all servers are slow or just one specific server?
+- If my HTTP requests are slow or timeout, is every server slow, or just a specific one?
 - If someone is sending `GET` requests (which value is big) to my Redis instance, causing bandwidth saturation, which client IP is responsible?
 
 The `stat` command is designed to address the need to analyze a large number of request-response pairs to derive conclusions.
@@ -18,9 +18,9 @@ The `stat` command is designed to address the need to analyze a large number of 
 
 Using the `stat` command is straightforward; you just need to determine **what metric you care about**.
 
-For instance, to address the question: "Are my HTTP requests slow due to all servers or just one server?" we focus on the **response time** of the **remote servers(remote-ip)**.
+For example, to solve the question: "If my HTTP requests are slow or timeout, is every server slow, or just a specific one?" so **the metric you care about** is the **response time** of  **remote servers(remote-ip)**.
 
-You can use the following command:
+then you can use the following command:
 ```bash
 ./kyanos stat --metric total-time --group-by remote-ip
 ```
@@ -38,10 +38,10 @@ Here, `-m` is a shorthand for `metric`, `t` for `total-time`, and `-g` for `grou
 
 ## Analyzing the Results of the Stat Command
 
-After entering the above `stat` command, you will see a table similar to this:
+After entering the above `stat` command, you will see a table like this:
 ![kyanos stat result](/stat-result.jpg)
 
-Like with the `watch` table, you can sort the columns by pressing the corresponding number key. You can also navigate up and down using the `"↑"` `"↓"` or `"k"` `"j"` keys to select records in the table.
+Like the `watch` table, you can sort the columns by pressing the corresponding number key. You can also navigate up and down using the `"↑"` `"↓"` or `"k"` `"j"` keys to select records in the table.
 
 However, unlike the `watch` table, the records in the `stat` command are aggregated based on the `--group-by` option. Therefore, the second column is labeled `remote-ip`, with subsequent columns such as `max`, `avg`, `p50`, etc., representing the specified metric (in this case, `total-time`), showing the maximum, average, and 50th percentile values.
 

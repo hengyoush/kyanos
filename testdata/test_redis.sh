@@ -30,7 +30,7 @@ function test_redis_client() {
     cat "${CLIENT_LNAME}"
     docker rm -f $cid1 || true
     # check_time_detail_completed_with_last_lines "${LNAME}" 3
-    check_patterns_in_file_with_last_lines "${CLIENT_LNAME}" "HGET" 3
+    check_patterns_in_file "${CLIENT_LNAME}" "HGET"
 }
 
 
@@ -56,7 +56,7 @@ function test_redis_server() {
     cat "${SERVER_LNAME}"
     docker rm -f $cid1 || true
     # check_time_detail_completed_with_last_lines "${LNAME}" 3
-    check_patterns_in_file_with_last_lines "${SERVER_LNAME}" "HGET" 3
+    check_patterns_in_file "${SERVER_LNAME}" "HGET"
 }
 
 

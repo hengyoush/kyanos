@@ -129,6 +129,7 @@ func init() {
 	v5d4 := copyKernelVersion(v5d15)
 	v5d4.Version = "5.4.0"
 	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"kprobe/ip_rcv_core.isra.0", "IpRcvCore"})
+	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"kprobe/ip_rcv_core.isra.20", "IpRcvCore"})
 	v5d4.removeCapability(SupportRingBuffer).removeCapability(SupportXDP)
 	KernelVersionsMap.Put(v5d4.Version, v5d4)
 

@@ -15,15 +15,15 @@ hero:
       link: ./what-is-kyanos
     - theme: alt
       text: Quickstart
-      link: /api-examples
+      link: ./quickstart
     - theme: alt
       text: Star me at Github!
       link: https://github.com/hengyoush/kyanos
 
 features:
       - icon: 🚀
-        title: 快速分析
-        details: 只需一条命令即可快速查看机器的网络性能，包括MySQL、Redis等常用服务的网络延迟和数据传输大小
+        title: 面向程序员
+        details: 聚焦于7层协议，只需一条命令即可快速查看应用的网络性能，包括MySQL、Redis等常用服务的网络延迟和数据传输大小
         link: ./how-to
         linkText: Learn how to use kyanos
       - icon: 🎯️

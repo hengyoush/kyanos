@@ -83,6 +83,7 @@ static __always_inline void process_ssl_data(struct pt_regs* ctx, uint64_t id,
     uint64_t tgid_fd = gen_tgid_fd(id>>32, args->fd);
     struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
     if (conn_info) {
+        conn_info->ssl = true;
         process_syscall_data_with_conn_info(ctx, args, tgid_fd, direction, bytes_count, conn_info, syscall_len, true, true);
         if (direction == kEgress) {
             conn_info->ssl_write_bytes += bytes_count;

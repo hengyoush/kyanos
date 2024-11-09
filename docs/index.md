@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "Kyanos"
   text: "A Simple & Powerful Network Tracing Tool"
-  tagline: Capture & Analysis network traffic in Realtime
+  tagline: Provides real-time, packet-level to protocol-level visibility into a host's internal network
   image:
     src: /kyanos.png
     alt: Kyanos
@@ -15,15 +15,15 @@ hero:
       link: ./what-is-kyanos
     - theme: alt
       text: Quickstart
-      link: /api-examples
+      link: ./quickstart
     - theme: alt
       text: Star me at Github!
       link: https://github.com/hengyoush/kyanos
 
 features:
       - icon: 🚀
-        title: Rapid Analysis
-        details: With just one command, you can quickly inspect the machine's network issues, including the network latency and data transfer sizes of L7 protocol like HTTP, MySQL and Redis.
+        title: Oriented towards developer
+        details: User-friendly, focusing on the Layer 7 protocol, capture and analyze application layer network performance with a single command.
         link: ./how-to
         linkText: Learn how to use kyanos
       - icon: 🎯️
@@ -33,7 +33,7 @@ features:
         linkText: Learn how to filter traffic
       - icon: 📈️
         title: Powerful Aggregation Analysis
-        details: Supports automatic traffic aggregation based on dimensions such as remote IP, protocol, etc., to quickly obtain specific information, such as the latency of certain HTTP paths from specific IPs.
+        details: Supports automatic traffic aggregation based on various dimensions such as remote IP, protocol, etc., to quickly obtain specific information, such as the latency of certain HTTP paths from specific IPs.
         link: ./stat
         linkText: Learn how to analysis traffic
       - icon: 💻️

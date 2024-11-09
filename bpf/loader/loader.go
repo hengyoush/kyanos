@@ -22,7 +22,6 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
-	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/features"
 	"github.com/cilium/ebpf/link"
 	"github.com/emirpasic/gods/maps/treemap"
@@ -37,16 +36,17 @@ type BPF struct {
 
 func (b *BPF) Close() {
 	b.objs.Close()
-
-	for e := b.links.Front(); e != nil; e = e.Next() {
-		if e.Value == nil {
-			continue
-		}
-		if l, ok := e.Value.(link.Link); ok {
-			err := l.Close()
-			if err != nil {
-				info, _ := l.Info()
-				common.AgentLog.Errorf("Fail to close link for: %v\n", info)
+	if b.links != nil {
+		for e := b.links.Front(); e != nil; e = e.Next() {
+			if e.Value == nil {
+				continue
+			}
+			if l, ok := e.Value.(link.Link); ok {
+				err := l.Close()
+				if err != nil {
+					info, _ := l.Info()
+					common.AgentLog.Errorf("Fail to close link for: %v\n", info)
+				}
 			}
 		}
 	}
@@ -64,48 +64,10 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 		common.AgentLog.Fatalf("Require oldest kernel version is 3.10.0-957, pls check your kernel version by `uname -r`")
 	}
 
-	if options.BTFFilePath != "" {
-		btfPath, err := btf.LoadSpec(options.BTFFilePath)
-		if err != nil {
-			common.AgentLog.Fatalf("can't load btf spec: %v", err)
-		}
-		collectionOptions = &ebpf.CollectionOptions{
-			Programs: ebpf.ProgramOptions{
-				KernelTypes: btfPath,
-				LogSize:     options.BPFVerifyLogSize,
-			},
-		}
-	} else {
-		fileBytes, err := getBestMatchedBTFFile()
-		if err != nil {
-			common.AgentLog.Fatalln(err)
-		}
-		needGenerateBTF := fileBytes != nil
-
-		if needGenerateBTF {
-			btfFilePath, err := writeToFile(fileBytes, ".kyanos.btf")
-			if err != nil {
-				common.AgentLog.Fatalln(err)
-			}
-			defer os.Remove(btfFilePath)
-
-			btfPath, err := btf.LoadSpec(btfFilePath)
-			if err != nil {
-				common.AgentLog.Fatalf("can't load btf spec: %v", err)
-			}
-			collectionOptions = &ebpf.CollectionOptions{
-				Programs: ebpf.ProgramOptions{
-					KernelTypes: btfPath,
-					LogSize:     options.BPFVerifyLogSize,
-				},
-			}
-		} else {
-			collectionOptions = &ebpf.CollectionOptions{
-				Programs: ebpf.ProgramOptions{
-					LogSize: options.BPFVerifyLogSize,
-				},
-			}
-		}
+	collectionOptions = &ebpf.CollectionOptions{
+		Programs: ebpf.ProgramOptions{
+			KernelTypes: loadBTFSpec(options),
+		},
 	}
 
 	ac.CollectionOpts = collectionOptions
@@ -130,12 +92,12 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	}
 	bf.objs = objs
 	bpf.Objs = objs
+	options.LoadPorgressChannel <- "🍎 Loaded eBPF maps & programs."
 
 	if err != nil {
 		err = errors.Unwrap(errors.Unwrap(err))
 		inner_err, ok := err.(*ebpf.VerifierError)
 		if ok {
-			inner_err.Truncated = false
 			common.AgentLog.Errorf("loadAgentObjects: %+v", inner_err)
 		} else {
 			common.AgentLog.Errorf("loadAgentObjects: %+v", err)
@@ -147,6 +109,7 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 	if !validateResult {
 		return nil, fmt.Errorf("validate param failed!")
 	}
+	options.LoadPorgressChannel <- "🍓 Setup traffic filters"
 
 	// var links *list.List
 	// if options.LoadBpfProgramFunction != nil {
@@ -173,66 +136,19 @@ func (bf *BPF) AttachProgs(options ac.AgentOptions) error {
 		links = attachBpfProgs(options.IfName, options.Kv, &options)
 	}
 
+	options.LoadPorgressChannel <- "🍆 Attached base eBPF programs."
+
 	if !options.DisableOpensslUprobe {
 		attachOpenSslUprobes(links, options, options.Kv, bf.objs)
+		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
 	attachNfFunctions(links)
+	options.LoadPorgressChannel <- "🥪 Attached conntrack eBPF programs."
 	bf.links = links
 	return nil
 }
 
-var osReleaseFiles = []string{
-	"/etc/os-release",
-	"/usr/lib/os-release",
-}
-
-type Release struct {
-	Id        string
-	VersionId string
-}
-
-func getRelease() (*Release, error) {
-	var errors []error
-	for _, path := range osReleaseFiles {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			errors = append(errors, err)
-			continue
-		}
-
-		var release Release
-		for _, line := range strings.Split(string(data), "\n") {
-			line := strings.TrimSpace(line)
-			parts := strings.Split(line, "=")
-			if len(parts) < 2 {
-				continue
-			}
-			key, value := parts[0], parts[1]
-			key = strings.TrimSpace(key)
-			switch key {
-			case "ID":
-				release.Id = strings.TrimSpace(value)
-				break
-			case "VERSION_ID":
-				release.VersionId = strings.TrimSpace(value)
-				break
-			}
-		}
-		if release.Id != "" {
-			return &release, nil
-		}
-	}
-
-	if len(errors) != 0 {
-		return nil, fmt.Errorf("%v", errors)
-	}
-
-	return nil, fmt.Errorf("can't get release info from %v", osReleaseFiles)
-}
 func getBestMatchedBTFFile() ([]uint8, error) {
-	if bpf.IsKernelSupportHasBTF() {
-		return nil, nil
-	}
 
 	var si sysinfo.SysInfo
 	si.GetSysInfo()
@@ -517,7 +433,12 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 		}
 	}
 
-	for _, functions := range kernelVersion.InstrumentFunctions {
+	nonCriticalSteps := getNonCriticalSteps()
+	for step, functions := range kernelVersion.InstrumentFunctions {
+		_, isNonCriticalStep := nonCriticalSteps[step]
+		if options.PerformanceMode && isNonCriticalStep {
+			continue
+		}
 		for idx, function := range functions {
 			var err error
 			var l link.Link
@@ -533,7 +454,11 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 			}
 			if err != nil {
 				if idx == len(functions)-1 {
-					common.AgentLog.Fatalf("Attach failed: %v, functions: %v", err, functions)
+					if isNonCriticalStep {
+						common.AgentLog.Debugf("Attach failed: %v, functions: %v skip it because it's a non-criticalstep", err, functions)
+					} else {
+						common.AgentLog.Fatalf("Attach failed: %v, functions: %v", err, functions)
+					}
 				} else {
 					common.AgentLog.Debugf("Attach failed but has fallback: %v, functions: %v", err, functions)
 				}
@@ -587,16 +512,21 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 
 func attachOpenSslUprobes(links *list.List, options ac.AgentOptions, kernelVersion *compatible.KernelVersion, objs any) {
 	if attachOpensslToSpecificProcess() {
-		uprobeLinks, err := uprobe.AttachSslUprobe(int(viper.GetInt64(common.FilterPidVarName)))
+		sslUprobeLinks, err := uprobe.AttachSslUprobe(int(viper.GetInt64(common.FilterPidVarName)))
 		if err == nil {
-			for _, l := range uprobeLinks {
+			for _, l := range sslUprobeLinks {
 				links.PushBack(l)
 			}
 		} else {
 			common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, viper.GetInt64(common.FilterPidVarName))
 		}
+
 	} else {
 		pids, err := common.GetAllPids()
+		loadGoTlsErr := uprobe.LoadGoTlsUprobe()
+		if loadGoTlsErr != nil {
+			common.AgentLog.Warnf("Load GoTls Probe failed: %+v", loadGoTlsErr)
+		}
 		if err == nil {
 			for _, pid := range pids {
 				uprobeLinks, err := uprobe.AttachSslUprobe(int(pid))
@@ -609,6 +539,20 @@ func attachOpenSslUprobes(links *list.List, options ac.AgentOptions, kernelVersi
 					common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
 				} else if len(uprobeLinks) == 0 {
 					common.AgentLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
+				}
+				if loadGoTlsErr == nil {
+					gotlsUprobeLinks, err := uprobe.AttachGoTlsProbes(int(pid))
+
+					if err == nil && len(gotlsUprobeLinks) > 0 {
+						for _, l := range gotlsUprobeLinks {
+							links.PushBack(l)
+						}
+						common.AgentLog.Infof("Attach GoTls uprobes success for pid: %d", pid)
+					} else if err != nil {
+						common.AgentLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d", err, pid)
+					} else {
+						common.AgentLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d links is empty %v", err, pid, gotlsUprobeLinks)
+					}
 				}
 			}
 		} else {
@@ -645,5 +589,13 @@ func attachNfFunctions(links *list.List) {
 		common.AgentLog.Warnf("Attahc kprobe/nf_nat_packet failed: %v", err)
 	} else {
 		links.PushBack(l)
+	}
+}
+
+func getNonCriticalSteps() map[bpf.AgentStepT]bool {
+	return map[bpf.AgentStepT]bool{
+		bpf.AgentStepTIP_OUT:    true,
+		bpf.AgentStepTQDISC_OUT: true,
+		bpf.AgentStepTIP_IN:     true,
 	}
 }

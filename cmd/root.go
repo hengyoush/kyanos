@@ -28,10 +28,8 @@ sudo kyanos watch http --pid 1234 --path /foo/bar
 sudo kyanos watch redis --comands GET,SET
 sudo kyanos watch mysql --latency 100
 
-sudo kyanos stat http --metrics t --interval 5
-sudo kyanos stat http --metrics t --group-by remote-ip
-sudo kyanos stat http --metrics t --samples 3 --full-body
-sudo kyanos stat http --metrics tq --sort-by avg --group-by remote-ip`,
+sudo kyanos stat http --metrics total-time
+sudo kyanos stat http --metrics total-time --group-by remote-ip`,
 	Run: func(cmd *cobra.Command, args []string) {
 		startAgent()
 	},
@@ -93,6 +91,7 @@ func init() {
 				strings.Join(getDefaultCriRuntimeEndpoint(), ", ")))
 
 	// internal
+	rootCmd.PersistentFlags().BoolVar(&options.PerformanceMode, "performance-mode", true, "--performance false")
 	rootCmd.PersistentFlags().IntVar(&BPFVerifyLogSize, "bpf-verify-log-size", 10*1024, "--bpf-verify-log-size 1024")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "kern-perf-event-buffer-size", 1*1024*1024, "--kern-perf-event-buffer-size 1024")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "data-perf-event-buffer-size", 30*1024*1024, "--data-perf-event-buffer-size 1024")

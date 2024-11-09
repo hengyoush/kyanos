@@ -364,9 +364,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					timeDetail := ViewRecordTimeDetailAsFlowChart(r)
 					// m.viewport.SetContent("[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), 1024) + "\n" + line + "\n[Response]\n\n" +
 					// 	c.TruncateString(r.Resp.FormatToString(), 10240))
-					m.viewport.SetContent(timeDetail + "\n" + line + "\n" +
-						"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), m.options.MaxRecordContentDisplayBytes) + "\n" + line + "\n[Response]\n\n" +
-						c.TruncateString(r.Resp.FormatToString(), m.options.MaxRecordContentDisplayBytes))
+					m.viewport.SetContent(
+						timeDetail + "\n" + line + "\n" +
+							r.String(common.AnnotatedRecordToStringOptions{
+								Nano:          false,
+								MetricTypeSet: common.MetricTypeSet{common.TotalDuration: true},
+							}) + "\n" + line + "\n" +
+							"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), m.options.MaxRecordContentDisplayBytes) + "\n" + line +
+							"\n[Response]\n\n" + c.TruncateString(r.Resp.FormatToString(), m.options.MaxRecordContentDisplayBytes))
 				} else {
 					panic("!")
 				}

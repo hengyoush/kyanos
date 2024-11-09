@@ -3,7 +3,6 @@ package conn
 import (
 	"context"
 	"fmt"
-	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
 	"kyanos/common"
@@ -148,43 +147,13 @@ func (p *Processor) run() {
 				common.ConntrackLog.Debugf("ipv6: %x", event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:])
 			}
 			if event.ConnType == bpf.AgentConnTypeTKConnect {
-				conn = &Connection4{
-					LocalIp: common.BytesToNetIP(event.ConnInfo.Laddr.In6.Sin6Addr.In6U.U6Addr8[:], isIpv6),
-					// LocalIp:    common.IntToBytes(event.ConnInfo.Laddr.In4.SinAddr.S_addr),
-					RemoteIp: common.BytesToNetIP(event.ConnInfo.Raddr.In6.Sin6Addr.In6U.U6Addr8[:], isIpv6),
-					// RemoteIp:   common.IntToBytes(event.ConnInfo.Raddr.In4.SinAddr.S_addr),
-					LocalPort:  common.Port(event.ConnInfo.Laddr.In6.Sin6Port),
-					RemotePort: common.Port(event.ConnInfo.Raddr.In6.Sin6Port),
-					Protocol:   event.ConnInfo.Protocol,
-					Role:       event.ConnInfo.Role,
-					TgidFd:     TgidFd,
-					Status:     Connected,
-					tracable:   true,
-
-					MessageFilter: p.messageFilter,
-					LatencyFilter: p.latencyFilter,
-					SizeFilter:    p.SizeFilter,
-
-					reqStreamBuffer:  buffer.New(1024 * 1024),
-					respStreamBuffer: buffer.New(1024 * 1024),
-					ReqQueue:         make([]protocol.ParsedMessage, 0),
-					RespQueue:        make([]protocol.ParsedMessage, 0),
-
-					prevConn: []*Connection4{},
-
-					protocolParsers: make(map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser),
-				}
-				conn.onRoleChanged = func() {
-					onRoleChanged(p, conn)
-				}
-				conn.StreamEvents = NewKernEventStream(conn, 300)
+				conn = NewConnFromEvent(event, p)
+				p.connManager.AddConnection4(TgidFd, conn)
 				// if p.side != common.AllSide && p.side != conn.Side() {
 				// 	// conn.OnClose(true)
 				// 	conn.UpdateConnectionTraceable(false)
 				// 	continue
 				// }
-				conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
-				p.connManager.AddConnection4(TgidFd, conn)
 			} else if event.ConnType == bpf.AgentConnTypeTKClose {
 				conn = p.connManager.FindConnection4Exactly(TgidFd)
 				if conn == nil {
@@ -203,7 +172,14 @@ func (p *Processor) run() {
 				if conn != nil && conn.Status != Closed {
 					conn.Protocol = event.ConnInfo.Protocol
 				} else {
-					continue
+					if conn == nil {
+						missedConn := NewConnFromEvent(event, p)
+						common.ConntrackLog.Debugf("[no conn][%s]no conn found for infer event", missedConn.ToString())
+						p.connManager.AddConnection4(TgidFd, missedConn)
+						conn = missedConn
+					} else {
+						continue
+					}
 				}
 
 				if conn.Role == bpf.AgentEndpointRoleTKRoleUnknown && event.ConnInfo.Role != bpf.AgentEndpointRoleTKRoleUnknown {
@@ -229,7 +205,7 @@ func (p *Processor) run() {
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
 					conn.TempConnEvents = conn.TempConnEvents[0:0]
 				} else {
-					common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
+					common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideNotMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
 					conn.UpdateConnectionTraceable(false)
 					// conn.OnClose(true)
 				}
@@ -257,8 +233,12 @@ func (p *Processor) run() {
 			if conn != nil && conn.Status == Closed {
 				continue
 			}
+			if conn != nil && !conn.tracable {
+				common.BPFEventLog.Debugf("[syscall][no-trace][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+				continue
+			}
 			if conn != nil && conn.ProtocolInferred() {
-				common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+				common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
 
 				conn.OnSyscallEvent(event.Buf, event, recordChannel)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
@@ -274,6 +254,10 @@ func (p *Processor) run() {
 			conn := p.connManager.FindConnection4Or(tgidFd, event.SslEventHeader.Ke.Ts+common.LaunchEpochTime)
 			event.SslEventHeader.Ke.Ts += common.LaunchEpochTime
 			if conn != nil && conn.Status == Closed {
+				continue
+			}
+			if conn != nil && !conn.tracable {
+				common.BPFEventLog.Debugf("[ssl][no-trace][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
 				continue
 			}
 			if conn != nil && conn.ProtocolInferred() {

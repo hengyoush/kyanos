@@ -9,6 +9,8 @@ BTFHUB_ARCH_REPO="https://github.com/aquasecurity/btfhub-archive.git"
 
 
 KYANOS_BPF_CORE="${BASEDIR}/bpf/agent_$2_bpfel.o"
+KYANOS_BPF_CORE_FOR_LEGACY_KERNEL="${BASEDIR}/bpf/agentlagacykernel310_$2_bpfel.o"
+KYANOS_BPF_CORE_GOTLS="${BASEDIR}/bpf/gotls_$2_bpfel.o"
 
 BTFHUB_DIR="${BASEDIR}/deps/btfhub"
 BTFHUB_ARCH_DIR="${BASEDIR}/deps/btfhub-archive"
@@ -85,7 +87,7 @@ rsync -avz \
 rm -rf ${BASEDIR}/bpf/custom-archive/* || true
 
 [ ! -f ./tools/btfgen.sh ] && die "could not find btfgen.sh"
-./tools/btfgen.sh -a $1 -o ${KYANOS_BPF_CORE}
+./tools/btfgen.sh -a $1 -o ${KYANOS_BPF_CORE} -o ${KYANOS_BPF_CORE_FOR_LEGACY_KERNEL} -o ${KYANOS_BPF_CORE_GOTLS}
 
 # move tailored BTFs to dist
 mv ./custom-archive/* ${BASEDIR}/bpf/custom-archive

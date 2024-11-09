@@ -15,6 +15,11 @@ type KernEventStream struct {
 	sslInEvents  []SslEvent
 	sslOutEvents []SslEvent
 	maxLen       int
+
+	egressDiscardSeq     uint64
+	ingressDiscardSeq    uint64
+	egressSslDiscardSeq  uint64
+	ingressSslDiscardSeq uint64
 }
 
 func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
@@ -27,6 +32,7 @@ func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
 	return stream
 }
 func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
+	s.discardSslEventsIfNeeded()
 	var sslEvents []SslEvent
 	if event.SslEventHeader.Ke.Step == bpf.AgentStepTSSL_IN {
 		sslEvents = s.sslInEvents
@@ -64,6 +70,7 @@ func (s *KernEventStream) AddSyscallEvent(event *bpf.SyscallEventData) {
 }
 
 func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
+	s.discardEventsIfNeeded()
 	if event.Len > 0 {
 		if _, ok := s.kernEvents[event.Step]; !ok {
 			s.kernEvents[event.Step] = make([]KernEvent, 0)
@@ -109,7 +116,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 	}
 }
 
-func (s *KernEventStream) FindAndRemoveSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []SslEvent {
+func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []SslEvent {
 	var sslEvents []SslEvent
 	if step == bpf.AgentStepTSSL_IN {
 		sslEvents = s.sslInEvents
@@ -118,61 +125,92 @@ func (s *KernEventStream) FindAndRemoveSslEventsBySeqAndLen(step bpf.AgentStepT,
 	}
 	start := seq
 	end := start + uint64(len)
-	needsRemoveLastIndex := -1
 	result := make([]SslEvent, 0)
-	for index, each := range sslEvents {
+	for _, each := range sslEvents {
 		if each.Seq < start {
-			needsRemoveLastIndex = index
 			continue
 		}
 
 		if each.Seq < end {
 			result = append(result, each)
-			needsRemoveLastIndex = index
 		} else {
 			break
-		}
-	}
-	if needsRemoveLastIndex != -1 {
-		if step == bpf.AgentStepTSSL_IN {
-			s.sslInEvents = sslEvents[needsRemoveLastIndex+1:]
-		} else {
-			s.sslOutEvents = sslEvents[needsRemoveLastIndex+1:]
 		}
 	}
 
 	return result
 }
 
-func (s *KernEventStream) FindAndRemoveEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []KernEvent {
+func (s *KernEventStream) FindEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []KernEvent {
 	events, ok := s.kernEvents[step]
 	if !ok {
 		return []KernEvent{}
 	}
 	start := seq
 	end := start + uint64(len)
-	needsRemoveLastIndex := -1
 	result := make([]KernEvent, 0)
-	for index, each := range events {
+	for _, each := range events {
 		if each.seq < start {
-			needsRemoveLastIndex = index
 			continue
 		}
 
 		if each.seq < end {
 			result = append(result, each)
-			needsRemoveLastIndex = index
 		} else {
 			break
 		}
 	}
-	if needsRemoveLastIndex != -1 {
-		s.kernEvents[step] = events[needsRemoveLastIndex+1:]
-	}
 	return result
 }
 
-func (s *KernEventStream) DiscardEventsBySeq(seq uint64, egress bool) {
+func (s *KernEventStream) MarkNeedDiscardSeq(seq uint64, egress bool) {
+	if egress {
+		s.egressDiscardSeq = max(s.egressDiscardSeq, seq)
+	} else {
+		s.ingressDiscardSeq = max(s.ingressDiscardSeq, seq)
+	}
+}
+func (s *KernEventStream) MarkNeedDiscardSslSeq(seq uint64, egress bool) {
+	if egress {
+		s.egressSslDiscardSeq = max(s.egressSslDiscardSeq, seq)
+	} else {
+		s.ingressSslDiscardSeq = max(s.ingressSslDiscardSeq, seq)
+	}
+}
+func (s *KernEventStream) discardSslEventsIfNeeded() {
+	if s.egressSslDiscardSeq != 0 {
+		s.discardSslEventsBySeq(s.egressSslDiscardSeq, true)
+	}
+	if s.ingressSslDiscardSeq != 0 {
+		s.discardSslEventsBySeq(s.ingressSslDiscardSeq, false)
+	}
+}
+
+func (s *KernEventStream) discardEventsIfNeeded() {
+	if s.egressDiscardSeq != 0 {
+		s.discardEventsBySeq(s.egressDiscardSeq, true)
+	}
+	if s.ingressDiscardSeq != 0 {
+		s.discardEventsBySeq(s.ingressDiscardSeq, false)
+	}
+}
+func (s *KernEventStream) discardSslEventsBySeq(seq uint64, egress bool) {
+	var oldevents *[]SslEvent
+	if egress {
+		oldevents = &s.sslOutEvents
+	} else {
+		oldevents = &s.sslInEvents
+	}
+	index, _ := slices.BinarySearchFunc(*oldevents, SslEvent{Seq: seq}, func(i SslEvent, j SslEvent) int {
+		return cmp.Compare(i.Seq, j.Seq)
+	})
+	discardIdx := index
+	if discardIdx > 0 {
+		*oldevents = (*oldevents)[discardIdx:]
+		// common.ConntrackLog.Debugf("Discarded ssl events(egress: %v) events num: %d, cur len: %d", egress, discardIdx, len(*oldevents))
+	}
+}
+func (s *KernEventStream) discardEventsBySeq(seq uint64, egress bool) {
 	for step, events := range s.kernEvents {
 		if egress && !bpf.IsEgressStep(step) {
 			continue
@@ -186,6 +224,7 @@ func (s *KernEventStream) DiscardEventsBySeq(seq uint64, egress bool) {
 		discardIdx := index
 		if discardIdx > 0 {
 			s.kernEvents[step] = events[discardIdx:]
+			// common.ConntrackLog.Debugf("Discarded kern events, step: %d(egress: %v) events num: %d, cur len: %d", step, egress, discardIdx, len(s.kernEvents[step]))
 		}
 	}
 }
