@@ -62,6 +62,7 @@ Below are the ways to use `kyanos` options to filter request-responses you're in
 | Local Connection Ports   | `local-ports`             | `--local-ports 6379,16379` <br> Only observe request-responses on local ports 6379 and 16379. |
 | Remote Connection Ports  | `remote-ports`            | `--remote-ports 6379,16379` <br> Only observe request-responses on remote ports 6379 and 16379. |
 | Remote IP Addresses      | `remote-ips`              | `--remote-ips 10.0.4.5,10.0.4.2` <br> Only observe request-responses from remote IPs 10.0.4.5 and 10.0.4.2. |
+| Client/Server side    | `side`              | `--side client/server` <br> Only observe requests and responses when acting as a client initiating connections or as a server receiving connections. |
 
 ### Filtering by Process/Container {#filter-by-container}
 
