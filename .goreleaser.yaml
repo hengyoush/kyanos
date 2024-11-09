@@ -14,7 +14,7 @@ before:
     - sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
     - sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 15CF4D18AF4F7421
     - sudo apt update
-    - sudo apt-get install -y gcc flex bison make autoconf libelf-dev gcc-aarch64-linux-gnu libc6-dev-arm64-cross pkg-config llvm clang rsync
+    - sudo apt-get install -y gcc flex bison make autoconf libelf-dev gcc-aarch64-linux-gnu libc6-dev-arm64-cross pkg-config llvm clang rsync upx
     - git submodule update --init --recursive
 
 builds:
@@ -37,6 +37,8 @@ builds:
         - bash -c 'sudo make clean || true'
         - bash -c 'sudo make build-bpf' 
         - bash -c 'sudo make btfgen BUILD_ARCH=arm64 ARCH_BPF_NAME=arm64' 
+      post:
+        - bash -c 'upx -9 kyanos' || true
 
 
   - id: kyanos-amd64
@@ -59,6 +61,8 @@ builds:
         - bash -c 'sudo make clean || true'
         - bash -c 'sudo make build-bpf'
         - bash -c 'sudo make btfgen BUILD_ARCH=x86_64 ARCH_BPF_NAME=x86' 
+      post:
+        - bash -c 'upx -9 kyanos' || true
 
 archives:
   - builds:

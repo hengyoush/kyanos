@@ -15,7 +15,7 @@ function test() {
         ESCAPED_DOCKER_REGISTRY=$(echo "$DOCKER_REGISTRY" | sed 's/[]\/$*.^|[]/\\&/g')
         IMAGE_NAME=$ESCAPED_DOCKER_REGISTRY"library\/alpine:3.18"
     fi
-    sleep 10
+    sleep 30
     NEW_TEST_YAML="test_k8s_real.yaml"
     sed -e 's/\$IMAGE_NAME/'$IMAGE_NAME'/g' "$TEST_YAML" > $NEW_TEST_YAML
     cat $NEW_TEST_YAML

@@ -7,6 +7,8 @@ import (
 	"kyanos/common"
 	"kyanos/monitor"
 	"slices"
+
+	"github.com/jefurry/logrus"
 )
 
 type KernEventStream struct {
@@ -54,7 +56,9 @@ func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
 		Step:      event.SslEventHeader.Ke.Step,
 	})
 	if len(sslEvents) > s.maxLen {
-		common.ConntrackLog.Debugf("ssl event size: %d exceed maxLen", len(sslEvents))
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("ssl event size: %d exceed maxLen", len(sslEvents))
+		}
 	}
 	for len(sslEvents) > s.maxLen {
 		sslEvents = sslEvents[1:]
@@ -107,7 +111,9 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 		}
 		kernEvtSlice = slices.Insert(kernEvtSlice, index, *kernEvent)
 		if len(kernEvtSlice) > s.maxLen {
-			common.ConntrackLog.Debugf("kern event stream size: %d exceed maxLen", len(kernEvtSlice))
+			if common.ConntrackLog.Level >= logrus.DebugLevel {
+				common.ConntrackLog.Debugf("kern event stream size: %d exceed maxLen", len(kernEvtSlice))
+			}
 		}
 		for len(kernEvtSlice) > s.maxLen {
 			kernEvtSlice = kernEvtSlice[1:]

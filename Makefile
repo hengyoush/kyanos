@@ -73,6 +73,11 @@ kyanos: $(GO_FILES)
 	$(call msg,BINARY,$@)
 	export CGO_LDFLAGS="-Xlinker -rpath=. -static" && go build
 
+.PHONY: kyanos-compress
+kyanos-compress: $(GO_FILES)
+	$(call msg,BINARY,$@)
+	export CGO_LDFLAGS="-Xlinker -rpath=. -static" && go build && upx -9 kyanos
+
 
 .PHONY: btfgen
 btfgen:
