@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf"
+	"github.com/jefurry/logrus"
 )
 
 // var RecordFunc func(protocol.Record, *Connection4) error
@@ -147,7 +148,9 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 	existedConn := c.FindConnection4Exactly(TgidFd)
 	if existedConn != nil {
 		if !existedConn.IsIpPortEqualsWith(conn) {
-			common.ConntrackLog.Debugf("[AddConnection4] %s find existed conn with same tgidfd but ip port not same: %s", conn.ToString(), existedConn.ToString())
+			if common.ConntrackLog.Level >= logrus.DebugLevel {
+				common.ConntrackLog.Debugf("[AddConnection4] %s find existed conn with same tgidfd but ip port not same: %s", conn.ToString(), existedConn.ToString())
+			}
 			prevConn := existedConn.prevConn
 			deleteEndIdx := -1
 			for idx := len(prevConn) - 1; idx >= 0; idx-- {
@@ -168,11 +171,16 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 			atomic.AddInt64(&c.connectionAdded, 1)
 			return nil
 		} else {
-			common.ConntrackLog.Debugf("[AddConnection4] %s find existed conn with same tgidfd and same ip port", conn.ToString())
+			if common.ConntrackLog.Level >= logrus.DebugLevel {
+				common.ConntrackLog.Debugf("[AddConnection4] %s find existed conn with same tgidfd and same ip port", conn.ToString())
+			}
+
 			return nil
 		}
 	} else {
-		common.ConntrackLog.Debugf("[AddConnection4] %s store into map because no existed conn", conn.ToString())
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("[AddConnection4] %s store into map because no existed conn", conn.ToString())
+		}
 		c.connMap.Store(TgidFd, conn)
 		atomic.AddInt64(&c.connectionAdded, 1)
 		return nil
@@ -301,9 +309,13 @@ func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
 	if err == nil {
 		connInfo.NoTrace = !traceable
 		connInfoMap.Update(c.TgidFd, &connInfo, ebpf.UpdateExist)
-		common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v success!", c.ToString(), traceable)
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v success!", c.ToString(), traceable)
+		}
 	} else {
-		common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v, but no entry in map found!", c.ToString(), traceable)
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v, but no entry in map found!", c.ToString(), traceable)
+		}
 	}
 }
 
@@ -313,9 +325,13 @@ func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m
 	if err == nil {
 		connIds.NoTrace = !traceable
 		m.Update(&key, &connIds, ebpf.UpdateExist)
-		common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, success, sock key: %v", c.ToString(), traceable, key)
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, success, sock key: %v", c.ToString(), traceable, key)
+		}
 	} else {
-		common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, but no entry in map found! key: %v", c.ToString(), traceable, key)
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, but no entry in map found! key: %v", c.ToString(), traceable, key)
+		}
 	}
 }
 
@@ -330,17 +346,23 @@ func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 		if (event.Flags&uint8(common.TCP_FLAGS_SYN) != 0) && !isReq && event.Step == bpf.AgentStepTIP_IN {
 			// 接收到Server给的Syn包
 			if c.ServerSynReceived {
-				common.ConntrackLog.Debugf("[kern][handshake]%s already received server sync, but now received again!\n", c.ToString())
+				if common.ConntrackLog.Level >= logrus.DebugLevel {
+					common.ConntrackLog.Debugf("[kern][handshake]%s already received server sync, but now received again!\n", c.ToString())
+				}
 			} else {
 				c.ServerSynReceived = true
 				c.ServerSynReceivedTs = event.Ts
-				common.ConntrackLog.Debugf("[kern][handshake]%s received server sync\n", c.ToString())
+				if common.ConntrackLog.Level >= logrus.DebugLevel {
+					common.ConntrackLog.Debugf("[kern][handshake]%s received server sync\n", c.ToString())
+				}
 			}
 		}
 		if (event.Flags&uint8(common.TCP_FLAGS_ACK) != 0) && isReq && c.ServerSynReceived && !c.ClientAckSent && event.Step == bpf.AgentStepTIP_OUT {
 			c.ClientAckSent = true
 			c.ClientAckSentTs = event.Ts
-			common.ConntrackLog.Debugf("[kern][handshake]%s sent ack, complete handshake, use time: %d(%d-%d)\n", c.ToString(), c.ClientAckSentTs-c.ConnectStartTs, c.ClientAckSentTs, c.ConnectStartTs)
+			if common.ConntrackLog.Level >= logrus.DebugLevel {
+				common.ConntrackLog.Debugf("[kern][handshake]%s sent ack, complete handshake, use time: %d(%d-%d)\n", c.ToString(), c.ClientAckSentTs-c.ConnectStartTs, c.ClientAckSentTs, c.ConnectStartTs)
+			}
 		}
 	}
 	return true
@@ -440,7 +462,9 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 				if c.onRoleChanged != nil {
 					c.onRoleChanged()
 				}
-				common.ConntrackLog.Debugf("[parseStreamBuffer] Update %s role", c.ToString())
+				if common.ConntrackLog.Level >= logrus.DebugLevel {
+					common.ConntrackLog.Debugf("[parseStreamBuffer] Update %s role", c.ToString())
+				}
 				c.resetParseProgress()
 			} else {
 				if len(parseResult.ParsedMessages) > 0 && parseResult.ParsedMessages[0].IsReq() != (messageType == protocol.Request) {
@@ -454,32 +478,44 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 			pos := parser.FindBoundary(streamBuffer, messageType, 1)
 			if pos != -1 {
 				streamBuffer.RemovePrefix(pos)
-				common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue(found boundary) and continue", c.ToString(), pos, messageType.String())
+				if common.ConntrackLog.Level >= logrus.DebugLevel {
+					common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue(found boundary) and continue", c.ToString(), pos, messageType.String())
+				}
 				stop = false
 			} else if c.progressIsStucked(streamBuffer) {
 				if streamBuffer.Head().Len() > int(ke.Len) {
-					common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue", c.ToString(), streamBuffer.Head().Len()-int(ke.Len), messageType.String())
+					if common.ConntrackLog.Level >= logrus.DebugLevel {
+						common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue", c.ToString(), streamBuffer.Head().Len()-int(ke.Len), messageType.String())
+					}
 					streamBuffer.RemovePrefix(streamBuffer.Head().Len() - int(ke.Len))
 					stop = false
 				} else {
 					removed := c.checkProgress(streamBuffer)
 					if removed {
-						common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer head due to stuck from %s queue and continue", c.ToString(), messageType.String())
+						if common.ConntrackLog.Level >= logrus.DebugLevel {
+							common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer head due to stuck from %s queue and continue", c.ToString(), messageType.String())
+						}
 						stop = false
 					} else {
-						common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer head due to stuck from %s queue and stop", c.ToString(), messageType.String())
+						if common.ConntrackLog.Level >= logrus.DebugLevel {
+							common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer head due to stuck from %s queue and stop", c.ToString(), messageType.String())
+						}
 						stop = true
 					}
 				}
 			} else {
 				stop = true
 
-				common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s stop process %s queue", c.ToString(), messageType.String())
+				if common.ConntrackLog.Level >= logrus.DebugLevel {
+					common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s stop process %s queue", c.ToString(), messageType.String())
+				}
 			}
 		case protocol.NeedsMoreData:
 			removed := c.checkProgress(streamBuffer)
 			if removed {
-				common.ConntrackLog.Debugf("[parseStreamBuffer] Needs more data, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
+				if common.ConntrackLog.Level >= logrus.DebugLevel {
+					common.ConntrackLog.Debugf("[parseStreamBuffer] Needs more data, %s Removed streambuffer head due to stuck from %s queue", c.ToString(), messageType.String())
+				}
 				stop = false
 			} else {
 				// common.ConntrackLog.Debugf("[parseStreamBuffer] Needs more data, %s stop processing %s queue, headsize: %d", c.ToString(), messageType.String(), streamBuffer.Head().Len())

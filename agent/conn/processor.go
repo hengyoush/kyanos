@@ -8,6 +8,8 @@ import (
 	"kyanos/common"
 	"sync"
 	"time"
+
+	"github.com/jefurry/logrus"
 )
 
 type ProcessorManager struct {
@@ -174,7 +176,9 @@ func (p *Processor) run() {
 				} else {
 					if conn == nil {
 						missedConn := NewConnFromEvent(event, p)
-						common.ConntrackLog.Debugf("[no conn][%s]no conn found for infer event", missedConn.ToString())
+						if common.ConntrackLog.Level >= logrus.DebugLevel {
+							common.ConntrackLog.Debugf("[no conn][%s]no conn found for infer event", missedConn.ToString())
+						}
 						p.connManager.AddConnection4(TgidFd, missedConn)
 						conn = missedConn
 					} else {
@@ -193,11 +197,15 @@ func (p *Processor) run() {
 				if isProtocolInterested && !isSideNotMatched(p, conn) {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
-							common.ConntrackLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
+							if common.ConntrackLog.Level >= logrus.DebugLevel {
+								common.ConntrackLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
+							}
 							conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 						}
 						for _, sslEvent := range conn.TempSslEvents {
-							common.ConntrackLog.Debugf("%s process %d temp ssl events before infer\n", conn.ToString(), len(conn.TempSslEvents))
+							if common.ConntrackLog.Level >= logrus.DebugLevel {
+								common.ConntrackLog.Debugf("%s process %d temp ssl events before infer\n", conn.ToString(), len(conn.TempSslEvents))
+							}
 							conn.OnSslDataEvent(sslEvent.Buf, sslEvent, recordChannel)
 						}
 						conn.UpdateConnectionTraceable(true)
@@ -205,7 +213,9 @@ func (p *Processor) run() {
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
 					conn.TempConnEvents = conn.TempConnEvents[0:0]
 				} else {
-					common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideNotMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
+					if common.ConntrackLog.Level >= logrus.DebugLevel {
+						common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideNotMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
+					}
 					conn.UpdateConnectionTraceable(false)
 					// conn.OnClose(true)
 				}
@@ -221,10 +231,12 @@ func (p *Processor) run() {
 				conn.AddConnEvent(event)
 			}
 
-			if event.ConnType == bpf.AgentConnTypeTKProtocolInfer && conn.ProtocolInferred() {
-				common.ConntrackLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
-			} else {
-				common.ConntrackLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
+			if common.ConntrackLog.Level >= logrus.DebugLevel {
+				if event.ConnType == bpf.AgentConnTypeTKProtocolInfer && conn.ProtocolInferred() {
+					common.ConntrackLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
+				} else {
+					common.ConntrackLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
+				}
 			}
 		case event := <-p.syscallEvents:
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
@@ -234,20 +246,31 @@ func (p *Processor) run() {
 				continue
 			}
 			if conn != nil && !conn.tracable {
-				common.BPFEventLog.Debugf("[syscall][no-trace][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[syscall][no-trace][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+				}
 				continue
 			}
 			if conn != nil && conn.ProtocolInferred() {
-				common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+				}
 
 				conn.OnSyscallEvent(event.Buf, event, recordChannel)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSyscallEvent(event)
-				common.BPFEventLog.Debugf("[syscall][protocol unset][ts=%d][len=%d]%s | %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[syscall][protocol unset][ts=%d][len=%d]%s | %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				}
+
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
-				common.BPFEventLog.Debugf("[syscall][protocol unknown][ts=%d][len=%d]%s | %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[syscall][protocol unknown][ts=%d][len=%d]%s | %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
+				}
 			} else {
-				common.BPFEventLog.Debugf("[syscall][no conn][ts=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[syscall][no conn][ts=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
+				}
 			}
 		case event := <-p.sslEvents:
 			tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
@@ -257,21 +280,31 @@ func (p *Processor) run() {
 				continue
 			}
 			if conn != nil && !conn.tracable {
-				common.BPFEventLog.Debugf("[ssl][no-trace][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[ssl][no-trace][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
+				}
 				continue
 			}
 			if conn != nil && conn.ProtocolInferred() {
-				common.BPFEventLog.Debugf("[ssl][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[ssl][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
+				}
 
 				conn.OnSslDataEvent(event.Buf, event, recordChannel)
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 				conn.AddSslEvent(event)
-				common.BPFEventLog.Debugf("[ssl][protocol unset][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[ssl][protocol unset][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+				}
 			} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
 				conn.AddSslEvent(event)
-				common.BPFEventLog.Debugf("[ssl][protocol unknown][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[ssl][protocol unknown][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
+				}
 			} else {
-				common.BPFEventLog.Debugf("[ssl][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SslEventHeader.BufSize, string(event.Buf))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[ssl][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SslEventHeader.BufSize, string(event.Buf))
+				}
 			}
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
@@ -289,20 +322,30 @@ func (p *Processor) run() {
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					conn.OnKernEvent(event)
-					// log.Debug("[skip] skip due to protocol unset")
-					common.BPFEventLog.Debugf("[protocol-unset]%s", FormatKernEvt(event, conn))
+
+					if common.BPFEventLog.Level >= logrus.DebugLevel {
+						common.BPFEventLog.Debugf("[protocol-unset]%s", FormatKernEvt(event, conn))
+					}
 				} else if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
-					common.BPFEventLog.Debugf("%s", FormatKernEvt(event, conn))
+					if common.BPFEventLog.Level >= logrus.DebugLevel {
+						common.BPFEventLog.Debugf("%s", FormatKernEvt(event, conn))
+					}
 					conn.OnKernEvent(event)
 				}
 			} else if event.Len > 0 && conn != nil {
-				common.BPFEventLog.Debugf("[protocol-unknown]%s\n", FormatKernEvt(event, conn))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[protocol-unknown]%s\n", FormatKernEvt(event, conn))
+				}
 			} else if event.Len == 0 && conn != nil {
 				conn.OnKernEvent(event)
 			} else if conn == nil {
-				common.BPFEventLog.Debugf("[no-conn]%s\n", FormatKernEvt(event, conn))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[no-conn]%s\n", FormatKernEvt(event, conn))
+				}
 			} else {
-				common.BPFEventLog.Debugf("[other]%s\n", FormatKernEvt(event, conn))
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[other]%s\n", FormatKernEvt(event, conn))
+				}
 			}
 		}
 	}
@@ -312,10 +355,14 @@ func isSideNotMatched(p *Processor, conn *Connection4) bool {
 }
 func onRoleChanged(p *Processor, conn *Connection4) {
 	if isSideNotMatched(p, conn) {
-		common.ConntrackLog.Debugf("[onRoleChanged] %s discarded due to not matched by side", conn.ToString())
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("[onRoleChanged] %s discarded due to not matched by side", conn.ToString())
+		}
 		conn.UpdateConnectionTraceable(false)
 	} else {
-		common.ConntrackLog.Debugf("[onRoleChanged] %s actived due to matched by side", conn.ToString())
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("[onRoleChanged] %s actived due to matched by side", conn.ToString())
+		}
 		conn.UpdateConnectionTraceable(true)
 	}
 }
