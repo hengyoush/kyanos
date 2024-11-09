@@ -40,9 +40,9 @@ func init() {
 	watchCmd.PersistentFlags().Int64("resp-size", 0, "Filter based on response bytes size")
 	watchCmd.PersistentFlags().IntVar(&maxRecords, "max-records", 100, "Limit the max number of table records")
 	watchCmd.PersistentFlags().BoolVar(&options.WatchOptions.DebugOutput, "debug-output", false, "Print output to console instead display ui")
+	watchCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "Filter based on connection side. can be: server | client")
 	watchCmd.PersistentFlags().StringVarP(&options.WatchOptions.Opts, "output", "o", "", "Can be `wide`")
 	watchCmd.PersistentFlags().IntVar(&options.WatchOptions.MaxRecordContentDisplayBytes, "max-print-bytes", 1024, "Control how may bytes of record's req/resp can be printed, \n exceeded part are truncated")
-	watchCmd.PersistentFlags().StringVar(&SidePar, "side", "all", "Filter based on connection side. can be: server | client")
 	watchCmd.Flags().SortFlags = false
 	watchCmd.PersistentFlags().SortFlags = false
 	rootCmd.AddCommand(watchCmd)

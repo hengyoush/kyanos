@@ -15,7 +15,7 @@ var logger *common.Klogger = common.DefaultLog
 var rootCmd = &cobra.Command{
 	Use: `kyanos <command> [flags]`,
 	Short: "Kyanos is a command-line tool for monitoring, troubleshooting, and analyzing network issues using eBPF. \n" +
-		"It helps you quickly diagnose network-related problems in applications," +
+		"It helps you quickly diagnose network-related problems in realtime," +
 		" such as slow queries, high traffic, and other anomalies.\n" +
 		"More info: https://github.com/hengyoush/kyanos",
 	CompletionOptions: cobra.CompletionOptions{
@@ -24,7 +24,7 @@ var rootCmd = &cobra.Command{
 	DisableFlagsInUseLine: true,
 	Example: `
 sudo kyanos
-sudo kyanos watch http --pid 1234 --path /foo/bar
+sudo kyanos watch http --pids 1234 --path /foo/bar
 sudo kyanos watch redis --comands GET,SET
 sudo kyanos watch mysql --latency 100
 
@@ -44,7 +44,6 @@ var RemoteIps []string
 var LocalIps []string
 var IfName string
 var BTFFilePath string
-var BPFVerifyLogSize int
 var KernEvtPerfEventBufferSize int
 var DataEvtPerfEventBufferSize int
 var DefaultLogLevel int32
@@ -92,7 +91,6 @@ func init() {
 
 	// internal
 	rootCmd.PersistentFlags().BoolVar(&options.PerformanceMode, "performance-mode", true, "--performance false")
-	rootCmd.PersistentFlags().IntVar(&BPFVerifyLogSize, "bpf-verify-log-size", 10*1024, "--bpf-verify-log-size 1024")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "kern-perf-event-buffer-size", 1*1024*1024, "--kern-perf-event-buffer-size 1024")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "data-perf-event-buffer-size", 30*1024*1024, "--data-perf-event-buffer-size 1024")
 
@@ -104,6 +102,7 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("bpf-verify-log-size")
 	rootCmd.PersistentFlags().MarkHidden("kern-perf-event-buffer-size")
 	rootCmd.PersistentFlags().MarkHidden("data-perf-event-buffer-size")
+	rootCmd.PersistentFlags().MarkHidden("performance-mode")
 
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false

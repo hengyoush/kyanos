@@ -12,7 +12,7 @@ import (
 )
 
 var statCmd = &cobra.Command{
-	Use:   "stat [--metrics pqtsn] [--samples 10] [--group-by conn|remote-ip|remote-port|local-port|protocol] [--sort-by avg|max|p50|p90|p99]",
+	Use:   "stat [--metrics pqtsn] [--samples 10] [--group-by conn|remote-ip|remote-port|local-port|protocol|http-path] [--sort-by avg|max|p50|p90|p99]",
 	Short: "Analysis connections statistics. Aggregate metrics such as latency and size for request-response pairs.",
 	Example: `
 # Basic Usage, only count HTTP connections, print results when press 'ctlc+c' 

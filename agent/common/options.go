@@ -39,7 +39,6 @@ type AgentOptions struct {
 	TraceSide              common.SideEnum
 	IfName                 string
 	BTFFilePath            string
-	BPFVerifyLogSize       int
 	protocol.SizeFilter
 	AnalysisEnable bool
 	anc.AnalysisOptions
@@ -100,9 +99,6 @@ func ValidateAndRepairOptions(options AgentOptions) AgentOptions {
 	}
 	if newOptions.MessageFilter == nil {
 		newOptions.MessageFilter = protocol.BaseFilter{}
-	}
-	if newOptions.BPFVerifyLogSize <= 0 {
-		newOptions.BPFVerifyLogSize = 10 * 1024
 	}
 	if newOptions.PerfEventBufferSizeForData <= 0 {
 		newOptions.PerfEventBufferSizeForData = perfEventDataBufferSize

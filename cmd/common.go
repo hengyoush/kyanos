@@ -61,7 +61,6 @@ func startAgent() {
 	}
 	options.IfName = IfName
 	options.BTFFilePath = BTFFilePath
-	options.BPFVerifyLogSize = BPFVerifyLogSize
 	options.PerfEventBufferSizeForEvent = KernEvtPerfEventBufferSize
 	options.PerfEventBufferSizeForData = DataEvtPerfEventBufferSize
 
