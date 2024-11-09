@@ -176,6 +176,8 @@ github.com/mandiant/GoReSym v1.7.1 h1:rhIAoxKH+GTDXilQ2BWpfQ4zE97hVq6cv53wDSqtZl
 github.com/mandiant/GoReSym v1.7.1/go.mod h1:+mhyyzEn74xGB/s3E/N9WPXjofkFxCrDBeLzzfk4juU=
 github.com/mandiant/GoReSym v1.7.2-0.20240819162932-534ca84b42d5 h1:OyxMVWG+V2gzLNCXfLGyze3zN9Zbi2CKtAlCWtS0L64=
 github.com/mandiant/GoReSym v1.7.2-0.20240819162932-534ca84b42d5/go.mod h1:C9Cyl7dQTqNzm5KyrZ78bS54bzwMd1fu3cWDWULCzLc=
+github.com/mandiant/GoReSym v1.7.2-0.20241019185929-45d5c9d6063f h1:h0uhdT3Qs503Jnx2AGEZFTlbtJQuDu452OKpiwAZeKg=
+github.com/mandiant/GoReSym v1.7.2-0.20241019185929-45d5c9d6063f/go.mod h1:C9Cyl7dQTqNzm5KyrZ78bS54bzwMd1fu3cWDWULCzLc=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mattn/go-localereader v0.0.1 h1:ygSAOl7ZXTx4RdPYinUpg6W99U8jWvWi9Ye2JC/oIi4=

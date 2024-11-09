@@ -22,9 +22,11 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0
 	github.com/sevlyar/go-daemon v0.1.6
 	github.com/shirou/gopsutil v3.21.11+incompatible
+	github.com/smira/go-xz v0.1.0
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
 	github.com/zcalusic/sysinfo v1.1.2
+	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff
 	k8s.io/cri-api v0.31.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.24.17
@@ -104,7 +106,6 @@ require (
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/smira/go-xz v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
@@ -121,7 +122,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.30.0 // indirect
 	go.opentelemetry.io/otel/trace v1.30.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff // indirect
 	golang.org/x/crypto v0.27.0 // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
@@ -144,7 +144,7 @@ require (
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/mandiant/GoReSym v1.7.2-0.20240819162932-534ca84b42d5
+	github.com/mandiant/GoReSym v1.7.2-0.20241019185929-45d5c9d6063f
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.19.0
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
