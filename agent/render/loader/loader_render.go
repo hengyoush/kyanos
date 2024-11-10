@@ -87,7 +87,7 @@ func (m model) View() string {
 	if m.quitting {
 		s += "Kyanos exited."
 	} else {
-		s += m.spinner.View() + " Kyanos Loading..."
+		s += m.spinner.View() + "🦜 Kyanos Loading..."
 	}
 
 	s += "\n\n"
