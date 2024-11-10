@@ -560,8 +560,12 @@ func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 		return false
 	}
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
-	if !ok || time.Now().UnixMilli()-int64(common.NanoToMills(headTime)) > maxAllowStuckTime {
+	stuckDuration := time.Now().UnixMilli() - int64(common.NanoToMills(headTime))
+	if !ok || stuckDuration > maxAllowStuckTime {
 		return true
+	}
+	if common.ConntrackLog.Level >= logrus.DebugLevel {
+		common.ConntrackLog.Debugf("%s stucked for %d ms, less than %d", c.ToString(), stuckDuration, maxAllowStuckTime)
 	}
 	return false
 }
