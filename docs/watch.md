@@ -25,6 +25,9 @@ Since no filter is specified, `kyanos` will attempt to capture all traffic it ca
 When you execute this command, you’ll see a table like this:
 ![kyanos watch result](/watch-result.jpg)
 
+> [!TIP]
+> By default, watch collects 100 request-response records. You can specify this using the `--max-records` option.
+
 Each column represents:
 
 | Column Name       | Description                                                                                                 | Example                               |
