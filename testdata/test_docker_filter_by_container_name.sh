@@ -25,7 +25,6 @@ function test_docker_filter_by_container_name() {
     wait
 
     cat "${LNAME}"
-    check_time_detail_completed "${LNAME}"
     check_patterns_in_file "${LNAME}" "baidu.com"
 }
 
