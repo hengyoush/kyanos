@@ -286,7 +286,7 @@ func (m *model) updateRowsInTable() {
 					row = append(row, fmt.Sprintf("%d", i+idx))
 				} else {
 					rowData := cols[colIdx].data(record)
-					row = append(row, strings.Replace(rowData, "-0.000", "-", -1))
+					row = append(row, strings.Replace(rowData, "-0.00", "-", -1))
 					cur, ok := colMaxWidth[colIdx]
 					if ok {
 						if len(rowData) > cur {
