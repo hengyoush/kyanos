@@ -21,9 +21,11 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf/rlimit"
+	gops "github.com/google/gops/agent"
 )
 
 func SetupAgent(options ac.AgentOptions) {
+	// startGopsServer(options)
 	options = ac.ValidateAndRepairOptions(options)
 	common.LaunchEpochTime = GetMachineStartTimeNano()
 	stopper := options.Stopper
@@ -68,14 +70,18 @@ func SetupAgent(options ac.AgentOptions) {
 		kernelVersion := compatible.GetCurrentKernelVersion()
 		options.Kv = &kernelVersion
 		var err error
-		bf, err := loader.LoadBPF(options)
-		if err != nil {
-			if bf != nil {
-				bf.Close()
+		{
+			bf, err := loader.LoadBPF(options)
+			if err != nil {
+				if bf != nil {
+					bf.Close()
+				}
+				return
 			}
-			return
+			_bf.Links = bf.Links
+			_bf.Objs = bf.Objs
 		}
-		*_bf = *bf
+
 		err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), 2048, options.CustomSyscallEventHook)
 		if err != nil {
 			return
@@ -92,17 +98,23 @@ func SetupAgent(options ac.AgentOptions) {
 		if err != nil {
 			return
 		}
-		bf.AttachProgs(options)
-		options.LoadPorgressChannel <- "🍹 All programs attached"
-		options.LoadPorgressChannel <- "🍭 Waiting for events.."
-		time.Sleep(500 * time.Millisecond)
-		options.LoadPorgressChannel <- "quit"
+		_bf.AttachProgs(options)
+		if !options.WatchOptions.DebugOutput {
+			options.LoadPorgressChannel <- "🍹 All programs attached"
+			options.LoadPorgressChannel <- "🍭 Waiting for events.."
+			time.Sleep(500 * time.Millisecond)
+			options.LoadPorgressChannel <- "quit"
+		}
+		defer wg.Done()
 	}(&_bf)
 	defer func() {
 		_bf.Close()
 	}()
 	if !options.WatchOptions.DebugOutput {
 		loader_render.Start(ctx, options)
+	} else {
+		wg.Wait()
+		common.AgentLog.Info("Waiting for events..")
 	}
 
 	stop := false
@@ -113,8 +125,6 @@ func SetupAgent(options ac.AgentOptions) {
 		pm.StopAll()
 		stop = true
 	}()
-
-	// common.AgentLog.Info("Waiting for events..")
 
 	if options.InitCompletedHook != nil {
 		options.InitCompletedHook()
@@ -132,4 +142,14 @@ func SetupAgent(options ac.AgentOptions) {
 	common.AgentLog.Infoln("Kyanos Stopped: ", stop)
 
 	return
+}
+
+func startGopsServer(opts ac.AgentOptions) {
+	if opts.WatchOptions.DebugOutput {
+		if err := gops.Listen(gops.Options{}); err != nil {
+			common.AgentLog.Fatalf("agent.Listen err: %v", err)
+		} else {
+			common.AgentLog.Info("gops server started")
+		}
+	}
 }

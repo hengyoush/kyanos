@@ -30,14 +30,14 @@ import (
 )
 
 type BPF struct {
-	links *list.List        // close
-	objs  *bpf.AgentObjects // close
+	Links *list.List        // close
+	Objs  *bpf.AgentObjects // close
 }
 
 func (b *BPF) Close() {
-	b.objs.Close()
-	if b.links != nil {
-		for e := b.links.Front(); e != nil; e = e.Next() {
+	b.Objs.Close()
+	if b.Links != nil {
+		for e := b.Links.Front(); e != nil; e = e.Next() {
 			if e.Value == nil {
 				continue
 			}
@@ -90,7 +90,7 @@ func LoadBPF(options ac.AgentOptions) (*BPF, error) {
 		filterFunctions(spec, *options.Kv)
 		err = spec.LoadAndAssign(objs, collectionOptions)
 	}
-	bf.objs = objs
+	bf.Objs = objs
 	bpf.Objs = objs
 	options.LoadPorgressChannel <- "🍎 Loaded eBPF maps & programs."
 
@@ -139,12 +139,12 @@ func (bf *BPF) AttachProgs(options ac.AgentOptions) error {
 	options.LoadPorgressChannel <- "🍆 Attached base eBPF programs."
 
 	if !options.DisableOpensslUprobe {
-		attachOpenSslUprobes(links, options, options.Kv, bf.objs)
+		attachOpenSslUprobes(links, options, options.Kv, bf.Objs)
 		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
 	attachNfFunctions(links)
 	options.LoadPorgressChannel <- "🥪 Attached conntrack eBPF programs."
-	bf.links = links
+	bf.Links = links
 	return nil
 }
 
