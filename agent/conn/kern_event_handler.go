@@ -160,7 +160,7 @@ func (s *KernEventStream) FindEventsBySeqAndLen(step bpf.AgentStepT, seq uint64,
 			result = append(result, each)
 		} else if each.seq <= end && each.seq+uint64(each.len) >= end {
 			result = append(result, each)
-		} else if each.seq <= start && each.seq+uint64(each.len) >= end {
+		} else if each.seq >= start && each.seq+uint64(each.len) <= end {
 			result = append(result, each)
 		} else if each.seq > end {
 			break
