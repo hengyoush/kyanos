@@ -268,8 +268,8 @@ func (r *AnnotatedRecord) String(options AnnotatedRecordToStringOptions) string 
 	result += r.Record.String(options.RecordToStringOptions)
 	result += "\n"
 	if options.IncludeConnDesc {
-		result += fmt.Sprintf("[conn] [local addr]=%s:%d [remote addr]=%s:%d [side]=%s [ssl]=%v\n",
-			r.LocalAddr.String(), r.LocalPort, r.RemoteAddr.String(), r.RemotePort, r.Side.String(), r.IsSsl)
+		result += fmt.Sprintf("[conn] [pid=%d][local addr]=%s:%d [remote addr]=%s:%d [side]=%s [ssl]=%v\n",
+			r.Pid, r.LocalAddr.String(), r.LocalPort, r.RemoteAddr.String(), r.RemotePort, r.Side.String(), r.IsSsl)
 	}
 	if _, ok := options.MetricTypeSet[TotalDuration]; ok {
 		result += fmt.Sprintf("[total duration] = %.3f(%s)(start=%s, end=%s)\n", common.ConvertDurationToMillisecondsIfNeeded(float64(r.TotalDuration), nano), timeUnitName(nano),

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -151,6 +152,20 @@ var (
 		width:      15,
 		metricType: common.ReadFromSocketBufferDuration,
 	}
+	startTimeCol watchCol = watchCol{
+		name: "StartTime",
+		cmp: func(c1, c2 *common.AnnotatedRecord, reverse bool) int {
+			if reverse {
+				return cmp.Compare(c2.StartTs, c1.StartTs)
+			} else {
+				return cmp.Compare(c1.StartTs, c2.StartTs)
+			}
+		},
+		data: func(c *common.AnnotatedRecord) string {
+			return time.Unix(0, int64(c.StartTs)).Format("2006-01-02 15:04:05.000")
+		},
+		width: 10,
+	}
 )
 
 type model struct {
@@ -199,11 +214,11 @@ func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialW
 
 func initWatchCols(wide bool) {
 	cols = make([]watchCol, 0)
-	cols = []watchCol{idCol, connCol, protoCol, totalTimeCol, reqSizeCol, respSizeCol}
-	if wide {
-		cols = slices.Insert(cols, 1, processCol)
-	}
+	cols = []watchCol{idCol, startTimeCol, connCol, protoCol, totalTimeCol, reqSizeCol, respSizeCol}
 	cols = append(cols, netInternalCol, readSocketCol)
+	if wide {
+		cols = slices.Insert(cols, 2, processCol)
+	}
 }
 
 func initDetailViewKeyMap(cols []watchCol) {
@@ -335,7 +350,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
-		case "1", "2", "3", "4", "5", "6", "7", "8":
+		case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 			i, err := strconv.Atoi(msg.String())
 			if !m.chosen {
 				if err == nil {
@@ -367,8 +382,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.viewport.SetContent(
 						timeDetail + "\n" + line + "\n" +
 							r.String(common.AnnotatedRecordToStringOptions{
-								Nano:          false,
-								MetricTypeSet: common.MetricTypeSet{common.TotalDuration: true},
+								Nano:            false,
+								MetricTypeSet:   common.MetricTypeSet{common.TotalDuration: true},
+								IncludeConnDesc: true,
 							}) + "\n" + line + "\n" +
 							"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), m.options.MaxRecordContentDisplayBytes) + "\n" + line +
 							"\n[Response]\n\n" + c.TruncateString(r.Resp.FormatToString(), m.options.MaxRecordContentDisplayBytes))
