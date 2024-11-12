@@ -329,9 +329,7 @@ func (m *model) timeLimitReached() bool {
 func (m *model) getAnalysisResult() (noresult bool) {
 	m.options.HavestSignal <- struct{}{}
 	connstats := <-m.resultChannel
-	c.DefaultLog.Warnf("Received %d events", len(connstats))
 	if connstats != nil {
-		c.DefaultLog.Warnf("Received %d events", len(connstats))
 		m.connstats = &connstats
 	} else {
 		lock.Lock()
@@ -339,10 +337,8 @@ func (m *model) getAnalysisResult() (noresult bool) {
 	}
 	if m.connstats != nil {
 		m.updateRowsInTable()
-		c.DefaultLog.Warnf("Received %d events in 2", len(*m.connstats))
 		return false
 	} else {
-		c.DefaultLog.Warnf("No result received")
 		return true
 	}
 }
@@ -554,7 +550,6 @@ func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, option
 			case r := <-ch:
 				if r != nil {
 					lock.Lock()
-					c.DefaultLog.Warnf("Received %d events in go func", len(r))
 					m.connstats = &r
 					lock.Unlock()
 					prog.Send(rc.TickMsg{})

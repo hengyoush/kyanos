@@ -196,7 +196,6 @@ func (a *Analyzer) harvest() []*ConnStat {
 	if a.AnalysisOptions.CleanWhenHarvest {
 		a.Aggregators = make(map[analysis_common.ClassId]*aggregator)
 	}
-	common.DefaultLog.Warnf("harvested %d records\n", len(result))
 	return result
 }
 
