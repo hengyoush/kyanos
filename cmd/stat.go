@@ -132,7 +132,7 @@ func init() {
 	statCmd.PersistentFlags().BoolVar(&slowMode, "slow", false, "Find slowest records")
 	statCmd.PersistentFlags().BoolVar(&bigReqModel, "bigreq", false, "Find biggest request size records")
 	statCmd.PersistentFlags().BoolVar(&bigRespModel, "bigresp", false, "Find biggest response size records")
-	statCmd.PersistentFlags().IntVar(&timeLimit, "time", 10, "")
+	statCmd.PersistentFlags().IntVar(&timeLimit, "time", 0, "")
 	// statCmd.PersistentFlags().IntVarP(&duration, "duration", "d", 10, "")
 
 	// common

@@ -158,7 +158,10 @@ func CreateAnalyzer(recordsChannel <-chan *analysis_common.AnnotatedRecord, opts
 }
 
 func (a *Analyzer) Run() {
-	defer close(a.resultChannel)
+	defer func() {
+		time.Sleep(1 * time.Second)
+		go close(a.resultChannel)
+	}()
 	for {
 		select {
 		// case <-a.stopper:
@@ -193,6 +196,7 @@ func (a *Analyzer) harvest() []*ConnStat {
 	if a.AnalysisOptions.CleanWhenHarvest {
 		a.Aggregators = make(map[analysis_common.ClassId]*aggregator)
 	}
+	common.DefaultLog.Warnf("harvested %d records\n", len(result))
 	return result
 }
 

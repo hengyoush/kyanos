@@ -72,7 +72,8 @@ func (a *AnalysisOptions) Init() {
 }
 
 func (a AnalysisOptions) EnableBatchModel() bool {
-	return a.SlowMode || a.BigReqMode || a.BigRespMode
+	return a.TimeLimit > 0
+	// return a.SlowMode || a.BigReqMode || a.BigRespMode
 }
 
 func (a *AnalysisOptions) disableBatchModel() {

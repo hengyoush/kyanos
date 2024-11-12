@@ -329,13 +329,20 @@ func (m *model) timeLimitReached() bool {
 func (m *model) getAnalysisResult() (noresult bool) {
 	m.options.HavestSignal <- struct{}{}
 	connstats := <-m.resultChannel
+	c.DefaultLog.Warnf("Received %d events", len(connstats))
 	if connstats != nil {
+		c.DefaultLog.Warnf("Received %d events", len(connstats))
 		m.connstats = &connstats
+	} else {
+		lock.Lock()
+		lock.Unlock()
 	}
 	if m.connstats != nil {
 		m.updateRowsInTable()
+		c.DefaultLog.Warnf("Received %d events in 2", len(*m.connstats))
 		return false
 	} else {
+		c.DefaultLog.Warnf("No result received")
 		return true
 	}
 }
@@ -507,7 +514,7 @@ func (m *model) viewStatTable() string {
 			Bold(false).
 			Foreground(lipgloss.Color("#FFF7DB")).Background(lipgloss.Color(rc.ColorGrid(1, 5)[2][0]))
 
-		if m.options.EnableBatchModel() && m.timeLimitReached() {
+		if m.options.EnableBatchModel() && m.timeLimitReached() || (m.connstats != nil && len(*m.connstats) > 0) {
 			s += fmt.Sprintf("\n %s \n\n", titleStyle.Render(" Colleted events are here! "))
 			s += rc.BaseTableStyle.Render(curTable.View()) + "\n  " + curTable.HelpView() + "\n\n  " + m.additionHelp.View(sortByKeyMap)
 		} else {
@@ -547,6 +554,7 @@ func StartStatRender(ctx context.Context, ch <-chan []*analysis.ConnStat, option
 			case r := <-ch:
 				if r != nil {
 					lock.Lock()
+					c.DefaultLog.Warnf("Received %d events in go func", len(r))
 					m.connstats = &r
 					lock.Unlock()
 					prog.Send(rc.TickMsg{})

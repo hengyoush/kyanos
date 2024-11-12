@@ -84,7 +84,7 @@ kyanos目前支持通过 `--group-by` 指定的指标如下：
 - bigreq：分析大请求。
 - bigresp：分析大响应。
 
-当指定了以上任意一个选项，stat 命令会收集流量10s（可通过--time选项指定收集时间）：
+同时可以通过`--time`选项指定收集时间，如`--time 10`，stat 命令会收集流量10s：
 
 ![kyanos stat fast](/qs-stat-slow.jpg) 
 
@@ -97,10 +97,10 @@ kyanos目前支持通过 `--group-by` 指定的指标如下：
 
 
 ### 分析慢请求
-快速找到哪一个远程ip的HTTP请求最慢：
+抓取10s内的流量，快速找到哪一个远程ip的HTTP请求最慢：
 
 ```bash
-./kyanos stat http --slow
+./kyanos stat http --slow --time 10
 ```
 
 ### 分析大请求和大响应

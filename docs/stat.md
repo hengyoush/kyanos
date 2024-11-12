@@ -84,7 +84,7 @@ If you find it difficult to remember all these options, the `stat` command offer
 - `bigreq`: Analyze large requests.
 - `bigresp`: Analyze large responses.
 
-When you specify any of these options, the `stat` command will collect traffic for 10 seconds (you can customize this duration using the `--time` option):
+You can also use the --time option to specify the data collection period. For example, --time 10 will have the stat command collect traffic for 10 seconds.
 
 ![kyanos stat fast](/qs-stat-slow.jpg)
 
