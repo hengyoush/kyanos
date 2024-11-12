@@ -1,18 +1,15 @@
 package loader
 
 import (
-	"cmp"
 	"container/list"
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	ac "kyanos/agent/common"
 	"kyanos/agent/compatible"
 	"kyanos/agent/uprobe"
 	"kyanos/bpf"
 	"kyanos/common"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -24,9 +21,7 @@ import (
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/features"
 	"github.com/cilium/ebpf/link"
-	"github.com/emirpasic/gods/maps/treemap"
 	"github.com/spf13/viper"
-	"github.com/zcalusic/sysinfo"
 )
 
 type BPF struct {
@@ -146,72 +141,6 @@ func (bf *BPF) AttachProgs(options ac.AgentOptions) error {
 	options.LoadPorgressChannel <- "🥪 Attached conntrack eBPF programs."
 	bf.Links = links
 	return nil
-}
-
-func getBestMatchedBTFFile() ([]uint8, error) {
-
-	var si sysinfo.SysInfo
-	si.GetSysInfo()
-	common.AgentLog.Debugf("[sys info] vendor: %s, os_arch: %s, kernel_arch: %s", si.OS.Vendor, si.OS.Architecture, si.Kernel.Architecture)
-
-	osInfo, err := common.GetOSInfo()
-	osId := osInfo.GetOSReleaseFieldValue(common.OS_ID)
-	versionId := strings.Replace(osInfo.GetOSReleaseFieldValue(common.OS_VERSION_ID), "\"", "", -1)
-	kernelRelease := osInfo.GetOSReleaseFieldValue(common.OS_KERNEL_RELEASE)
-	arch := osInfo.GetOSReleaseFieldValue(common.OS_ARCH)
-
-	btfFileDir := fmt.Sprintf("custom-archive/%s/%s/%s", osId, versionId, arch)
-	dir, err := bpf.BtfFiles.ReadDir(btfFileDir)
-	if err != nil {
-		common.AgentLog.Warnf("btf file not exists, path: %s", btfFileDir)
-	}
-	btfFileNames := treemap.NewWithStringComparator()
-	for _, entry := range dir {
-		btfFileName := entry.Name()
-		if idx := strings.Index(btfFileName, ".btf"); idx != -1 {
-			btfFileName = btfFileName[:idx]
-			btfFileNames.Put(btfFileName, entry)
-		}
-	}
-
-	release := kernelRelease
-	if value, found := btfFileNames.Get(release); found {
-		common.AgentLog.Debug("find btf file exactly!")
-		dirEntry := value.(fs.DirEntry)
-		fileName := dirEntry.Name()
-		file, err := bpf.BtfFiles.ReadFile(btfFileDir + "/" + fileName)
-		if err == nil {
-			return file, nil
-		}
-	} else {
-		common.AgentLog.Warnf("find btf file exactly failed, try to find a lower version btf file...")
-	}
-
-	sortedBtfFileNames := btfFileNames.Keys()
-	slices.SortFunc(sortedBtfFileNames, func(a, b interface{}) int {
-		return cmp.Compare(a.(string), b.(string))
-	})
-	var result string
-	var commonPrefixLength = 0
-	for _, btfFileName := range btfFileNames.Keys() {
-		prefix := common.CommonPrefix(btfFileName.(string), release)
-		if len(prefix) > commonPrefixLength {
-			result = btfFileName.(string)
-			commonPrefixLength = len(prefix)
-		}
-	}
-	if commonPrefixLength != 0 && result != "" {
-		value, _ := btfFileNames.Get(result)
-		dirEntry := value.(fs.DirEntry)
-		fileName := dirEntry.Name()
-		common.AgentLog.Debugf("find a  btf file may be success: %s", fileName)
-		file, err := bpf.BtfFiles.ReadFile(btfFileDir + "/" + fileName)
-		if err == nil {
-			return file, nil
-		}
-	}
-	log.Fatalln("can't start kyanos because no available btf file, please refer this url: https://hengyoush.github.io/kyanos/quickstart.html for more info.")
-	return nil, errors.New("no btf file found to load")
 }
 
 // writeToFile writes the []uint8 slice to a specified file in the system's temp directory.

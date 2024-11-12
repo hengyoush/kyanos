@@ -1,21 +1,28 @@
 package loader
 
 import (
+	"cmp"
 	"context"
 	"debug/elf"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	ac "kyanos/agent/common"
 	"kyanos/bpf"
 	"kyanos/common"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/cilium/ebpf/btf"
+	"github.com/emirpasic/gods/maps/treemap"
+	"github.com/zcalusic/sysinfo"
 	"golang.org/x/sys/unix"
 )
 
@@ -35,6 +42,27 @@ const (
 	MirrorOpenAnolis
 )
 
+func generateBTF(fileBytes []byte) (*btf.Spec, error) {
+	if fileBytes == nil {
+		return nil, nil
+	}
+
+	btfFilePath, err := writeToFile(fileBytes, ".kyanos.btf")
+	if err != nil {
+		common.AgentLog.Warnf("failed write embeded btf file to disk: %+v", err)
+		return nil, err
+	}
+	defer os.Remove(btfFilePath)
+
+	btfPath, err := btf.LoadSpec(btfFilePath)
+	if err != nil {
+		common.AgentLog.Warnf("can't load btf spec: %v (embedded in kyanos)", err)
+		return nil, err
+	}
+
+	return btfPath, nil
+}
+
 func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
 	if bpf.IsKernelSupportHasBTF() {
 		return nil
@@ -45,25 +73,18 @@ func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
 	if options.BTFFilePath != "" {
 		btfPath, err := btf.LoadSpec(options.BTFFilePath)
 		if err != nil {
-			common.AgentLog.Fatalf("can't load btf spec: %v", err)
+			common.AgentLog.Fatalf("can't load btf spec from file %s: %v", options.BTFFilePath, err)
 		}
 		spec = btfPath
 		options.LoadPorgressChannel <- "starting load BTF file: success!"
 	} else {
-		fileBytes, err := getBestMatchedBTFFile()
-		if err == nil {
+		fileBytes, err := getBestMatchedBTFFile(true)
+		if err == nil && fileBytes != nil {
 			needGenerateBTF := fileBytes != nil
 			if needGenerateBTF {
-				btfFilePath, err := writeToFile(fileBytes, ".kyanos.btf")
-				if err == nil {
-					defer os.Remove(btfFilePath)
-					btfPath, err := btf.LoadSpec(btfFilePath)
-					if err != nil {
-						common.AgentLog.Warnf("can't load btf spec: %v (embedded in kyanos)", err)
-					}
-					spec = btfPath
-				} else {
-					common.AgentLog.Warnf("failed write embeded btf file to disk: %+v", err)
+				spec, err = generateBTF(fileBytes)
+				if err != nil {
+					common.AgentLog.Warnf("failed to generate btf file: %+v", err)
 				}
 			}
 		} else {
@@ -77,8 +98,24 @@ func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
 		btfSpec, _, err := loadBTFSpecFallback("")
 		if err != nil {
 			common.AgentLog.Warnf("failed to get btf file from network: %+v", err)
+		} else {
+			spec = btfSpec
 		}
-		spec = btfSpec
+	}
+
+	if spec == nil {
+		fileBytes, err := getBestMatchedBTFFile(false)
+		if err == nil && fileBytes != nil {
+			needGenerateBTF := fileBytes != nil
+			if needGenerateBTF {
+				spec, err = generateBTF(fileBytes)
+				if err != nil {
+					common.AgentLog.Warnf("failed to generate btf file (best matched): %+v", err)
+				}
+			}
+		} else {
+			common.AgentLog.Warnf("failed to load embedded btf file (best matched): %+v", err)
+		}
 	}
 
 	if spec == nil {
@@ -332,4 +369,74 @@ func loadSpecFromELF(path string) (spec *btf.Spec, err error) {
 
 	spec, err = btf.LoadSpecFromReader(btfSection.ReaderAt)
 	return spec, err
+}
+
+func getBestMatchedBTFFile(findExactly bool) ([]uint8, error) {
+
+	var si sysinfo.SysInfo
+	si.GetSysInfo()
+	common.AgentLog.Debugf("[sys info] vendor: %s, os_arch: %s, kernel_arch: %s", si.OS.Vendor, si.OS.Architecture, si.Kernel.Architecture)
+
+	osInfo, err := common.GetOSInfo()
+	osId := osInfo.GetOSReleaseFieldValue(common.OS_ID)
+	versionId := strings.Replace(osInfo.GetOSReleaseFieldValue(common.OS_VERSION_ID), "\"", "", -1)
+	kernelRelease := osInfo.GetOSReleaseFieldValue(common.OS_KERNEL_RELEASE)
+	arch := osInfo.GetOSReleaseFieldValue(common.OS_ARCH)
+
+	btfFileDir := fmt.Sprintf("custom-archive/%s/%s/%s", osId, versionId, arch)
+	dir, err := bpf.BtfFiles.ReadDir(btfFileDir)
+	if err != nil {
+		common.AgentLog.Warnf("btf file not exists, path: %s", btfFileDir)
+	}
+	btfFileNames := treemap.NewWithStringComparator()
+	for _, entry := range dir {
+		btfFileName := entry.Name()
+		if idx := strings.Index(btfFileName, ".btf"); idx != -1 {
+			btfFileName = btfFileName[:idx]
+			btfFileNames.Put(btfFileName, entry)
+		}
+	}
+
+	release := kernelRelease
+	if value, found := btfFileNames.Get(release); found {
+		common.AgentLog.Debug("find btf file exactly!")
+		dirEntry := value.(fs.DirEntry)
+		fileName := dirEntry.Name()
+		file, err := bpf.BtfFiles.ReadFile(btfFileDir + "/" + fileName)
+		if err == nil {
+			return file, nil
+		}
+	} else {
+		if findExactly {
+			return nil, nil
+		} else {
+			common.AgentLog.Warnf("find btf file exactly failed, try to find a lower version btf file...")
+		}
+	}
+
+	sortedBtfFileNames := btfFileNames.Keys()
+	slices.SortFunc(sortedBtfFileNames, func(a, b interface{}) int {
+		return cmp.Compare(a.(string), b.(string))
+	})
+	var result string
+	var commonPrefixLength = 0
+	for _, btfFileName := range btfFileNames.Keys() {
+		prefix := common.CommonPrefix(btfFileName.(string), release)
+		if len(prefix) > commonPrefixLength {
+			result = btfFileName.(string)
+			commonPrefixLength = len(prefix)
+		}
+	}
+	if commonPrefixLength != 0 && result != "" {
+		value, _ := btfFileNames.Get(result)
+		dirEntry := value.(fs.DirEntry)
+		fileName := dirEntry.Name()
+		common.AgentLog.Debugf("find a  btf file may be success: %s", fileName)
+		file, err := bpf.BtfFiles.ReadFile(btfFileDir + "/" + fileName)
+		if err == nil {
+			return file, nil
+		}
+	}
+	log.Fatalln("can't start kyanos because no available btf file, please refer this url: https://hengyoush.github.io/kyanos/quickstart.html for more info.")
+	return nil, errors.New("no btf file found to load")
 }
