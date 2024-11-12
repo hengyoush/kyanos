@@ -26,8 +26,8 @@ import (
 
 func SetupAgent(options ac.AgentOptions) {
 	if enabled, err := common.IsEnableBPF(); err == nil && !enabled {
-		common.AgentLog.Error("BPF is not enabled in your kernel, this might be your kernel is too old," +
-			" please check requriements in https://kyanos.pages.dev/quickstart.html#installation-requirements.")
+		common.AgentLog.Error("BPF is not enabled in your kernel. This might be because your kernel version is too old. " +
+			"Please check the requirements for Kyanos at https://kyanos.pages.dev/quickstart.html#installation-requirements.")
 	}
 
 	// startGopsServer(options)

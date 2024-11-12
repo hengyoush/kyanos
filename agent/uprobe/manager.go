@@ -24,10 +24,10 @@ func StartHandleSchedExecEvent() chan *bpf.AgentProcessExecEvent {
 	go func() {
 		for event := range ch {
 			go func(e *bpf.AgentProcessExecEvent) {
-				// delay some time to give the process time to map ssl lib
-				// but still have chances that the process doesn't mapping ssl lib
-				// at start time.
-				// TODO may be there is a better way to handle this
+				// Delay some time to give the process time to map the SSL library
+				// but there is still a chance that the process doesn't map the SSL library
+				// at the start time.
+				// TODO: There may be a better way to handle this.
 				time.Sleep(1000 * time.Millisecond)
 				handleSchedExecEvent(e)
 			}(event)

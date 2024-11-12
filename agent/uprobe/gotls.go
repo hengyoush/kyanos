@@ -308,7 +308,7 @@ func ResolveSymbolWithEachGoPrefix(e *elf.File, symbolName string) uint64 {
 	goPrefixies := []string{"go.", "go:"}
 	for _, prefix := range goPrefixies {
 		targetSymbolName := prefix + symbolName
-		// 遍历所有符号表，查找符号
+		// Traverse all symbol tables to find the symbol
 		for _, section := range e.Sections {
 			if section.Type == elf.SHT_SYMTAB || section.Type == elf.SHT_DYNSYM {
 				symbols, err := e.Symbols()
