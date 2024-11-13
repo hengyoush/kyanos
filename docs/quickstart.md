@@ -9,7 +9,14 @@ next: false
 
 ## Installation Requirements
 
-- Kernel version 3.10.0-957 or higher
+**Kernel Version Requirements**
+- 3.x: Kernel version 3.10.0-957 and above
+- 4.x: Kernel version 4.14 and above
+- 5.x, 6.x: Fully supported
+
+**Architecture Support**
+- amd64
+- arm64
 
 ## Installation and Running {#prerequire}
 

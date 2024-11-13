@@ -9,7 +9,7 @@ prev: false
 
 Kyanos is a Network Traffic Analyzer that provides real-time, packet-level to protocol-level visibility into a host's internal network, capturing and analyzing all inbound and outbound traffic.
 
-## Why Should You Use Kyanos?
+## Why Kyanos?
 
 > There are already many network troubleshooting tools available, such as tcpdump, iftop, and netstat. So, what benefits does Kyanos offer?
 
