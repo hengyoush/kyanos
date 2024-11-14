@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "Kyanos"
   text: "A Simple & Powerful Network Tracing Tool"
-  tagline: Provides real-time, packet-level to protocol-level visibility into a host's internal network
+  tagline: Visualize the time packets spend in the kernel, watch & analyze.
   image:
     src: /kyanos.png
     alt: Kyanos
@@ -22,8 +22,8 @@ hero:
 
 features:
       - icon: 🚀
-        title: Oriented towards developer
-        details: User-friendly, focusing on the Layer 7 protocol, capture and analyze application layer network performance with a single command.
+        title: Easy-to-use
+        details: Focusing on the Layer 7 protocol, capture and analyze application layer network performance with a single command.
         link: ./how-to
         linkText: Learn how to use kyanos
       - icon: 🎯️

@@ -16,7 +16,7 @@
 [![Share](https://img.shields.io/badge/share-0088CC?logo=telegram&logoColor=white)](https://t.me/share/url?url=https://github.com/hengyoush/kyanos&text=Check%20out%20this%20project%20on%20GitHub)
 
 ## Table of Contents
-- [Overview](#-overview)
+- [What is kyanos](#-what-is-kyanos)
 - [Examples](#-examples)
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
@@ -25,7 +25,7 @@
 - [Feedback and Contributions](#-feedback-and-contributions)
 - [Contacts](#%EF%B8%8F-contacts)
 
-## Overview
+## What is kyanos
 Kyanos is an **eBPF-based** network issue analysis tool that enables you to capture network requests, such as HTTP, Redis, and MySQL requests.   
 It also helps you analyze abnormal network issues and quickly troubleshooting without the complex steps of packet capturing, downloading, and analysis.
 

@@ -14,7 +14,7 @@
 [![Share](https://img.shields.io/badge/share-0088CC?logo=telegram&logoColor=white)](https://t.me/share/url?url=https://github.com/hengyoush/kyanos&text=Check%20out%20this%20project%20on%20GitHub)
 
 ## Table of Contents
-- [Overview](#-overview)
+- [What is Kyanos](#-what-is-kyanos)
 - [Examples](#-examples)
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
@@ -23,7 +23,7 @@
 - [Feedback and Contributions](#-feedback-and-contributions)
 - [Contacts](#%EF%B8%8F-contacts)
 
-## Overview
+## What is kyanos
 Kyanos 是一个网络流量采集和分析工具，它提供如下特性：
 1. **强大的流量过滤功能**：不仅可以根据传统 IP/端口 等信息过滤，还支持根据：进程/容器、L7协议信息、请求/响应字节数、耗时等过滤你想要的数据。
 ```bash
