@@ -162,7 +162,7 @@ var (
 			}
 		},
 		data: func(c *common.AnnotatedRecord) string {
-			return time.Unix(0, int64(c.StartTs)).Format("2006-01-02 15:04:05.000")
+			return time.Unix(0, int64(c.StartTs)).Format("15:04:05.000")
 		},
 		width: 10,
 	}
@@ -466,7 +466,7 @@ func (m *model) View() string {
 	} else {
 		var s string
 		if !m.staticRecord {
-			s += fmt.Sprintf("\n %s Events received: %d\n\n", m.spinner.View(), len(m.table.Rows()))
+			s += fmt.Sprintf("\n %s Events received: %d/%d\n\n", m.spinner.View(), len(m.table.Rows()), m.options.MaxRecords)
 		} else {
 			s += fmt.Sprintf("\n Events Num: %d\n\n", len(m.table.Rows()))
 		}
