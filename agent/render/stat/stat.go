@@ -258,7 +258,13 @@ func connstatPercentileSortFunc(c1, c2 *analysis.ConnStat, line float64, m commo
 }
 func (m *model) sortConnstats(connstats *[]*analysis.ConnStat) {
 	metric := m.options.EnabledMetricTypeSet.GetFirstEnabledMetricType()
-	switch m.sortBy {
+	var sortBy rc.SortBy
+	if !m.options.Overview && m.sortBy >= 2 {
+		sortBy = m.sortBy + 1
+	} else {
+		sortBy = m.sortBy
+	}
+	switch sortBy {
 	case max:
 		slices.SortFunc(*connstats, func(c1, c2 *analysis.ConnStat) int {
 			if m.reverse {
@@ -378,13 +384,12 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "1", "2", "3", "4", "5", "6", "7", "8":
 			i, err := strconv.Atoi(strings.TrimPrefix(msg.String(), "ctrl+"))
 			curTable := m.curTable()
-			if i >= 2 && !m.options.Overview {
-				i++
-			}
 			if err == nil && (i >= int(none) && i < int(end)) &&
 				(i >= 0 && i < len(curTable.Columns())) {
 				prevSortBy := m.sortBy
+
 				m.sortBy = rc.SortBy(i)
+
 				m.reverse = !m.reverse
 				cols := curTable.Columns()
 				if prevSortBy != none {
@@ -392,7 +397,7 @@ func (m *model) updateStatTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 					col.Title = strings.TrimRight(col.Title, "↑")
 					col.Title = strings.TrimRight(col.Title, "↓")
 				}
-				col := &cols[m.sortBy]
+				col := &cols[i]
 				if m.reverse {
 					col.Title = col.Title + "↓"
 				} else {
