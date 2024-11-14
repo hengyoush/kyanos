@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "Kyanos"
   text: "A Simple & Powerful Network Tracing Tool"
-  tagline: Visualize the time packets spend in the kernel, watch & analyze.
+  tagline: Visualize the time packets spend in the kernel, watch & analyze in command line.
   image:
     src: /kyanos.png
     alt: Kyanos
