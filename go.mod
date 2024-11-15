@@ -155,5 +155,5 @@ require (
 
 replace (
 	k8s.io/apiserver => k8s.io/apiserver v0.24.17
-	k8s.io/cri-api => k8s.io/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20230824000246-2cb31c9333ad
+	k8s.io/cri-api => k8s.io/kubernetes/staging/src/k8s.io/cri-api 23e76432a9f2
 )
