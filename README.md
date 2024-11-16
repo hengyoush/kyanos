@@ -4,7 +4,7 @@
 [简体中文](./README_CN.md) | English 
 
 
-- [English Document](https://kyanos.pages.dev/)
+- [English Document](https://kyanos.io/)
 
 ## Table of Contents
 - [What is kyanos](#-what-is-kyanos)
@@ -104,7 +104,7 @@ If the following table appears:
 
 ## 📝 Documentation
 
-[English Document](https://kyanos.pages.dev/)
+[English Document](https://kyanos.io/)
 
 ## ⚙ Usage
 
@@ -138,7 +138,7 @@ You can narrow it further to capture traffic for a specific HTTP path:
 ./kyanos watch http --path /abc 
 ```
 
-Learn more: [Kyanos Docs](https://kyanos.pages.dev/)
+Learn more: [Kyanos Docs](https://kyanos.io/)
 
 
 ## 🤝 Feedback and Contributions

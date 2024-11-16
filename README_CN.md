@@ -79,7 +79,7 @@ Kyanos当前支持3.10(3.10.0-957以上)及4.14以上版本内核(4.7版本到4.
 
 ## 📝 Documentation
 
-[Chinese Document](https://kyanos.pages.dev/cn/)
+[Chinese Document](https://kyanos.io/cn/)
 
 ## How to get kyanos 
 你可以从 [release page](https://github.com/hengyoush/kyanos/releases) 中下载以静态链接方式编译的适用于 x86_64 和 arm64 架构的二进制文件：
@@ -130,7 +130,7 @@ kyanos watch
 ./kyanos watch http --path /abc 
 ```
 
-了解更多，请参考文档：[Kyanos Docs](kyanos.pages.dev)
+了解更多，请参考文档：[Kyanos Docs](kyanos.io)
 
 ## Feedback and Contributions
 > [!IMPORTANT]
