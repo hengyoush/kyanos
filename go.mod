@@ -30,7 +30,7 @@ require (
 	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff
 	k8s.io/cri-api v0.31.0
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kubernetes v1.24.17
+	k8s.io/kubernetes v1.31.3
 )
 
 require (
