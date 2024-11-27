@@ -140,6 +140,18 @@ You can narrow it further to capture traffic for a specific HTTP path:
 
 Learn more: [Kyanos Docs](https://kyanos.io/)
 
+## Roadmap
+The Kyanos Roadmap shows the future plans for Kyanos. If you have feature requests or want to prioritize a specific feature, please submit an issue on GitHub.
+
+_1.5.0_
+
+1. Support for openssl 3.4.0
+2. Support for parsing ipip packets
+3. Support for filtering data based on process name
+4. Support for postgresql protocol parsing
+5. Support for kafka protocol parsing
+6. Full support for ipv6
+
 
 ## 🤝 Feedback and Contributions
 > [!IMPORTANT]

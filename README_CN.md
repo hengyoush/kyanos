@@ -132,6 +132,18 @@ kyanos watch
 
 了解更多，请参考文档：[Kyanos Docs](kyanos.io)
 
+## Roadmap
+Kyanos 的 Roadmap展示了 Kyanos 未来的计划，如果你有功能需求，或者想提高某个特性的优先级，请在 GitHub 上提交 issue。
+
+_1.5.0_   
+1. 支持 openssl 3.4.0
+2. 支持解析 ipip 包
+3. 支持根据 process name 过滤数据
+4. 支持 postgresql 协议解析
+5. 支持 kafka 协议解析
+6. 完全支持 ipv6
+
+
 ## Feedback and Contributions
 > [!IMPORTANT]
 > 如果你遇到了任何使用上的问题、bug都可以在issue中提问。
