@@ -13,8 +13,10 @@
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
 - [Documentation](#-documentation)
+- [How to build](#-how-to-build)
 - [Usage](#-usage)
 - [Feedback and Contributions](#-feedback-and-contributions)
+- [Special Thanks](#-special-thanks)
 - [Contacts](#%EF%B8%8F-contacts)
 
 ## What is kyanos
@@ -141,6 +143,10 @@ You can narrow it further to capture traffic for a specific HTTP path:
 
 Learn more: [Kyanos Docs](https://kyanos.io/)
 
+## How to Build
+
+👉 [COMPILATION.md](./COMPILATION.md)
+
 ## Roadmap
 The Kyanos Roadmap shows the future plans for Kyanos. If you have feature requests or want to prioritize a specific feature, please submit an issue on GitHub.
 
@@ -157,6 +163,12 @@ _1.5.0_
 ## 🤝 Feedback and Contributions
 > [!IMPORTANT]
 > If you encounter any issues or bugs while using the tool, please feel free to ask questions in the issue tracker.
+
+## 🙇‍ Special Thanks
+During the development of kyanos, some code was borrowed from the following projects:
+- [eCapture](https://ecapture.cc/zh/)
+- [pixie](https://github.com/pixie-io/pixie)
+- [ptcpdump](https://github.com/mozillazg/ptcpdump)
 
 ## 🗨️ Contacts
 For more detailed inquiries, you can use the following contact methods:

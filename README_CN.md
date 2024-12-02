@@ -13,8 +13,10 @@
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
 - [Documentation](#-documentation)
+- [How to build](#-how-to-build)
 - [Usage](#-usage)
 - [Feedback and Contributions](#-feedback-and-contributions)
+- [Special Thanks](#-special-thanks)
 - [Contacts](#%EF%B8%8F-contacts)
 
 ## What is kyanos
@@ -132,6 +134,10 @@ kyanos watch
 
 了解更多，请参考文档：[Kyanos Docs](kyanos.io)
 
+## How to Build
+
+👉 [COMPILATION_CN.md](./COMPILATION_CN.md)
+
 ## Roadmap
 Kyanos 的 Roadmap展示了 Kyanos 未来的计划，如果你有功能需求，或者想提高某个特性的优先级，请在 GitHub 上提交 issue。
 
@@ -147,6 +153,13 @@ _1.5.0_
 ## Feedback and Contributions
 > [!IMPORTANT]
 > 如果你遇到了任何使用上的问题、bug都可以在issue中提问。
+
+
+## 🙇‍ Special Thanks
+在开发 kyanos 的过程中，部分代码借用了以下项目：
+- [eCapture](https://ecapture.cc/zh/)
+- [pixie](https://github.com/pixie-io/pixie)
+- [ptcpdump](https://github.com/mozillazg/ptcpdump)
 
 ## Contacts
 如果你有更详细的问题需要咨询，可以用以下联系方式：
