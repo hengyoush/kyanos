@@ -1,5 +1,6 @@
 # kyanos
 [![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml)
+<a href="https://trendshift.io/repositories/12330" target="_blank"><img src="https://trendshift.io/api/badge/repositories/12330" alt="hengyoush%2Fkyanos | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 ![](docs/public/kyanos-demo.gif)
 [简体中文](./README_CN.md) | English 
 
