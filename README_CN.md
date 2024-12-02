@@ -13,8 +13,10 @@
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
 - [Documentation](#-documentation)
+- [How to build](#-how-to-build)
 - [Usage](#-usage)
 - [Feedback and Contributions](#-feedback-and-contributions)
+- [Special Thanks](#-special-thanks)
 - [Contacts](#%EF%B8%8F-contacts)
 
 ## What is kyanos
@@ -79,7 +81,7 @@ Kyanos当前支持3.10(3.10.0-957以上)及4.14以上版本内核(4.7版本到4.
 
 ## 📝 Documentation
 
-[Chinese Document](https://kyanos.pages.dev/cn/)
+[Chinese Document](https://kyanos.io/cn/)
 
 ## How to get kyanos 
 你可以从 [release page](https://github.com/hengyoush/kyanos/releases) 中下载以静态链接方式编译的适用于 x86_64 和 arm64 架构的二进制文件：
@@ -130,11 +132,34 @@ kyanos watch
 ./kyanos watch http --path /abc 
 ```
 
-了解更多，请参考文档：[Kyanos Docs](kyanos.pages.dev)
+了解更多，请参考文档：[Kyanos Docs](kyanos.io)
+
+## How to Build
+
+👉 [COMPILATION_CN.md](./COMPILATION_CN.md)
+
+## Roadmap
+Kyanos 的 Roadmap展示了 Kyanos 未来的计划，如果你有功能需求，或者想提高某个特性的优先级，请在 GitHub 上提交 issue。
+
+_1.5.0_   
+1. 支持 openssl 3.4.0
+2. 支持解析 ipip 包
+3. 支持根据 process name 过滤数据
+4. 支持 postgresql 协议解析
+5. 支持 kafka 协议解析
+6. 完全支持 ipv6
+
 
 ## Feedback and Contributions
 > [!IMPORTANT]
 > 如果你遇到了任何使用上的问题、bug都可以在issue中提问。
+
+
+## 🙇‍ Special Thanks
+在开发 kyanos 的过程中，部分代码借用了以下项目：
+- [eCapture](https://ecapture.cc/zh/)
+- [pixie](https://github.com/pixie-io/pixie)
+- [ptcpdump](https://github.com/mozillazg/ptcpdump)
 
 ## Contacts
 如果你有更详细的问题需要咨询，可以用以下联系方式：

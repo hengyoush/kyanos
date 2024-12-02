@@ -408,7 +408,9 @@ func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChan
 func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, recordChannel chan RecordWithConn) {
 	if len(data) > 0 {
 		if c.ssl {
-			common.ConntrackLog.Warnf("%s is ssl, but receive syscall event with data!", c.ToString())
+			if common.ConntrackLog.Level >= logrus.WarnLevel {
+				common.ConntrackLog.Warnf("%s is ssl, but receive syscall event with data!", c.ToString())
+			}
 		} else {
 			c.addDataToBufferAndTryParse(data, &event.SyscallEvent.Ke)
 		}

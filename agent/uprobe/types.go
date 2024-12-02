@@ -88,6 +88,7 @@ const (
 	SupportedOpenSSL32Version2    = 2 // openssl 3.2.0 ~ 3.2.2
 	MaxSupportedOpenSSL32Version  = 3 // openssl 3.2.3 ~ newer
 	MaxSupportedOpenSSL33Version  = 2
+	SupportedOpenSSL34Version0    = 0 // openssl 3.4.0
 )
 const (
 	Linuxdefaulefilename102 = "linux_default_1_0_2"
@@ -97,6 +98,7 @@ const (
 	Linuxdefaulefilename31  = "linux_default_3_0"
 	Linuxdefaulefilename320 = "linux_default_3_2"
 	Linuxdefaulefilename330 = "linux_default_3_3"
+	Linuxdefaulefilename340 = "linux_default_3_4"
 	AndroidDefauleFilename  = "android_default"
 
 	OpenSslVersionLen = 30 // openssl version string length
@@ -285,6 +287,18 @@ func initOpensslOffset() {
 		// The OpenSSL 3.3.* series is the same as the 3.2.* series of offsets
 		sslVersionBpfMap[fmt.Sprintf("openssl 3.3.%d", ch)] = func() (*ebpf.CollectionSpec, any, error) {
 			r, err := bpf.LoadOpenssl330()
+			if err != nil {
+				common.UprobeLog.Errorln(err)
+				return nil, nil, err
+			}
+			return r, &bpf.Openssl330Objects{}, nil
+		}
+	}
+
+	// openssl 3.4.0
+	for ch := 0; ch <= SupportedOpenSSL34Version0; ch++ {
+		sslVersionBpfMap[fmt.Sprintf("openssl 3.4.%d", ch)] = func() (*ebpf.CollectionSpec, any, error) {
+			r, err := bpf.LoadOpenssl340()
 			if err != nil {
 				common.UprobeLog.Errorln(err)
 				return nil, nil, err

@@ -1,10 +1,11 @@
 # kyanos
 [![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml)
+<a href="https://trendshift.io/repositories/12330" target="_blank"><img src="https://trendshift.io/api/badge/repositories/12330" alt="hengyoush%2Fkyanos | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 ![](docs/public/kyanos-demo.gif)
 [简体中文](./README_CN.md) | English 
 
 
-- [English Document](https://kyanos.pages.dev/)
+- [English Document](https://kyanos.io/)
 
 ## Table of Contents
 - [What is kyanos](#-what-is-kyanos)
@@ -12,8 +13,10 @@
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
 - [Documentation](#-documentation)
+- [How to build](#-how-to-build)
 - [Usage](#-usage)
 - [Feedback and Contributions](#-feedback-and-contributions)
+- [Special Thanks](#-special-thanks)
 - [Contacts](#%EF%B8%8F-contacts)
 
 ## What is kyanos
@@ -104,7 +107,7 @@ If the following table appears:
 
 ## 📝 Documentation
 
-[English Document](https://kyanos.pages.dev/)
+[English Document](https://kyanos.io/)
 
 ## ⚙ Usage
 
@@ -138,12 +141,34 @@ You can narrow it further to capture traffic for a specific HTTP path:
 ./kyanos watch http --path /abc 
 ```
 
-Learn more: [Kyanos Docs](https://kyanos.pages.dev/)
+Learn more: [Kyanos Docs](https://kyanos.io/)
+
+## How to Build
+
+👉 [COMPILATION.md](./COMPILATION.md)
+
+## Roadmap
+The Kyanos Roadmap shows the future plans for Kyanos. If you have feature requests or want to prioritize a specific feature, please submit an issue on GitHub.
+
+_1.5.0_
+
+1. Support for openssl 3.4.0
+2. Support for parsing ipip packets
+3. Support for filtering data based on process name
+4. Support for postgresql protocol parsing
+5. Support for kafka protocol parsing
+6. Full support for ipv6
 
 
 ## 🤝 Feedback and Contributions
 > [!IMPORTANT]
 > If you encounter any issues or bugs while using the tool, please feel free to ask questions in the issue tracker.
+
+## 🙇‍ Special Thanks
+During the development of kyanos, some code was borrowed from the following projects:
+- [eCapture](https://ecapture.cc/zh/)
+- [pixie](https://github.com/pixie-io/pixie)
+- [ptcpdump](https://github.com/mozillazg/ptcpdump)
 
 ## 🗨️ Contacts
 For more detailed inquiries, you can use the following contact methods:

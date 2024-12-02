@@ -454,7 +454,7 @@ func attachOpenSslUprobes(links *list.List, options ac.AgentOptions, kernelVersi
 		pids, err := common.GetAllPids()
 		loadGoTlsErr := uprobe.LoadGoTlsUprobe()
 		if loadGoTlsErr != nil {
-			common.AgentLog.Warnf("Load GoTls Probe failed: %+v", loadGoTlsErr)
+			common.UprobeLog.Debugf("Load GoTls Probe failed: %+v", loadGoTlsErr)
 		}
 		if err == nil {
 			for _, pid := range pids {
@@ -463,11 +463,11 @@ func attachOpenSslUprobes(links *list.List, options ac.AgentOptions, kernelVersi
 					for _, l := range uprobeLinks {
 						links.PushBack(l)
 					}
-					common.AgentLog.Infof("Attach OpenSsl uprobes success for pid: %d", pid)
+					common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d", pid)
 				} else if err != nil {
-					common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
+					common.UprobeLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
 				} else if len(uprobeLinks) == 0 {
-					common.AgentLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
+					common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
 				}
 				if loadGoTlsErr == nil {
 					gotlsUprobeLinks, err := uprobe.AttachGoTlsProbes(int(pid))
@@ -476,16 +476,16 @@ func attachOpenSslUprobes(links *list.List, options ac.AgentOptions, kernelVersi
 						for _, l := range gotlsUprobeLinks {
 							links.PushBack(l)
 						}
-						common.AgentLog.Infof("Attach GoTls uprobes success for pid: %d", pid)
+						common.UprobeLog.Infof("Attach GoTls uprobes success for pid: %d", pid)
 					} else if err != nil {
-						common.AgentLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d", err, pid)
+						common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d", err, pid)
 					} else {
-						common.AgentLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d links is empty %v", err, pid, gotlsUprobeLinks)
+						common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d links is empty %v", err, pid, gotlsUprobeLinks)
 					}
 				}
 			}
 		} else {
-			common.AgentLog.Warnf("get all pid failed: %v", err)
+			common.UprobeLog.Warnf("get all pid failed: %v", err)
 		}
 		attachSchedProgs(links)
 		uprobeSchedExecEvent := uprobe.StartHandleSchedExecEvent()
@@ -509,13 +509,13 @@ func attachSchedProgs(links *list.List) {
 func attachNfFunctions(links *list.List) {
 	l, err := link.Kprobe("nf_nat_manip_pkt", bpf.GetProgramFromObjs(bpf.Objs, "KprobeNfNatManipPkt"), nil)
 	if err != nil {
-		common.AgentLog.Warnf("Attahc kprobe/nf_nat_manip_pkt failed: %v", err)
+		common.AgentLog.Debugf("Attahc kprobe/nf_nat_manip_pkt failed: %v", err)
 	} else {
 		links.PushBack(l)
 	}
 	l, err = link.Kprobe("nf_nat_packet", bpf.GetProgramFromObjs(bpf.Objs, "KprobeNfNatPacket"), nil)
 	if err != nil {
-		common.AgentLog.Warnf("Attahc kprobe/nf_nat_packet failed: %v", err)
+		common.AgentLog.Debugf("Attahc kprobe/nf_nat_packet failed: %v", err)
 	} else {
 		links.PushBack(l)
 	}
