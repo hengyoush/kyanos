@@ -13,13 +13,13 @@
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
 - [Documentation](#-documentation)
-- [How to build](#-how-to-build)
 - [Usage](#-usage)
+- [How to build](#-how-to-build)
 - [Feedback and Contributions](#-feedback-and-contributions)
 - [Special Thanks](#-special-thanks)
 - [Contacts](#%EF%B8%8F-contacts)
 
-## What is kyanos
+## 🦜 What is kyanos
 Kyanos 是一个网络流量采集和分析工具，它提供如下特性：
 1. **强大的流量过滤功能**：不仅可以根据传统 IP/端口 等信息过滤，还支持根据：进程/容器、L7协议信息、请求/响应字节数、耗时等过滤你想要的数据。
 ```bash
@@ -41,7 +41,7 @@ Kyanos 是一个网络流量采集和分析工具，它提供如下特性：
 4. **轻量级零依赖**：几乎 0 依赖，只需要单个二进制文件，一行命令，所有结果都展示在命令行中。
 5. **SSL流量自动解密**：kyanos 为你抓取的请求响应结果全部都是明文。
 
-## Examples
+## 🌰 Examples
 
 **抓取 HTTP 流量并且获取耗时细节**  
 
@@ -74,7 +74,7 @@ Kyanos 是一个网络流量采集和分析工具，它提供如下特性：
 
 ![kyanos stat slow](docs/public/qs-stat-slow.gif)
 
-## Requirements
+## ❗ Requirements
 
 Kyanos当前支持3.10(3.10.0-957以上)及4.14以上版本内核(4.7版本到4.14版本之间的后续计划支持)。
 > 通过`uname -r`查看内核版本
@@ -83,7 +83,7 @@ Kyanos当前支持3.10(3.10.0-957以上)及4.14以上版本内核(4.7版本到4.
 
 [Chinese Document](https://kyanos.io/cn/)
 
-## How to get kyanos 
+## 🎯 How to get kyanos 
 你可以从 [release page](https://github.com/hengyoush/kyanos/releases) 中下载以静态链接方式编译的适用于 x86_64 和 arm64 架构的二进制文件：
 
 ```bash
@@ -100,7 +100,7 @@ kyanos watch
 🎉 恭喜你，kyanos启动成功了。
 
 
-## Usage
+## ⚙ Usage
 
 最简单的用法如下，抓取所有 kyanos 当前能够识别的协议
 
@@ -134,7 +134,7 @@ kyanos watch
 
 了解更多，请参考文档：[Kyanos Docs](kyanos.io)
 
-## How to Build
+## 🏠 How to Build
 
 👉 [COMPILATION_CN.md](./COMPILATION_CN.md)
 
@@ -150,7 +150,7 @@ _1.5.0_
 6. 完全支持 ipv6
 
 
-## Feedback and Contributions
+## 🤝 Feedback and Contributions
 > [!IMPORTANT]
 > 如果你遇到了任何使用上的问题、bug都可以在issue中提问。
 
@@ -161,7 +161,7 @@ _1.5.0_
 - [pixie](https://github.com/pixie-io/pixie)
 - [ptcpdump](https://github.com/mozillazg/ptcpdump)
 
-## Contacts
+## 🗨️ Contacts
 如果你有更详细的问题需要咨询，可以用以下联系方式：
 - **我的邮箱：**:  [hengyoush1@163.com](mailto:hengyoush1@163.com).
 - **我的Blog：**:  [http://blog.deadlock.cloud](http://blog.deadlock.cloud/).
