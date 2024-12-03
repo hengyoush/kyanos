@@ -2,7 +2,7 @@ module kyanos
 
 go 1.22.2
 
-toolchain go1.23.3
+toolchain go1.23.4
 
 require (
 	github.com/Ha4sh-447/flowcharts v0.0.0-20240802124452-44516e0e7dc8
