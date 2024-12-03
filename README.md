@@ -142,7 +142,7 @@ You can narrow it further to capture traffic for a specific HTTP path:
 
 Learn more: [Kyanos Docs](https://kyanos.io/)
 
-## How to build
+## 🏠 How to build
 
 👉 [COMPILATION.md](./COMPILATION.md)
 
