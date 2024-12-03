@@ -12,8 +12,8 @@
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
 - [Documentation](#-documentation)
-- [How to Build](#-how-to-build)
 - [Usage](#-usage)
+- [How to build](#-how-to-build)
 - [Feedback and Contributions](#-feedback-and-contributions)
 - [Special Thanks](#-special-thanks)
 - [Contacts](#%EF%B8%8F-contacts)
@@ -142,7 +142,7 @@ You can narrow it further to capture traffic for a specific HTTP path:
 
 Learn more: [Kyanos Docs](https://kyanos.io/)
 
-## How to Build
+## How to build
 
 👉 [COMPILATION.md](./COMPILATION.md)
 
