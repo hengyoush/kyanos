@@ -70,6 +70,6 @@ export PATH=/usr/local/go/bin:$PATH
 export GOPROXY=https://goproxy.cn
 
 cd ~ || exit
-git clone https://ghp.ci/github.com/hengyoush/kyanos.git
+git clone https://github.com/hengyoush/kyanos.git
 cd kyanos || exit
 git submodule update --init --recursive
