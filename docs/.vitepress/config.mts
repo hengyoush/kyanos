@@ -34,6 +34,13 @@ export default defineConfig({
           { text: 'How to use watch', link: './watch' },
           { text: 'How to use stat', link: './stat' },
         ]
+      },
+      {
+        text: 'Development',
+        items: [
+          
+          { text: 'How to build', link: './how-to-build' },
+        ]
       }
     ],
 
