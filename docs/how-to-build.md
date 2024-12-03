@@ -1,5 +1,5 @@
 ---
-next:
+next: false
 prev: false
 ---
 # Compilation Steps
