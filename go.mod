@@ -25,7 +25,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/smira/go-xz v0.1.0
 	github.com/spf13/cobra v1.8.1
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/zcalusic/sysinfo v1.1.2
 	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff
 	k8s.io/cri-api v0.31.0
