@@ -163,6 +163,7 @@ _1.5.0_
 
 ## 🗨️ Contacts
 如果你有更详细的问题需要咨询，可以用以下联系方式：
-- **我的邮箱：**:  [hengyoush1@163.com](mailto:hengyoush1@163.com).
-- **我的Blog：**:  [http://blog.deadlock.cloud](http://blog.deadlock.cloud/).
+- **我的微信：**:  hengyh1995。
+- **我的邮箱：**:  [hengyoush1@163.com](mailto:hengyoush1@163.com)。
+- **我的Blog：**:  [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)。
 [Back to top](#top)
