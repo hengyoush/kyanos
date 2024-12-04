@@ -1,3 +1,5 @@
+_Pragma("GCC diagnostic ignored \"-Wint-conversion\"")
+
 #ifndef __KPROBE_H__
 #define __KPROBE_H__
 
