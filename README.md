@@ -1,5 +1,6 @@
 # kyanos
-[![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml)
+[![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml) [![Twitter](https://img.shields.io/twitter/url/https/x.com/kyanos.svg?style=social&label=Follow%20%40kyanos)](https://x.com/kyanos_github)
+
 ![](docs/public/kyanos-demo.gif)
 [简体中文](./README_CN.md) | English 
 
