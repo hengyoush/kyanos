@@ -172,6 +172,7 @@ During the development of kyanos, some code was borrowed from the following proj
 
 ## 🗨️ Contacts
 For more detailed inquiries, you can use the following contact methods:
+- **Twitter:** [https://x.com/kyanos_github](https://x.com/kyanos_github)
 - **My Email:** [hengyoush1@163.com](mailto:hengyoush1@163.com)
 - **My Blog:** [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)
 
