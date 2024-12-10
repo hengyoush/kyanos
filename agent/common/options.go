@@ -48,13 +48,15 @@ type AgentOptions struct {
 	WatchOptions                watch.WatchOptions
 	PerformanceMode             bool
 
-	DockerEndpoint     string
-	ContainerdEndpoint string
-	CriRuntimeEndpoint string
-	ContainerId        string
-	ContainerName      string
-	PodName            string
-	PodNameSpace       string
+	FilterComm              string
+	ProcessExecEventChannel chan *bpf.AgentProcessExecEvent
+	DockerEndpoint          string
+	ContainerdEndpoint      string
+	CriRuntimeEndpoint      string
+	ContainerId             string
+	ContainerName           string
+	PodName                 string
+	PodNameSpace            string
 
 	Cc                  *metadata.ContainerCache
 	Objs                any
