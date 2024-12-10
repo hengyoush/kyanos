@@ -72,6 +72,7 @@ Below are the ways to use `kyanos` options to filter request-responses you're in
 | Filter Condition          | Command Line Flag         | Example                                                                  |
 |---------------------------|---------------------------|-------------------------------------------------------------------------|
 | Process PID List          | `pids`                    | `--pids 12345,12346` <br> Separate multiple PIDs with commas.          |
+| Process Name   | `comm`          | `--comm 'curl'`    |
 | Container ID              | `container-id`            | `--container-id xx` <br> Specify the container ID.                     |
 | Container Name            | `container-name`          | `--container-name foobar` <br> Specify the container name.             |
 | Kubernetes Pod Name       | `pod-name`                | `--pod-name nginx-7bds23212-23s1s.default` <br> Format: NAME.NAMESPACE |

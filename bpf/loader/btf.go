@@ -63,7 +63,7 @@ func generateBTF(fileBytes []byte) (*btf.Spec, error) {
 	return btfPath, nil
 }
 
-func loadBTFSpec(options ac.AgentOptions) *btf.Spec {
+func loadBTFSpec(options *ac.AgentOptions) *btf.Spec {
 	if bpf.IsKernelSupportHasBTF() {
 		return nil
 	}
