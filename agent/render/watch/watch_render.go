@@ -389,7 +389,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							"[Request]\n\n" + c.TruncateString(r.Req.FormatToString(), m.options.MaxRecordContentDisplayBytes) + "\n" + line +
 							"\n[Response]\n\n" + c.TruncateString(r.Resp.FormatToString(), m.options.MaxRecordContentDisplayBytes))
 				} else {
-					panic("!")
+					m.chosen = false
+					break
 				}
 			}
 			return m, nil
