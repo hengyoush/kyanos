@@ -90,15 +90,15 @@ Kyanos currently supports kernel versions 3.10(from 3.10.0-957) and 4.14 or abov
 
 ## 🎯 How to get kyanos 
 
-You can download a statically linked binary compatible with x86_64 and arm64 architectures from the [release page](https://github.com/hengyoush/kyanos/releases):
+You can download a statically linked binary compatible with amd64 and arm64 architectures from the [release page](https://github.com/hengyoush/kyanos/releases):
 
 ```bash
-tar xvf kyanos_vx.x.x_linux_x86.tar.gz
+tar xvf kyanos_vx.x.x_linux_amd64.tar.gz
 ```
 
-Then, run:
+Then, run kyanos with **root privilege**:
 ```bash
-kyanos watch 
+sudo ./kyanos watch 
 ```
 
 If the following table appears:
@@ -114,7 +114,7 @@ If the following table appears:
 The simplest usage captures all protocols currently supported by Kyanos:
 
 ```bash
-./kyanos watch
+sudo ./kyanos watch
 ```
 
 Each request-response record is stored as a row in a table, with each column capturing basic information about that request. You can use the arrow keys or `j/k` to move up and down through the records:

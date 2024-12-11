@@ -20,15 +20,15 @@ next: false
 
 ## Installation and Running {#prerequire}
 
-You can download a statically linked binary compatible with x86_64 and arm64 architectures from the [release page](https://github.com/hengyoush/kyanos/releases):
+You can download a statically linked binary compatible with amd64 and arm64 architectures from the [release page](https://github.com/hengyoush/kyanos/releases):
 
 ```bash
-tar xvf kyanos_vx.x.x_linux_x86.tar.gz
+tar xvf kyanos_vx.x.x_linux_amd64.tar.gz
 ```
 
-Then, run:
+Then, run kyanos with **root privilege**:
 ```bash
-kyanos watch 
+sudo ./kyanos watch 
 ```
 
 If the following table appears:

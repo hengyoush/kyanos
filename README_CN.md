@@ -84,15 +84,15 @@ Kyanos当前支持3.10(3.10.0-957以上)及4.14以上版本内核(4.7版本到4.
 [Chinese Document](https://kyanos.io/cn/)
 
 ## 🎯 How to get kyanos 
-你可以从 [release page](https://github.com/hengyoush/kyanos/releases) 中下载以静态链接方式编译的适用于 x86_64 和 arm64 架构的二进制文件：
+你可以从 [release page](https://github.com/hengyoush/kyanos/releases) 中下载以静态链接方式编译的适用于 amd64 和 arm64 架构的二进制文件：
 
 ```bash
-tar xvf kyanos_vx.x.x_linux_x86.tar.gz
+tar xvf kyanos_vx.x.x_linux_amd64.tar.gz
 ```
 
-然后输入
+然后以 **root 权限**执行如下命令：
 ```bash
-kyanos watch 
+sudo ./kyanos watch 
 ```
 
  如果显示了下面的表格：
@@ -105,7 +105,7 @@ kyanos watch
 最简单的用法如下，抓取所有 kyanos 当前能够识别的协议
 
 ```bash
-./kyanos watch
+sudo ./kyanos watch
 ```
 每个请求响应记录会记录在表格中的一行，每列记录这个请求的基本信息。你可以通过方向键或者j/k上下移动来选择记录：
 ![kyanos watch result](docs/public/watch-result.jpg)  
