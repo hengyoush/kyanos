@@ -410,20 +410,37 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 	void *l3 = {0};
 	void* l4 = NULL;
 	u16 l3_proto;
+	int ifindex = _C(skb,dev,ifindex);
+		// bpf_printk(" dev1: %s, ifindex: %d", _C(skb,dev)->name, _C(skb,dev,ifindex));//629
+		// bpf_printk("is_l2:%d, mac_header: %lld, network_header:%lld", is_l2, mac_header, network_header); 
+		// bpf_printk("len: %u, data_len: %u", _C(skb, len), _C(skb, data_len));
+	// if (ifindex == 629) {
+	// 	bpf_printk("is_l2:%d, mac_header: %lld, network_header:%lld", is_l2, mac_header, network_header); 
+	// }
+
 	if (is_l2) {
+		if (network_header && mac_header >= network_header) {
+			/* to tun device, mac header is the same to network header.
+			* For this case, we assume that this is a IP packet.
+			*
+			* For vxlan device, mac header may be inner mac, and the
+			* network header is outer, which make mac > network.
+			*/
+			// bpf_printk(" mac_header >= network_header: %s, ifindex: %d", _C(skb,dev)->name, _C(skb,dev,ifindex));//629
+			l3 = data + network_header;
+			l3_proto = ETH_P_IP;
+			goto __l3;
+		}
 		goto __l2;
 	} else {
 		u16 _protocol = 0;
 		BPF_CORE_READ_INTO(&_protocol, skb, protocol);
 		l3_proto = bpf_ntohs(_protocol);
 		// bpf_printk("%s, l3_proto: %x", func_name, l3_proto);
+		// bpf_printk("devname2: %s", _C(skb,dev)->name);
 		if (l3_proto == ETH_P_IP || l3_proto == ETH_P_IPV6) {
 			// bpf_printk("%s, is_ip: %d", func_name, 1);
 			l3 = data + network_header;
-			goto __l3;
-		} else if (mac_header >= network_header) {
-			l3 = data + network_header;
-			l3_proto = ETH_P_IP;
 			goto __l3;
 		}
 				
@@ -459,6 +476,15 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 				l4 = l4 ? l4 : ip + ip_hdr_len;
 				BPF_CORE_READ_INTO(&proto_l4, ipv4, protocol);
 				tcp_len = len - ip_hdr_len;
+
+				if (proto_l4 == IPPROTO_IPIP) {
+					ip = ip + ip_hdr_len;
+					ipv4 = ip;
+					tcp_len -= ip_hdr_len;
+					BPF_CORE_READ_INTO(&proto_l4, ipv4, protocol);
+					l4 = ip + ip_hdr_len;
+					bpf_printk("ipipprotocol_l4:%d,len:%lld",proto_l4,_C(skb, len));//629
+				}
 			} else if (l3_proto == ETH_P_IPV6) {
 				proto_l4 = _(ipv6->nexthdr);
 				tcp_len = _C(ipv6, payload_len);
@@ -466,7 +492,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 			}else{
 				goto err;
 			}
-			
+			// bpf_printk("protocol_l4:%d,len:%lld",proto_l4,_C(skb, len));//629
 			struct tcphdr *tcp = l4;
 			if (proto_l4 == IPPROTO_TCP) {
 				if (!inital_seq) {
@@ -629,7 +655,7 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 #ifdef ARCH_amd64
 	BPF_CORE_READ_INTO(&skb, ctx, di);
 #else
-    skb = PT_REGS_PARM1_CORE(ctx);
+    skb = (struct sk_buff *) PT_REGS_PARM1_CORE(ctx);
 #endif
 	// BPF_CORE_READ_INTO(&skb, ctx, di);
 	// skb = PT_REGS_PARM1_CORE(ctx);
