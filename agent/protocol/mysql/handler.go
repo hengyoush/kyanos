@@ -425,11 +425,15 @@ func HandleStmtCloseRequest(reqPacket *MysqlPacket, prepareMap map[int]PreparedS
 		return Invalid
 	}
 
-	record.Req = &(*reqPacket)
+	record.Req = reqPacket
 	record.Req.(*MysqlPacket).msg = ""
-
-	stmt_id, _ :=
-		common.LEndianBytesToKInt[int32]([]byte(reqPacket.msg[kStmtIDStartOffset:]), kStmtIDBytes)
+	var stmt_id int32
+	if len(reqPacket.msg) >= kStmtIDStartOffset+kStmtIDBytes {
+		stmt_id, _ = common.LEndianBytesToKInt[int32]([]byte(reqPacket.msg[kStmtIDStartOffset:]), kStmtIDBytes)
+	} else {
+		// 处理错误情况，例如记录日志或返回错误
+		common.ProtocolParserLog.Errorf("reqPacket.msg 长度不足")
+	}
 	_, ok := prepareMap[int(stmt_id)]
 	if ok {
 		delete(prepareMap, int(stmt_id))
