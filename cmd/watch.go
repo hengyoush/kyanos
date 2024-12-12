@@ -7,6 +7,7 @@ import (
 )
 
 var maxRecords int
+var supportedProtocols = []string{"http", "redis", "mysql"}
 var watchCmd = &cobra.Command{
 	Use: "watch [http|redis|mysql] [flags]",
 	Example: `
@@ -23,8 +24,11 @@ sudo kyanos watch mysql --latency 100 --req-size 1024 --resp-size 2048
 			logger.Errorln(err)
 		} else {
 			if list {
-				fmt.Println([]string{"http", "redis", "mysql"})
+				fmt.Println(supportedProtocols)
 			} else {
+				if len(args) > 0 {
+					logger.Fatalln("current only support:", supportedProtocols)
+				}
 				options.LatencyFilter = initLatencyFilter(cmd)
 				options.SizeFilter = initSizeFilter(cmd)
 				startAgent()

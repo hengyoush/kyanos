@@ -1,6 +1,6 @@
 # kyanos
-[![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml)
-<a href="https://trendshift.io/repositories/12330" target="_blank"><img src="https://trendshift.io/api/badge/repositories/12330" alt="hengyoush%2Fkyanos | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+[![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml) [![Twitter](https://img.shields.io/twitter/url/https/x.com/kyanos.svg?style=social&label=Follow%20%40kyanos)](https://x.com/kyanos_github)
+
 ![](docs/public/kyanos-demo.gif)
 [简体中文](./README_CN.md) | English 
 
@@ -13,8 +13,8 @@
 - [Requirements](#-requirements)
 - [How to get kyanos](#-how-to-get-kyanos)
 - [Documentation](#-documentation)
-- [How to build](#-how-to-build)
 - [Usage](#-usage)
+- [How to build](#-how-to-build)
 - [Feedback and Contributions](#-feedback-and-contributions)
 - [Special Thanks](#-special-thanks)
 - [Contacts](#%EF%B8%8F-contacts)
@@ -90,15 +90,15 @@ Kyanos currently supports kernel versions 3.10(from 3.10.0-957) and 4.14 or abov
 
 ## 🎯 How to get kyanos 
 
-You can download a statically linked binary compatible with x86_64 and arm64 architectures from the [release page](https://github.com/hengyoush/kyanos/releases):
+You can download a statically linked binary compatible with amd64 and arm64 architectures from the [release page](https://github.com/hengyoush/kyanos/releases):
 
 ```bash
-tar xvf kyanos_vx.x.x_linux_x86.tar.gz
+tar xvf kyanos_vx.x.x_linux_amd64.tar.gz
 ```
 
-Then, run:
+Then, run kyanos with **root privilege**:
 ```bash
-kyanos watch 
+sudo ./kyanos watch 
 ```
 
 If the following table appears:
@@ -114,7 +114,7 @@ If the following table appears:
 The simplest usage captures all protocols currently supported by Kyanos:
 
 ```bash
-./kyanos watch
+sudo ./kyanos watch
 ```
 
 Each request-response record is stored as a row in a table, with each column capturing basic information about that request. You can use the arrow keys or `j/k` to move up and down through the records:
@@ -143,7 +143,7 @@ You can narrow it further to capture traffic for a specific HTTP path:
 
 Learn more: [Kyanos Docs](https://kyanos.io/)
 
-## How to Build
+## 🏠 How to build
 
 👉 [COMPILATION.md](./COMPILATION.md)
 
@@ -172,6 +172,7 @@ During the development of kyanos, some code was borrowed from the following proj
 
 ## 🗨️ Contacts
 For more detailed inquiries, you can use the following contact methods:
+- **Twitter:** [https://x.com/kyanos_github](https://x.com/kyanos_github)
 - **My Email:** [hengyoush1@163.com](mailto:hengyoush1@163.com)
 - **My Blog:** [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)
 

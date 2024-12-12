@@ -20,15 +20,15 @@ next: false
 
 ## 安装并运行 {#prerequire}
 
-你可以从 [release page](https://github.com/hengyoush/kyanos/releases) 中下载以静态链接方式编译的适用于 x86_64 和 arm64 架构的二进制文件：
+你可以从 [release page](https://github.com/hengyoush/kyanos/releases) 中下载以静态链接方式编译的适用于 amd64 和 arm64 架构的二进制文件：
 
 ```bash
-tar xvf kyanos_vx.x.x_linux_x86.tar.gz
+tar xvf kyanos_vx.x.x_linux_amd64.tar.gz
 ```
 
-然后输入
+然后以 **root** 权限执行如下命令：
 ```bash
-kyanos watch 
+sudo ./kyanos watch 
 ```
 
  如果显示了下面的表格：
