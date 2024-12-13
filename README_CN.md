@@ -1,5 +1,3 @@
-# kyanos
-
 [![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml)
 
 ![](docs/public/kyanos-demo.gif)
@@ -163,7 +161,7 @@ _1.5.0_
 
 ## 🗨️ Contacts
 如果你有更详细的问题需要咨询，可以用以下联系方式：
-- **我的微信：**:  hengyh1995。
+- **微信交流群：**: <img width="465" alt="image" src="https://github.com/user-attachments/assets/5a2a4fc1-8c31-4cf6-a2b2-313fed9259f7" />。
 - **我的邮箱：**:  [hengyoush1@163.com](mailto:hengyoush1@163.com)。
 - **我的Blog：**:  [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)。
 [Back to top](#top)
