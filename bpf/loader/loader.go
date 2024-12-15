@@ -57,12 +57,17 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 	var bf *BPF = &BPF{}
 
 	if err := features.HaveProgramType(ebpf.Kprobe); errors.Is(err, ebpf.ErrNotSupported) {
-		common.AgentLog.Fatalf("Require oldest kernel version is 3.10.0-957, pls check your kernel version by `uname -r`")
+		common.AgentLog.Errorf("Require oldest kernel version is 3.10.0-957, pls check your kernel version by `uname -r`\n")
+		return nil, err
 	}
 
+	btfSpec, err := loadBTFSpec(options)
+	if err != nil {
+		return nil, err
+	}
 	collectionOptions = &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
-			KernelTypes: loadBTFSpec(options),
+			KernelTypes: btfSpec,
 		},
 	}
 
