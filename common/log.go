@@ -36,8 +36,13 @@ var ConntrackLog *Klogger = &Klogger{logrus.New()}
 var ProtocolParserLog *Klogger = &Klogger{logrus.New()}
 
 var Loggers []*Klogger = []*Klogger{DefaultLog, AgentLog, BPFLog, BPFEventLog, UprobeLog, ConntrackLog, ProtocolParserLog}
+var SetLogToFileFlag = false
 
 func SetLogToFile() {
+	if SetLogToFileFlag {
+		return
+	}
+	SetLogToFileFlag = true
 	for _, l := range Loggers {
 		l.SetOut(io.Discard)
 		logdir := "/tmp"

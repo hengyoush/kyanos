@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"kyanos/agent/common"
+	c "kyanos/common"
 	"os"
 	"strings"
 	"time"
@@ -108,6 +109,7 @@ func (m model) View() string {
 }
 
 func Start(ctx context.Context, options common.AgentOptions) {
+	c.SetLogToFile()
 	const numLastResults = 5
 	m := model{
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
