@@ -78,6 +78,7 @@ func SetupAgent(options ac.AgentOptions) {
 		{
 			bf, err := loader.LoadBPF(&options)
 			if err != nil {
+				common.AgentLog.Error("Failed to load BPF programs: ", err)
 				if bf != nil {
 					bf.Close()
 				}
