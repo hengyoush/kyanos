@@ -49,14 +49,10 @@ func submitRecord(record protocol.Record, c *Connection4) {
 	var needSubmit bool
 
 	needSubmit = c.MessageFilter.FilterByProtocol(c.Protocol)
-	var duration uint64
-	if c.IsServerSide() {
-		duration = record.Request().TimestampNs() - record.Response().TimestampNs()
-	} else {
-		duration = record.Response().TimestampNs() - record.Request().TimestampNs()
-	}
 
+	duration := record.Response().TimestampNs() - record.Request().TimestampNs()
 	needSubmit = needSubmit && c.LatencyFilter.Filter(float64(duration)/1000000)
+
 	needSubmit = needSubmit &&
 		c.SizeFilter.FilterByReqSize(int64(record.Request().ByteSize())) &&
 		c.SizeFilter.FilterByRespSize(int64(record.Response().ByteSize()))
