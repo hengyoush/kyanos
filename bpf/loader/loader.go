@@ -28,10 +28,14 @@ import (
 type BPF struct {
 	Links *list.List        // close
 	Objs  *bpf.AgentObjects // close
+	Err   error
 }
 
 func (b *BPF) Close() {
-	b.Objs.Close()
+	if b.Objs != nil {
+		b.Objs.Close()
+	}
+
 	if b.Links != nil {
 		for e := b.Links.Front(); e != nil; e = e.Next() {
 			if e.Value == nil {
@@ -112,20 +116,8 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 	}
 	options.LoadPorgressChannel <- "🍓 Setup traffic filters"
 
-	// var links *list.List
-	// if options.LoadBpfProgramFunction != nil {
-	// 	links = options.LoadBpfProgramFunction()
-	// } else {
-	// 	links = attachBpfProgs(options.IfName, options.Kv, &options)
-	// }
-
-	// if !options.DisableOpensslUprobe {
-	// 	attachOpenSslUprobes(links, options, options.Kv, objs)
-	// }
-	// attachNfFunctions(links)
 	bpf.PullProcessExitEvents(options.Ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.Ctx)})
 
-	// bf.links = links
 	return bf, nil
 }
 
