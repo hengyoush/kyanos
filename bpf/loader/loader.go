@@ -65,6 +65,11 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 		return nil, err
 	}
 
+	if os.Geteuid() != 0 {
+		common.AgentLog.Error("Kyanos requires root privileges to run. Please run kyanos with sudo.")
+		return nil, err
+	}
+
 	btfSpec, err := loadBTFSpec(options)
 	if err != nil {
 		return nil, err
