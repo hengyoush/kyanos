@@ -35,6 +35,13 @@ func SetupAgent(options ac.AgentOptions) {
 		common.AgentLog.Error("Kyanos requires root privileges to run. Please run kyanos with sudo.")
 		return
 	}
+
+	if common.Is256ColorSupported() {
+		common.AgentLog.Info("Terminal supports 256 colors")
+	} else {
+		common.AgentLog.Warnf("Your terminal does not support 256 colors (%s), use `export TERM=%s-256color`!", os.Getenv("TERM"))
+	}
+
 	// startGopsServer(options)
 	options = ac.ValidateAndRepairOptions(options)
 	common.LaunchEpochTime = GetMachineStartTimeNano()
