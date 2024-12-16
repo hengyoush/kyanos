@@ -2,6 +2,7 @@ package common
 
 import (
 	"io"
+	"os"
 	"time"
 
 	"github.com/jefurry/logrus"
@@ -56,5 +57,13 @@ func SetLogToFile() {
 				l.Hooks.Add(hook)
 			}
 		}
+	}
+}
+
+func SetLogToStdout() {
+	SetLogToFileFlag = false
+	for _, l := range Loggers {
+		// 设置为stdout
+		l.SetOut(os.Stdout)
 	}
 }
