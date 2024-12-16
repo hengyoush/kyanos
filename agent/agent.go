@@ -28,8 +28,13 @@ func SetupAgent(options ac.AgentOptions) {
 	if enabled, err := common.IsEnableBPF(); err == nil && !enabled {
 		common.AgentLog.Error("BPF is not enabled in your kernel. This might be because your kernel version is too old. " +
 			"Please check the requirements for Kyanos at https://kyanos.io/quickstart.html#installation-requirements.")
+		return
 	}
 
+	if os.Geteuid() != 0 {
+		common.AgentLog.Error("Kyanos requires root privileges to run. Please run kyanos with sudo.")
+		return
+	}
 	// startGopsServer(options)
 	options = ac.ValidateAndRepairOptions(options)
 	common.LaunchEpochTime = GetMachineStartTimeNano()
