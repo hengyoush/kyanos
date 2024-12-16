@@ -82,6 +82,9 @@ func SetupAgent(options ac.AgentOptions) {
 				if bf != nil {
 					bf.Close()
 				}
+				_bf.Err = err
+				options.LoadPorgressChannel <- "❌ Kyanos start failed"
+				options.LoadPorgressChannel <- "quit"
 				return
 			}
 			_bf.Links = bf.Links
@@ -118,9 +121,14 @@ func SetupAgent(options ac.AgentOptions) {
 	}()
 	if !options.WatchOptions.DebugOutput {
 		loader_render.Start(ctx, options)
+		common.SetLogToStdout()
 	} else {
 		wg.Wait()
 		common.AgentLog.Info("Waiting for events..")
+	}
+	if _bf.Err != nil {
+		common.AgentLog.Error("Failed to load BPF: ", _bf.Err)
+		return
 	}
 
 	stop := false
