@@ -39,15 +39,7 @@ sudo ./kyanos watch
 > 如果上面的命令执行失败了？没关系，在这个 [FAQ](./faq) 里看看有没有符合你的情况，如果没有欢迎提出 [github issue](https://github.com/hengyoush/kyanos/issues) ! 
 
 ## 常见问题
-### kyanos watch 执行后没有任何输出
-
-检查启动kyanos时是否有这样的日志：
-
-```js
-find btf file exactly failed, try to find a lower version btf file...
-```
-如果有，可能是因为你的系统缺少了btf文件导致的，可以在这里 https://mirrors.openanolis.cn/coolbpf/btf/ 以及 https://github.com/aquasecurity/btfhub-archive/ 这里手动下载和你的内核匹配的BTF文件，启动kyanos时通过`--btf`选项指定你下载的btf文件即可。
-
+请查看：[常见问题](./faq)
 
 ## 下一步
 - 快速了解 kyanos 的使用方法，请查看：[5分钟学会使用kyanos](./how-to)
