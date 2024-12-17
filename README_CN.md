@@ -1,3 +1,5 @@
+
+![](docs/public/kyanos-demo.gif)
 <div align="center">  
  
 [![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) 
