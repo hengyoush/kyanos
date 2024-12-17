@@ -1,4 +1,7 @@
 # kyanos
+
+
+![](docs/public/kyanos-demo.gif)
 <div align="center">  
  
 [![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) 
@@ -12,7 +15,6 @@
 
 </div>
 
-![](docs/public/kyanos-demo.gif)
 [简体中文](./README_CN.md) | English 
 
 
