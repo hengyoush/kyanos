@@ -37,9 +37,9 @@ func SetupAgent(options ac.AgentOptions) {
 	}
 
 	if common.Is256ColorSupported() {
-		common.AgentLog.Info("Terminal supports 256 colors")
+		common.AgentLog.Debugln("Terminal supports 256 colors")
 	} else {
-		common.AgentLog.Warnf("Your terminal does not support 256 colors (%s), use `export TERM=%s-256color`!", os.Getenv("TERM"))
+		common.AgentLog.Warnf("Your terminal does not support 256 colors, ui may display incorrectly")
 	}
 
 	// startGopsServer(options)
