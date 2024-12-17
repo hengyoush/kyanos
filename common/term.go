@@ -1,11 +1,10 @@
 package common
 
 import (
-	"os"
-	"strings"
+	"github.com/muesli/termenv"
 )
 
 func Is256ColorSupported() bool {
-	term := os.Getenv("TERM")
-	return strings.Contains(term, "256color")
+	colorProfile := termenv.DefaultOutput().ColorProfile()
+	return colorProfile == termenv.ANSI256 || colorProfile == termenv.TrueColor
 }
