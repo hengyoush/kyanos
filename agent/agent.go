@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"kyanos/agent/analysis"
 	anc "kyanos/agent/analysis/common"
 	ac "kyanos/agent/common"
@@ -15,7 +16,10 @@ import (
 	"kyanos/bpf/loader"
 	"kyanos/common"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -139,7 +143,7 @@ func SetupAgent(options ac.AgentOptions) {
 		common.AgentLog.Info("Waiting for events..")
 	}
 	if _bf.Err != nil {
-		common.AgentLog.Error("Failed to load BPF: ", _bf.Err)
+		logSystemInfo(_bf.Err)
 		return
 	}
 
@@ -168,6 +172,52 @@ func SetupAgent(options ac.AgentOptions) {
 	common.AgentLog.Infoln("Kyanos Stopped: ", stop)
 
 	return
+}
+
+func logSystemInfo(loadError error) {
+	common.SetLogToStdout()
+	info := []string{
+		"OS: " + runtime.GOOS,
+		"Arch: " + runtime.GOARCH,
+		"NumCPU: " + fmt.Sprintf("%d", runtime.NumCPU()),
+		"GoVersion: " + runtime.Version(),
+	}
+
+	kernelVersion, err := exec.Command("uname", "-r").Output()
+	if err == nil {
+		info = append(info, "Kernel Version: "+strings.TrimSpace(string(kernelVersion)))
+	} else {
+		info = append(info, "Failed to get kernel version: "+err.Error())
+	}
+
+	osRelease, err := exec.Command("cat", "/etc/os-release").Output()
+	if err == nil {
+		info = append(info, strings.TrimSpace(string(osRelease)))
+	} else {
+		info = append(info, "Failed to get Linux distribution: "+err.Error())
+	}
+
+	const crashReportFormat = `
+===================================
+	  Kyanos Crash Report
+=========Error Message=============
+%s
+============OS Info================
+%s
+===================================
+FAQ         : https://kyanos.io/faq.html
+Submit issue: https://github.com/hengyoush/kyanos/issues
+
+`
+
+	var errorInfo string
+	if loadError != nil {
+		errorInfo = "Error: " + loadError.Error()
+	} else {
+		errorInfo = "No load errors detected."
+	}
+
+	fmt.Printf(crashReportFormat, errorInfo, strings.Join(info, "\n"))
 }
 
 func startGopsServer(opts ac.AgentOptions) {
