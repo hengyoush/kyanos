@@ -38,15 +38,9 @@ If the following table appears:
 > [!TIP]
 > Did the command above fail? No worries——check the FAQ below to see if your situation is covered. If not, feel free to open a [GitHub issue](https://github.com/hengyoush/kyanos/issues)!
 
-## FAQ {#faq}
-### No Output After Running kyanos watch
 
-Check if you see a log like this when starting Kyanos:
-
-```js
-find btf file exactly failed, try to find a lower version btf file...
-```
-If so, this might be due to a missing BTF file on your system. You can manually download the BTF file matching your kernel version from [mirrors.openanolis.cn](https://mirrors.openanolis.cn/coolbpf/btf/) or [btfhub-archive](https://github.com/aquasecurity/btfhub-archive/), and then specify the downloaded BTF file using the `--btf` option when starting Kyanos.
+## FAQ  
+see：[FAQ](./faq)
 
 ## Next Steps
 - For a quick guide on using Kyanos, see: [Learn Kyanos in 5 Minutes](./how-to)
