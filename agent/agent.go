@@ -205,10 +205,11 @@ func logSystemInfo(loadError error) {
 ============OS Info================
 %s
 ===================================
-Please visit https://github.com/kyanos/issues to report this issue.
-
+FAQ         : https://kyanos.io/faq.html
+Submit issue: https://github.com/hengyoush/kyanos/issues
 
 `
+
 	var errorInfo string
 	if loadError != nil {
 		errorInfo = "Error: " + loadError.Error()
