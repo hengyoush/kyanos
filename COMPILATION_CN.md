@@ -15,6 +15,13 @@
 /bin/bash -c "$(curl -fsSL https://github.com/hengyoush/kyanos/blob/main/init_env.sh)"
 ```
 ### 其他 Linux 发行版
+用下面的命令 clone 项目:
+```bash
+git clone https://github.com/hengyoush/kyanos
+cd kyanos
+git submodule update --init --recursive
+```
+
 编译环境除了上面工具链版本列出的软件外，还需要以下软件，请自行安装。
 
 - linux-tools-common

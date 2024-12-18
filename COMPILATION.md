@@ -15,6 +15,12 @@ If you are using Ubuntu 20.04 or later, you can initialize the compilation envir
 /bin/bash -c "$(curl -fsSL https://github.com/hengyoush/kyanos/blob/main/init_env.sh)"
 ```
 ### Other Linux Distributions
+clone the project (don't forget to update submodle!):
+```bash
+git clone https://github.com/hengyoush/kyanos
+cd kyanos
+git submodule update --init --recursive
+```
 In addition to the toolchain versions listed above, the compilation environment also requires the following software. Please install them manually.
 
 - linux-tools-common
