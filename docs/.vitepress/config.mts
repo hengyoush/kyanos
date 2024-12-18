@@ -24,6 +24,7 @@ export default defineConfig({
         items: [
           { text: 'What is Kyanos?', link: './what-is-kyanos' },
           { text: 'Quickstart', link: './quickstart' },
+          { text: 'FAQ', link: './faq' },
         ]
       },
       {
