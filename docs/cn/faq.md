@@ -7,7 +7,7 @@ prev: false
 
 
 ## 支持运行在 Windows / Mac 上吗 ？
-目前还未支持，但后续有计划支持。
+目前还未支持，但后续有计划支持。([ISSUE-151](https://github.com/hengyoush/kyanos/issues/151))
 
 ## 支持运行在低版本内核上吗 ？
 目前支持最低内核版本: 3.10.0-957，而且低版本内核下kyanos的会缺少某些功能。

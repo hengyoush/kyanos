@@ -6,7 +6,7 @@ prev: false
 # FAQ
 
 ## Does it support running on Windows / Mac?
-Not yet, but there are plans to support it in the future.([ISSUE-151](https://kkgithub.com/hengyoush/kyanos/issues/151))
+Not yet, but there are plans to support it in the future.([ISSUE-151](https://github.com/hengyoush/kyanos/issues/151))
 
 ## Does it support running on lower kernel versions?
 Currently, it supports the minimum kernel version: 3.10.0-957, but some features may be missing on lower kernel versions.
