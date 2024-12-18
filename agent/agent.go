@@ -15,7 +15,10 @@ import (
 	"kyanos/bpf/loader"
 	"kyanos/common"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -139,6 +142,7 @@ func SetupAgent(options ac.AgentOptions) {
 		common.AgentLog.Info("Waiting for events..")
 	}
 	if _bf.Err != nil {
+		printOSInfo()
 		common.AgentLog.Error("Failed to load BPF: ", _bf.Err)
 		return
 	}
@@ -168,6 +172,28 @@ func SetupAgent(options ac.AgentOptions) {
 	common.AgentLog.Infoln("Kyanos Stopped: ", stop)
 
 	return
+}
+
+func printOSInfo() {
+	common.SetLogToStdout()
+	common.AgentLog.Warnf("OS: %s", runtime.GOOS)
+	common.AgentLog.Warnf("Arch: %s", runtime.GOARCH)
+	common.AgentLog.Warnf("NumCPU: %d", runtime.NumCPU())
+	common.AgentLog.Warnf("GoVersion: %s", runtime.Version())
+
+	kernelVersion, err := exec.Command("uname", "-r").Output()
+	if err == nil {
+		common.AgentLog.Warnf("Kernel Version: %s", strings.TrimSpace(string(kernelVersion)))
+	} else {
+		common.AgentLog.Errorf("Failed to get kernel version: %v", err)
+	}
+
+	osRelease, err := exec.Command("cat", "/etc/os-release").Output()
+	if err == nil {
+		common.AgentLog.Warn(string(osRelease))
+	} else {
+		common.AgentLog.Errorf("Failed to get Linux distribution: %v", err)
+	}
 }
 
 func startGopsServer(opts ac.AgentOptions) {
