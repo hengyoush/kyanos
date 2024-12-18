@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"kyanos/agent/analysis"
 	anc "kyanos/agent/analysis/common"
 	ac "kyanos/agent/common"
@@ -142,7 +143,7 @@ func SetupAgent(options ac.AgentOptions) {
 		common.AgentLog.Info("Waiting for events..")
 	}
 	if _bf.Err != nil {
-		printOSInfo()
+		logSystemInfo(_bf.Err)
 		common.AgentLog.Error("Failed to load BPF: ", _bf.Err)
 		return
 	}
@@ -174,26 +175,49 @@ func SetupAgent(options ac.AgentOptions) {
 	return
 }
 
-func printOSInfo() {
+func logSystemInfo(loadError error) {
 	common.SetLogToStdout()
-	common.AgentLog.Warnf("OS: %s", runtime.GOOS)
-	common.AgentLog.Warnf("Arch: %s", runtime.GOARCH)
-	common.AgentLog.Warnf("NumCPU: %d", runtime.NumCPU())
-	common.AgentLog.Warnf("GoVersion: %s", runtime.Version())
+	info := []string{
+		"OS: " + runtime.GOOS,
+		"Arch: " + runtime.GOARCH,
+		"NumCPU: " + fmt.Sprintf("%d", runtime.NumCPU()),
+		"GoVersion: " + runtime.Version(),
+	}
 
 	kernelVersion, err := exec.Command("uname", "-r").Output()
 	if err == nil {
-		common.AgentLog.Warnf("Kernel Version: %s", strings.TrimSpace(string(kernelVersion)))
+		info = append(info, "Kernel Version: "+strings.TrimSpace(string(kernelVersion)))
 	} else {
-		common.AgentLog.Errorf("Failed to get kernel version: %v", err)
+		info = append(info, "Failed to get kernel version: "+err.Error())
 	}
 
 	osRelease, err := exec.Command("cat", "/etc/os-release").Output()
 	if err == nil {
-		common.AgentLog.Warn(string(osRelease))
+		info = append(info, strings.TrimSpace(string(osRelease)))
 	} else {
-		common.AgentLog.Errorf("Failed to get Linux distribution: %v", err)
+		info = append(info, "Failed to get Linux distribution: "+err.Error())
 	}
+
+	const crashReportFormat = `
+===================================
+	  Kyanos Crash Report
+=========Error Message=============
+%s
+============OS Info================
+%s
+===================================
+Please visit https://github.com/kyanos/issues to report this issue.
+
+
+`
+	var errorInfo string
+	if loadError != nil {
+		errorInfo = "Error: " + loadError.Error()
+	} else {
+		errorInfo = "No load errors detected."
+	}
+
+	fmt.Printf(crashReportFormat, errorInfo, strings.Join(info, "\n"))
 }
 
 func startGopsServer(opts ac.AgentOptions) {
