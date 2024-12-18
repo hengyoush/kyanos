@@ -144,7 +144,6 @@ func SetupAgent(options ac.AgentOptions) {
 	}
 	if _bf.Err != nil {
 		logSystemInfo(_bf.Err)
-		common.AgentLog.Error("Failed to load BPF: ", _bf.Err)
 		return
 	}
 
