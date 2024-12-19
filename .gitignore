@@ -28,6 +28,7 @@ docs/.vitepress/cache
 # Go workspace file
 go.work
 .vscode/
+.idea/
 .output/
 deps/**
 
