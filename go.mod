@@ -28,7 +28,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/zcalusic/sysinfo v1.1.2
-	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff
+	golang.org/x/arch v0.12.0
 	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
 	golang.org/x/sys v0.28.0
 	k8s.io/cri-api v0.31.0
