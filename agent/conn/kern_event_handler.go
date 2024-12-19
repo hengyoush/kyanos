@@ -13,13 +13,14 @@ import (
 )
 
 type KernEventStream struct {
-	conn         *Connection4
-	kernEvents   map[bpf.AgentStepT][]KernEvent
-	kernEventsMu sync.RWMutex
-	sslInEvents  []SslEvent
-	sslOutEvents []SslEvent
-	sslEventsMu  sync.RWMutex
-	maxLen       int
+	conn           *Connection4
+	kernEvents     map[bpf.AgentStepT][]KernEvent
+	kernEventsMu   sync.RWMutex
+	sslInEvents    []SslEvent
+	sslOutEvents   []SslEvent
+	sslInEventsMu  sync.RWMutex
+	sslOutEventsMu sync.RWMutex
+	maxLen         int
 
 	egressDiscardSeq     uint64
 	ingressDiscardSeq    uint64
@@ -37,9 +38,15 @@ func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
 	return stream
 }
 func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
-	s.sslEventsMu.Lock()
-	defer s.sslEventsMu.Unlock()
-	s.discardSslEventsIfNeeded()
+	if event.SslEventHeader.Ke.Step == bpf.AgentStepTSSL_IN {
+		s.sslInEventsMu.Lock()
+		defer s.sslInEventsMu.Unlock()
+		s.discardSslEventsIfNeeded(true)
+	} else {
+		s.sslOutEventsMu.Lock()
+		defer s.sslOutEventsMu.Unlock()
+		s.discardSslEventsIfNeeded(false)
+	}
 	var sslEvents []SslEvent
 	if event.SslEventHeader.Ke.Step == bpf.AgentStepTSSL_IN {
 		sslEvents = s.sslInEvents
@@ -130,8 +137,13 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 }
 
 func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []SslEvent {
-	s.sslEventsMu.RLock()
-	defer s.sslEventsMu.RUnlock()
+	if step == bpf.AgentStepTSSL_IN {
+		s.sslInEventsMu.RLock()
+		defer s.sslInEventsMu.RUnlock()
+	} else {
+		s.sslOutEventsMu.RLock()
+		defer s.sslOutEventsMu.RUnlock()
+	}
 	var sslEvents []SslEvent
 	if step == bpf.AgentStepTSSL_IN {
 		sslEvents = s.sslInEvents
@@ -194,14 +206,19 @@ func (s *KernEventStream) MarkNeedDiscardSslSeq(seq uint64, egress bool) {
 		s.ingressSslDiscardSeq = max(s.ingressSslDiscardSeq, seq)
 	}
 }
-func (s *KernEventStream) discardSslEventsIfNeeded() {
-	s.sslEventsMu.Lock()
-	defer s.sslEventsMu.Unlock()
-	if s.egressSslDiscardSeq != 0 {
-		s.discardSslEventsBySeq(s.egressSslDiscardSeq, true)
-	}
-	if s.ingressSslDiscardSeq != 0 {
-		s.discardSslEventsBySeq(s.ingressSslDiscardSeq, false)
+func (s *KernEventStream) discardSslEventsIfNeeded(isIn bool) {
+	if isIn {
+		s.sslInEventsMu.Lock()
+		defer s.sslInEventsMu.Unlock()
+		if s.ingressSslDiscardSeq != 0 {
+			s.discardSslEventsBySeq(s.ingressSslDiscardSeq, false)
+		}
+	} else {
+		s.sslOutEventsMu.Lock()
+		defer s.sslOutEventsMu.Unlock()
+		if s.egressSslDiscardSeq != 0 {
+			s.discardSslEventsBySeq(s.egressSslDiscardSeq, true)
+		}
 	}
 }
 
@@ -216,8 +233,13 @@ func (s *KernEventStream) discardEventsIfNeeded() {
 	}
 }
 func (s *KernEventStream) discardSslEventsBySeq(seq uint64, egress bool) {
-	s.sslEventsMu.Lock()
-	defer s.sslEventsMu.Unlock()
+	if egress {
+		s.sslOutEventsMu.Lock()
+		defer s.sslOutEventsMu.Unlock()
+	} else {
+		s.sslInEventsMu.Lock()
+		defer s.sslInEventsMu.Unlock()
+	}
 	var oldevents *[]SslEvent
 	if egress {
 		oldevents = &s.sslOutEvents
