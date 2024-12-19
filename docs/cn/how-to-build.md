@@ -17,7 +17,7 @@ prev: false
 ### Ubuntu
 如果你使用的是 ubuntu 20.04 以及更新版本，可以使用一条命令即可完成编译环境的初始化。
 ```
-/bin/bash -c "$(curl -fsSL https://github.com/hengyoush/kyanos/blob/main/init_env.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/hengyoush/kyanos/refs/heads/main/init_env.sh)"
 ```
 ### 其他 Linux 发行版
 用下面的命令 clone 项目:
