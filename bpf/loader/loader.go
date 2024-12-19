@@ -81,7 +81,7 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 		lagacyobjs := &bpf.AgentLagacyKernel310Objects{}
 		spec, err = bpf.LoadAgentLagacyKernel310()
 		if err != nil {
-			common.AgentLog.Fatal("load Agent error:", err)
+			return nil, err
 		}
 		filterFunctions(spec, *options.Kv)
 		err = spec.LoadAndAssign(lagacyobjs, collectionOptions)
@@ -90,7 +90,7 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 		objs = &bpf.AgentObjects{}
 		spec, err = bpf.LoadAgent()
 		if err != nil {
-			common.AgentLog.Fatal("load Agent error:", err)
+			return nil, err
 		}
 		filterFunctions(spec, *options.Kv)
 		err = spec.LoadAndAssign(objs, collectionOptions)
@@ -123,10 +123,14 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 
 func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	var links *list.List
+	var err error
 	if options.LoadBpfProgramFunction != nil {
 		links = options.LoadBpfProgramFunction()
 	} else {
-		links = attachBpfProgs(options.IfName, options.Kv, options)
+		links, err = attachBpfProgs(options.IfName, options.Kv, options)
+		if err != nil {
+			return err
+		}
 	}
 
 	options.LoadPorgressChannel <- "🍆 Attached base eBPF programs."
@@ -314,6 +318,9 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 			writeFilterNsIdsToMap(filterResult, bpf.Objs)
 			one := int64(1)
 			controlValues.Update(bpf.AgentControlValueIndexTKEnableFilterByPid, one, ebpf.UpdateAny)
+		} else {
+			common.AgentLog.Errorf("applyContainerFilter failed: %v", err)
+			return false
 		}
 	}
 
@@ -398,7 +405,14 @@ func isProcNameMacthed(proc *process.Process, filterComm string) bool {
 	return false
 }
 
-func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, options *ac.AgentOptions) *list.List {
+func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, options *ac.AgentOptions) (l *list.List, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			common.AgentLog.Errorf("Recovered in attachBpfProgs: %v", r)
+			err = fmt.Errorf("attachBpfProgs panic: %v", r)
+		}
+	}()
+
 	linkList := list.New()
 
 	if kernelVersion.SupportCapability(compatible.SupportXDP) {
@@ -443,7 +457,7 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 					if isNonCriticalStep {
 						common.AgentLog.Debugf("Attach failed: %v, functions: %v skip it because it's a non-criticalstep", err, functions)
 					} else {
-						common.AgentLog.Fatalf("Attach failed: %v, functions: %v", err, functions)
+						return nil, fmt.Errorf("Attach failed: %v, functions: %v", err, functions)
 					}
 				} else {
 					common.AgentLog.Debugf("Attach failed but has fallback: %v, functions: %v", err, functions)
@@ -493,7 +507,7 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry())
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry())
 
-	return linkList
+	return linkList, nil
 }
 
 func attachOpenSslUprobes(links *list.List, options *ac.AgentOptions, kernelVersion *compatible.KernelVersion, objs any) {
