@@ -11,7 +11,6 @@ import (
 	ac "kyanos/agent/common"
 	"kyanos/bpf"
 	"kyanos/common"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -438,6 +437,5 @@ func getBestMatchedBTFFile(findExactly bool) ([]uint8, error) {
 			return file, nil
 		}
 	}
-	log.Fatalln("can't start kyanos because no available btf file, please refer this url: https://hengyoush.github.io/kyanos/quickstart.html for more info.")
 	return nil, errors.New("no btf file found to load")
 }
