@@ -2,12 +2,12 @@ package loader
 
 import (
 	"context"
+	"fmt"
 	ac "kyanos/agent/common"
 	"kyanos/agent/metadata"
 	"kyanos/agent/metadata/types"
 	"kyanos/bpf"
 	"kyanos/common"
-	"log"
 
 	"github.com/cilium/ebpf"
 )
@@ -22,7 +22,8 @@ func applyContainerFilter(ctx context.Context, options *ac.AgentOptions) (*metad
 	cc, err, k8sErr := metadata.NewContainerCache(ctx, options.DockerEndpoint, options.ContainerdEndpoint, options.CriRuntimeEndpoint)
 	if err != nil {
 		if options.FilterByContainer() {
-			common.DefaultLog.Fatalf("find container failed: %s", err)
+			common.DefaultLog.Errorf("find container failed: %s", err)
+			return nil, nil, err
 		} else {
 			common.DefaultLog.Warnf("find container failed: %s", err)
 			return nil, nil, nil
@@ -30,7 +31,8 @@ func applyContainerFilter(ctx context.Context, options *ac.AgentOptions) (*metad
 	}
 	if k8sErr != nil {
 		if options.FilterByK8s() {
-			common.DefaultLog.Fatalf("find pod failed: %s", k8sErr)
+			common.DefaultLog.Errorf("find pod failed: %s", k8sErr)
+			return nil, nil, k8sErr
 		} else {
 			common.DefaultLog.Infof("find pod failed: %s", k8sErr)
 		}
@@ -45,17 +47,17 @@ func applyContainerFilter(ctx context.Context, options *ac.AgentOptions) (*metad
 	case options.ContainerId != "":
 		container := cc.GetById(options.ContainerId)
 		if container.EmptyNS() {
-			log.Fatalf("can not find any running container by id %s", options.ContainerId)
+			return nil, nil, fmt.Errorf("can not find any running container by id %s", options.ContainerId)
 		}
 		containers = append(containers, container)
 	case options.ContainerName != "":
 		cs := cc.GetByName(options.ContainerName)
 		cs = removeNonFilterAbleContainers(cs)
 		if len(cs) > 1 {
-			log.Fatalf("found more than one containers by name %s", options.ContainerName)
+			return nil, nil, fmt.Errorf("found more than one containers by name %s", options.ContainerName)
 		}
 		if len(cs) == 0 {
-			log.Fatalf("can not find any running container by name %s", options.ContainerName)
+			return nil, nil, fmt.Errorf("can not find any running container by name %s", options.ContainerName)
 		}
 		container := cs[0]
 		containers = append(containers, container)
@@ -63,7 +65,7 @@ func applyContainerFilter(ctx context.Context, options *ac.AgentOptions) (*metad
 		cs := cc.GetByPodName(options.PodName, options.PodNameSpace)
 		cs = removeNonFilterAbleContainers(cs)
 		if len(cs) == 0 {
-			log.Fatalf("can not find any running pod by name %s in namespace %s", options.PodName, options.PodNameSpace)
+			return nil, nil, fmt.Errorf("can not find any running pod by name %s in namespace %s", options.PodName, options.PodNameSpace)
 		}
 		containers = append(containers, cs...)
 	}
@@ -74,10 +76,10 @@ func applyContainerFilter(ctx context.Context, options *ac.AgentOptions) (*metad
 	}
 	for _, container := range containers {
 		if container.IsSandbox() {
-			common.DefaultLog.Infof("skip sandbox container: %#v", container)
+			common.AgentLog.Infof("skip sandbox container: %#v", container)
 			continue
 		}
-		common.DefaultLog.Infof("filter by container %#v", container)
+		common.AgentLog.Infof("filter by container %#v", container)
 		if container.PidNamespace > 0 && container.PidNamespace != metadata.HostPidNs {
 			result.pidnsIds = append(result.pidnsIds, uint32(container.PidNamespace))
 		}
