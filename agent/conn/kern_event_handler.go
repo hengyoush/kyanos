@@ -7,6 +7,7 @@ import (
 	"kyanos/common"
 	"kyanos/monitor"
 	"slices"
+	"sync"
 
 	"github.com/jefurry/logrus"
 )
@@ -14,8 +15,10 @@ import (
 type KernEventStream struct {
 	conn         *Connection4
 	kernEvents   map[bpf.AgentStepT][]KernEvent
+	kernEventsMu sync.RWMutex
 	sslInEvents  []SslEvent
 	sslOutEvents []SslEvent
+	sslEventsMu  sync.RWMutex
 	maxLen       int
 
 	egressDiscardSeq     uint64
@@ -34,6 +37,8 @@ func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
 	return stream
 }
 func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
+	s.sslEventsMu.Lock()
+	defer s.sslEventsMu.Unlock()
 	s.discardSslEventsIfNeeded()
 	var sslEvents []SslEvent
 	if event.SslEventHeader.Ke.Step == bpf.AgentStepTSSL_IN {
@@ -74,6 +79,8 @@ func (s *KernEventStream) AddSyscallEvent(event *bpf.SyscallEventData) {
 }
 
 func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
+	s.kernEventsMu.Lock()
+	defer s.kernEventsMu.Unlock()
 	s.discardEventsIfNeeded()
 	if event.Len > 0 {
 		if _, ok := s.kernEvents[event.Step]; !ok {
@@ -123,6 +130,8 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 }
 
 func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []SslEvent {
+	s.sslEventsMu.RLock()
+	defer s.sslEventsMu.RUnlock()
 	var sslEvents []SslEvent
 	if step == bpf.AgentStepTSSL_IN {
 		sslEvents = s.sslInEvents
@@ -148,6 +157,8 @@ func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint
 }
 
 func (s *KernEventStream) FindEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []KernEvent {
+	s.kernEventsMu.RLock()
+	defer s.kernEventsMu.RUnlock()
 	events, ok := s.kernEvents[step]
 	if !ok {
 		return []KernEvent{}
@@ -184,6 +195,8 @@ func (s *KernEventStream) MarkNeedDiscardSslSeq(seq uint64, egress bool) {
 	}
 }
 func (s *KernEventStream) discardSslEventsIfNeeded() {
+	s.sslEventsMu.Lock()
+	defer s.sslEventsMu.Unlock()
 	if s.egressSslDiscardSeq != 0 {
 		s.discardSslEventsBySeq(s.egressSslDiscardSeq, true)
 	}
@@ -193,6 +206,8 @@ func (s *KernEventStream) discardSslEventsIfNeeded() {
 }
 
 func (s *KernEventStream) discardEventsIfNeeded() {
+	s.kernEventsMu.Lock()
+	defer s.kernEventsMu.Unlock()
 	if s.egressDiscardSeq != 0 {
 		s.discardEventsBySeq(s.egressDiscardSeq, true)
 	}
@@ -201,6 +216,8 @@ func (s *KernEventStream) discardEventsIfNeeded() {
 	}
 }
 func (s *KernEventStream) discardSslEventsBySeq(seq uint64, egress bool) {
+	s.sslEventsMu.Lock()
+	defer s.sslEventsMu.Unlock()
 	var oldevents *[]SslEvent
 	if egress {
 		oldevents = &s.sslOutEvents
@@ -217,6 +234,8 @@ func (s *KernEventStream) discardSslEventsBySeq(seq uint64, egress bool) {
 	}
 }
 func (s *KernEventStream) discardEventsBySeq(seq uint64, egress bool) {
+	s.kernEventsMu.Lock()
+	defer s.kernEventsMu.Unlock()
 	for step, events := range s.kernEvents {
 		if egress && !bpf.IsEgressStep(step) {
 			continue
