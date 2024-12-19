@@ -16,7 +16,7 @@ This document describes the local compilation method for kyanos. My environment 
 ### Ubuntu
 If you are using Ubuntu 22.04 or later, you can initialize the compilation environment with a single command.
 ```
-/bin/bash -c "$(curl -fsSL https://github.com/hengyoush/kyanos/blob/main/init_env.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/hengyoush/kyanos/refs/heads/main/init_env.sh)"
 ```
 ### Other Linux Distributions
 clone the project (don't forget to update submodle!):
