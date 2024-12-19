@@ -91,21 +91,23 @@ func SetupAgent(options ac.AgentOptions) {
 		kernelVersion := compatible.GetCurrentKernelVersion()
 		options.Kv = &kernelVersion
 		var err error
-		{
-			bf, err := loader.LoadBPF(&options)
+		defer func() {
 			if err != nil {
 				common.AgentLog.Error("Failed to load BPF programs: ", err)
-				if bf != nil {
-					bf.Close()
-				}
 				_bf.Err = err
 				options.LoadPorgressChannel <- "❌ Kyanos start failed"
 				options.LoadPorgressChannel <- "quit"
-				return
 			}
-			_bf.Links = bf.Links
-			_bf.Objs = bf.Objs
+		}()
+		bf, err := loader.LoadBPF(&options)
+		if err != nil {
+			if bf != nil {
+				bf.Close()
+			}
+			return
 		}
+		_bf.Links = bf.Links
+		_bf.Objs = bf.Objs
 
 		err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), 2048, options.CustomSyscallEventHook)
 		if err != nil {
@@ -123,7 +125,10 @@ func SetupAgent(options ac.AgentOptions) {
 		if err != nil {
 			return
 		}
-		_bf.AttachProgs(&options)
+		err = _bf.AttachProgs(&options)
+		if err != nil {
+			return
+		}
 		if !options.WatchOptions.DebugOutput {
 			options.LoadPorgressChannel <- "🍹 All programs attached"
 			options.LoadPorgressChannel <- "🍭 Waiting for events.."
