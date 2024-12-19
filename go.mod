@@ -19,13 +19,18 @@ require (
 	github.com/hashicorp/go-version v1.7.0
 	github.com/jefurry/logrus v2.0.6+incompatible
 	github.com/lucasb-eyer/go-colorful v1.2.0
+	github.com/mandiant/GoReSym v1.7.2-0.20240819162932-534ca84b42d5
+	github.com/muesli/termenv v0.15.2
 	github.com/sevlyar/go-daemon v0.1.6
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/smira/go-xz v0.1.0
 	github.com/spf13/cobra v1.8.1
+	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/zcalusic/sysinfo v1.1.2
 	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff
+	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
+	golang.org/x/sys v0.28.0
 	k8s.io/cri-api v0.31.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.24.17
@@ -66,6 +71,7 @@ require (
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.17.2 // indirect
 	github.com/lestrrat-go/strftime v1.1.0 // indirect
@@ -84,7 +90,6 @@ require (
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
-	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
@@ -104,6 +109,7 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.14 // indirect
 	github.com/tklauser/numcpus v0.9.0 // indirect
@@ -136,16 +142,26 @@ require (
 	rsc.io/binaryregexp v0.2.0 // indirect
 )
 
-require (
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/mandiant/GoReSym v1.7.2-0.20240819162932-534ca84b42d5
-	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/spf13/viper v1.19.0
-	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
-	golang.org/x/sys v0.28.0
-)
-
 replace (
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.24.17
 	k8s.io/apiserver => k8s.io/apiserver v0.24.17
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.24.17
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.24.17
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.24.17
+	k8s.io/code-generator => k8s.io/code-generator v0.24.17
+	k8s.io/component-helpers => k8s.io/component-helpers v0.24.17
+	k8s.io/controller-manager => k8s.io/controller-manager v0.24.17
 	k8s.io/cri-api => k8s.io/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20230824000246-2cb31c9333ad
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.24.17
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.24.17
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.24.17
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.24.17
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.24.17
+	k8s.io/kubectl => k8s.io/kubectl v0.24.17
+	k8s.io/kubelet => k8s.io/kubelet v0.24.17
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.24.17
+	k8s.io/metrics => k8s.io/metrics v0.24.17
+	k8s.io/mount-utils => k8s.io/mount-utils v0.24.17
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.24.17
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.24.17
 )
