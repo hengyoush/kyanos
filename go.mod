@@ -5,7 +5,7 @@ go 1.23.3
 require (
 	github.com/Ha4sh-447/flowcharts v0.0.0-20240802124452-44516e0e7dc8
 	github.com/charmbracelet/bubbles v0.20.0
-	github.com/charmbracelet/bubbletea v1.2.2
+	github.com/charmbracelet/bubbletea v1.2.4
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/cilium/ebpf v0.16.0
 	github.com/containerd/containerd v1.7.23
