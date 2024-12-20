@@ -209,7 +209,7 @@ func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelV
 	}
 
 	needsDelete := make([]string, 0)
-	for cProgName, _ := range coll.Programs {
+	for cProgName := range coll.Programs {
 		if slices.Index(finalCProgNames, cProgName) == -1 {
 			needsDelete = append(needsDelete, cProgName)
 		}
