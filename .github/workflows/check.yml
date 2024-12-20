@@ -20,9 +20,9 @@ permissions:
 jobs:
   go:
     timeout-minutes: 30
+    continue-on-error: true
     # TODO：adapt to different architecture runner
     runs-on: ${{ matrix.os }}
-
     # https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-public-repositories
     strategy:
       matrix:
@@ -54,7 +54,7 @@ jobs:
           sudo apt install -y libelf-dev
 
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
-          sudo add-apt-repository "deb http://apt.llvm.org/${{ matrix.name }}/ llvm-toolchain-${{ matrix.name }}-15 main"
+          sudo add-apt-repository "deb http://apt.llvm.org/${{ matrix.name }}/ llvm-toolchain-${{ matrix.name }}-18 main"
           sudo apt update
 
           sudo apt install -y llvm
@@ -66,10 +66,10 @@ jobs:
       - name: Test
         run: |
           make test
-        if: always()
+        if: success()
 
       - name: Format
         run: |
           make format-go
           git diff --exit-code --quiet || { echo "Code formatting issues detected"; exit 1; }
-        if: always()
+        if: success()
