@@ -1,0 +1,76 @@
+name: Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "dev","feature/*" ]
+  pull_request:
+    branches: [ "main", "dev","feature/*" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+env:
+  kyanos_log_option: --bpf-event-log-level 5 --conntrack-log-level 5
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    timeout-minutes: 30
+    # TODO：adapt to different architecture runner
+    runs-on: ${{ matrix.os }}
+
+    # https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-public-repositories
+    strategy:
+      matrix:
+        arch: [ amd64 ]
+        include:
+          - os: "ubuntu-20.04"
+            name: "focal"
+          - os: "ubuntu-22.04"
+            name: "jammy"
+          - os: "ubuntu-24.04"
+            name: "noble"
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
+        with:
+          go-version: '1.23.3'
+
+      # TODO: extra a common step and used for both check and test
+      # TODO: build a basic image including necessary dependencies
+      - name: Build
+        run: |
+          sudo apt update
+          sudo apt install -y git
+          sudo apt-get -y install pkg-config
+          sudo apt install -y libelf-dev
+
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/${{ matrix.name }}/ llvm-toolchain-${{ matrix.name }}-15 main"
+          sudo apt update
+
+          sudo apt install -y llvm
+          sudo apt install -y clang
+          pwd
+          ls -l
+          make clean && make build-bpf && make
+
+      - name: Test
+        run: |
+          make test
+        if: always()
+
+      - name: Format
+        run: |
+          make format-go
+          git diff --exit-code --quiet || { echo "Code formatting issues detected"; exit 1; }
+        if: always()
