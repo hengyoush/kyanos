@@ -1,4 +1,4 @@
-name: Check
+name: Build Verification
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  go:
+  verify:
     timeout-minutes: 30
     continue-on-error: true
     # TODO：adapt to different architecture runner
