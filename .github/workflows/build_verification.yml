@@ -38,6 +38,10 @@ jobs:
         with:
           go-version: '1.23.3'
 
-      - name: Build
+      - name: Init
         run: |
           /bin/bash init_env.sh
+
+      - name: Build
+        run: |
+          make clean && make build-bpf && make
