@@ -88,3 +88,17 @@ btfgen:
 
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
+
+.PHONY: test
+test: test-go
+
+.PHONY: test-go
+test-go:
+	go test -v ./...
+
+.PHONY: format
+format: format-go
+
+.PHONY: format-go
+format-go:
+	gofmt -s -w .
