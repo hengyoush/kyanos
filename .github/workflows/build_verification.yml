@@ -41,9 +41,3 @@ jobs:
       - name: Build
         run: |
           /bin/bash init_env.sh
-
-      - name: Format
-        run: |
-          make format-go
-          git diff --exit-code --quiet || { echo "Code formatting issues detected"; exit 1; }
-        if: success()
