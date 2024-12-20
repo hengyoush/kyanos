@@ -26,7 +26,6 @@ jobs:
     # https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-public-repositories
     strategy:
       matrix:
-        arch: [ amd64 ]
         include:
           - os: "ubuntu-20.04"
             name: "focal"
