@@ -149,7 +149,7 @@ replace (
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.24.17
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.24.17
 	k8s.io/code-generator => k8s.io/code-generator v0.24.17
-	k8s.io/component-helpers => k8s.io/component-helpers v0.24.17
+	k8s.io/component-helpers => k8s.io/component-helpers v0.32.0
 	k8s.io/controller-manager => k8s.io/controller-manager v0.24.17
 	k8s.io/cri-api => k8s.io/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20230824000246-2cb31c9333ad
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.24.17
