@@ -68,6 +68,7 @@ echo "GOBIN_ZIP:${GOBIN_ZIP}"
 # install golang
 wget https://golang.google.cn/dl/${GOBIN_ZIP}
 sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf ${GOBIN_ZIP}
+rm ${GOBIN_ZIP}
 export PATH=/usr/local/go/bin:$PATH
 export GOPROXY=https://goproxy.cn
 
