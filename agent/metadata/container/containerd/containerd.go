@@ -125,7 +125,7 @@ func (d *MetaData) GetById(containerId string) types.Container {
 	id := getContainerId(containerId)
 	common.DefaultLog.Debugf("get by id, id: %s", id)
 
-	if len(id) == shortContainerIdLength {
+	if len(id) >= shortContainerIdLength && len(id) < 64 {
 		return d.getByShortId(id)
 	}
 
@@ -333,7 +333,7 @@ func (d *MetaData) handleContainerEvent(ctx context.Context, containerId string)
 func (d *MetaData) saveContainer(ctx context.Context, container containerd.Container) {
 	cr, err := d.inspectContainer(ctx, container)
 	if err != nil {
-		common.DefaultLog.Errorf(err.Error())
+		common.DefaultLog.Errorf("%s", err.Error())
 		return
 	}
 
