@@ -19,6 +19,8 @@ Theoretically yes, but Linux distributions on WSL usually do not include Linux h
 ## Can it run in a container/Pod?
 It must run in a privileged mode container/Pod.
 
+> Note: Kyanos must be running on the same host as the container/Pod.
+
 ## `can't find btf file to load!` log appears during operation
 This may be because your system lacks the BTF file. You can manually download the BTF file that matches your kernel from here: https://mirrors.openanolis.cn/coolbpf/btf/ and https://github.com/aquasecurity/btfhub-archive/. Specify the downloaded BTF file with the `--btf` option when starting kyanos.
 

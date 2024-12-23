@@ -20,6 +20,8 @@ prev: false
 ## 可以运行在容器/Pod里吗 ?
 必须运行在具有特权模式下的容器/Pod里。
 
+> 注意：Kyanos 必须与容器/Pod 运行在同一主机上。
+
 ## 运行出现`can't find btf file to load!`日志
 可能是因为你的系统缺少了btf文件导致的，可以在这里 https://mirrors.openanolis.cn/coolbpf/btf/ 以及 https://github.com/aquasecurity/btfhub-archive/ 这里手动下载和你的内核匹配的BTF文件，启动kyanos时通过`--btf`选项指定你下载的btf文件即可。
 
