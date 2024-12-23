@@ -1,5 +1,9 @@
 # kyanos
 
+<div align="center"> 
+<i>One command to find slow requests on your machine and identify the reasons.</i>
+ <br/>
+</div>
 
 ![](docs/public/kyanos-demo.gif)
 <div align="center">  
