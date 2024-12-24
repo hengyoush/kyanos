@@ -21,14 +21,14 @@ type ProcessorManager struct {
 }
 
 func InitProcessorManager(n int, connManager *ConnManager, filter protocol.ProtocolFilter,
-	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum) *ProcessorManager {
+	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum, conntrackCloseWaitTimeMills int) *ProcessorManager {
 	pm := new(ProcessorManager)
 	pm.processors = make([]*Processor, n)
 	pm.wg = new(sync.WaitGroup)
 	pm.ctx, pm.cancel = context.WithCancel(context.Background())
 	pm.connManager = connManager
 	for i := 0; i < n; i++ {
-		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter, sizeFilter, side)
+		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter, sizeFilter, side, conntrackCloseWaitTimeMills)
 		go pm.processors[i].run()
 		pm.wg.Add(1)
 	}
@@ -76,7 +76,7 @@ func (pm *ProcessorManager) GetKernEventsChannels() []chan *bpf.AgentKernEvt {
 func (pm *ProcessorManager) StopAll() error {
 	pm.cancel()
 	pm.wg.Wait()
-	common.DefaultLog.Debugln("All Processor Stopped!")
+	common.DefaultLog.Debugln("All Processor Stopped.")
 	return nil
 }
 
@@ -92,12 +92,13 @@ type Processor struct {
 	messageFilter protocol.ProtocolFilter
 	latencyFilter protocol.LatencyFilter
 	protocol.SizeFilter
-	side            common.SideEnum
-	recordProcessor *RecordsProcessor
+	side                        common.SideEnum
+	recordProcessor             *RecordsProcessor
+	conntrackCloseWaitTimeMills int
 }
 
 func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter protocol.ProtocolFilter,
-	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum) *Processor {
+	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum, conntrackCloseWaitTimeMills int) *Processor {
 	p := new(Processor)
 	p.wg = wg
 	p.ctx = ctx
@@ -114,6 +115,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.recordProcessor = &RecordsProcessor{
 		records: make([]RecordWithConn, 0),
 	}
+	p.conntrackCloseWaitTimeMills = conntrackCloseWaitTimeMills
 	return p
 }
 
@@ -164,7 +166,7 @@ func (p *Processor) run() {
 					conn.CloseTs = event.Ts + common.LaunchEpochTime
 				}
 				go func(c *Connection4) {
-					time.Sleep(1 * time.Second)
+					time.Sleep(time.Duration(p.conntrackCloseWaitTimeMills) * time.Millisecond)
 					c.OnClose(true)
 				}(conn)
 			} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
@@ -309,16 +311,10 @@ func (p *Processor) run() {
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.Ts+common.LaunchEpochTime)
+			if conn != nil && conn.Status == Closed {
+				continue
+			}
 			event.Ts += common.LaunchEpochTime
-			// if conn != nil {
-			// 	common.BPFEventLog.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
-			// 		conn.ToString(), event.Seq, event.Len,
-			// 		common.DisplayTcpFlags(event.Flags))
-			// } else {
-			// 	common.BPFEventLog.Debugf("[data no conn][tgid=%d fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n", tgidFd>>32, uint32(tgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
-			// 		event.Seq, event.Len,
-			// 		common.DisplayTcpFlags(event.Flags))
-			// }
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					conn.OnKernEvent(event)

@@ -47,6 +47,7 @@ type AgentOptions struct {
 	DisableOpensslUprobe        bool
 	WatchOptions                watch.WatchOptions
 	PerformanceMode             bool
+	ConntrackCloseWaitTimeMills int
 
 	FilterComm              string
 	ProcessExecEventChannel chan *bpf.AgentProcessExecEvent
