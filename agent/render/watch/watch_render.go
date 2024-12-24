@@ -79,6 +79,9 @@ var (
 			}
 		},
 		data: func(r *common.AnnotatedRecord) string {
+			if r.TotalDuration == -1 {
+				return "-"
+			}
 			return fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(r.TotalDuration, false))
 		},
 		width:      10,
@@ -132,6 +135,9 @@ var (
 			}
 		},
 		data: func(r *common.AnnotatedRecord) string {
+			if r.BlackBoxDuration == -1 {
+				return "-"
+			}
 			return fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(r.BlackBoxDuration, false))
 		},
 		width:      13,
@@ -147,6 +153,9 @@ var (
 			}
 		},
 		data: func(r *common.AnnotatedRecord) string {
+			if r.ReadFromSocketBufferDuration == -1 {
+				return "-"
+			}
 			return fmt.Sprintf("%.2f", c.ConvertDurationToMillisecondsIfNeeded(r.ReadFromSocketBufferDuration, false))
 		},
 		width:      15,

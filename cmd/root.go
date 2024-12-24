@@ -94,6 +94,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&options.PerformanceMode, "performance-mode", true, "--performance false")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "kern-perf-event-buffer-size", 1*1024*1024, "--kern-perf-event-buffer-size 1024")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "data-perf-event-buffer-size", 30*1024*1024, "--data-perf-event-buffer-size 1024")
+	rootCmd.PersistentFlags().IntVar(&options.ConntrackCloseWaitTimeMills, "conntrack-close-wait-time-mills", 100, "--conntrack-close-wait-time-mills 100")
 
 	rootCmd.PersistentFlags().MarkHidden("default-log-level")
 	rootCmd.PersistentFlags().MarkHidden("agent-log-level")
@@ -104,6 +105,7 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("kern-perf-event-buffer-size")
 	rootCmd.PersistentFlags().MarkHidden("data-perf-event-buffer-size")
 	rootCmd.PersistentFlags().MarkHidden("performance-mode")
+	rootCmd.PersistentFlags().MarkHidden("conntrack-close-wait-time-mills")
 
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false
