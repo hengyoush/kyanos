@@ -1,7 +1,7 @@
 # kyanos
 
 <div align="center"> 
-<i>One command to find slow requests on your machine and identify the reasons.</i>
+<i>One command to find slowest requests and identify the reasons.</i>
  <br/>
 </div>
 
@@ -192,5 +192,9 @@ For more detailed inquiries, you can use the following contact methods:
 - **Twitter:** [https://x.com/kyanos_github](https://x.com/kyanos_github)
 - **My Email:** [hengyoush1@163.com](mailto:hengyoush1@163.com)
 - **My Blog:** [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=hengyoush/kyanos&type=Date)](https://star-history.com/#hengyoush/kyanos&Date)
 
 [Back to top](#top)

@@ -175,4 +175,10 @@ _1.5.0_
 - **微信交流群：**: ![image](https://github.com/user-attachments/assets/427c9221-7090-4df6-ac84-f3b11edbef58)。
 - **我的邮箱：**:  [hengyoush1@163.com](mailto:hengyoush1@163.com)。
 - **我的Blog：**:  [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)。
+
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=hengyoush/kyanos&type=Date)](https://star-history.com/#hengyoush/kyanos&Date)
+
 [Back to top](#top)
