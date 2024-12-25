@@ -102,3 +102,15 @@ format: format-go
 .PHONY: format-go
 format-go:
 	gofmt -s -w .
+
+.PHONY: dlv
+dlv:
+	chmod +x kyanos && dlv --headless --listen=:2345 --api-version=2 --check-go-version=false exec ./kyanos 
+
+.PHONY: kyanos-debug
+kyanos-debug: $(GO_FILES)
+	$(call msg,BINARY,$@)
+	export CGO_LDFLAGS="-Xlinker -rpath=. -static" && go build -gcflags "all=-N -l"
+
+.PHONY: remote-debug
+remote-debug: build-bpf kyanos-debug dlv
