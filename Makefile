@@ -101,6 +101,7 @@ format: format-go
 
 .PHONY: format-go
 format-go:
+	goimports -w .
 	gofmt -s -w .
 
 .PHONY: dlv

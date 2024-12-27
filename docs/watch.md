@@ -105,11 +105,13 @@ Here are the options available for filtering by each protocol:
 
 #### HTTP Protocol Filtering
 
-| Filter Condition | Command Line Flag | Example                                                |
-|------------------|-------------------|--------------------------------------------------------|
-| Request Path     | `path`            | `--path /foo/bar` <br> Only observe requests with the path `/foo/bar`. |
-| Request Host     | `host`            | `--host www.baidu.com` <br> Only observe requests with the host `www.baidu.com`. |
-| Request Method    | `method`          | `--method GET` <br> Only observe requests with the method `GET`. |
+| Filter Condition    | Command Line Flag | Example                                                                                                    |
+|---------------------|-------------------|------------------------------------------------------------------------------------------------------------|
+| Request Path        | `path`            | `--path /foo/bar` <br> Only observe requests with the path `/foo/bar`.                                     |
+| Request Path Prefix | `path-prefix`     | `--path-prefix /foo/bar` <br> Only observe requests with paths started with `/foo/bar`.                    |
+| Request Path Regex  | `path-regex`      | `--path-regex "\/foo\/bar\/.*"` <br> Only observe requests with paths matching the regex `\/foo\/bar\/.*`. |
+| Request Host        | `host`            | `--host www.baidu.com` <br> Only observe requests with the host `www.baidu.com`.                           |
+| Request Method      | `method`          | `--method GET` <br> Only observe requests with the method `GET`.                                           |
 
 #### Redis Protocol Filtering
 
