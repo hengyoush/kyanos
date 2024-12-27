@@ -1,6 +1,8 @@
 {
   "devDependencies": {
     "cz-conventional-changelog": "^3.3.0",
+    "md-padding": "1.9.2",
+    "prettier": "3.4.2",
     "vitepress": "^1.4.1"
   },
   "config": {
