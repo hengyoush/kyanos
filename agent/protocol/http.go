@@ -8,8 +8,11 @@ import (
 	"kyanos/bpf"
 	"kyanos/common"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
+
+	"k8s.io/utils/ptr"
 )
 
 var _ ProtocolStreamParser = &HTTPStreamParser{}
@@ -233,9 +236,12 @@ func (resp *ParsedHttpResponse) IsReq() bool {
 var _ ProtocolFilter = HttpFilter{}
 
 type HttpFilter struct {
-	TargetPath     string
-	TargetHostName string
-	TargetMethods  []string
+	TargetPath       string
+	TargetPathReg    *regexp.Regexp
+	TargetPathPrefix string
+	TargetHostName   string
+	TargetMethods    []string
+	needFilter       *bool
 }
 
 func (filter HttpFilter) FilterByProtocol(protocol bpf.AgentTrafficProtocolT) bool {
@@ -243,28 +249,57 @@ func (filter HttpFilter) FilterByProtocol(protocol bpf.AgentTrafficProtocolT) bo
 }
 
 func (filter HttpFilter) FilterByRequest() bool {
-	return filter.TargetPath != "" || len(filter.TargetMethods) > 0 || filter.TargetHostName != ""
+	if filter.needFilter != nil {
+		return *filter.needFilter
+	}
+	filter.needFilter = ptr.To(len(filter.TargetPath) > 0 ||
+		filter.TargetPathReg != nil ||
+		len(filter.TargetPathPrefix) > 0 ||
+		len(filter.TargetMethods) > 0 ||
+		len(filter.TargetHostName) > 0)
+	return *filter.needFilter
 }
 
 func (filter HttpFilter) FilterByResponse() bool {
 	return false
 }
 
-func (filter HttpFilter) Filter(parsedReq ParsedMessage, parsedResp ParsedMessage) bool {
+// Filter filters HTTP requests based on various criteria such as path, path prefix, path regex, method, and host name.
+// It returns true if the request matches all the specified criteria, otherwise it returns false.
+//
+// The filtering logic is as follows:
+// - If TargetPath is specified, the request path must exactly match TargetPath.
+// - If TargetPathPrefix is specified, the request path must start with TargetPathPrefix.
+// - If TargetPathReg is specified, the request path must match the regular expression TargetPathReg.
+// - If TargetMethods is specified, the request method must be one of the methods in TargetMethods.
+// - If TargetHostName is specified, the request host must exactly match TargetHostName.
+func (filter HttpFilter) Filter(parsedReq ParsedMessage, _ ParsedMessage) bool {
 	req, ok := parsedReq.(*ParsedHttpRequest)
 	if !ok {
 		common.ProtocolParserLog.Warnf("[HttpFilter] cast to http.Request failed: %v\n", req)
 		return false
 	}
+	common.ProtocolParserLog.Debugf("[HttpFilter] filtering request: %v\n", req)
 
-	if filter.TargetPath != "" && filter.TargetPath != req.Path {
+	if len(filter.TargetPath) > 0 && filter.TargetPath != req.Path {
 		return false
 	}
+
+	if len(filter.TargetPathPrefix) > 0 && !strings.HasPrefix(req.Path, filter.TargetPathPrefix) {
+		return false
+	}
+
+	if filter.TargetPathReg != nil && !filter.TargetPathReg.MatchString(req.Path) {
+		return false
+	}
+
 	if len(filter.TargetMethods) > 0 && !slices.Contains(filter.TargetMethods, req.Method) {
 		return false
 	}
+
 	if filter.TargetHostName != "" && filter.TargetHostName != req.Host {
 		return false
 	}
+
 	return true
 }
