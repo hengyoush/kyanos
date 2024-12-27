@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"k8s.io/utils/ptr"
 )
 
 var _ ProtocolStreamParser = &HTTPStreamParser{}
@@ -239,6 +241,7 @@ type HttpFilter struct {
 	TargetPathPrefix string
 	TargetHostName   string
 	TargetMethods    []string
+	needFilter       *bool
 }
 
 func (filter HttpFilter) FilterByProtocol(protocol bpf.AgentTrafficProtocolT) bool {
@@ -246,11 +249,15 @@ func (filter HttpFilter) FilterByProtocol(protocol bpf.AgentTrafficProtocolT) bo
 }
 
 func (filter HttpFilter) FilterByRequest() bool {
-	return len(filter.TargetPath) > 0 ||
+	if filter.needFilter != nil {
+		return *filter.needFilter
+	}
+	filter.needFilter = ptr.To(len(filter.TargetPath) > 0 ||
 		filter.TargetPathReg != nil ||
 		len(filter.TargetPathPrefix) > 0 ||
 		len(filter.TargetMethods) > 0 ||
-		len(filter.TargetHostName) > 0
+		len(filter.TargetHostName) > 0)
+	return *filter.needFilter
 }
 
 func (filter HttpFilter) FilterByResponse() bool {
