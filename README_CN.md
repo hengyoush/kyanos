@@ -172,7 +172,7 @@ _1.5.0_
 
 ## 🗨️ Contacts
 如果你有更详细的问题需要咨询，可以用以下联系方式：
-- **微信交流群：**: ![image](https://github.com/user-attachments/assets/427c9221-7090-4df6-ac84-f3b11edbef58)。
+- **微信交流群：**: <img width="182" alt="image" src="https://github.com/user-attachments/assets/cf65f281-485f-4506-b387-0286c25bcf03" />。
 - **我的邮箱：**:  [hengyoush1@163.com](mailto:hengyoush1@163.com)。
 - **我的Blog：**:  [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)。
 
