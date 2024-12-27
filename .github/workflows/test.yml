@@ -18,40 +18,40 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      with:
-        submodules: recursive
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          submodules: recursive
 
-    - name: Set up Go
-      uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
-      with:
-        go-version: '1.22.4'
+      - name: Set up Go
+        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
+        with:
+          go-version: '1.22.4'
 
-    - name: Build
-      run: |
-        sudo apt update
-        sudo apt install -y git
-        sudo apt-get -y install pkg-config
-        sudo apt install -y libelf-dev
-        
-        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
-        sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
-        sudo apt update
-        
-        sudo apt install -y llvm
-        sudo apt install -y clang
-        pwd
-        ls -l
-        make clean && make build-bpf && make
+      - name: Build
+        run: |
+          sudo apt update
+          sudo apt install -y git
+          sudo apt-get -y install pkg-config
+          sudo apt install -y libelf-dev
 
-    # - name: Test
-    #   run: make test
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
+          sudo apt update
 
-    - name: Store executable
-      uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4
-      with:
-        name: kyanos
-        path: kyanos
+          sudo apt install -y llvm
+          sudo apt install -y clang
+          pwd
+          ls -l
+          make clean && make build-bpf && make
+
+      # - name: Test
+      #   run: make test
+
+      - name: Store executable
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4
+        with:
+          name: kyanos
+          path: kyanos
 
 
   e2e-test:
@@ -101,7 +101,7 @@ jobs:
           install-dependencies: 'true'
           cmd: |
             chmod +x /host/kyanos/kyanos
-      
+
       - name: download btf file
         if: ${{ startsWith(matrix.kernel, '4.') }}
         run: |
@@ -113,7 +113,7 @@ jobs:
           ls -la data/
           find data/ -path "*vmlinuz*" -type f
           find data/ -path "*btf*" -type f
-      
+
       - name: copy btf file
         if: ${{ startsWith(matrix.kernel, '4.') }}
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
@@ -125,7 +125,7 @@ jobs:
             cat /etc/os-release
 
             sudo mkdir -p /var/lib/kyanos/btf/
-             
+
             sudo cp /host/data/kernels/4.*/boot/btf-4.* /var/lib/kyanos/btf/current.btf
             # btf_file=$(find /host/ -path "*btf*" -type f)
             # sudo cp $btf_file /var/lib/ptcpdump/btf/vmlinux
@@ -155,8 +155,22 @@ jobs:
             #install python pip
             sudo apt install -y python3 python3-pip pipx
 
-      
-            
+      - name: Test filter by comm
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            pushd /host
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then
+                bash /host/testdata/test_filter_by_comm.sh '/host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else
+                bash /host/testdata/test_filter_by_comm.sh '/host/kyanos/kyanos $kyanos_log_option'
+            fi
+            popd
+
       - name: Test gotls
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
         with:
@@ -172,7 +186,7 @@ jobs:
                 bash /host/testdata/test_gotls.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
             popd
-            
+
       - name: Test https
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
         with:
@@ -188,7 +202,7 @@ jobs:
                 bash /host/testdata/test_https.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
             popd
-      
+
       - name: Test side
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
         with:
@@ -263,7 +277,7 @@ jobs:
             else  
                 bash /host/testdata/test_kern_evt.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
-            
+
       - name: Test test docker filter by container id
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
         with:
@@ -347,7 +361,7 @@ jobs:
             else  
                 bash /host/testdata/test_redis.sh '/host/kyanos/kyanos $kyanos_log_option'
             fi
-            
+
       - name: Test k8s
         if: ${{ startsWith(matrix.kernel, '6.') }}
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
