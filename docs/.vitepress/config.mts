@@ -39,8 +39,9 @@ export default defineConfig({
       {
         text: 'Development',
         items: [
-          
+
           { text: 'How to build', link: './how-to-build' },
+          { text: 'How to add a new protocol', link: './how-to-add-a-new-protocol' },
         ]
       }
     ],
