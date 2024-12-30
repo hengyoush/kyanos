@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -42,7 +42,7 @@ func main() {
 		}
 
 		// 读取并打印响应内容
-		body, err := ioutil.ReadAll(response.Body)
+		body, err := io.ReadAll(response.Body)
 		if err != nil {
 			fmt.Printf("Failed to read response %d: %v\n", i+1, err)
 			response.Body.Close()
