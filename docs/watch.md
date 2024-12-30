@@ -31,7 +31,9 @@ protocols: `HTTP`, `Redis`, and `MySQL`.
 When you execute this command, you’ll see a table like this:
 ![kyanos watch result](/watch-result.jpg)
 
-> [!TIP] By default, watch collects 100 request-response records. You can
+<!-- prettier-ignore -->
+> [!TIP]
+> By default, watch collects 100 request-response records. You can
 > specify this using the `--max-records` option.
 
 Each column represents:
@@ -150,7 +152,9 @@ Here are the options available for filtering by each protocol:
 
 ---
 
-> [!TIP] All of the above options can be combined. For example:
+<!-- prettier-ignore -->
+> [!TIP]
+> All of the above options can be combined. For example:
 
 ```bash
 ./kyanos watch redis --keys foo,bar --remote-ports 6379 --pid 12345

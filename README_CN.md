@@ -7,9 +7,13 @@
 [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml) 
 [![Twitter](https://img.shields.io/twitter/url/https/x.com/kyanos.svg?style=social&label=Follow%20%40kyanos)](https://x.com/kyanos_github)
 
-<a href="https://trendshift.io/repositories/12330" target="_blank"> <img src="https://trendshift.io/api/badge/repositories/12330" alt="hengyoush%2Fkyanos | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/> </a>
+<a href="https://trendshift.io/repositories/12330" target="_blank">
+<img src="https://trendshift.io/api/badge/repositories/12330" alt="hengyoush%2Fkyanos | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
+</a>
 [![Featured on Hacker News](https://hackerbadge.now.sh/api?id=42154583)](https://news.ycombinator.com/item?id=42154583)
-<a href="https://hellogithub.com/repository/9e20a14a45dd4cd5aa169acf0e21fc45" target="_blank"> <img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=9e20a14a45dd4cd5aa169acf0e21fc45&claim_uid=temso5CUu6fB7wb" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /> </a>
+<a href="https://hellogithub.com/repository/9e20a14a45dd4cd5aa169acf0e21fc45" target="_blank">
+<img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=9e20a14a45dd4cd5aa169acf0e21fc45&claim_uid=temso5CUu6fB7wb" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" />
+</a>
 
 </div>
 
@@ -180,7 +184,9 @@ _1.5.0_
 
 ## 🤝 Feedback and Contributions
 
-> [!IMPORTANT] 如果你遇到了任何使用上的问题、bug 都可以在 issue 中提问。
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> 如果你遇到了任何使用上的问题、bug 都可以在 issue 中提问。
 
 ## 🙇‍ Special Thanks
 

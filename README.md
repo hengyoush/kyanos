@@ -217,7 +217,9 @@ _1.5.0_
 
 ## 🤝 Feedback and Contributions
 
-> [!IMPORTANT] If you encounter any issues or bugs while using the tool, please
+<!-- prettier-ignore -->
+> [!IMPORTANT]
+> If you encounter any issues or bugs while using the tool, please
 > feel free to ask questions in the issue tracker.
 
 ## 🙇‍ Special Thanks

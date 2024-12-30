@@ -49,7 +49,9 @@ A shorter version of the command would be:
 Here, `-m` is a shorthand for `metric`, `t` for `total-time`, and `-g` for
 `group-by`.
 
-> [!TIP] > **How to Filter Traffic?**  
+<!-- prettier-ignore -->
+> [!TIP]
+> **How to Filter Traffic?**  
 > The `stat` command supports all the filtering options available in the `watch`
 > command.
 
