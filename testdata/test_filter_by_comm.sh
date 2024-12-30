@@ -8,27 +8,24 @@ BEFORE_LNAME="${FILE_PREFIX}_filter_by_comm_before.log"
 AFTER_LNAME="${FILE_PREFIX}_filter_by_comm_after.log"
 
 function test_filter_by_comm() {
-    openssl req -x509 -newkey rsa:2048 -keyout server.pem -out server.pem -days 365 -nodes -subj "/C=US/ST=California/L=San Francisco/O=My Company/CN=localhost"
-
-    pip install --break-system-packages ssl || true
-
     # server start before kyanos
-    timeout 40 python3 ./testdata/start_https_server.py  &
+    timeout 40 python3 ./testdata/start_http_server.py  &
     timeout 30 ${CMD} watch --debug-output http --comm python3 2>&1 | tee "${BEFORE_LNAME}" &
     sleep 10
-    curl --insecure https://127.0.0.1:4443 &>/dev/null || true
+    curl http://127.0.0.1:8080 &>/dev/null || true
     wait
 
-    cat "${BEFORE_LNAME}" | grep "127.0.0.1:4443"
+    cat "${BEFORE_LNAME}"
+    cat "${BEFORE_LNAME}" | grep "Host: 127.0.0.1:8080" | grep "\\[side\\]=server"
 
-    # server start after kyanos
-    timeout 40 ${CMD} watch --debug-output http --comm python3 2>&1 | tee "${AFTER_LNAME}" &
-    timeout 30 python3 ./testdata/start_https_server.py  &
+    # client start after kyanos
+    timeout 40 ${CMD} watch --debug-output http --comm curl 2>&1 | tee "${AFTER_LNAME}" &
     sleep 10
-    curl --insecure https://127.0.0.1:4443 &>/dev/null || true
+    curl http://github.com &>/dev/null || true
     wait
 
-    cat "${AFTER_LNAME}" | grep "127.0.0.1:4443"
+    cat "${AFTER_LNAME}"
+    cat "${AFTER_LNAME}" | grep "Host: github.com" | grep "\\[side\\]=client"
 }
 
 function main() {
