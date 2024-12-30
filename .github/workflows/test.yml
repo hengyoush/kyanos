@@ -160,7 +160,7 @@ jobs:
         with:
           provision: 'false'
           cmd: |
-            set -ex
+            set -euxo pipefail
             uname -a
             cat /etc/issue
             pushd /host
