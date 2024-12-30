@@ -433,7 +433,6 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, ke *bpf.AgentKernEvt) {
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
-		streamBuffer.Clear()
 		return
 	}
 	if streamBuffer.IsEmpty() {
