@@ -40,8 +40,8 @@ stat 命令用于解决这种需要分析大量请求响应才能得出结论的
 
 m 是 metric 的缩写，t 是 total-time 的缩写，g 是 group-by 的缩写。
 
-<!-- prettier-ignore -->
 > [!TIP]
+>
 > **如何过滤流量？**  
 > stat 支持所有 watch 命令的过滤选项。
 

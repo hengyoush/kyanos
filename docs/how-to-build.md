@@ -54,13 +54,15 @@ make build-bpf && make
 the kyanos executable file will be generated in the root directory of the
 project.
 
-<!-- prettier-ignore -->
 > [!IMPORTANT]
+>
 > Note that this binary file does not include the BTF files from
 > [btfhub-archive](https://github.com/aquasecurity/btfhub-archive/). If you run
 > this kyanos on a lower version kernel without BTF support, it may fail to
 > start. You can build a kyanos artifact with embedded BTF files using the
-> following commands: ::: code-group
+> following commands:
+>
+> ::: code-group
 >
 > ```bash [x86_64]
 > make build-bpf && make btfgen BUILD_ARCH=x86_64 ARCH_BPF_NAME=x86 && make
@@ -70,12 +72,14 @@ project.
 > make build-bpf && make btfgen BUILD_ARCH=arm64 ARCH_BPF_NAME=arm64 && make
 > ```
 >
-> ::: Note that make btfgen may take more than 15 minutes.
+> :::
+>
+> Note that make btfgen may take more than 15 minutes.
 
-<!-- prettier-ignore -->
 > [!TIP]
-> If your kernel does not have BTF enabled, you may not be able to start
-> kyanos successfully.
+>
+> If your kernel does not have BTF enabled, you may not be able to start kyanos
+> successfully.
 >
 > Check if BTF is enabled:
 >

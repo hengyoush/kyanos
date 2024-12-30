@@ -38,8 +38,8 @@ sudo ./kyanos watch
 如果显示了下面的表格： ![kyanos quick start success](/quickstart-success.png)
 🎉 恭喜你，kyanos 启动成功了。
 
-<!-- prettier-ignore -->
 > [!TIP]
+>
 > 如果上面的命令执行失败了？没关系，在这个 [FAQ](./faq)
 > 里看看有没有符合你的情况，如果没有欢迎提出
 > [github issue](https://github.com/hengyoush/kyanos/issues) !

@@ -40,10 +40,10 @@ If the following table appears:
 ![kyanos quick start success](/quickstart-success.png) 🎉 Congratulations!
 Kyanos has started successfully.
 
-<!-- prettier-ignore -->
 > [!TIP]
-> Did the command above fail? No worries——check the FAQ below to see if
-> your situation is covered. If not, feel free to open a
+>
+> Did the command above fail? No worries——check the FAQ below to see if your
+> situation is covered. If not, feel free to open a
 > [GitHub issue](https://github.com/hengyoush/kyanos/issues)!
 
 ## FAQ

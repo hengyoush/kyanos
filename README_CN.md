@@ -184,8 +184,8 @@ _1.5.0_
 
 ## 🤝 Feedback and Contributions
 
-<!-- prettier-ignore -->
 > [!IMPORTANT]
+>
 > 如果你遇到了任何使用上的问题、bug 都可以在 issue 中提问。
 
 ## 🙇‍ Special Thanks

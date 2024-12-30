@@ -49,8 +49,8 @@ make build-bpf && make
 the kyanos executable file will be generated in the root directory of the
 project.
 
-<!-- prettier-ignore -->
-> [!IMPORTANT] 
+> [!IMPORTANT]
+>
 > Note that this binary file does not include the BTF files from
 > [btfhub-archive](https://github.com/aquasecurity/btfhub-archive/). If you run
 > this kyanos on a lower version kernel without BTF support, it may fail to
@@ -70,10 +70,10 @@ project.
 >
 > Note that make btfgen may take more than 15 minutes.
 
-<!-- prettier-ignore -->
 > [!TIP]
-> If your kernel does not have BTF enabled, you may not be able to start
-> kyanos successfully.
+>
+> If your kernel does not have BTF enabled, you may not be able to start kyanos
+> successfully.
 >
 > Check if BTF is enabled:
 >

@@ -217,10 +217,10 @@ _1.5.0_
 
 ## 🤝 Feedback and Contributions
 
-<!-- prettier-ignore -->
 > [!IMPORTANT]
-> If you encounter any issues or bugs while using the tool, please
-> feel free to ask questions in the issue tracker.
+>
+> If you encounter any issues or bugs while using the tool, please feel free to
+> ask questions in the issue tracker.
 
 ## 🙇‍ Special Thanks
 

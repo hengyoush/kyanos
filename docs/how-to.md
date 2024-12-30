@@ -140,11 +140,10 @@ command—each row represents a request-response record. You can further explore
 each record by pressing `Enter` to view detailed latency and content information
 for the selected request.
 
-<!-- prettier-ignore -->
 > [!TIP]
-> The `stat` command offers powerful capabilities, so it’s highly
-> recommended to explore other use cases in
-> [How to Aggregate and Analyze](./stat).
+>
+> The `stat` command offers powerful capabilities, so it’s highly recommended to
+> explore other use cases in [How to Aggregate and Analyze](./stat).
 
 ## Next Steps
 
