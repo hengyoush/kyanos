@@ -178,6 +178,12 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	if connection.IsServerSide() {
 		if hasNicInEvents {
 			annotatedRecord.StartTs = events.nicIngressEvents[0].GetTimestamp()
+		} else if hasTcpInEvents {
+			annotatedRecord.StartTs = events.tcpInEvents[0].GetTimestamp()
+		} else if hasUserCopyEvents {
+			annotatedRecord.StartTs = events.userCopyEvents[0].GetTimestamp()
+		} else if hasReadSyscallEvents {
+			annotatedRecord.StartTs = events.readSyscallEvents[0].GetTimestamp()
 		}
 		if hasDevOutEvents {
 			annotatedRecord.EndTs = events.devOutEvents[len(events.devOutEvents)-1].GetTimestamp()
