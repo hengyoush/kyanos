@@ -104,6 +104,12 @@ format-go:
 	goimports -w .
 	gofmt -s -w .
 
+.PHONY: format-md
+format-md:
+	find . -type f -name "*.md" | xargs npx prettier --write
+	find docs/cn -type f -name "*.md" | xargs npx md-padding -i
+	find . -type f -name "*_CN.md" | xargs npx md-padding -i
+
 .PHONY: dlv
 dlv:
 	chmod +x kyanos && dlv --headless --listen=:2345 --api-version=2 --check-go-version=false exec ./kyanos 
