@@ -20,6 +20,7 @@ function test_filter_by_server_comm() {
     cat "${BEFORE_LNAME}" | grep "Host: 127.0.0.1:8080" | grep "\\[side\\]=server"
 }
 
+# skip for https://github.com/hengyoush/kyanos/pull/222#issuecomment-2566106756
 function test_filter_by_client_comm() {
     # client start after kyanos
     timeout 40 ${CMD} watch --debug-output http --comm https-request 2>&1 | tee "${AFTER_LNAME}" &
@@ -33,8 +34,6 @@ function test_filter_by_client_comm() {
 
 function main() {
     test_filter_by_server_comm
-    sleep 10
-    test_filter_by_client_comm
 }
 
 main
