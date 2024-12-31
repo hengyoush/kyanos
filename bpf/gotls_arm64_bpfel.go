@@ -99,6 +99,7 @@ type GoTlsProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type GoTlsMapSpecs struct {
+	ActiveSendfileArgsMap *ebpf.MapSpec `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ActiveTlsConnOpMap    *ebpf.MapSpec `ebpf:"active_tls_conn_op_map"`
@@ -139,6 +140,7 @@ func (o *GoTlsObjects) Close() error {
 //
 // It can be passed to LoadGoTlsObjects or ebpf.CollectionSpec.LoadAndAssign.
 type GoTlsMaps struct {
+	ActiveSendfileArgsMap *ebpf.Map `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ActiveTlsConnOpMap    *ebpf.Map `ebpf:"active_tls_conn_op_map"`
@@ -162,6 +164,7 @@ type GoTlsMaps struct {
 
 func (m *GoTlsMaps) Close() error {
 	return _GoTlsClose(
+		m.ActiveSendfileArgsMap,
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.ActiveTlsConnOpMap,

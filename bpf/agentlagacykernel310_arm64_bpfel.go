@@ -53,49 +53,51 @@ type AgentLagacyKernel310Specs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type AgentLagacyKernel310ProgramSpecs struct {
-	DevHardStartXmit                   *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
-	DevQueueXmit                       *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
-	IpQueueXmit                        *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
-	IpQueueXmit2                       *ebpf.ProgramSpec `ebpf:"ip_queue_xmit2"`
-	IpRcvCore                          *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
-	KprobeNfNatManipPkt                *ebpf.ProgramSpec `ebpf:"kprobe__nf_nat_manip_pkt"`
-	KprobeNfNatPacket                  *ebpf.ProgramSpec `ebpf:"kprobe__nf_nat_packet"`
-	SecuritySocketRecvmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
-	SecuritySocketSendmsgEnter         *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
-	SkbCopyDatagramIovec               *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iovec"`
-	SkbCopyDatagramIter                *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
-	SockAllocRet                       *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
-	TcpDestroySock                     *ebpf.ProgramSpec `ebpf:"tcp_destroy_sock"`
-	TcpQueueRcv                        *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
-	TcpRcvEstablished                  *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
-	TcpV4DoRcv                         *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
-	TcpV4Rcv                           *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
-	TracepointNetifReceiveSkb          *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
-	TracepointSchedSchedProcessExec    *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
-	TracepointSchedSchedProcessExit    *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exit"`
-	TracepointSyscallsSysEnterAccept4  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
-	TracepointSyscallsSysEnterClose    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_close"`
-	TracepointSyscallsSysEnterConnect  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_connect"`
-	TracepointSyscallsSysEnterRead     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_read"`
-	TracepointSyscallsSysEnterReadv    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_readv"`
-	TracepointSyscallsSysEnterRecvfrom *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvfrom"`
-	TracepointSyscallsSysEnterRecvmsg  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvmsg"`
-	TracepointSyscallsSysEnterSendmsg  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
-	TracepointSyscallsSysEnterSendto   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
-	TracepointSyscallsSysEnterWrite    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_write"`
-	TracepointSyscallsSysEnterWritev   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_writev"`
-	TracepointSyscallsSysExitAccept4   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_accept4"`
-	TracepointSyscallsSysExitClose     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_close"`
-	TracepointSyscallsSysExitConnect   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_connect"`
-	TracepointSyscallsSysExitRead      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_read"`
-	TracepointSyscallsSysExitReadv     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_readv"`
-	TracepointSyscallsSysExitRecvfrom  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvfrom"`
-	TracepointSyscallsSysExitRecvmsg   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
-	TracepointSyscallsSysExitSendmsg   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
-	TracepointSyscallsSysExitSendto    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
-	TracepointSyscallsSysExitWrite     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_write"`
-	TracepointSyscallsSysExitWritev    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_writev"`
-	XdpProxy                           *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
+	DevHardStartXmit                     *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
+	DevQueueXmit                         *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
+	IpQueueXmit                          *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
+	IpQueueXmit2                         *ebpf.ProgramSpec `ebpf:"ip_queue_xmit2"`
+	IpRcvCore                            *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
+	KprobeNfNatManipPkt                  *ebpf.ProgramSpec `ebpf:"kprobe__nf_nat_manip_pkt"`
+	KprobeNfNatPacket                    *ebpf.ProgramSpec `ebpf:"kprobe__nf_nat_packet"`
+	SecuritySocketRecvmsgEnter           *ebpf.ProgramSpec `ebpf:"security_socket_recvmsg_enter"`
+	SecuritySocketSendmsgEnter           *ebpf.ProgramSpec `ebpf:"security_socket_sendmsg_enter"`
+	SkbCopyDatagramIovec                 *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iovec"`
+	SkbCopyDatagramIter                  *ebpf.ProgramSpec `ebpf:"skb_copy_datagram_iter"`
+	SockAllocRet                         *ebpf.ProgramSpec `ebpf:"sock_alloc_ret"`
+	TcpDestroySock                       *ebpf.ProgramSpec `ebpf:"tcp_destroy_sock"`
+	TcpQueueRcv                          *ebpf.ProgramSpec `ebpf:"tcp_queue_rcv"`
+	TcpRcvEstablished                    *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
+	TcpV4DoRcv                           *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
+	TcpV4Rcv                             *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
+	TracepointNetifReceiveSkb            *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
+	TracepointSchedSchedProcessExec      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
+	TracepointSchedSchedProcessExit      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exit"`
+	TracepointSyscallsSysEnterAccept4    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
+	TracepointSyscallsSysEnterClose      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_close"`
+	TracepointSyscallsSysEnterConnect    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_connect"`
+	TracepointSyscallsSysEnterRead       *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_read"`
+	TracepointSyscallsSysEnterReadv      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_readv"`
+	TracepointSyscallsSysEnterRecvfrom   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvfrom"`
+	TracepointSyscallsSysEnterRecvmsg    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvmsg"`
+	TracepointSyscallsSysEnterSendfile64 *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendfile64"`
+	TracepointSyscallsSysEnterSendmsg    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
+	TracepointSyscallsSysEnterSendto     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
+	TracepointSyscallsSysEnterWrite      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_write"`
+	TracepointSyscallsSysEnterWritev     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_writev"`
+	TracepointSyscallsSysExitAccept4     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_accept4"`
+	TracepointSyscallsSysExitClose       *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_close"`
+	TracepointSyscallsSysExitConnect     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_connect"`
+	TracepointSyscallsSysExitRead        *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_read"`
+	TracepointSyscallsSysExitReadv       *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_readv"`
+	TracepointSyscallsSysExitRecvfrom    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvfrom"`
+	TracepointSyscallsSysExitRecvmsg     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
+	TracepointSyscallsSysExitSendfile64  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendfile64"`
+	TracepointSyscallsSysExitSendmsg     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
+	TracepointSyscallsSysExitSendto      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
+	TracepointSyscallsSysExitWrite       *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_write"`
+	TracepointSyscallsSysExitWritev      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_writev"`
+	XdpProxy                             *ebpf.ProgramSpec `ebpf:"xdp_proxy"`
 }
 
 // AgentLagacyKernel310MapSpecs contains maps before they are loaded into the kernel.
@@ -103,6 +105,7 @@ type AgentLagacyKernel310ProgramSpecs struct {
 // It can be passed ebpf.CollectionSpec.Assign.
 type AgentLagacyKernel310MapSpecs struct {
 	AcceptArgsMap         *ebpf.MapSpec `ebpf:"accept_args_map"`
+	ActiveSendfileArgsMap *ebpf.MapSpec `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	CloseArgsMap          *ebpf.MapSpec `ebpf:"close_args_map"`
@@ -157,6 +160,7 @@ func (o *AgentLagacyKernel310Objects) Close() error {
 // It can be passed to LoadAgentLagacyKernel310Objects or ebpf.CollectionSpec.LoadAndAssign.
 type AgentLagacyKernel310Maps struct {
 	AcceptArgsMap         *ebpf.Map `ebpf:"accept_args_map"`
+	ActiveSendfileArgsMap *ebpf.Map `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	CloseArgsMap          *ebpf.Map `ebpf:"close_args_map"`
@@ -194,6 +198,7 @@ type AgentLagacyKernel310Maps struct {
 func (m *AgentLagacyKernel310Maps) Close() error {
 	return _AgentLagacyKernel310Close(
 		m.AcceptArgsMap,
+		m.ActiveSendfileArgsMap,
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.CloseArgsMap,
@@ -233,49 +238,51 @@ func (m *AgentLagacyKernel310Maps) Close() error {
 //
 // It can be passed to LoadAgentLagacyKernel310Objects or ebpf.CollectionSpec.LoadAndAssign.
 type AgentLagacyKernel310Programs struct {
-	DevHardStartXmit                   *ebpf.Program `ebpf:"dev_hard_start_xmit"`
-	DevQueueXmit                       *ebpf.Program `ebpf:"dev_queue_xmit"`
-	IpQueueXmit                        *ebpf.Program `ebpf:"ip_queue_xmit"`
-	IpQueueXmit2                       *ebpf.Program `ebpf:"ip_queue_xmit2"`
-	IpRcvCore                          *ebpf.Program `ebpf:"ip_rcv_core"`
-	KprobeNfNatManipPkt                *ebpf.Program `ebpf:"kprobe__nf_nat_manip_pkt"`
-	KprobeNfNatPacket                  *ebpf.Program `ebpf:"kprobe__nf_nat_packet"`
-	SecuritySocketRecvmsgEnter         *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
-	SecuritySocketSendmsgEnter         *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
-	SkbCopyDatagramIovec               *ebpf.Program `ebpf:"skb_copy_datagram_iovec"`
-	SkbCopyDatagramIter                *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
-	SockAllocRet                       *ebpf.Program `ebpf:"sock_alloc_ret"`
-	TcpDestroySock                     *ebpf.Program `ebpf:"tcp_destroy_sock"`
-	TcpQueueRcv                        *ebpf.Program `ebpf:"tcp_queue_rcv"`
-	TcpRcvEstablished                  *ebpf.Program `ebpf:"tcp_rcv_established"`
-	TcpV4DoRcv                         *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
-	TcpV4Rcv                           *ebpf.Program `ebpf:"tcp_v4_rcv"`
-	TracepointNetifReceiveSkb          *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
-	TracepointSchedSchedProcessExec    *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
-	TracepointSchedSchedProcessExit    *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exit"`
-	TracepointSyscallsSysEnterAccept4  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
-	TracepointSyscallsSysEnterClose    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_close"`
-	TracepointSyscallsSysEnterConnect  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_connect"`
-	TracepointSyscallsSysEnterRead     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_read"`
-	TracepointSyscallsSysEnterReadv    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_readv"`
-	TracepointSyscallsSysEnterRecvfrom *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvfrom"`
-	TracepointSyscallsSysEnterRecvmsg  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvmsg"`
-	TracepointSyscallsSysEnterSendmsg  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
-	TracepointSyscallsSysEnterSendto   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
-	TracepointSyscallsSysEnterWrite    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_write"`
-	TracepointSyscallsSysEnterWritev   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_writev"`
-	TracepointSyscallsSysExitAccept4   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_accept4"`
-	TracepointSyscallsSysExitClose     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_close"`
-	TracepointSyscallsSysExitConnect   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_connect"`
-	TracepointSyscallsSysExitRead      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_read"`
-	TracepointSyscallsSysExitReadv     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_readv"`
-	TracepointSyscallsSysExitRecvfrom  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvfrom"`
-	TracepointSyscallsSysExitRecvmsg   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
-	TracepointSyscallsSysExitSendmsg   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
-	TracepointSyscallsSysExitSendto    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
-	TracepointSyscallsSysExitWrite     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_write"`
-	TracepointSyscallsSysExitWritev    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_writev"`
-	XdpProxy                           *ebpf.Program `ebpf:"xdp_proxy"`
+	DevHardStartXmit                     *ebpf.Program `ebpf:"dev_hard_start_xmit"`
+	DevQueueXmit                         *ebpf.Program `ebpf:"dev_queue_xmit"`
+	IpQueueXmit                          *ebpf.Program `ebpf:"ip_queue_xmit"`
+	IpQueueXmit2                         *ebpf.Program `ebpf:"ip_queue_xmit2"`
+	IpRcvCore                            *ebpf.Program `ebpf:"ip_rcv_core"`
+	KprobeNfNatManipPkt                  *ebpf.Program `ebpf:"kprobe__nf_nat_manip_pkt"`
+	KprobeNfNatPacket                    *ebpf.Program `ebpf:"kprobe__nf_nat_packet"`
+	SecuritySocketRecvmsgEnter           *ebpf.Program `ebpf:"security_socket_recvmsg_enter"`
+	SecuritySocketSendmsgEnter           *ebpf.Program `ebpf:"security_socket_sendmsg_enter"`
+	SkbCopyDatagramIovec                 *ebpf.Program `ebpf:"skb_copy_datagram_iovec"`
+	SkbCopyDatagramIter                  *ebpf.Program `ebpf:"skb_copy_datagram_iter"`
+	SockAllocRet                         *ebpf.Program `ebpf:"sock_alloc_ret"`
+	TcpDestroySock                       *ebpf.Program `ebpf:"tcp_destroy_sock"`
+	TcpQueueRcv                          *ebpf.Program `ebpf:"tcp_queue_rcv"`
+	TcpRcvEstablished                    *ebpf.Program `ebpf:"tcp_rcv_established"`
+	TcpV4DoRcv                           *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
+	TcpV4Rcv                             *ebpf.Program `ebpf:"tcp_v4_rcv"`
+	TracepointNetifReceiveSkb            *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
+	TracepointSchedSchedProcessExec      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
+	TracepointSchedSchedProcessExit      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exit"`
+	TracepointSyscallsSysEnterAccept4    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
+	TracepointSyscallsSysEnterClose      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_close"`
+	TracepointSyscallsSysEnterConnect    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_connect"`
+	TracepointSyscallsSysEnterRead       *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_read"`
+	TracepointSyscallsSysEnterReadv      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_readv"`
+	TracepointSyscallsSysEnterRecvfrom   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvfrom"`
+	TracepointSyscallsSysEnterRecvmsg    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvmsg"`
+	TracepointSyscallsSysEnterSendfile64 *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendfile64"`
+	TracepointSyscallsSysEnterSendmsg    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
+	TracepointSyscallsSysEnterSendto     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
+	TracepointSyscallsSysEnterWrite      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_write"`
+	TracepointSyscallsSysEnterWritev     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_writev"`
+	TracepointSyscallsSysExitAccept4     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_accept4"`
+	TracepointSyscallsSysExitClose       *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_close"`
+	TracepointSyscallsSysExitConnect     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_connect"`
+	TracepointSyscallsSysExitRead        *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_read"`
+	TracepointSyscallsSysExitReadv       *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_readv"`
+	TracepointSyscallsSysExitRecvfrom    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvfrom"`
+	TracepointSyscallsSysExitRecvmsg     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
+	TracepointSyscallsSysExitSendfile64  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendfile64"`
+	TracepointSyscallsSysExitSendmsg     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
+	TracepointSyscallsSysExitSendto      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
+	TracepointSyscallsSysExitWrite       *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_write"`
+	TracepointSyscallsSysExitWritev      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_writev"`
+	XdpProxy                             *ebpf.Program `ebpf:"xdp_proxy"`
 }
 
 func (p *AgentLagacyKernel310Programs) Close() error {
@@ -307,6 +314,7 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 		p.TracepointSyscallsSysEnterReadv,
 		p.TracepointSyscallsSysEnterRecvfrom,
 		p.TracepointSyscallsSysEnterRecvmsg,
+		p.TracepointSyscallsSysEnterSendfile64,
 		p.TracepointSyscallsSysEnterSendmsg,
 		p.TracepointSyscallsSysEnterSendto,
 		p.TracepointSyscallsSysEnterWrite,
@@ -318,6 +326,7 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 		p.TracepointSyscallsSysExitReadv,
 		p.TracepointSyscallsSysExitRecvfrom,
 		p.TracepointSyscallsSysExitRecvmsg,
+		p.TracepointSyscallsSysExitSendfile64,
 		p.TracepointSyscallsSysExitSendmsg,
 		p.TracepointSyscallsSysExitSendto,
 		p.TracepointSyscallsSysExitWrite,
