@@ -24,5 +24,4 @@ type RocketMQMessage struct {
 var _ protocol.ProtocolStreamParser = &RocketMQStreamParser{}
 
 type RocketMQStreamParser struct {
-	correlationIDMap map[int32]bool // To track request-response matching
 }

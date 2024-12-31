@@ -49,6 +49,7 @@ enum traffic_protocol_t {
   kProtocolKafka,
   kProtocolMux,
   kProtocolAMQP,
+  kProtocolRocketMQ,
   kNumProtocols
 };
 

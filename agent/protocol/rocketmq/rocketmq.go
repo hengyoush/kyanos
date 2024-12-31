@@ -6,39 +6,25 @@ import (
 	"fmt"
 	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
+	"kyanos/bpf"
 )
 
 func init() {
-
+	protocol.ParsersMap[bpf.AgentTrafficProtocolTKProtocolRocketMQ] = func() protocol.ProtocolStreamParser {
+		return &RocketMQStreamParser{}
+	}
 }
 
 func (r *RocketMQMessage) FormatToString() string {
 	return fmt.Sprintf("base=[%s] command=[%s] payload=[%s]", r.FrameBase.String(), "todo", r.Body)
 }
 
-func (r *RocketMQMessage) FormatToSummaryString() string {
-	return "rocketmq"
-}
-
-func (r *RocketMQMessage) TimestampNs() uint64 {
-	return 0
-}
-
-func (r *RocketMQMessage) ByteSize() int {
-	return 0
-}
-
 func (r *RocketMQMessage) IsReq() bool {
 	return r.isReq
 }
 
-func (r *RocketMQMessage) Seq() uint64 {
-	return 0
-}
-
 func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType) protocol.ParseResult {
-	head := streamBuffer.Head()
-	buffer := head.Buffer()
+	buffer := streamBuffer.Head().Buffer()
 	if len(buffer) < 8 {
 		return protocol.ParseResult{
 			ParseState: protocol.NeedsMoreData,
@@ -131,22 +117,24 @@ func (r *RocketMQStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, m
 
 func (r *RocketMQStreamParser) Match(reqStream *[]protocol.ParsedMessage, respStream *[]protocol.ParsedMessage) []protocol.Record {
 	records := []protocol.Record{}
-	for i := 0; i < len(*reqStream); i++ {
-		req := (*reqStream)[i].(*RocketMQMessage)
-		for j := 0; j < len(*respStream); j++ {
-			resp := (*respStream)[j].(*RocketMQMessage)
-			if req.Opaque == resp.Opaque {
-				records = append(records, protocol.Record{
-					Req:  req,
-					Resp: resp,
-				})
-				*reqStream = (*reqStream)[1:]
-				*respStream = (*respStream)[1:]
-				break
-			} else {
-				continue
-			}
+
+	reqMap := make(map[int32]*RocketMQMessage)
+	for _, msg := range *reqStream {
+		req := msg.(*RocketMQMessage)
+		reqMap[req.Opaque] = req
+	}
+
+	for _, msg := range *respStream {
+		resp := msg.(*RocketMQMessage)
+		if req, ok := reqMap[resp.Opaque]; ok {
+			records = append(records, protocol.Record{
+				Req:  req,
+				Resp: resp,
+			})
+
+			delete(reqMap, resp.Opaque)
 		}
 	}
+
 	return records
 }

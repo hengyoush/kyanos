@@ -127,6 +127,28 @@ static __always_inline enum message_type_t is_http_protocol(const char *old_buf,
   return kUnknown;
 }
 
+static __always_inline enum message_type_t is_rocketmq_protocol(const char *old_buf, size_t count) {
+  if (count < 8) {
+    return 0;
+  }
+
+  int32_t frame_size = 0;
+  bpf_probe_read_user(&frame_size, sizeof(int32_t), old_buf);
+
+  if (frame_size <= 0 || frame_size > 64 * 1024 * 1024) {
+    return kUnknown;
+  }
+
+  char serialized_type = 0;
+  bpf_probe_read_user(&serialized_type, 1, old_buf + 4);
+
+  if (serialized_type != 0x0 && serialized_type != 0x1) {
+    return kUnknown;
+  }
+
+  return kRequest;
+}
+
 static __always_inline struct protocol_message_t infer_protocol(const char *buf, size_t count, struct conn_info_t *conn_info) {
   struct protocol_message_t protocol_message;
   protocol_message.protocol = kProtocolUnknown;
@@ -137,6 +159,8 @@ static __always_inline struct protocol_message_t infer_protocol(const char *buf,
     protocol_message.protocol = kProtocolMySQL;
   } else if (is_redis_protocol(buf, count)) {
     protocol_message.protocol = kProtocolRedis;
+  } else if (is_rocketmq_protocol(buf,count)) {
+    protocol_message.protocol = kProtocolRocketMQ;
   }
   conn_info->prev_count = count;
   if (count == 4) {
