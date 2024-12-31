@@ -58,6 +58,14 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(key_size, sizeof(uint64_t));
+	__uint(value_size, sizeof(struct sendfile_args));
+	__uint(max_entries, 65535);
+	__uint(map_flags, 0);
+} active_sendfile_args_map SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(key_size, sizeof(uint64_t));
 	__uint(value_size, sizeof(struct nested_syscall_fd_t));
 	__uint(max_entries, 65535);
 	__uint(map_flags, 0);
@@ -137,6 +145,7 @@ static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t 
 	evt->ke.seq = seq;
 	evt->ke.len = len;
 	evt->ke.step = step;
+	evt->ke.func_name[0] = (char)source_fn;
 	if (ts != 0) {
 		evt->ke.ts = ts;
 	} else {
@@ -162,6 +171,7 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	evt->ke.seq = seq;
 	evt->ke.len = len;
 	evt->ke.step = step;
+	evt->ke.func_name[0] = (char)source_fn;
 	if (ts != 0) {
 		evt->ke.ts = ts;
 	} else {
@@ -248,10 +258,27 @@ static void __always_inline report_syscall_evt_vecs(void* ctx, uint64_t seq, str
 static __inline uint64_t gen_tgid_fd(uint32_t tgid, int fd) {
   return ((uint64_t)tgid << 32) | (uint32_t)fd;
 }
+static __always_inline void process_sendfile_with_conn_info(void* ctx, struct sendfile_args *args, uint64_t tgid_fd,
+ enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, int32_t syscall_len, bool is_ssl, bool with_data) {
+
+	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+	struct conn_id_s_t conn_id_s;
+	conn_id_s.tgid_fd = tgid_fd;
+	// conn_id_s.direct = direct;
+	enum step_t step;
+	if (is_ssl) {
+		step = direct == kEgress ? SSL_OUT : SSL_IN;
+	} else {
+		step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
+	}
+	if (conn_info->protocol != kProtocolUnknown && (!conn_info->no_trace)) {//, bytes_count
+		report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->ts, kSyscallSendfile);
+	}
+ }
 static __always_inline void process_syscall_data_with_conn_info(void* ctx, struct data_args *args, uint64_t tgid_fd,
  enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, int32_t syscall_len, bool is_ssl, bool with_data) {
 	bool inferred = false;
-	if (conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) {
+	if ((conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) && with_data) {
 		enum traffic_protocol_t before_infer = conn_info->protocol;
 		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
 		// conn_info->protocol = protocol_message.protocol;

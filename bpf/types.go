@@ -5,6 +5,10 @@ type SyscallEvent struct {
 	BufSize uint32
 }
 
+func (s SyscallEvent) GetSourceFunction() AgentSourceFunctionT {
+	return AgentSourceFunctionT(s.Ke.FuncName[0])
+}
+
 type SyscallEventData struct {
 	SyscallEvent SyscallEvent
 	Buf          []byte

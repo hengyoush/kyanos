@@ -30,6 +30,7 @@ const enum conn_type_t *conn_type_t_unused __attribute__((unused));
 const enum endpoint_role_t *endpoint_role_unused  __attribute__((unused));
 const enum traffic_direction_t *traffic_direction_t_unused __attribute__((unused));
 const enum traffic_protocol_t *traffic_protocol_t_unused __attribute__((unused));
+const enum source_function_t *source_function_t_unused __attribute__((unused));
 const enum control_value_index_t *control_value_index_t_unused __attribute__((unused));
 const enum step_t *step_t_unused __attribute__((unused));
 
@@ -1339,6 +1340,51 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	}
 }
 
+static __always_inline void process_syscall_sendfile(void* ctx, uint64_t id, struct sendfile_args *args, ssize_t bytes_count) {
+
+  	uint32_t tgid = id >> 32;
+
+	if (args->out_fd < 0) {
+		return;
+	}
+
+	if (bytes_count <= 0) {
+		return;
+	}
+
+	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
+		return;
+	}
+	uint64_t tgid_fd = gen_tgid_fd(tgid, args->out_fd);
+	struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+	struct tcp_sock* tcp_sk = NULL;
+	if (!conn_info) {
+		tcp_sk = get_socket_from_fd(args->out_fd);
+		if (tcp_sk) {
+			int zero = 0;
+			// struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			struct conn_info_t _new_conn_info = {};
+			struct conn_info_t *new_conn_info = &_new_conn_info;
+			if (new_conn_info) {
+				new_conn_info->protocol = kProtocolUnset;
+				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, kEgress, bytes_count, new_conn_info);
+				if (created) {
+					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+				}
+			}
+		}
+	} 
+
+	if (!conn_info) {
+		return;
+	}
+	
+	process_sendfile_with_conn_info(ctx, args, tgid_fd, kEgress, bytes_count, conn_info, 0, false, /*with_data*/false);
+
+	
+	conn_info->write_bytes += bytes_count;
+}
+
 static __always_inline void process_implicit_conn(void* ctx, uint64_t id,
                                            const struct connect_args* args,
                                            enum source_function_t source_fn,
@@ -1431,7 +1477,12 @@ int BPF_KPROBE(security_socket_recvmsg_enter) {
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 //                  struct sockaddr *src_addr, socklen_t *addrlen);
 SEC("tracepoint/syscalls/sys_enter_recvfrom")
-int tracepoint__syscalls__sys_enter_recvfrom(struct trace_event_raw_sys_exit *ctx) {
+int tracepoint__syscalls__sys_enter_recvfrom(struct trace_event_raw_sys_enter *ctx) {
+	int flags = 0;
+	TP_ARGS(&flags, 3, ctx)
+	if ((flags & MSG_OOB) ||(flags & MSG_PEEK)) {
+		return 0;
+	}
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct data_args args = {0};
@@ -1495,6 +1546,11 @@ struct my_user_msghdr {
 
 SEC("tracepoint/syscalls/sys_enter_recvmsg")
 int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ctx) {
+	int flags = 0;
+	TP_ARGS(&flags, 2, ctx)
+	if ((flags & MSG_OOB) ||(flags & MSG_PEEK)) {
+		return 0;
+	}
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct my_user_msghdr* msghdr;
 	TP_ARGS(&msghdr, 1, ctx)
@@ -1574,6 +1630,35 @@ int tracepoint__syscalls__sys_exit_readv(struct trace_event_raw_sys_exit *ctx) {
 	return 0;
 }
 
+//ssize_t sendfile(int out_fd, int in_fd, off_t *_Nullable offset, size_t count);
+SEC("tracepoint/syscalls/sys_enter_sendfile64")
+int tracepoint__syscalls__sys_enter_sendfile64(struct trace_event_raw_sys_enter *ctx) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	struct sendfile_args args = {0};
+
+	TP_ARGS(&args.out_fd, 0, ctx)
+	TP_ARGS(&args.in_fd, 1, ctx)
+	TP_ARGS(&args.count, 3, ctx)
+	args.ts = bpf_ktime_get_ns();
+	bpf_map_update_elem(&active_sendfile_args_map, &id, &args, BPF_ANY);
+	return 0;
+}
+
+
+SEC("tracepoint/syscalls/sys_exit_sendfile64")
+int tracepoint__syscalls__sys_exit_sendfile64(struct trace_event_raw_sys_exit *ctx) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
+	struct sendfile_args *args = bpf_map_lookup_elem(&active_sendfile_args_map, &id);
+
+	if (args != NULL ) {
+		process_syscall_sendfile(ctx, id, args, bytes_count);
+	}
+
+	bpf_map_delete_elem(&active_sendfile_args_map, &id);
+	return 0;
+}
 
 // ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
 //                const struct sockaddr *dest_addr, socklen_t addrlen);
