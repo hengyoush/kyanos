@@ -26,6 +26,11 @@ builds:
     flags:
       - -tags=static
     ldflags:
+      - -s
+      - -w
+      - -X "kyanos/cmd.Version={{.Version}}"
+      - -X "kyanos/cmd.CommitID={{.Commit}}"
+      - -X "kyanos/cmd.BuildTime={{.Date}}"
       - -linkmode 'external'
       - -extldflags "-static"
     goos:
@@ -48,6 +53,11 @@ builds:
     flags:
       - -tags=static
     ldflags:
+      - -s
+      - -w
+      - -X "kyanos/cmd.Version={{.Version}}"
+      - -X "kyanos/cmd.CommitID={{.Commit}}"
+      - -X "kyanos/cmd.BuildTime={{.Date}}"
       - -linkmode 'external'
       - -extldflags "-static"
     goos:
