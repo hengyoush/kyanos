@@ -81,6 +81,15 @@ func AttachSyscallSendMsgExit() link.Link {
 	return TracepointNoError("syscalls", "sys_exit_sendmsg", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitSendmsg"))
 }
 
+/* sendfile pair */
+func AttachSyscallSendFile64Entry() link.Link {
+	return TracepointNoError("syscalls", "sys_enter_sendfile64", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterSendfile64"))
+}
+
+func AttachSyscallSendFile64Exit() link.Link {
+	return TracepointNoError("syscalls", "sys_exit_sendfile64", GetProgramFromObjs(Objs, "TracepointSyscallsSysExitSendfile64"))
+}
+
 /* recvmsg pair */
 func AttachSyscallRecvMsgEntry() link.Link {
 	return TracepointNoError("syscalls", "sys_enter_recvmsg", GetProgramFromObjs(Objs, "TracepointSyscallsSysEnterRecvmsg"))

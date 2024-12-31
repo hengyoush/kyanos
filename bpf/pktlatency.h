@@ -8,6 +8,8 @@ _Pragma("GCC diagnostic ignored \"-Wint-conversion\"")
 #define AF_INET6 10
 #define MAX_MSG_SIZE 30720
 #define EINPROGRESS 115
+#define MSG_OOB 1
+#define MSG_PEEK 2
 
 // #include <bpf/bpf_tracing.h>
 // #include <bpf/bpf_endian.h>
@@ -237,6 +239,13 @@ struct data_args {
 };
 struct close_args {
   uint32_t fd;
+};
+
+struct sendfile_args {
+  int32_t out_fd;
+  int32_t in_fd;
+  size_t count;
+  uint64_t ts;
 };
 
 struct connect_args {

@@ -486,6 +486,9 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 	linkList.PushBack(bpf.AttachSyscallSendMsgEntry())
 	linkList.PushBack(bpf.AttachSyscallSendMsgExit())
 
+	linkList.PushBack(bpf.AttachSyscallSendFile64Entry())
+	linkList.PushBack(bpf.AttachSyscallSendFile64Exit())
+
 	linkList.PushBack(bpf.AttachSyscallRecvMsgEntry())
 	linkList.PushBack(bpf.AttachSyscallRecvMsgExit())
 

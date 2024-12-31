@@ -99,6 +99,7 @@ type GoTlsLagacyKernel310ProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type GoTlsLagacyKernel310MapSpecs struct {
+	ActiveSendfileArgsMap *ebpf.MapSpec `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ActiveTlsConnOpMap    *ebpf.MapSpec `ebpf:"active_tls_conn_op_map"`
@@ -139,6 +140,7 @@ func (o *GoTlsLagacyKernel310Objects) Close() error {
 //
 // It can be passed to LoadGoTlsLagacyKernel310Objects or ebpf.CollectionSpec.LoadAndAssign.
 type GoTlsLagacyKernel310Maps struct {
+	ActiveSendfileArgsMap *ebpf.Map `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ActiveTlsConnOpMap    *ebpf.Map `ebpf:"active_tls_conn_op_map"`
@@ -162,6 +164,7 @@ type GoTlsLagacyKernel310Maps struct {
 
 func (m *GoTlsLagacyKernel310Maps) Close() error {
 	return _GoTlsLagacyKernel310Close(
+		m.ActiveSendfileArgsMap,
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.ActiveTlsConnOpMap,
