@@ -24,11 +24,11 @@ function test_filter_by_client_comm() {
     # client start after kyanos
     timeout 40 ${CMD} watch --debug-output http --comm https-request 2>&1 | tee "${AFTER_LNAME}" &
     sleep 10
-    timeout 30 ./testdata/https-request/https-request 'http://github.com' 40 &
+    timeout 30 ./testdata/https-request/https-request 'http://ipinfo.io' 40 &
     wait
 
     cat "${AFTER_LNAME}"
-    cat "${AFTER_LNAME}" | grep "Host: github.com" | grep "\\[side\\]=client"
+    cat "${AFTER_LNAME}" | grep "Host: ipinfo.io" | grep "\\[side\\]=client"
 }
 
 function main() {
