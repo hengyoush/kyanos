@@ -85,12 +85,12 @@ type ParsedMessage interface {
 }
 ```
 
-| 方法名             | 作用                                                                     |
-| ------------------ | ------------------------------------------------------------------------ |
-| `FormatToString()` | 将消息格式化为字符串表示形式。                                           |
-| `TimestampNs()`    | 返回消息的时间戳（以纳秒为单位）。                                       |
-| `ByteSize()`       | 返回消息的字节大小。                                                     |
-| `IsReq()`          | 判断消息是否为请求。                                                     |
+| 方法名             | 作用                                                                       |
+| ------------------ | -------------------------------------------------------------------------- |
+| `FormatToString()` | 将消息格式化为字符串表示形式。                                             |
+| `TimestampNs()`    | 返回消息的时间戳（以纳秒为单位）。                                         |
+| `ByteSize()`       | 返回消息的字节大小。                                                       |
+| `IsReq()`          | 判断消息是否为请求。                                                       |
 | `Seq()`            | 返回消息的字节流序列号, 可以从 `streamBuffer.Head().LeftBoundary()` 获取。 |
 
 HTTP 的例子：
@@ -137,10 +137,11 @@ ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseRes
 
 注意 eBPF 数据事件可能会无序到达，或者丢失事件，因此数据缓冲区中的数据可能缺少数据块，参数 streamBuffer 中通过
 `streamBuffer.Head`
-函数获取到目前为止已接收到的缓冲区前面的所有连续数据。因此，此时 **无法保证数据有效或缓冲区与数据包的开头对齐**。
+函数获取到目前为止已接收到的缓冲区前面的所有连续数据。因此，此时
+**无法保证数据有效或缓冲区与数据包的开头对齐**。
 
-如果返回 `ParseResult` 中的 `state` 为
-`success`，且那么 kyanos 会自动删除掉 `ParseResult.ReadBytes` 个字节的数据；如果返回 `invalid`，那么通过
+如果返回 `ParseResult` 中的 `state` 为 `success`，且那么 kyanos 会自动删除掉
+`ParseResult.ReadBytes` 个字节的数据；如果返回 `invalid`，那么通过
 `FindBoundary` 找到下一个可能的 `Message` 边界；如果返回
 `needsMoreData`，则不会删除数据，而是稍后重试。
 
@@ -242,7 +243,8 @@ func init() {
 
 ## Step.6-添加 e2e 测试
 
-在 testdata 目录下添加对应协议的 e2e 测试，可以参考其他协议的写法（比如 `test_redis.sh` 等）。
+在 testdata 目录下添加对应协议的 e2e 测试，可以参考其他协议的写法（比如
+`test_redis.sh` 等）。
 
 ## 其他
 
@@ -252,7 +254,9 @@ func init() {
 `common.ProtocolParserLog`. 打开 protocol 解析日志：`--protocol-log-level 5`
 设置协议解析相关 log 日志为 debug 级别。
 
-协议解析框架代码在 conntrack.go 的 `addDataToBufferAndTryParse` 函数里。
+协议解析框架代码在 conntrack.go 的 `addDataToBufferAndTryParse` 函数里。 
+
+更多调试建议参考：[Debug Tips](./debug-tips)
 
 ### 协议解析持久化信息
 
