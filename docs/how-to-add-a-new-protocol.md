@@ -300,6 +300,8 @@ protocol parsing-related log levels to debug.
 The protocol parsing framework code is in the `addDataToBufferAndTryParse`
 function in conntrack.go.
 
+More debug tips are here：[Debug Tips](./debug-tips)
+
 ### Persisting Protocol Parsing Information
 
 In some protocols, if you need to retain some data during the parsing process
