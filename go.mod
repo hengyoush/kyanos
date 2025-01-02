@@ -139,6 +139,8 @@ require (
 	k8s.io/apiserver v0.31.1 // indirect
 	k8s.io/component-base v0.31.1 // indirect
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
+	kernel.org/pub/linux/libs/security/libcap/cap v1.2.73 // indirect
+	kernel.org/pub/linux/libs/security/libcap/psx v1.2.73 // indirect
 	rsc.io/binaryregexp v0.2.0 // indirect
 )
 
