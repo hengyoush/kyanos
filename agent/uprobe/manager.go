@@ -19,8 +19,7 @@ import (
 var attachedLibPaths map[string]bool = make(map[string]bool)
 var uprobeLinks []link.Link = make([]link.Link, 0)
 
-func StartHandleSchedExecEvent() chan *bpf.AgentProcessExecEvent {
-	ch := make(chan *bpf.AgentProcessExecEvent)
+func StartHandleSchedExecEvent(ch chan *bpf.AgentProcessExecEvent) {
 	go func() {
 		for event := range ch {
 			go func(e *bpf.AgentProcessExecEvent) {
@@ -33,7 +32,6 @@ func StartHandleSchedExecEvent() chan *bpf.AgentProcessExecEvent {
 			}(event)
 		}
 	}()
-	return ch
 }
 
 func handleSchedExecEvent(event *bpf.AgentProcessExecEvent) {
