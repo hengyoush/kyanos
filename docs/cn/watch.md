@@ -55,6 +55,27 @@ Net/Internal
 **请求响应的具体内容**，分为 Request 和 Response 两部分，超过 1024 字节会截断展示（通过
 `--max-print-bytes` 选项可以调整这个限制）。
 
+## JSON 输出
+
+如果你需要以编程方式处理采集到的数据，可以使用 `--json-output` 参数将结果输出为 JSON 格式：
+
+```bash
+# 输出到终端
+kyanos watch --json-output=stdout
+
+# 输出到文件
+kyanos watch --json-output=/path/to/custom.json
+```
+
+JSON 输出中包含每个请求-响应对的详细信息，包括：
+- 请求和响应的时间戳
+- 连接详情（地址和端口）
+- 协议特定信息
+- 详细的耗时指标
+- 请求和响应内容
+
+完整的 JSON 输出格式规范，请参考 [JSON 输出格式](./json-output.md) 文档。
+
 ## 如何发现你感兴趣的请求响应 {#how-to-filter}
 
 默认 kyanos 会抓取所有它目前支持协议的请求响应，在很多场景下，我们需要更加精确的过滤，比如想要发送给某个远程端口的请求，抑或是某个进程或者容器的关联的请求，又或者是某个 Redis 命令或者 HTTP 路径相关的请求。下面介绍如何使用 kyanos 的各种选项找到我们感兴趣的请求响应。

@@ -36,7 +36,14 @@ export default defineConfig({
         ]
       },
       {
-        text: "Development",
+        text: 'Reference',
+        items: [
+          
+          { text: 'JSON Output Format', link: './json-output' },
+        ]
+      },
+      {
+        text: 'Development',
         items: [
           { text: "How to build", link: "./how-to-build" },
           {
