@@ -112,7 +112,7 @@ func init() {
 			bpf.AgentStepTDEV_IN:    {InstrumentFunction{"tracepoint/net/netif_receive_skb", "TracepointNetifReceiveSkb"}},
 			bpf.AgentStepTIP_IN:     {InstrumentFunction{"kprobe/ip_rcv_core", "IpRcvCore"}},
 			bpf.AgentStepTTCP_IN:    {InstrumentFunction{"kprobe/tcp_v4_do_rcv", "TcpV4DoRcv"}},
-			bpf.AgentStepTUSER_COPY: {InstrumentFunction{"kprobe/__skb_datagram_iter", "SkbCopyDatagramIter"}},
+			bpf.AgentStepTUSER_COPY: {InstrumentFunction{"tracepoint/skb/skb_copy_datagram_iovec", "TracepointSkbCopyDatagramIovec"}},
 		},
 		Capabilities: map[Capability]bool{
 			SupportConstants:         true,
@@ -140,8 +140,6 @@ func init() {
 	v4d14.addBackupInstrumentFunction(bpf.AgentStepTIP_OUT, InstrumentFunction{"kprobe/__ip_queue_xmit", "IpQueueXmit"})
 	v4d14.InstrumentFunctions[bpf.AgentStepTIP_IN] =
 		[]InstrumentFunction{{"kprobe/ip_rcv", "IpRcvCore"}}
-	v4d14.InstrumentFunctions[bpf.AgentStepTUSER_COPY] =
-		[]InstrumentFunction{{"kprobe/skb_copy_datagram_iter", "SkbCopyDatagramIter"}}
 	v4d14.removeCapability(SupportConstants).removeCapability(SupportRawTracepoint).removeCapability(SupportBTF).removeCapability(SupportXDP)
 	KernelVersionsMap.Put(v4d14.Version, v4d14)
 
@@ -149,8 +147,6 @@ func init() {
 	v310.Version = "3.10.0"
 	v310.InstrumentFunctions[bpf.AgentStepTIP_OUT] =
 		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "IpQueueXmit2"}}
-	v310.InstrumentFunctions[bpf.AgentStepTUSER_COPY] =
-		[]InstrumentFunction{{"kprobe/skb_copy_datagram_iovec", "SkbCopyDatagramIter"}}
 	v310.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"kprobe/ip_rcv", "IpRcvCore"})
 	v310.removeCapability(SupportConstants).
 		removeCapability(SupportRawTracepoint).
