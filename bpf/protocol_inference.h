@@ -147,15 +147,13 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
     return kUnknown;
   }
 
-  char serialized_type = 0;
-  bpf_probe_read_user(&serialized_type, 1, old_buf + 4);
+  int32_t header_length = 0;
+  bpf_probe_read_user(&header_length, sizeof(int32_t), old_buf + 4);
 
+  char serialized_type = (header_length >> 24) & 0xFF;
   if (serialized_type != 0x0 && serialized_type != 0x1) {
     return kUnknown;
   }
-
-  int32_t header_length = 0;
-  bpf_probe_read_user(&header_length, sizeof(int32_t), old_buf + 4);
 
   int32_t header_data_len = header_length & 0xFFFFFF;
   if (header_data_len <= 0 || header_data_len > count - 8) {
@@ -163,9 +161,11 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
   }
 
   if (serialized_type == 0x0) {  // json format
-    if (old_buf[8] != '{' || old_buf[9] != '"' || old_buf[10] != 'c' ||
-        old_buf[11] != 'o' || old_buf[12] != 'd' || old_buf[13] != 'e' ||
-        old_buf[14] != '"' || old_buf[15] != ':') {
+    char buf[8] = {};
+    bpf_probe_read_user(buf, 8, old_buf + 8);
+    if (old_buf[0] != '{' || old_buf[1] != '"' || old_buf[2] != 'c' ||
+        old_buf[3] != 'o' || old_buf[4] != 'd' || old_buf[5] != 'e' ||
+        old_buf[6] != '"' || old_buf[7] != ':') {
       // {"code":
       return kUnknown;
     }
