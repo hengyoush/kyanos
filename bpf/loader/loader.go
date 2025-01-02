@@ -136,9 +136,18 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	options.LoadPorgressChannel <- "🍆 Attached base eBPF programs."
 
 	if !options.DisableOpensslUprobe {
+		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, 10)
+		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
+		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedEventChannel}
+		if options.ProcessExecEventChannel != nil {
+			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
+		}
+		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
+
 		attachOpenSslUprobes(links, options, options.Kv, bf.Objs)
 		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
+	attachSchedProgs(links)
 	attachNfFunctions(links)
 	options.LoadPorgressChannel <- "🥪 Attached conntrack eBPF programs."
 	bf.Links = links
@@ -514,60 +523,41 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 }
 
 func attachOpenSslUprobes(links *list.List, options *ac.AgentOptions, kernelVersion *compatible.KernelVersion, objs any) {
-	if attachOpensslToSpecificProcess() {
-		sslUprobeLinks, err := uprobe.AttachSslUprobe(int(viper.GetInt64(common.FilterPidVarName)))
-		if err == nil {
-			for _, l := range sslUprobeLinks {
-				links.PushBack(l)
+	pids, err := common.GetAllPids()
+	loadGoTlsErr := uprobe.LoadGoTlsUprobe()
+	if loadGoTlsErr != nil {
+		common.UprobeLog.Debugf("Load GoTls Probe failed: %+v", loadGoTlsErr)
+	}
+	if err == nil {
+		for _, pid := range pids {
+			uprobeLinks, err := uprobe.AttachSslUprobe(int(pid))
+			if err == nil && len(uprobeLinks) > 0 {
+				for _, l := range uprobeLinks {
+					links.PushBack(l)
+				}
+				common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d", pid)
+			} else if err != nil {
+				common.UprobeLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
+			} else if len(uprobeLinks) == 0 {
+				common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
 			}
-		} else {
-			common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, viper.GetInt64(common.FilterPidVarName))
-		}
+			if loadGoTlsErr == nil {
+				gotlsUprobeLinks, err := uprobe.AttachGoTlsProbes(int(pid))
 
-	} else {
-		pids, err := common.GetAllPids()
-		loadGoTlsErr := uprobe.LoadGoTlsUprobe()
-		if loadGoTlsErr != nil {
-			common.UprobeLog.Debugf("Load GoTls Probe failed: %+v", loadGoTlsErr)
-		}
-		if err == nil {
-			for _, pid := range pids {
-				uprobeLinks, err := uprobe.AttachSslUprobe(int(pid))
-				if err == nil && len(uprobeLinks) > 0 {
-					for _, l := range uprobeLinks {
+				if err == nil && len(gotlsUprobeLinks) > 0 {
+					for _, l := range gotlsUprobeLinks {
 						links.PushBack(l)
 					}
-					common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d", pid)
+					common.UprobeLog.Infof("Attach GoTls uprobes success for pid: %d", pid)
 				} else if err != nil {
-					common.UprobeLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
-				} else if len(uprobeLinks) == 0 {
-					common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
-				}
-				if loadGoTlsErr == nil {
-					gotlsUprobeLinks, err := uprobe.AttachGoTlsProbes(int(pid))
-
-					if err == nil && len(gotlsUprobeLinks) > 0 {
-						for _, l := range gotlsUprobeLinks {
-							links.PushBack(l)
-						}
-						common.UprobeLog.Infof("Attach GoTls uprobes success for pid: %d", pid)
-					} else if err != nil {
-						common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d", err, pid)
-					} else {
-						common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d links is empty %v", err, pid, gotlsUprobeLinks)
-					}
+					common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d", err, pid)
+				} else {
+					common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d links is empty %v", err, pid, gotlsUprobeLinks)
 				}
 			}
-		} else {
-			common.UprobeLog.Warnf("get all pid failed: %v", err)
 		}
-		attachSchedProgs(links)
-		uprobeSchedExecEvent := uprobe.StartHandleSchedExecEvent()
-		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedExecEvent}
-		if options.ProcessExecEventChannel != nil {
-			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
-		}
-		bpf.PullProcessExecEvents(options.Ctx, execEventChannels)
+	} else {
+		common.UprobeLog.Warnf("get all pid failed: %v", err)
 	}
 }
 
