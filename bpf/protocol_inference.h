@@ -135,12 +135,13 @@ static __always_inline enum message_type_t is_http_protocol(const char *old_buf,
 
 static __always_inline enum message_type_t is_rocketmq_protocol(
     const char *old_buf, size_t count) {
-  if (count < 12) {
+  if (count < 16) {
     return kUnknown;
   }
 
   int32_t frame_size = 0;
   bpf_probe_read_user(&frame_size, sizeof(int32_t), old_buf);
+  bpf_printk("frame_size: %d", frame_size);
 
   if (frame_size <= 0 || frame_size > 64 * 1024 * 1024) {
     return kUnknown;
@@ -162,7 +163,12 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
   }
 
   if (serialized_type == 0x0) {  // json format
-    // TODO
+    if (old_buf[8] != '{' || old_buf[9] != '"' || old_buf[10] != 'c' ||
+        old_buf[11] != 'o' || old_buf[12] != 'd' || old_buf[13] != 'e' ||
+        old_buf[14] != '"' || old_buf[15] != ':') {
+      // {"code":
+      return kUnknown;
+    }
   } else if (serialized_type == 0x1) {
     uint16_t request_code = 0;
     uint8_t l_flag = 0;
