@@ -36,7 +36,7 @@ export default defineConfig({
         ]
       },
       {
-        text: 'Concepts',
+        text: 'Reference',
         items: [
           
           { text: 'JSON Output Format', link: './json-output' },
