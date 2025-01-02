@@ -11,7 +11,7 @@ permissions:
 
 jobs:
 
-  release-test:
+  release:
     runs-on: ubuntu-22.04
     steps:
 

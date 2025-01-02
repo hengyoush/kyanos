@@ -71,6 +71,7 @@ type Openssl111dProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type Openssl111dMapSpecs struct {
+	ActiveSendfileArgsMap *ebpf.MapSpec `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
@@ -106,6 +107,7 @@ func (o *Openssl111dObjects) Close() error {
 //
 // It can be passed to LoadOpenssl111dObjects or ebpf.CollectionSpec.LoadAndAssign.
 type Openssl111dMaps struct {
+	ActiveSendfileArgsMap *ebpf.Map `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
@@ -124,6 +126,7 @@ type Openssl111dMaps struct {
 
 func (m *Openssl111dMaps) Close() error {
 	return _Openssl111dClose(
+		m.ActiveSendfileArgsMap,
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.ConnEvtRb,
