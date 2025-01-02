@@ -7,6 +7,7 @@ import (
 	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
+	"kyanos/common"
 )
 
 func init() {
@@ -25,14 +26,24 @@ func (r *RocketMQMessage) IsReq() bool {
 
 func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType) protocol.ParseResult {
 	buffer := streamBuffer.Head().Buffer()
+	common.ProtocolParserLog.Debugf("ParseStream received buffer length: %d", len(buffer))
+	common.ProtocolParserLog.Debugln("==============", buffer)
+
 	if len(buffer) < 8 {
+		common.ProtocolParserLog.Warn("Buffer too small for header, needs more data.")
 		return protocol.ParseResult{
 			ParseState: protocol.NeedsMoreData,
 		}
 	}
 
 	frameSize := int(binary.BigEndian.Uint32(buffer[:4]))
+	if frameSize <= 0 {
+		common.ProtocolParserLog.Warnf("Invalid frame size: %d", frameSize)
+		return protocol.ParseResult{ParseState: protocol.Invalid, ReadBytes: 4}
+	}
+
 	if frameSize > len(buffer) {
+		common.ProtocolParserLog.Debugf("Frame size %d exceeds buffer length %d, needs more data.", frameSize, len(buffer))
 		return protocol.ParseResult{ParseState: protocol.NeedsMoreData}
 	}
 
@@ -40,14 +51,17 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 	headerDataLen := headerLength & 0xFFFFFF
 	serializedType := byte((headerLength >> 24) & 0xFF)
 
-	if len(buffer) < 8+int(headerDataLen) {
+	if 8+int(headerDataLen) > frameSize || len(buffer) < 8+int(headerDataLen) {
+		common.ProtocolParserLog.Warnf("Incomplete header detected: headerDataLen=%d, frameSize=%d.", headerDataLen, frameSize)
 		return protocol.ParseResult{ParseState: protocol.NeedsMoreData}
 	}
 
 	headerBody := buffer[8 : 8+headerDataLen]
 	body := buffer[8+headerDataLen : frameSize]
+
 	message, err := r.parseHeader(headerBody, serializedType)
 	if err != nil {
+		common.ProtocolParserLog.Errorf("Failed to parse header: %v", err)
 		return protocol.ParseResult{ParseState: protocol.Invalid, ReadBytes: int(frameSize)}
 	}
 
@@ -56,18 +70,21 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 	fb, ok := protocol.CreateFrameBase(streamBuffer, frameSize)
 
 	if !ok {
+		common.ProtocolParserLog.Warnf("Failed to create FrameBase for frameSize=%d", frameSize)
 		return protocol.ParseResult{
 			ParseState: protocol.Ignore,
 			ReadBytes:  frameSize,
 		}
-	} else {
-		message.FrameBase = fb
-		return protocol.ParseResult{
-			ParseState:     protocol.Success,
-			ReadBytes:      frameSize,
-			ParsedMessages: []protocol.ParsedMessage{message},
-		}
 	}
+
+	common.ProtocolParserLog.Debugf("Successfully parsed message: %+v", message)
+	message.FrameBase = fb
+	return protocol.ParseResult{
+		ParseState:     protocol.Success,
+		ReadBytes:      frameSize,
+		ParsedMessages: []protocol.ParsedMessage{message},
+	}
+
 }
 
 func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedType byte) (*RocketMQMessage, error) {
@@ -102,20 +119,29 @@ func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedTyp
 }
 
 func (r *RocketMQStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, startPos int) int {
-	buffer := streamBuffer.Head().Buffer()[startPos:]
-	for i := range buffer {
-		if len(buffer[i:]) < 8 {
-			return -1
+	buffer := streamBuffer.Head().Buffer()
+	common.ProtocolParserLog.Debugf("FindBoundary starting at position: %d, buffer length: %d", startPos, len(buffer))
+
+	for i := startPos; i <= len(buffer)-8; i++ {
+		frameSize := int(binary.BigEndian.Uint32(buffer[i : i+4]))
+
+		if frameSize <= 0 || frameSize > len(buffer)-i {
+			common.ProtocolParserLog.Warnf("Skipping invalid frameSize=%d at position=%d", frameSize, i)
+			continue
 		}
-		frameSize := binary.BigEndian.Uint32(buffer[i : i+4])
-		if int(frameSize) <= len(buffer[i:]) {
-			return startPos + i
+
+		if i+frameSize <= len(buffer) {
+			common.ProtocolParserLog.Debugf("Found boundary at position=%d with frameSize=%d", i, frameSize)
+			return i
 		}
 	}
+
+	common.ProtocolParserLog.Warn("No valid boundary found, returning -1.")
 	return -1
 }
 
 func (r *RocketMQStreamParser) Match(reqStream *[]protocol.ParsedMessage, respStream *[]protocol.ParsedMessage) []protocol.Record {
+	common.ProtocolParserLog.Debugf("Matching %d requests with %d responses.", len(*reqStream), len(*respStream))
 	records := []protocol.Record{}
 
 	reqMap := make(map[int32]*RocketMQMessage)
@@ -131,9 +157,14 @@ func (r *RocketMQStreamParser) Match(reqStream *[]protocol.ParsedMessage, respSt
 				Req:  req,
 				Resp: resp,
 			})
-
 			delete(reqMap, resp.Opaque)
+		} else {
+			common.ProtocolParserLog.Warnf("No matching request found for response Opaque=%d", resp.Opaque)
 		}
+	}
+
+	if len(reqMap) > 0 {
+		common.ProtocolParserLog.Warnf("Unmatched requests remain: %d", len(reqMap))
 	}
 
 	return records
