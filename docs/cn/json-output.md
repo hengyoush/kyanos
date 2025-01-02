@@ -24,7 +24,7 @@ kyanos watch --json-output=/path/to/custom.json
 | `start_time` | string | 请求开始时间，RFC3339Nano 格式 |
 | `end_time` | string | 请求结束时间，RFC3339Nano 格式 |
 | `total_duration_ms` | number | 请求-响应总耗时，单位毫秒 |
-| `black_box_duration_ms` | number | 请求离开到响应到达网卡之间的耗时 |
+| `black_box_duration_ms` | number | 对于客户端：请求离开和响应到达网络接口之间的持续时间<br>对于服务器端：请求到达进程和响应离开进程之间的持续时间 |
 | `read_socket_duration_ms` | number | 从 socket 缓冲区读取数据的耗时 |
 | `copy_to_socket_buffer_duration_ms` | number | 复制数据到 socket 缓冲区的耗时 |
 

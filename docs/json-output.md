@@ -24,7 +24,7 @@ Each request-response pair is represented as a JSON object with the following fi
 | `start_time` | string | Start time of the request in RFC3339Nano format |
 | `end_time` | string | End time of the request in RFC3339Nano format |
 | `total_duration_ms` | number | Total duration of the request-response in milliseconds |
-| `black_box_duration_ms` | number | Duration between request leaving and response arriving at the network interface |
+| `black_box_duration_ms` | number | For client side: Duration between request leaving and response arriving at the network interface.<br> For server side: Duration between request arriving at process and response leaving process. |
 | `read_socket_duration_ms` | number | Time spent reading from socket buffer |
 | `copy_to_socket_buffer_duration_ms` | number | Time spent copying data to socket buffer |
 
