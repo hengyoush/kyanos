@@ -46,11 +46,23 @@ git submodule update --init --recursive
 
 如果只是本地开发测试，可以执行
 
-```
+```bash
 make build-bpf && make
 ```
 
 之后在项目根目录下会生成 kyanos 可执行文件。
+
+格式化代码
+
+```bash
+make format
+```
+
+格式化文档
+
+```bash
+make format-md
+```
 
 > [!IMPORTANT]
 >

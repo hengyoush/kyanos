@@ -254,7 +254,7 @@ func init() {
 `common.ProtocolParserLog`. 打开 protocol 解析日志：`--protocol-log-level 5`
 设置协议解析相关 log 日志为 debug 级别。
 
-协议解析框架代码在 conntrack.go 的 `addDataToBufferAndTryParse` 函数里。 
+协议解析框架代码在 conntrack.go 的 `addDataToBufferAndTryParse` 函数里。
 
 更多调试建议参考：[Debug Tips](./debug-tips)
 
