@@ -2,6 +2,7 @@ package rocketmq
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"kyanos/agent/buffer"
@@ -17,6 +18,9 @@ func init() {
 }
 
 func (r *RocketMQMessage) FormatToString() string {
+	//         return "RemotingCommand [code=" + code + ", language=" + language + ", version=" + version + ", opaque=" + opaque + ", flag(B)="
+	// + Integer.toBinaryString(flag) + ", remark=" + remark + ", extFields=" + extFields + ", serializeTypeCurrentRPC="
+	// + serializeTypeCurrentRPC + "]";
 	return fmt.Sprintf("base=[%s] command=[%s] payload=[%s]", r.FrameBase.String(), "todo", r.Body)
 }
 
@@ -90,9 +94,35 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedType byte) (*RocketMQMessage, error) {
 	fmt.Println(serializedType)
 	message := &RocketMQMessage{}
-	if serializedType == 0 {
+	switch serializedType {
+	case 0: // json
+		var temp struct {
+			RequestCode int16             `json:"code"`
+			Language    string            `json:"language"`
+			VersionFlag int16             `json:"version"`
+			Opaque      int32             `json:"opaque"`
+			RequestFlag int32             `json:"flag"`
+			Remark      string            `json:"remark,omitempty"`
+			Properties  map[string]string `json:"extFields,omitempty"`
+		}
+
+		if err := json.Unmarshal(headerBody, &temp); err != nil {
+			return nil, fmt.Errorf("failed to parse JSON header: %w", err)
+		}
+
+		message.RequestCode = temp.RequestCode
+		// message.LanguageFlag = temp.LanguageFlag
+		message.VersionFlag = temp.VersionFlag
+		message.Opaque = temp.Opaque
+		message.RequestFlag = temp.RequestFlag
+		message.RemarkLength = int32(len(temp.Remark))
+		message.Remark = []byte(temp.Remark)
+		message.PropertiesLen = int32(len(temp.Properties))
+		// message.Properties = temp.Properties
+
+	case 1: // custom
 		if len(headerBody) < 18 {
-			return nil, errors.New("invalid header size")
+			return nil, errors.New("invalid header size for private serialization")
 		}
 
 		message.RequestCode = int16(binary.BigEndian.Uint16(headerBody[:2]))
@@ -105,16 +135,21 @@ func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedTyp
 		if int(message.RemarkLength) > len(headerBody[17:]) {
 			return nil, errors.New("invalid remark length")
 		}
+
 		message.Remark = headerBody[17 : 17+message.RemarkLength]
+
 		propertiesStart := 17 + message.RemarkLength
 		if len(headerBody[propertiesStart:]) < 4 {
 			return nil, errors.New("invalid properties length")
 		}
+
 		message.PropertiesLen = int32(binary.BigEndian.Uint32(headerBody[propertiesStart:]))
 		message.Properties = headerBody[propertiesStart+4 : propertiesStart+4+message.PropertiesLen]
-	} else {
-		return nil, errors.New("unsupported serialization type")
+
+	default:
+		return nil, fmt.Errorf("unsupported serialization type: %d", serializedType)
 	}
+
 	return message, nil
 }
 
