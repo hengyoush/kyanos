@@ -66,6 +66,27 @@ The second section contains the **request and response content**, split into
 Request and Response parts. Content exceeding 1024 bytes is truncated, but you
 can adjust this limit using the `--max-print-bytes` option.
 
+## JSON Output
+
+If you need to process the captured data programmatically, you can use the `--json-output` flag to output the results in JSON format:
+
+```bash
+# Output to terminal
+kyanos watch --json-output=stdout
+
+# Output to a file
+kyanos watch --json-output=/path/to/custom.json
+```
+
+The JSON output will contain detailed information for each request-response pair including:
+- Timestamps for request and response
+- Connection details (addresses and ports)
+- Protocol-specific information
+- Detailed latency metrics
+- Request and response content
+
+For the complete JSON output format specification, please refer to the [JSON Output Format](./json-output.md) documentation.
+
 ## How to Filter Requests and Responses ? {#how-to-filter}
 
 By default, `kyanos` captures all traffic for the protocols it currently
