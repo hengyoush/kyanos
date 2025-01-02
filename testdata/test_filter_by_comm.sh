@@ -12,7 +12,7 @@ function test_filter_by_server_comm() {
     timeout 40 python3 ./testdata/start_http_server.py  &
     timeout 30 ${CMD} watch --debug-output http --comm python3 2>&1 | tee "${BEFORE_LNAME}" &
     sleep 2
-    timeout 25 ./testdata/https-request/https-request 'http://127.0.0.1:8080' 40 &
+    ./testdata/https-request/https-request 'http://127.0.0.1:8080' 40 &>/dev/null || true
     sleep 10
     wait
 
@@ -25,7 +25,7 @@ function test_filter_by_client_comm() {
     # client start after kyanos
     timeout 40 ${CMD} watch --debug-output http --comm https-request 2>&1 | tee "${AFTER_LNAME}" &
     sleep 20
-    timeout 30 ./testdata/https-request/https-request 'http://ipinfo.io' 40 &
+    ./testdata/https-request/https-request 'http://ipinfo.io' 40 &>/dev/null || true
     wait
 
     cat "${AFTER_LNAME}"
