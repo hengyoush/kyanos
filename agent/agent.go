@@ -35,8 +35,11 @@ func SetupAgent(options ac.AgentOptions) {
 		return
 	}
 
-	if os.Geteuid() != 0 {
-		common.AgentLog.Error("Kyanos requires root privileges to run. Please run kyanos with sudo.")
+	if ok, err := ac.HasPermission(); err != nil {
+		common.AgentLog.Error("check capabilities failed: ", err)
+		return
+	} else if !ok {
+		common.AgentLog.Error("Kyanos requires CAP_BPF to run. Please run kyanos with sudo or run container in privilege mode.")
 		return
 	}
 
