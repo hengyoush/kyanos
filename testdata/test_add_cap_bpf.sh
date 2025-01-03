@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-set -ex
+set -x
 
 CMD="$1"
 FILE_PREFIX="/tmp/kyanos"
