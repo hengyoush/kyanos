@@ -41,7 +41,7 @@ func (r *RocketMQMessage) FormatToString() string {
 		propertiesMap = fmt.Sprintf("{%s}", strings.Join(props, ", "))
 	}
 
-	return fmt.Sprintf("base=[%s] detail=[code=%d, language=%s, version=%d, opaque=%d, flag(B)=%b, remark=%s, extFields=%s, body=%s]",
+	return fmt.Sprintf("base=[%s] detail=[code=%d, language=%s, version=%d, opaque=%d, flag=%d, remark=%s, extFields=%s, body=%s]",
 		r.FrameBase.String(),
 		r.RequestCode,
 		r.LanguageCode,
@@ -61,9 +61,7 @@ func (r *RocketMQMessage) IsReq() bool {
 
 func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType) protocol.ParseResult {
 	buffer := streamBuffer.Head().Buffer()
-	common.ProtocolParserLog.Debugln("RocketMQ Parser")
 	common.ProtocolParserLog.Debugf("ParseStream received buffer length: %d", len(buffer))
-	common.ProtocolParserLog.Debugln(buffer)
 
 	if len(buffer) < 8 {
 		common.ProtocolParserLog.Warn("Buffer too small for header, needs more data.")
@@ -127,9 +125,7 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 }
 
 func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedType byte) (*RocketMQMessage, error) {
-	message := &RocketMQMessage{
-		RemarkBuf: make([]byte, 0),
-	}
+	message := NewRocketMQMessage()
 	switch serializedType {
 	case 0: // json
 		var temp struct {
@@ -157,8 +153,7 @@ func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedTyp
 		message.PropertiesLen = int32(len(temp.Properties))
 		message.Properties = temp.Properties
 
-	case 1: // custom
-		// TODO: NEED TEST
+	case 1: // ROCKETMQ
 		if len(headerBody) < 18 {
 			return nil, errors.New("invalid header size for private serialization")
 		}
