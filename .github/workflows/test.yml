@@ -157,6 +157,7 @@ jobs:
 
       - name: Test CAP_BPF privilege check
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        if: ${{ !contains(fromJSON('["4.19-20240912.022020", "5.4-20240912.022020"]'), matrix.kernel) }}
         with:
           provision: 'false'
           cmd: |
@@ -164,7 +165,21 @@ jobs:
             uname -a
             cat /etc/issue
             pushd /host
-            bash /host/testdata/run_cap_bpf_test.sh ""
+            bash /host/testdata/run_cap_bpf_test.sh "" "CAP_BPF"
+            popd
+
+
+      - name: Test CAP_SYS_ADMIN privilege check
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        if: contains(fromJSON('["4.19-20240912.022020", "5.4-20240912.022020"]'), matrix.kernel)
+        with:
+          provision: 'false'
+          cmd: |
+            set -euxo pipefail
+            uname -a
+            cat /etc/issue
+            pushd /host
+            bash /host/testdata/run_cap_bpf_test.sh "" "CAP_SYS_ADMIN"
             popd
 
       - name: Test filter by comm
