@@ -3,6 +3,7 @@ package watch
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"kyanos/agent/analysis/common"
 	"kyanos/agent/protocol"
@@ -565,6 +566,36 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 				}))
 			}
 		}
+	} else if options.JsonOutput != "" {
+		var jsonFile *os.File
+		var err error
+		if options.JsonOutput != "stdout" {
+			jsonFile, err = os.OpenFile(options.JsonOutput, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				c.BPFEventLog.Errorln("Failed to open JSON output file:", err)
+				return
+			}
+			defer jsonFile.Close()
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case r := <-ch:
+				jsonData, err := json.Marshal(r)
+				if err != nil {
+					c.BPFEventLog.Errorln("Failed to marshal record to JSON:", err)
+					continue
+				}
+				if jsonFile != nil {
+					if _, err := jsonFile.Write(append(jsonData, '\n')); err != nil {
+						c.BPFEventLog.Errorln("Failed to write JSON to file:", err)
+					}
+				} else {
+					fmt.Println(string(jsonData))
+				}
+			}
+		}
 	} else {
 		c.SetLogToFile()
 		records := &[]*common.AnnotatedRecord{}
@@ -592,7 +623,6 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 			os.Exit(1)
 		}
 	}
-
 }
 
 func (m *model) SortBy() rc.SortBy {

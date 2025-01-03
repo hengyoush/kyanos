@@ -66,6 +66,29 @@ OK
 > `--bpf-event-log-level 5 --conntrack-log-level 5 --protocol-log-level 5 --debug-output`
 > This option is generally sufficient.
 
+## IDE Related
+
+Open the project directly in VSCODE, and add the following configuration to
+.vscode/launch.json:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch file",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}",
+      "args": ["watch", "--debug-output"]
+    }
+  ]
+}
+```
+
+Make sure to add the `--debug-output` parameter.
+
 ## Source Code Structure
 
 ```

@@ -201,7 +201,7 @@ _1.5.0_
 如果你有更详细的问题需要咨询，可以用以下联系方式：
 
 - **微信交流群：**:
-  <img width="182" alt="image" src="https://github.com/user-attachments/assets/cf65f281-485f-4506-b387-0286c25bcf03" />。
+  ![6bdeac2c0f76190942e74060f60546d](https://github.com/user-attachments/assets/6e010a6c-687e-403e-ad17-4b2e46ccd4a4)。
 - **我的邮箱：**: [hengyoush1@163.com](mailto:hengyoush1@163.com)。
 - **我的 Blog：**: [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)。
 

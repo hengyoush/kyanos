@@ -47,12 +47,24 @@ also requires the following software. Please install them manually.
 
 If you are just developing and testing locally, you can execute
 
-```
+```bash
 make build-bpf && make
 ```
 
 the kyanos executable file will be generated in the root directory of the
 project.
+
+Format code:
+
+```bash
+make format
+```
+
+Format documentation:
+
+```bash
+make format-md
+```
 
 > [!IMPORTANT]
 >

@@ -1,12 +1,15 @@
 package watch
 
-import "strings"
+import (
+	"strings"
+)
 
 type WatchOptions struct {
 	WideOutput                   bool
 	StaticRecord                 bool
 	Opts                         string
 	DebugOutput                  bool
+	JsonOutput                   string
 	MaxRecordContentDisplayBytes int
 	MaxRecords                   int
 }
