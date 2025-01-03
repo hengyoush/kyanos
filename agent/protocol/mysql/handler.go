@@ -318,7 +318,7 @@ func ProcessBinaryResultsetRowPacket(packet *MysqlPacket, columnDefs []ColDefini
 		common.ProtocolParserLog.Warningln("Not enough bytes.")
 	}
 
-	nullBitmap := packet.msg[kBinaryResultsetRowHeaderOffset:nullBitmapLen]
+	nullBitmap := packet.msg[kBinaryResultsetRowHeaderOffset : kBinaryResultsetRowHeaderOffset+nullBitmapLen]
 
 	for i := 0; i < len(columnDefs); i++ {
 		null_bitmap_bytepos := (i + kBinaryResultsetRowNullBitmapOffset) / 8
