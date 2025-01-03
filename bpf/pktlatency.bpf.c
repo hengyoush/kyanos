@@ -583,6 +583,16 @@ int BPF_KPROBE(skb_copy_datagram_iovec, struct sk_buff *skb, int offset, struct 
 	return handle_skb_data_copy(ctx, skb, offset, to, len);
 }
 
+SEC("tracepoint/skb/skb_copy_datagram_iovec")
+int tracepoint__skb_copy_datagram_iovec(struct trace_event_raw_skb_copy_datagram_iovec  *ctx) {
+	void *p = (void*)ctx + sizeof(struct trace_entry);
+	struct sk_buff *skb;
+	bpf_probe_read_kernel(&skb, sizeof(struct sk_buff *), p);
+	p += sizeof(struct sk_buff *);
+	int len = 0;
+	bpf_probe_read_kernel(&len, sizeof(int), p);
+	return handle_skb_data_copy(ctx, skb, 0, NULL, len);
+}
 
 SEC("tracepoint/net/netif_receive_skb")
 int tracepoint__netif_receive_skb(struct trace_event_raw_net_dev_template  *ctx) {
