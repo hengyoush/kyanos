@@ -191,15 +191,15 @@ func (r *RocketMQStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, m
 	buffer := streamBuffer.Head().Buffer()
 	common.ProtocolParserLog.Debugf("FindBoundary starting at position: %d, buffer length: %d", startPos, len(buffer))
 
-	for i := startPos; i <= len(buffer)-8; i++ {
+	for i := startPos; i <= len(buffer)-4; i++ {
 		frameSize := int(binary.BigEndian.Uint32(buffer[i : i+4]))
 
-		if frameSize <= 0 || frameSize > len(buffer)-i {
+		if frameSize <= 0 || (frameSize+4) > len(buffer)-i {
 			common.ProtocolParserLog.Warnf("Skipping invalid frameSize=%d at position=%d", frameSize, i)
 			continue
 		}
 
-		if i+frameSize <= len(buffer) {
+		if (i + frameSize + 4) <= len(buffer) {
 			common.ProtocolParserLog.Debugf("Found boundary at position=%d with frameSize=%d", i, frameSize)
 			return i
 		}

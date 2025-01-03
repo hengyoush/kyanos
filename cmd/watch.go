@@ -13,7 +13,7 @@ var watchCmd = &cobra.Command{
 	Example: `
 sudo kyanos watch
 sudo kyanos watch http --side server --pid 1234 --path /foo/bar --host ubuntu.com
-sudo kyanos watch redis --comands GET,SET --keys foo,bar --key-prefix app1:
+sudo kyanos watch redis --command GET,SET --keys foo,bar --key-prefix app1:
 sudo kyanos watch mysql --latency 100 --req-size 1024 --resp-size 2048
 sudo kyanos watch rocketmq
 	`,

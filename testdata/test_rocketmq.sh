@@ -17,7 +17,7 @@ function test_rocketmq() {
 
     docker-compose up -d
 
-    timeout 30 ${CMD} watch --debug-output rocketmq --remote-ports 9876,8080 2>&1 | tee "${ROCKETMQ_CLIENT_LNAME}" &
+    timeout 30 ${CMD} watch --debug-output rocketmq 2>&1 | tee "${ROCKETMQ_CLIENT_LNAME}" &
     sleep 10
 
     python3 test_rocketmq.py

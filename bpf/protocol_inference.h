@@ -151,7 +151,7 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
   }
 
   int32_t header_data_len = header_length & 0xFFFFFF;
-  bpf_printk("header_data_len : %d", header_data_len);
+  // bpf_printk("header_data_len : %d", header_data_len);
   if (header_data_len <= 0 || header_data_len > count - 8) {
     return kUnknown;
   }
