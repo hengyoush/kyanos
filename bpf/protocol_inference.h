@@ -139,9 +139,9 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
     return kUnknown;
   }
 
-  int32_t frame_size = 0;
+  int32_t frame_size;
   bpf_probe_read_user(&frame_size, sizeof(int32_t), old_buf);
-  bpf_printk("frame_size: %d", frame_size);
+  frame_size = bpf_ntohl(frame_size);
 
   if (frame_size <= 0 || frame_size > 64 * 1024 * 1024) {
     return kUnknown;
@@ -149,6 +149,7 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
 
   int32_t header_length = 0;
   bpf_probe_read_user(&header_length, sizeof(int32_t), old_buf + 4);
+  header_length = bpf_ntohl(header_length);
 
   char serialized_type = (header_length >> 24) & 0xFF;
   if (serialized_type != 0x0 && serialized_type != 0x1) {
@@ -156,11 +157,13 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
   }
 
   int32_t header_data_len = header_length & 0xFFFFFF;
+  bpf_printk("header_data_len : %d", header_data_len);
   if (header_data_len <= 0 || header_data_len > count - 8) {
     return kUnknown;
   }
 
   if (serialized_type == 0x0) {  // json format
+    bpf_printk("json");
     char buf[8] = {};
     bpf_probe_read_user(buf, 8, old_buf + 8);
     if (buf[0] != '{' || buf[1] != '"' || buf[2] != 'c' || buf[3] != 'o' ||
@@ -178,6 +181,7 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
     bpf_probe_read_user(&v_flag, sizeof(uint16_t), old_buf + 11);
 
     // rocketmq/remoting/protocol/RequestCode.java
+    request_code = bpf_ntohl(request_code);
     if (request_code < 10) {
       return kUnknown;
     }

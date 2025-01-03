@@ -9,15 +9,16 @@ var _ protocol.ParsedMessage = &RocketMQMessage{}
 type RocketMQMessage struct {
 	protocol.FrameBase
 	RequestCode   int16
-	LanguageFlag  byte
+	LanguageCode  LanguageCode
 	VersionFlag   int16
 	Opaque        int32
 	RequestFlag   int32
 	RemarkLength  int32
-	Remark        []byte
+	RemarkBuf     []byte
 	PropertiesLen int32
-	Properties    []byte
-	Body          []byte
+	PropertiesBuf []byte
+	Properties    map[string]string
+	BodyBuf       []byte
 	isReq         bool
 }
 

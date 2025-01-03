@@ -9,6 +9,7 @@ import (
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
 	"kyanos/common"
+	"strings"
 )
 
 func init() {
@@ -17,11 +18,41 @@ func init() {
 	}
 }
 
+func NewRocketMQMessage() *RocketMQMessage {
+	return &RocketMQMessage{
+		LanguageCode:  UNKNOWN,
+		RemarkBuf:     make([]byte, 0),
+		PropertiesBuf: make([]byte, 0),
+		BodyBuf:       make([]byte, 0),
+		Properties:    map[string]string{},
+	}
+}
+
 func (r *RocketMQMessage) FormatToString() string {
-	//         return "RemotingCommand [code=" + code + ", language=" + language + ", version=" + version + ", opaque=" + opaque + ", flag(B)="
-	// + Integer.toBinaryString(flag) + ", remark=" + remark + ", extFields=" + extFields + ", serializeTypeCurrentRPC="
-	// + serializeTypeCurrentRPC + "]";
-	return fmt.Sprintf("base=[%s] command=[%s] payload=[%s]", r.FrameBase.String(), "todo", r.Body)
+	remark := string(r.RemarkBuf)
+	body := string(r.BodyBuf)
+
+	propertiesMap := string(r.PropertiesBuf)
+	if len(r.Properties) > 0 {
+		props := make([]string, 0, len(r.Properties))
+		for key, value := range r.Properties {
+			props = append(props, fmt.Sprintf("%s=%s", key, value))
+		}
+		propertiesMap = fmt.Sprintf("{%s}", strings.Join(props, ", "))
+	}
+
+	return fmt.Sprintf("base=[%s] detail=[code=%d, language=%s, version=%d, opaque=%d, flag(B)=%b, remark=%s, extFields=%s, body=%s]",
+		r.FrameBase.String(),
+		r.RequestCode,
+		r.LanguageCode,
+		r.VersionFlag,
+		r.Opaque,
+		r.RequestFlag,
+		remark,
+		propertiesMap,
+		body,
+	)
+
 }
 
 func (r *RocketMQMessage) IsReq() bool {
@@ -30,8 +61,9 @@ func (r *RocketMQMessage) IsReq() bool {
 
 func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType) protocol.ParseResult {
 	buffer := streamBuffer.Head().Buffer()
+	common.ProtocolParserLog.Debugln("RocketMQ Parser")
 	common.ProtocolParserLog.Debugf("ParseStream received buffer length: %d", len(buffer))
-	common.ProtocolParserLog.Debugln("==============", buffer)
+	common.ProtocolParserLog.Debugln(buffer)
 
 	if len(buffer) < 8 {
 		common.ProtocolParserLog.Warn("Buffer too small for header, needs more data.")
@@ -46,7 +78,7 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 		return protocol.ParseResult{ParseState: protocol.Invalid, ReadBytes: 4}
 	}
 
-	if frameSize > len(buffer) {
+	if frameSize+4 > len(buffer) {
 		common.ProtocolParserLog.Debugf("Frame size %d exceeds buffer length %d, needs more data.", frameSize, len(buffer))
 		return protocol.ParseResult{ParseState: protocol.NeedsMoreData}
 	}
@@ -55,13 +87,12 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 	headerDataLen := headerLength & 0xFFFFFF
 	serializedType := byte((headerLength >> 24) & 0xFF)
 
-	if 8+int(headerDataLen) > frameSize || len(buffer) < 8+int(headerDataLen) {
+	if 4+int(headerDataLen) > frameSize || len(buffer) < 8+int(headerDataLen) {
 		common.ProtocolParserLog.Warnf("Incomplete header detected: headerDataLen=%d, frameSize=%d.", headerDataLen, frameSize)
 		return protocol.ParseResult{ParseState: protocol.NeedsMoreData}
 	}
 
 	headerBody := buffer[8 : 8+headerDataLen]
-	body := buffer[8+headerDataLen : frameSize]
 
 	message, err := r.parseHeader(headerBody, serializedType)
 	if err != nil {
@@ -69,7 +100,11 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 		return protocol.ParseResult{ParseState: protocol.Invalid, ReadBytes: int(frameSize)}
 	}
 
-	message.Body = body
+	if frameSize > 4+int(headerDataLen) {
+		body := buffer[8+headerDataLen : frameSize]
+		message.BodyBuf = body
+	}
+
 	message.isReq = messageType == protocol.Request
 	fb, ok := protocol.CreateFrameBase(streamBuffer, frameSize)
 
@@ -92,8 +127,9 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 }
 
 func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedType byte) (*RocketMQMessage, error) {
-	fmt.Println(serializedType)
-	message := &RocketMQMessage{}
+	message := &RocketMQMessage{
+		RemarkBuf: make([]byte, 0),
+	}
 	switch serializedType {
 	case 0: // json
 		var temp struct {
@@ -111,22 +147,25 @@ func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedTyp
 		}
 
 		message.RequestCode = temp.RequestCode
-		// message.LanguageFlag = temp.LanguageFlag
+		lFlag, _ := convertToLanguageCode(temp.Language)
+		message.LanguageCode = lFlag
 		message.VersionFlag = temp.VersionFlag
 		message.Opaque = temp.Opaque
 		message.RequestFlag = temp.RequestFlag
 		message.RemarkLength = int32(len(temp.Remark))
-		message.Remark = []byte(temp.Remark)
+		message.RemarkBuf = []byte(temp.Remark)
 		message.PropertiesLen = int32(len(temp.Properties))
-		// message.Properties = temp.Properties
+		message.Properties = temp.Properties
 
 	case 1: // custom
+		// TODO: NEED TEST
 		if len(headerBody) < 18 {
 			return nil, errors.New("invalid header size for private serialization")
 		}
 
 		message.RequestCode = int16(binary.BigEndian.Uint16(headerBody[:2]))
-		message.LanguageFlag = headerBody[2]
+		lCode, _ := convertToLanguageCodeFromByte(headerBody[2])
+		message.LanguageCode = lCode
 		message.VersionFlag = int16(binary.BigEndian.Uint16(headerBody[3:5]))
 		message.Opaque = int32(binary.BigEndian.Uint32(headerBody[5:9]))
 		message.RequestFlag = int32(binary.BigEndian.Uint32(headerBody[9:13]))
@@ -136,7 +175,7 @@ func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedTyp
 			return nil, errors.New("invalid remark length")
 		}
 
-		message.Remark = headerBody[17 : 17+message.RemarkLength]
+		message.RemarkBuf = headerBody[17 : 17+message.RemarkLength]
 
 		propertiesStart := 17 + message.RemarkLength
 		if len(headerBody[propertiesStart:]) < 4 {
@@ -144,7 +183,7 @@ func (parser *RocketMQStreamParser) parseHeader(headerBody []byte, serializedTyp
 		}
 
 		message.PropertiesLen = int32(binary.BigEndian.Uint32(headerBody[propertiesStart:]))
-		message.Properties = headerBody[propertiesStart+4 : propertiesStart+4+message.PropertiesLen]
+		message.PropertiesBuf = headerBody[propertiesStart+4 : propertiesStart+4+message.PropertiesLen]
 
 	default:
 		return nil, fmt.Errorf("unsupported serialization type: %d", serializedType)
