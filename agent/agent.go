@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"kyanos/agent/analysis"
 	anc "kyanos/agent/analysis/common"
 	ac "kyanos/agent/common"
@@ -15,7 +16,10 @@ import (
 	"kyanos/bpf/loader"
 	"kyanos/common"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -28,6 +32,21 @@ func SetupAgent(options ac.AgentOptions) {
 	if enabled, err := common.IsEnableBPF(); err == nil && !enabled {
 		common.AgentLog.Error("BPF is not enabled in your kernel. This might be because your kernel version is too old. " +
 			"Please check the requirements for Kyanos at https://kyanos.io/quickstart.html#installation-requirements.")
+		return
+	}
+
+	if ok, err := ac.HasPermission(); err != nil {
+		common.AgentLog.Error("check capabilities failed: ", err)
+		return
+	} else if !ok {
+		common.AgentLog.Error("Kyanos requires CAP_BPF to run. Please run kyanos with sudo or run container in privilege mode.")
+		return
+	}
+
+	if common.Is256ColorSupported() {
+		common.AgentLog.Debugln("Terminal supports 256 colors")
+	} else {
+		common.AgentLog.Warnf("Your terminal does not support 256 colors, ui may display incorrectly")
 	}
 
 	// startGopsServer(options)
@@ -52,7 +71,7 @@ func SetupAgent(options ac.AgentOptions) {
 	var recordsChannel chan *anc.AnnotatedRecord = nil
 	recordsChannel = make(chan *anc.AnnotatedRecord, 1000)
 
-	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter, options.TraceSide)
+	pm := conn.InitProcessorManager(options.ProcessorsNum, connManager, options.MessageFilter, options.LatencyFilter, options.SizeFilter, options.TraceSide, options.ConntrackCloseWaitTimeMills)
 	conn.RecordFunc = func(r protocol.Record, c *conn.Connection4) error {
 		return statRecorder.ReceiveRecord(r, c, recordsChannel)
 	}
@@ -75,17 +94,23 @@ func SetupAgent(options ac.AgentOptions) {
 		kernelVersion := compatible.GetCurrentKernelVersion()
 		options.Kv = &kernelVersion
 		var err error
-		{
-			bf, err := loader.LoadBPF(&options)
+		defer func() {
 			if err != nil {
-				if bf != nil {
-					bf.Close()
-				}
-				return
+				common.AgentLog.Error("Failed to load BPF programs: ", err)
+				_bf.Err = err
+				options.LoadPorgressChannel <- "❌ Kyanos start failed"
+				options.LoadPorgressChannel <- "quit"
 			}
-			_bf.Links = bf.Links
-			_bf.Objs = bf.Objs
+		}()
+		bf, err := loader.LoadBPF(&options)
+		if err != nil {
+			if bf != nil {
+				bf.Close()
+			}
+			return
 		}
+		_bf.Links = bf.Links
+		_bf.Objs = bf.Objs
 
 		err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), 2048, options.CustomSyscallEventHook)
 		if err != nil {
@@ -103,7 +128,10 @@ func SetupAgent(options ac.AgentOptions) {
 		if err != nil {
 			return
 		}
-		_bf.AttachProgs(&options)
+		err = _bf.AttachProgs(&options)
+		if err != nil {
+			return
+		}
 		if !options.WatchOptions.DebugOutput {
 			options.LoadPorgressChannel <- "🍹 All programs attached"
 			options.LoadPorgressChannel <- "🍭 Waiting for events.."
@@ -117,9 +145,14 @@ func SetupAgent(options ac.AgentOptions) {
 	}()
 	if !options.WatchOptions.DebugOutput {
 		loader_render.Start(ctx, options)
+		common.SetLogToStdout()
 	} else {
 		wg.Wait()
 		common.AgentLog.Info("Waiting for events..")
+	}
+	if _bf.Err != nil {
+		logSystemInfo(_bf.Err)
+		return
 	}
 
 	stop := false
@@ -147,6 +180,52 @@ func SetupAgent(options ac.AgentOptions) {
 	common.AgentLog.Infoln("Kyanos Stopped: ", stop)
 
 	return
+}
+
+func logSystemInfo(loadError error) {
+	common.SetLogToStdout()
+	info := []string{
+		"OS: " + runtime.GOOS,
+		"Arch: " + runtime.GOARCH,
+		"NumCPU: " + fmt.Sprintf("%d", runtime.NumCPU()),
+		"GoVersion: " + runtime.Version(),
+	}
+
+	kernelVersion, err := exec.Command("uname", "-r").Output()
+	if err == nil {
+		info = append(info, "Kernel Version: "+strings.TrimSpace(string(kernelVersion)))
+	} else {
+		info = append(info, "Failed to get kernel version: "+err.Error())
+	}
+
+	osRelease, err := exec.Command("cat", "/etc/os-release").Output()
+	if err == nil {
+		info = append(info, strings.TrimSpace(string(osRelease)))
+	} else {
+		info = append(info, "Failed to get Linux distribution: "+err.Error())
+	}
+
+	const crashReportFormat = `
+===================================
+	  Kyanos Crash Report
+=========Error Message=============
+%s
+============OS Info================
+%s
+===================================
+FAQ         : https://kyanos.io/faq.html
+Submit issue: https://github.com/hengyoush/kyanos/issues
+
+`
+
+	var errorInfo string
+	if loadError != nil {
+		errorInfo = "Error: " + loadError.Error()
+	} else {
+		errorInfo = "No load errors detected."
+	}
+
+	fmt.Printf(crashReportFormat, errorInfo, strings.Join(info, "\n"))
 }
 
 func startGopsServer(opts ac.AgentOptions) {

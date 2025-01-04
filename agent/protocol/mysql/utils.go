@@ -136,6 +136,7 @@ func processLengthEncodedInt(s string, offset *int) (int64, bool) {
 	// If it is 0xfc, it is followed by a 2-byte integer.
 	// If it is 0xfd, it is followed by a 3-byte integer.
 	// If it is 0xfe, it is followed by a 8-byte integer.
+	const kResultsetRowNullPrefix = '\xfb'
 	const kLencIntPrefix2b byte = 0xfc
 	const kLencIntPrefix3b byte = 0xfd
 	const kLencIntPrefix8b byte = 0xfe
@@ -157,6 +158,9 @@ func processLengthEncodedInt(s string, offset *int) (int64, bool) {
 	}
 	var result int64
 	switch s[0] {
+	case kResultsetRowNullPrefix:
+		*offset = *offset + 1
+		return 0, true
 	case kLencIntPrefix2b:
 		s = s[1:]
 		if ok := checkLengthFunc(s, 2); !ok {
@@ -193,7 +197,11 @@ func DissectStringParam(s string, offset *int, param *string) bool {
 	if !ok || len(s) < *offset+int(param_length) {
 		return false
 	}
-	*param = s[*offset : *offset+int(param_length)]
+	if param_length == 0 {
+		*param = "NULL"
+	} else {
+		*param = s[*offset : *offset+int(param_length)]
+	}
 	*offset = *offset + int(param_length)
 	return true
 }

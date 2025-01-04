@@ -4,10 +4,11 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
-	"github.com/smira/go-xz"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/smira/go-xz"
 )
 
 func saveDataToFile(data []byte, targetPath string) error {

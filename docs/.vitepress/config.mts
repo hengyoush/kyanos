@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitepress'
+import { defineConfig } from "vitepress";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -6,55 +6,68 @@ export default defineConfig({
   description: "Kyanos official website",
   head: [["link", { rel: "icon", href: "/kyanos.png" }]], // 浏览器标签页logo
   locales: {
-    cn: { label: '简体中文', lang: 'cn' },
-    root: { label: 'English', lang: 'en' },
+    cn: { label: "简体中文", lang: "cn" },
+    root: { label: "English", lang: "en" }
   },
-  appearance: 'dark',
+  appearance: "dark",
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     logo: "/kyanos.png",
     nav: [
-      { text: 'Home', link: '/' },
-      { text: 'Guide', link: './what-is-kyanos' }
+      { text: "Home", link: "/" },
+      { text: "Guide", link: "./what-is-kyanos" }
     ],
 
     sidebar: [
       {
-        text: 'Introduction',
+        text: "Introduction",
         items: [
-          { text: 'What is Kyanos?', link: './what-is-kyanos' },
-          { text: 'Quickstart', link: './quickstart' },
+          { text: "What is Kyanos?", link: "./what-is-kyanos" },
+          { text: "Quickstart", link: "./quickstart" },
+          { text: "FAQ", link: "./faq" }
         ]
       },
       {
-        text: 'Tutorial',
+        text: "Tutorial",
         items: [
-          
-          { text: 'Learn kyanos in 5 minutes', link: './how-to' },
-          { text: 'How to use watch', link: './watch' },
-          { text: 'How to use stat', link: './stat' },
+          { text: "Learn kyanos in 5 minutes", link: "./how-to" },
+          { text: "How to use watch", link: "./watch" },
+          { text: "How to use stat", link: "./stat" }
         ]
       },
       {
-        text: 'Development',
+        text: "Reference",
+        items: [{ text: "JSON Output Format", link: "./json-output" }]
+      },
+      {
+        text: "Development",
         items: [
-          
-          { text: 'How to build', link: './how-to-build' },
+          { text: "How to build", link: "./how-to-build" },
+          {
+            text: "How to add a new protocol",
+            link: "./how-to-add-a-new-protocol"
+          },
+          {
+            text: "Debug Tips",
+            link: "./debug-tips"
+          }
         ]
       }
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/hengyoush/kyanos' }
+      { icon: "github", link: "https://github.com/hengyoush/kyanos" }
     ],
-    
+
     footer: {
-      message: 'Released under the <a href="https://github.com/hengyoush/kyanos/blob/main/LICENSE">Apache-2.0 license.',
-      copyright: 'Copyright © 2024-present <a href="https://github.com/hengyoush">Hengyoush'
+      message:
+        'Released under the <a href="https://github.com/hengyoush/kyanos/blob/main/LICENSE">Apache-2.0 license.',
+      copyright:
+        'Copyright © 2024-present <a href="https://github.com/hengyoush">Hengyoush'
     },
-    
+
     search: {
-      provider: 'local'
-    },
+      provider: "local"
+    }
   }
-})
+});

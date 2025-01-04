@@ -88,3 +88,36 @@ btfgen:
 
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 .SECONDARY:
+
+.PHONY: test
+test: test-go
+
+.PHONY: test-go
+test-go:
+	go test -v ./...
+
+.PHONY: format
+format: format-go
+
+.PHONY: format-go
+format-go:
+	goimports -w .
+	gofmt -s -w .
+
+.PHONY: format-md
+format-md:
+	find . -type f -name "*.md" | xargs npx prettier --write
+	find docs/cn -type f -name "*.md" | xargs npx md-padding -i
+	find . -type f -name "*_CN.md" | xargs npx md-padding -i
+
+.PHONY: dlv
+dlv:
+	chmod +x kyanos && dlv --headless --listen=:2345 --api-version=2 --check-go-version=false exec ./kyanos 
+
+.PHONY: kyanos-debug
+kyanos-debug: $(GO_FILES)
+	$(call msg,BINARY,$@)
+	export CGO_LDFLAGS="-Xlinker -rpath=. -static" && go build -gcflags "all=-N -l"
+
+.PHONY: remote-debug
+remote-debug: build-bpf kyanos-debug dlv

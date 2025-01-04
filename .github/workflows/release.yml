@@ -11,8 +11,8 @@ permissions:
 
 jobs:
 
-  release-test:
-    runs-on: ubuntu-latest
+  release:
+    runs-on: ubuntu-22.04
     steps:
 
       - name: Remove large directories

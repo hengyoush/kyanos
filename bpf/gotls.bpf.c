@@ -121,9 +121,10 @@ static __inline void assign_arg(void* arg, size_t arg_size, struct location_t lo
   if (loc.type == kLocationTypeStack) {
     bpf_probe_read(arg, arg_size, sp + loc.offset);
   } else if (loc.type == kLocationTypeRegisters) {
-    if (loc.offset >= 0) {
-      bpf_probe_read(arg, arg_size, (char*)regs + loc.offset);
+    if (loc.offset < 0 || loc.offset > 1000) {
+      return;
     }
+    bpf_probe_read(arg, arg_size, (char*)regs + loc.offset);
   }
 }
 

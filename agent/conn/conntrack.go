@@ -167,6 +167,14 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 			prevConn = append(prevConn, existedConn)
 			conn.prevConn = prevConn
 
+			// transfer existedConn's Events to conn
+			conn.TempSyscallEvents = append(conn.TempSyscallEvents, existedConn.TempSyscallEvents...)
+			existedConn.TempSyscallEvents = []*bpf.SyscallEventData{}
+			conn.TempKernEvents = append(conn.TempKernEvents, existedConn.TempKernEvents...)
+			existedConn.TempKernEvents = []*bpf.AgentKernEvt{}
+			conn.TempSslEvents = append(conn.TempSslEvents, existedConn.TempSslEvents...)
+			existedConn.TempSslEvents = []*bpf.SslData{}
+
 			c.connMap.Store(TgidFd, conn)
 			atomic.AddInt64(&c.connectionAdded, 1)
 			return nil
@@ -414,6 +422,11 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 		} else {
 			c.addDataToBufferAndTryParse(data, &event.SyscallEvent.Ke)
 		}
+	} else if event.SyscallEvent.GetSourceFunction() == bpf.AgentSourceFunctionTKSyscallSendfile {
+		// sendfile has no data, so we need to fill a fake data
+		common.ConntrackLog.Errorln("sendfile has no data, so we need to fill a fake data")
+		fakeData := make([]byte, event.SyscallEvent.Ke.Len)
+		c.addDataToBufferAndTryParse(fakeData, &event.SyscallEvent.Ke)
 	}
 	c.StreamEvents.AddSyscallEvent(event)
 
@@ -433,7 +446,6 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, ke *bpf.AgentKernEvt) {
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
-		streamBuffer.Clear()
 		return
 	}
 	if streamBuffer.IsEmpty() {

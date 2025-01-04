@@ -9,6 +9,7 @@ import (
 	"kyanos/common"
 	"net/http"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -161,4 +162,175 @@ func TestParseResponse(t *testing.T) {
 	assert.Equal(t, false, message.IsReq())
 	assert.Equal(t, uint64(10), message.TimestampNs())
 	assert.Equal(t, uint64(20), message.Seq())
+}
+
+func TestHttpFilter_Filter(t *testing.T) {
+	type fields struct {
+		TargetPath       string
+		TargetPathReg    *regexp.Regexp
+		TargetPathPrefix string
+		TargetHostName   string
+		TargetMethods    []string
+	}
+	type args struct {
+		parsedReq protocol.ParsedMessage
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		{
+			name: "not_http_req",
+			args: args{
+				parsedReq: &protocol.RedisMessage{},
+			},
+			want: false,
+		},
+		{
+			name: "filter_by_path",
+			fields: fields{
+				TargetPath: "/foo/bar",
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Path: "/foo/bar",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "not_filter_by_path",
+			fields: fields{
+				TargetPath: "/foo/bar",
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Path: "/foo/bar/baz",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "filter_by_path_prefix",
+			fields: fields{
+				TargetPathPrefix: "/foo/bar",
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Path: "/foo/bar/baz",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "not_filter_by_path_prefix",
+			fields: fields{
+				TargetPathPrefix: "/foo/bar",
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Path: "/test",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "filter_by_regex",
+			fields: fields{
+				TargetPathReg: regexp.MustCompile("/foo/bar/\\d+/baz"),
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Path: "/foo/bar/100/baz",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "not_filter_by_regex",
+			fields: fields{
+				TargetPathReg: regexp.MustCompile("/foo/bar/\\w+"),
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Path: "/test",
+				},
+			},
+			want: false,
+		},
+		{
+			name:   "no_filter",
+			fields: fields{},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Path:   "/test",
+					Host:   "test.com",
+					Method: "POST",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "filter_by_method",
+			fields: fields{
+				TargetMethods: []string{"GET"},
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Method: "GET",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "not_filter_by_method",
+			fields: fields{
+				TargetMethods: []string{"GET"},
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Method: "POST",
+				},
+			},
+			want: false,
+		},
+		{
+			name: "filter_by_host",
+			fields: fields{
+				TargetHostName: "foo.bar",
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Host: "foo.bar",
+				},
+			},
+			want: true,
+		},
+		{
+			name: "not_filter_by_host",
+			fields: fields{
+				TargetHostName: "foo.bar",
+			},
+			args: args{
+				parsedReq: &protocol.ParsedHttpRequest{
+					Host: "foo.baz",
+				},
+			},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := protocol.HttpFilter{
+				TargetPath:       tt.fields.TargetPath,
+				TargetPathReg:    tt.fields.TargetPathReg,
+				TargetPathPrefix: tt.fields.TargetPathPrefix,
+				TargetHostName:   tt.fields.TargetHostName,
+				TargetMethods:    tt.fields.TargetMethods,
+			}
+			assert.Equalf(t, tt.want, filter.Filter(tt.args.parsedReq, nil), "Filter(%v, %v)", tt.args.parsedReq, nil)
+		})
+	}
 }

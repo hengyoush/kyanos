@@ -160,9 +160,7 @@ func getGoRetOffset(elfFile *elf.File, execPath string, symbolName string) (uint
 		return 0, []uint64{}, nil
 	}
 
-	retOffset := retOffsets[len(retOffsets)-1]
-	common.UprobeLog.Debugf("got symbolOffset: %d, got retOffsets: %v, will attach at ret offset: %d",
-		symbolOffset, retOffsets, retOffset)
+	common.UprobeLog.Debugf("got symbolOffset: %d, got retOffsets: %v", symbolOffset, retOffsets)
 	return symbolOffset, retOffsets, nil
 }
 

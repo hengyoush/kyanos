@@ -11,7 +11,6 @@ import (
 	ac "kyanos/agent/common"
 	"kyanos/bpf"
 	"kyanos/common"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -63,9 +62,9 @@ func generateBTF(fileBytes []byte) (*btf.Spec, error) {
 	return btfPath, nil
 }
 
-func loadBTFSpec(options *ac.AgentOptions) *btf.Spec {
+func loadBTFSpec(options *ac.AgentOptions) (*btf.Spec, error) {
 	if bpf.IsKernelSupportHasBTF() {
-		return nil
+		return nil, nil
 	}
 
 	options.LoadPorgressChannel <- "starting load BTF file"
@@ -73,7 +72,8 @@ func loadBTFSpec(options *ac.AgentOptions) *btf.Spec {
 	if options.BTFFilePath != "" {
 		btfPath, err := btf.LoadSpec(options.BTFFilePath)
 		if err != nil {
-			common.AgentLog.Fatalf("can't load btf spec from file %s: %v", options.BTFFilePath, err)
+			common.AgentLog.Warnf("can't load btf spec from file %s: %v\n", options.BTFFilePath, err)
+			return nil, err
 		}
 		spec = btfPath
 		options.LoadPorgressChannel <- "starting load BTF file: success!"
@@ -84,11 +84,11 @@ func loadBTFSpec(options *ac.AgentOptions) *btf.Spec {
 			if needGenerateBTF {
 				spec, err = generateBTF(fileBytes)
 				if err != nil {
-					common.AgentLog.Warnf("failed to generate btf file: %+v", err)
+					common.AgentLog.Warnf("failed to generate btf file: %+v\n", err)
 				}
 			}
 		} else {
-			common.AgentLog.Warnf("failed to load embeded btf file: %+v", err)
+			common.AgentLog.Warnf("failed to load embeded btf file: %+v\n", err)
 		}
 	}
 
@@ -97,7 +97,7 @@ func loadBTFSpec(options *ac.AgentOptions) *btf.Spec {
 		options.LoadPorgressChannel <- "starting load BTF from network..."
 		btfSpec, _, err := loadBTFSpecFallback("")
 		if err != nil {
-			common.AgentLog.Warnf("failed to get btf file from network: %+v", err)
+			common.AgentLog.Warnf("failed to get btf file from network: %+v\n", err)
 		} else {
 			spec = btfSpec
 		}
@@ -110,18 +110,18 @@ func loadBTFSpec(options *ac.AgentOptions) *btf.Spec {
 			if needGenerateBTF {
 				spec, err = generateBTF(fileBytes)
 				if err != nil {
-					common.AgentLog.Warnf("failed to generate btf file (best matched): %+v", err)
+					common.AgentLog.Warnf("failed to generate btf file (best matched): %+v\n", err)
 				}
 			}
 		} else {
-			common.AgentLog.Warnf("failed to load embedded btf file (best matched): %+v", err)
+			common.AgentLog.Warnf("failed to load embedded btf file (best matched): %+v\n", err)
 		}
 	}
 
 	if spec == nil {
-		common.AgentLog.Fatalf("can't find btf file to load!")
+		return nil, fmt.Errorf("can't find btf file to load!")
 	}
-	return spec
+	return spec, nil
 }
 
 func loadBTFSpecFallback(path string) (*btf.Spec, string, error) {
@@ -437,6 +437,5 @@ func getBestMatchedBTFFile(findExactly bool) ([]uint8, error) {
 			return file, nil
 		}
 	}
-	log.Fatalln("can't start kyanos because no available btf file, please refer this url: https://hengyoush.github.io/kyanos/quickstart.html for more info.")
 	return nil, errors.New("no btf file found to load")
 }

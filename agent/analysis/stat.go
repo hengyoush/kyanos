@@ -6,6 +6,7 @@ import (
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
 	. "kyanos/common"
+	"math"
 
 	"github.com/jefurry/logrus"
 )
@@ -176,8 +177,20 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	hasUserCopyEvents := len(events.userCopyEvents) > 0
 	hasTcpInEvents := len(events.tcpInEvents) > 0
 	if connection.IsServerSide() {
+		// why not use nicIngressEvents[0] directly?
+		// because we could missed some nicIngressEvents, the total duration may be negative
+		annotatedRecord.StartTs = math.MaxUint64
 		if hasNicInEvents {
-			annotatedRecord.StartTs = events.nicIngressEvents[0].GetTimestamp()
+			annotatedRecord.StartTs = min(events.nicIngressEvents[0].GetTimestamp(), annotatedRecord.StartTs)
+		}
+		if hasTcpInEvents {
+			annotatedRecord.StartTs = min(events.tcpInEvents[0].GetTimestamp(), annotatedRecord.StartTs)
+		}
+		if hasUserCopyEvents {
+			annotatedRecord.StartTs = min(events.userCopyEvents[0].GetTimestamp(), annotatedRecord.StartTs)
+		}
+		if hasReadSyscallEvents {
+			annotatedRecord.StartTs = min(events.readSyscallEvents[0].GetTimestamp(), annotatedRecord.StartTs)
 		}
 		if hasDevOutEvents {
 			annotatedRecord.EndTs = events.devOutEvents[len(events.devOutEvents)-1].GetTimestamp()
@@ -188,7 +201,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		}
 		annotatedRecord.ReqSize = events.ingressKernLen
 		annotatedRecord.RespSize = events.egressKernLen
-		if hasNicInEvents && hasDevOutEvents {
+		if annotatedRecord.StartTs != math.MaxUint64 && hasDevOutEvents {
 			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		}
 		if hasReadSyscallEvents && hasWriteSyscallEvents {

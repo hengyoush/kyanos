@@ -28,10 +28,14 @@ import (
 type BPF struct {
 	Links *list.List        // close
 	Objs  *bpf.AgentObjects // close
+	Err   error
 }
 
 func (b *BPF) Close() {
-	b.Objs.Close()
+	if b.Objs != nil {
+		b.Objs.Close()
+	}
+
 	if b.Links != nil {
 		for e := b.Links.Front(); e != nil; e = e.Next() {
 			if e.Value == nil {
@@ -57,12 +61,17 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 	var bf *BPF = &BPF{}
 
 	if err := features.HaveProgramType(ebpf.Kprobe); errors.Is(err, ebpf.ErrNotSupported) {
-		common.AgentLog.Fatalf("Require oldest kernel version is 3.10.0-957, pls check your kernel version by `uname -r`")
+		common.AgentLog.Errorf("Require oldest kernel version is 3.10.0-957, pls check your kernel version by `uname -r`\n")
+		return nil, err
 	}
 
+	btfSpec, err := loadBTFSpec(options)
+	if err != nil {
+		return nil, err
+	}
 	collectionOptions = &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
-			KernelTypes: loadBTFSpec(options),
+			KernelTypes: btfSpec,
 		},
 	}
 
@@ -72,7 +81,7 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 		lagacyobjs := &bpf.AgentLagacyKernel310Objects{}
 		spec, err = bpf.LoadAgentLagacyKernel310()
 		if err != nil {
-			common.AgentLog.Fatal("load Agent error:", err)
+			return nil, err
 		}
 		filterFunctions(spec, *options.Kv)
 		err = spec.LoadAndAssign(lagacyobjs, collectionOptions)
@@ -81,7 +90,7 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 		objs = &bpf.AgentObjects{}
 		spec, err = bpf.LoadAgent()
 		if err != nil {
-			common.AgentLog.Fatal("load Agent error:", err)
+			return nil, err
 		}
 		filterFunctions(spec, *options.Kv)
 		err = spec.LoadAndAssign(objs, collectionOptions)
@@ -107,37 +116,38 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 	}
 	options.LoadPorgressChannel <- "🍓 Setup traffic filters"
 
-	// var links *list.List
-	// if options.LoadBpfProgramFunction != nil {
-	// 	links = options.LoadBpfProgramFunction()
-	// } else {
-	// 	links = attachBpfProgs(options.IfName, options.Kv, &options)
-	// }
-
-	// if !options.DisableOpensslUprobe {
-	// 	attachOpenSslUprobes(links, options, options.Kv, objs)
-	// }
-	// attachNfFunctions(links)
 	bpf.PullProcessExitEvents(options.Ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.Ctx)})
 
-	// bf.links = links
 	return bf, nil
 }
 
 func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	var links *list.List
+	var err error
 	if options.LoadBpfProgramFunction != nil {
 		links = options.LoadBpfProgramFunction()
 	} else {
-		links = attachBpfProgs(options.IfName, options.Kv, options)
+		links, err = attachBpfProgs(options.IfName, options.Kv, options)
+		if err != nil {
+			return err
+		}
 	}
 
 	options.LoadPorgressChannel <- "🍆 Attached base eBPF programs."
 
 	if !options.DisableOpensslUprobe {
+		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, 10)
+		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
+		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedEventChannel}
+		if options.ProcessExecEventChannel != nil {
+			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
+		}
+		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
+
 		attachOpenSslUprobes(links, options, options.Kv, bf.Objs)
 		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
+	attachSchedProgs(links)
 	attachNfFunctions(links)
 	options.LoadPorgressChannel <- "🥪 Attached conntrack eBPF programs."
 	bf.Links = links
@@ -208,7 +218,7 @@ func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelV
 	}
 
 	needsDelete := make([]string, 0)
-	for cProgName, _ := range coll.Programs {
+	for cProgName := range coll.Programs {
 		if slices.Index(finalCProgNames, cProgName) == -1 {
 			needsDelete = append(needsDelete, cProgName)
 		}
@@ -317,6 +327,9 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 			writeFilterNsIdsToMap(filterResult, bpf.Objs)
 			one := int64(1)
 			controlValues.Update(bpf.AgentControlValueIndexTKEnableFilterByPid, one, ebpf.UpdateAny)
+		} else {
+			common.AgentLog.Errorf("applyContainerFilter failed: %v", err)
+			return false
 		}
 	}
 
@@ -401,7 +414,14 @@ func isProcNameMacthed(proc *process.Process, filterComm string) bool {
 	return false
 }
 
-func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, options *ac.AgentOptions) *list.List {
+func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, options *ac.AgentOptions) (l *list.List, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			common.AgentLog.Errorf("Recovered in attachBpfProgs: %v", r)
+			err = fmt.Errorf("attachBpfProgs panic: %v", r)
+		}
+	}()
+
 	linkList := list.New()
 
 	if kernelVersion.SupportCapability(compatible.SupportXDP) {
@@ -446,7 +466,7 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 					if isNonCriticalStep {
 						common.AgentLog.Debugf("Attach failed: %v, functions: %v skip it because it's a non-criticalstep", err, functions)
 					} else {
-						common.AgentLog.Fatalf("Attach failed: %v, functions: %v", err, functions)
+						return nil, fmt.Errorf("Attach failed: %v, functions: %v", err, functions)
 					}
 				} else {
 					common.AgentLog.Debugf("Attach failed but has fallback: %v, functions: %v", err, functions)
@@ -475,6 +495,9 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 	linkList.PushBack(bpf.AttachSyscallSendMsgEntry())
 	linkList.PushBack(bpf.AttachSyscallSendMsgExit())
 
+	linkList.PushBack(bpf.AttachSyscallSendFile64Entry())
+	linkList.PushBack(bpf.AttachSyscallSendFile64Exit())
+
 	linkList.PushBack(bpf.AttachSyscallRecvMsgEntry())
 	linkList.PushBack(bpf.AttachSyscallRecvMsgExit())
 
@@ -496,64 +519,45 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketRecvmsgEntry())
 	linkList.PushBack(bpf.AttachKProbeSecuritySocketSendmsgEntry())
 
-	return linkList
+	return linkList, nil
 }
 
 func attachOpenSslUprobes(links *list.List, options *ac.AgentOptions, kernelVersion *compatible.KernelVersion, objs any) {
-	if attachOpensslToSpecificProcess() {
-		sslUprobeLinks, err := uprobe.AttachSslUprobe(int(viper.GetInt64(common.FilterPidVarName)))
-		if err == nil {
-			for _, l := range sslUprobeLinks {
-				links.PushBack(l)
+	pids, err := common.GetAllPids()
+	loadGoTlsErr := uprobe.LoadGoTlsUprobe()
+	if loadGoTlsErr != nil {
+		common.UprobeLog.Debugf("Load GoTls Probe failed: %+v", loadGoTlsErr)
+	}
+	if err == nil {
+		for _, pid := range pids {
+			uprobeLinks, err := uprobe.AttachSslUprobe(int(pid))
+			if err == nil && len(uprobeLinks) > 0 {
+				for _, l := range uprobeLinks {
+					links.PushBack(l)
+				}
+				common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d", pid)
+			} else if err != nil {
+				common.UprobeLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
+			} else if len(uprobeLinks) == 0 {
+				common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
 			}
-		} else {
-			common.AgentLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, viper.GetInt64(common.FilterPidVarName))
-		}
+			if loadGoTlsErr == nil {
+				gotlsUprobeLinks, err := uprobe.AttachGoTlsProbes(int(pid))
 
-	} else {
-		pids, err := common.GetAllPids()
-		loadGoTlsErr := uprobe.LoadGoTlsUprobe()
-		if loadGoTlsErr != nil {
-			common.UprobeLog.Debugf("Load GoTls Probe failed: %+v", loadGoTlsErr)
-		}
-		if err == nil {
-			for _, pid := range pids {
-				uprobeLinks, err := uprobe.AttachSslUprobe(int(pid))
-				if err == nil && len(uprobeLinks) > 0 {
-					for _, l := range uprobeLinks {
+				if err == nil && len(gotlsUprobeLinks) > 0 {
+					for _, l := range gotlsUprobeLinks {
 						links.PushBack(l)
 					}
-					common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d", pid)
+					common.UprobeLog.Infof("Attach GoTls uprobes success for pid: %d", pid)
 				} else if err != nil {
-					common.UprobeLog.Infof("Attach OpenSsl uprobes failed: %+v for pid: %d", err, pid)
-				} else if len(uprobeLinks) == 0 {
-					common.UprobeLog.Infof("Attach OpenSsl uprobes success for pid: %d use previous libssl path", pid)
-				}
-				if loadGoTlsErr == nil {
-					gotlsUprobeLinks, err := uprobe.AttachGoTlsProbes(int(pid))
-
-					if err == nil && len(gotlsUprobeLinks) > 0 {
-						for _, l := range gotlsUprobeLinks {
-							links.PushBack(l)
-						}
-						common.UprobeLog.Infof("Attach GoTls uprobes success for pid: %d", pid)
-					} else if err != nil {
-						common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d", err, pid)
-					} else {
-						common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d links is empty %v", err, pid, gotlsUprobeLinks)
-					}
+					common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d", err, pid)
+				} else {
+					common.UprobeLog.Infof("Attach GoTls uprobes failed: %+v for pid: %d links is empty %v", err, pid, gotlsUprobeLinks)
 				}
 			}
-		} else {
-			common.UprobeLog.Warnf("get all pid failed: %v", err)
 		}
-		attachSchedProgs(links)
-		uprobeSchedExecEvent := uprobe.StartHandleSchedExecEvent()
-		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedExecEvent}
-		if options.ProcessExecEventChannel != nil {
-			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
-		}
-		bpf.PullProcessExecEvents(options.Ctx, execEventChannels)
+	} else {
+		common.UprobeLog.Warnf("get all pid failed: %v", err)
 	}
 }
 

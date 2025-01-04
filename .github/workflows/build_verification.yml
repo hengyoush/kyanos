@@ -1,0 +1,47 @@
+name: Build Verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "dev","feature/*" ]
+  pull_request:
+    branches: [ "main", "dev","feature/*" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+env:
+  kyanos_log_option: --bpf-event-log-level 5 --conntrack-log-level 5
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    timeout-minutes: 30
+    continue-on-error: true
+    # TODO：adapt to different architecture runner
+    runs-on: ${{ matrix.os }}
+    # https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-public-repositories
+    strategy:
+      matrix:
+        os: [ "ubuntu-20.04","ubuntu-22.04","ubuntu-24.04" ]
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
+        with:
+          go-version: '1.23.3'
+
+      - name: Init
+        run: |
+          /bin/bash init_env.sh
+
+      - name: Build
+        run: |
+          make clean && make build-bpf && make

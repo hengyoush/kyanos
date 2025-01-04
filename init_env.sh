@@ -8,7 +8,9 @@ fi
 
 CLANG_NUM=-12
 # shellcheck disable=SC2209
-if [ ${release_num} == "20.10" ]; then
+if [ ${release_num} == "20.04" ]; then
+  CLANG_NUM=-10
+  elif [ ${release_num} == "20.04" ]; then
   CLANG_NUM=-10
   elif [ ${release_num} == "21.04" ]; then
   CLANG_NUM=-11
@@ -21,7 +23,7 @@ if [ ${release_num} == "20.10" ]; then
   elif [ ${release_num} == "23.04" ];then
   CLANG_NUM=-15
   elif [ ${release_num} == "23.10" ];then
-    CLANG_NUM=-15
+  CLANG_NUM=-15
   elif [ ${release_num} == "24.04" ];then
   CLANG_NUM=-18
   else
@@ -66,6 +68,7 @@ echo "GOBIN_ZIP:${GOBIN_ZIP}"
 # install golang
 wget https://golang.google.cn/dl/${GOBIN_ZIP}
 sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf ${GOBIN_ZIP}
+rm ${GOBIN_ZIP}
 export PATH=/usr/local/go/bin:$PATH
 export GOPROXY=https://goproxy.cn
 

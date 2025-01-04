@@ -21,14 +21,14 @@ type ProcessorManager struct {
 }
 
 func InitProcessorManager(n int, connManager *ConnManager, filter protocol.ProtocolFilter,
-	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum) *ProcessorManager {
+	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum, conntrackCloseWaitTimeMills int) *ProcessorManager {
 	pm := new(ProcessorManager)
 	pm.processors = make([]*Processor, n)
 	pm.wg = new(sync.WaitGroup)
 	pm.ctx, pm.cancel = context.WithCancel(context.Background())
 	pm.connManager = connManager
 	for i := 0; i < n; i++ {
-		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter, sizeFilter, side)
+		pm.processors[i] = initProcessor("Processor-"+fmt.Sprint(i), pm.wg, pm.ctx, pm.connManager, filter, latencyFilter, sizeFilter, side, conntrackCloseWaitTimeMills)
 		go pm.processors[i].run()
 		pm.wg.Add(1)
 	}
@@ -76,7 +76,7 @@ func (pm *ProcessorManager) GetKernEventsChannels() []chan *bpf.AgentKernEvt {
 func (pm *ProcessorManager) StopAll() error {
 	pm.cancel()
 	pm.wg.Wait()
-	common.DefaultLog.Debugln("All Processor Stopped!")
+	common.DefaultLog.Debugln("All Processor Stopped.")
 	return nil
 }
 
@@ -92,12 +92,13 @@ type Processor struct {
 	messageFilter protocol.ProtocolFilter
 	latencyFilter protocol.LatencyFilter
 	protocol.SizeFilter
-	side            common.SideEnum
-	recordProcessor *RecordsProcessor
+	side                        common.SideEnum
+	recordProcessor             *RecordsProcessor
+	conntrackCloseWaitTimeMills int
 }
 
 func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connManager *ConnManager, filter protocol.ProtocolFilter,
-	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum) *Processor {
+	latencyFilter protocol.LatencyFilter, sizeFilter protocol.SizeFilter, side common.SideEnum, conntrackCloseWaitTimeMills int) *Processor {
 	p := new(Processor)
 	p.wg = wg
 	p.ctx = ctx
@@ -114,6 +115,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.recordProcessor = &RecordsProcessor{
 		records: make([]RecordWithConn, 0),
 	}
+	p.conntrackCloseWaitTimeMills = conntrackCloseWaitTimeMills
 	return p
 }
 
@@ -164,7 +166,7 @@ func (p *Processor) run() {
 					conn.CloseTs = event.Ts + common.LaunchEpochTime
 				}
 				go func(c *Connection4) {
-					time.Sleep(1 * time.Second)
+					time.Sleep(time.Duration(p.conntrackCloseWaitTimeMills) * time.Millisecond)
 					c.OnClose(true)
 				}(conn)
 			} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
@@ -197,17 +199,23 @@ func (p *Processor) run() {
 				if isProtocolInterested && !isSideNotMatched(p, conn) {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
-							if common.ConntrackLog.Level >= logrus.DebugLevel {
-								common.ConntrackLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
+							if sysEvent.SyscallEvent.Ke.Ts > conn.ConnectStartTs {
+								if common.ConntrackLog.Level >= logrus.DebugLevel {
+									common.ConntrackLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
+								}
+								conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 							}
-							conn.OnSyscallEvent(sysEvent.Buf, sysEvent, recordChannel)
 						}
+						conn.TempConnEvents = conn.TempConnEvents[0:0]
 						for _, sslEvent := range conn.TempSslEvents {
-							if common.ConntrackLog.Level >= logrus.DebugLevel {
-								common.ConntrackLog.Debugf("%s process %d temp ssl events before infer\n", conn.ToString(), len(conn.TempSslEvents))
+							if sslEvent.SslEventHeader.Ke.Ts > conn.ConnectStartTs {
+								if common.ConntrackLog.Level >= logrus.DebugLevel {
+									common.ConntrackLog.Debugf("%s process %d temp ssl events before infer\n", conn.ToString(), len(conn.TempSslEvents))
+								}
+								conn.OnSslDataEvent(sslEvent.Buf, sslEvent, recordChannel)
 							}
-							conn.OnSslDataEvent(sslEvent.Buf, sslEvent, recordChannel)
 						}
+						conn.TempSslEvents = conn.TempSslEvents[0:0]
 						conn.UpdateConnectionTraceable(true)
 					}
 					conn.TempKernEvents = conn.TempKernEvents[0:0]
@@ -226,23 +234,22 @@ func (p *Processor) run() {
 				eventType = "close"
 			} else if event.ConnType == bpf.AgentConnTypeTKProtocolInfer {
 				eventType = "infer"
-				// 连接推断事件可以不上报
 			} else if event.ConnType == bpf.AgentConnTypeTKConnect {
 				conn.AddConnEvent(event)
 			}
 
 			if common.ConntrackLog.Level >= logrus.DebugLevel {
-				if event.ConnType == bpf.AgentConnTypeTKProtocolInfer && conn.ProtocolInferred() {
-					common.ConntrackLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
-				} else {
-					common.ConntrackLog.Debugf("[conn] %s | type: %s, protocol: %d, \n", conn.ToString(), eventType, conn.Protocol)
-				}
+				common.ConntrackLog.Debugf("[conn][ts=%d] %s | type: %s, protocol: %d, \n", event.Ts, conn.ToString(), eventType, conn.Protocol)
 			}
 		case event := <-p.syscallEvents:
 			tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.SyscallEvent.Ke.Ts+common.LaunchEpochTime)
 			event.SyscallEvent.Ke.Ts += common.LaunchEpochTime
 			if conn != nil && conn.Status == Closed {
+				conn.AddSyscallEvent(event)
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[syscall][closed conn][len=%d][ts=%d][fn=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, event.SyscallEvent.GetSourceFunction(), conn.ToString(), string(event.Buf))
+				}
 				continue
 			}
 			if conn != nil && !conn.tracable {
@@ -253,7 +260,7 @@ func (p *Processor) run() {
 			}
 			if conn != nil && conn.ProtocolInferred() {
 				if common.BPFEventLog.Level >= logrus.DebugLevel {
-					common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
+					common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d][fn=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, event.SyscallEvent.GetSourceFunction(), conn.ToString(), string(event.Buf))
 				}
 
 				conn.OnSyscallEvent(event.Buf, event, recordChannel)
@@ -277,9 +284,14 @@ func (p *Processor) run() {
 			conn := p.connManager.FindConnection4Or(tgidFd, event.SslEventHeader.Ke.Ts+common.LaunchEpochTime)
 			event.SslEventHeader.Ke.Ts += common.LaunchEpochTime
 			if conn != nil && conn.Status == Closed {
+				conn.AddSslEvent(event)
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[ssl][closed conn][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
+				}
 				continue
 			}
 			if conn != nil && !conn.tracable {
+				conn.AddSslEvent(event)
 				if common.BPFEventLog.Level >= logrus.DebugLevel {
 					common.BPFEventLog.Debugf("[ssl][no-trace][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
 				}
@@ -309,16 +321,14 @@ func (p *Processor) run() {
 		case event := <-p.kernEvents:
 			tgidFd := event.ConnIdS.TgidFd
 			conn := p.connManager.FindConnection4Or(tgidFd, event.Ts+common.LaunchEpochTime)
+			if conn != nil && conn.Status == Closed {
+				conn.AddKernEvent(event)
+				if common.BPFEventLog.Level >= logrus.DebugLevel {
+					common.BPFEventLog.Debugf("[closed conn]%s", FormatKernEvt(event, conn))
+				}
+				continue
+			}
 			event.Ts += common.LaunchEpochTime
-			// if conn != nil {
-			// 	common.BPFEventLog.Debugf("[data][func=%s][ts=%d][%s]%s | %d:%d flags:%s\n", common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
-			// 		conn.ToString(), event.Seq, event.Len,
-			// 		common.DisplayTcpFlags(event.Flags))
-			// } else {
-			// 	common.BPFEventLog.Debugf("[data no conn][tgid=%d fd=%d][func=%s][ts=%d][%s] | %d:%d flags:%s\n", tgidFd>>32, uint32(tgidFd), common.Int8ToStr(event.FuncName[:]), event.Ts, bpf.StepCNNames[event.Step],
-			// 		event.Seq, event.Len,
-			// 		common.DisplayTcpFlags(event.Flags))
-			// }
 			if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 				if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 					conn.OnKernEvent(event)
