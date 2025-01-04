@@ -312,6 +312,8 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 						if err != nil {
 							common.AgentLog.Errorf("Failed update  FilterPidMap: %s\n", err)
 						}
+					} else {
+						common.AgentLog.Debugf("Not matched: %d %s\n", execEvent.Pid, options.FilterComm)
 					}
 				}
 			}

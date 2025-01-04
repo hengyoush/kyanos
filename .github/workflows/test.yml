@@ -8,7 +8,7 @@ on:
     branches: [ "main", "dev","feature/*" ]
 
 env:
-  kyanos_log_option: --bpf-event-log-level 5 --conntrack-log-level 5
+  kyanos_log_option: --bpf-event-log-level 5 --conntrack-log-level 5 --agent-log-level 5
 
 permissions:
   contents: read
