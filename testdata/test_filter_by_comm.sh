@@ -23,9 +23,9 @@ function test_filter_by_server_comm() {
 # skip for https://github.com/hengyoush/kyanos/pull/222#issuecomment-2566106756
 function test_filter_by_client_comm() {
     # client start after kyanos
-    timeout 40 ${CMD} watch --debug-output http --comm https-request 2>&1 | tee "${AFTER_LNAME}" &
+    timeout 40 ${CMD} watch --debug-output http --comm curl 2>&1 | tee "${AFTER_LNAME}" &
     sleep 20
-    ./testdata/https-request/https-request 'http://ipinfo.io' 40 &>/dev/null || true
+    curl 'http://ipinfo.io'  &>/dev/null || true
     wait
 
     cat "${AFTER_LNAME}"
