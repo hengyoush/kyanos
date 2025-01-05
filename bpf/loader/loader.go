@@ -7,6 +7,7 @@ import (
 	"fmt"
 	ac "kyanos/agent/common"
 	"kyanos/agent/compatible"
+	"kyanos/agent/metadata"
 	"kyanos/agent/uprobe"
 	"kyanos/bpf"
 	"kyanos/common"
@@ -116,10 +117,13 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 	}
 	options.LoadPorgressChannel <- "🍓 Setup traffic filters"
 
-	bpf.PullProcessExitEvents(options.Ctx, []chan *bpf.AgentProcessExitEvent{initProcExitEventChannel(options.Ctx)})
-
 	return bf, nil
 }
+
+const (
+	execEventChannelBufferSize = 10
+	exitEventChannelBufferSize = 10
+)
 
 func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	var links *list.List
@@ -135,16 +139,10 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 
 	options.LoadPorgressChannel <- "🍆 Attached base eBPF programs."
 
+	bf.attachExecEventChannels(options)
+	bf.attachExitEventChannels(options)
 	if !options.DisableOpensslUprobe {
-		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, 10)
-		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
-		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedEventChannel}
-		if options.ProcessExecEventChannel != nil {
-			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
-		}
-		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
-
-		attachOpenSslUprobes(links, options, options.Kv, bf.Objs)
+		bf.attachOpenSslUprobes(links, options)
 		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
 	attachSchedProgs(links)
@@ -152,6 +150,34 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	options.LoadPorgressChannel <- "🥪 Attached conntrack eBPF programs."
 	bf.Links = links
 	return nil
+}
+
+func (bf *BPF) attachExecEventChannels(options *ac.AgentOptions) {
+	execEventChannels := []chan *bpf.AgentProcessExecEvent{}
+	execEventChannelForMetadata := make(chan *bpf.AgentProcessExecEvent, execEventChannelBufferSize)
+	execEventChannels = append(execEventChannels, execEventChannelForMetadata)
+	metadata.StartHandleSchedExecEvent(execEventChannelForMetadata, options.Ctx)
+	if !options.DisableOpensslUprobe {
+		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, execEventChannelBufferSize)
+		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
+		execEventChannels = append(execEventChannels, uprobeSchedEventChannel)
+		if options.ProcessExecEventChannel != nil {
+			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
+		}
+		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
+	}
+}
+
+func (bf *BPF) attachOpenSslUprobes(links *list.List, options *ac.AgentOptions) {
+	attachOpenSslUprobes(links, options, options.Kv, bf.Objs)
+}
+
+func (bf *BPF) attachExitEventChannels(options *ac.AgentOptions) {
+	exitEventChannels := []chan *bpf.AgentProcessExitEvent{}
+	exitEventChannelForMetadata := make(chan *bpf.AgentProcessExitEvent, exitEventChannelBufferSize)
+	metadata.StartHandleSchedExitEvent(exitEventChannelForMetadata, options.Ctx)
+	exitEventChannels = append(exitEventChannels, exitEventChannelForMetadata)
+	bpf.PullProcessExitEvents(options.Ctx, exitEventChannels)
 }
 
 // writeToFile writes the []uint8 slice to a specified file in the system's temp directory.

@@ -99,20 +99,28 @@ func addSocketBufferDiagram(duration int64, prevDiagram *diagrams.Shape, shapes 
 		Content: "",
 		Type:    arrowType,
 	}
-	connectFunc(prevDiagram, &lastNicToSocketArrow)
+	if prevDiagram != nil {
+		connectFunc(prevDiagram, &lastNicToSocketArrow)
+	}
 	socketBuffer := diagrams.Shape{
 		Content: fmt.Sprintf(" Socket(used:%.2fms) ",
 			c.ConvertDurationToMillisecondsIfNeeded(float64(duration), false)),
 		Type: diagrams.Rectangle,
 	}
-	connectFunc(&lastNicToSocketArrow, &socketBuffer)
+	if prevDiagram != nil {
+		connectFunc(&lastNicToSocketArrow, &socketBuffer)
+	}
 	socketToAppArrow := diagrams.Shape{
 		Content: "",
 		Type:    arrowType,
 	}
 	connectFunc(&socketBuffer, &socketToAppArrow)
 	defer func() {
-		*shapes = append(*shapes, &lastNicToSocketArrow, &socketBuffer)
+		if prevDiagram != nil {
+			*shapes = append(*shapes, &lastNicToSocketArrow, &socketBuffer)
+		} else {
+			*shapes = append(*shapes, &socketBuffer)
+		}
 	}()
 	return &socketToAppArrow
 }
@@ -121,7 +129,7 @@ func getFlowChartString(diagram *diagrams.Diagram) string {
 	s := diagrams.NewStore()
 	canvasRow := 200
 	canvas := draw.NewCanvas(canvasRow, canvasRow)
-	canvas.Cursor.X = canvasRow / 4
+	canvas.Cursor.X = calculateFirstComponentOffsetAtX(diagram)
 	c.DefaultLog.Debugf("shapes: %v", diagram.S)
 	for _, shape := range diagram.S {
 		c.DefaultLog.Debugf("shape: %v", shape)
@@ -169,6 +177,39 @@ func ViewRecordTimeDetailAsFlowChartForServer(r *common.AnnotatedRecord) string 
 		diagram.AddShapes(*shape)
 	}
 	return getFlowChartString(diagram)
+}
+
+func calculateFirstComponentOffsetAtX(diagram *diagrams.Diagram) (maxX int) {
+	upperX := 0
+	bottomX := 0
+	downArrowIndex := 0
+	// 1. find the down arrow
+	for i, shape := range diagram.S {
+		if shape.Type == diagrams.DownArrow {
+			downArrowIndex = i
+			break
+		}
+	}
+	for i, shape := range diagram.S {
+		if i < downArrowIndex {
+			if shape.Type > diagrams.HRectangle {
+				upperX += diagrams.ARROWLEN + 1
+			} else {
+				upperX += len(shape.Content)
+			}
+		} else if i > downArrowIndex {
+			if shape.Type > diagrams.HRectangle {
+				bottomX += diagrams.ARROWLEN + 1
+			} else {
+				bottomX += len(shape.Content)
+			}
+		}
+	}
+	if upperX > bottomX {
+		return len(diagram.S[0].Content) + 10
+	} else {
+		return bottomX - upperX + len(diagram.S[0].Content) + 10
+	}
 }
 
 func ViewRecordTimeDetailAsFlowChartForClientSide(r *common.AnnotatedRecord) string {

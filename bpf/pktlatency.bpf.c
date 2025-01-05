@@ -216,10 +216,6 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
  
 	if (conn_id_s == NULL || conn_id_s->no_trace) {
-		// if (key->sport==3306&& step == DEV_IN) {
-		// 	bpf_printk("discard!");
-		// 	print_sock_key(key);
-		// }
 		return;
 	}
 	uint64_t tgid_fd = conn_id_s->tgid_fd;
@@ -484,7 +480,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 					tcp_len -= ip_hdr_len;
 					BPF_CORE_READ_INTO(&proto_l4, ipv4, protocol);
 					l4 = ip + ip_hdr_len;
-					bpf_printk("ipipprotocol_l4:%d,len:%lld",proto_l4,_C(skb, len));//629
 				}
 			} else if (l3_proto == ETH_P_IPV6) {
 				proto_l4 = _(ipv6->nexthdr);
