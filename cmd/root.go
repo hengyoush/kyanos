@@ -90,6 +90,12 @@ func init() {
 			fmt.Sprintf("(default: uses in order the first successful one of [%s])",
 				strings.Join(getDefaultCriRuntimeEndpoint(), ", ")))
 
+	// pageNum of eBPF map
+	rootCmd.PersistentFlags().IntVar(&options.SyscallPerfEventMapPageNum, "syscall-perf-event-map-page-num", 2048, "pageNum of eBPF map size for syscall data events buffer")
+	rootCmd.PersistentFlags().IntVar(&options.SslPerfEventMapPageNum, "ssl-perf-event-map-page-num", 512, "pageNum of eBPF map size for ssl data events buffer")
+	rootCmd.PersistentFlags().IntVar(&options.ConnPerfEventMapPageNum, "conn-perf-event-map-page-num", 4, "pageNum of eBPF map size for conn data events buffer")
+	rootCmd.PersistentFlags().IntVar(&options.KernPerfEventMapPageNum, "kern-perf-event-map-page-num", 32, "pageNum of eBPF map size for kern events buffer")
+
 	// internal
 	rootCmd.PersistentFlags().BoolVar(&options.PerformanceMode, "performance-mode", true, "--performance false")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "kern-perf-event-buffer-size", 1*1024*1024, "--kern-perf-event-buffer-size 1024")
@@ -106,6 +112,10 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("data-perf-event-buffer-size")
 	rootCmd.PersistentFlags().MarkHidden("performance-mode")
 	rootCmd.PersistentFlags().MarkHidden("conntrack-close-wait-time-mills")
+	rootCmd.PersistentFlags().MarkHidden("syscall-perf-event-map-page-num")
+	rootCmd.PersistentFlags().MarkHidden("ssl-perf-event-map-page-num")
+	rootCmd.PersistentFlags().MarkHidden("conn-perf-event-map-page-num")
+	rootCmd.PersistentFlags().MarkHidden("kern-perf-event-map-page-num")
 
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false
