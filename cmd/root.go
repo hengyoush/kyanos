@@ -112,6 +112,10 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("data-perf-event-buffer-size")
 	rootCmd.PersistentFlags().MarkHidden("performance-mode")
 	rootCmd.PersistentFlags().MarkHidden("conntrack-close-wait-time-mills")
+	rootCmd.PersistentFlags().MarkHidden("syscall-perf-event-map-page-num")
+	rootCmd.PersistentFlags().MarkHidden("ssl-perf-event-map-page-num")
+	rootCmd.PersistentFlags().MarkHidden("conn-perf-event-map-page-num")
+	rootCmd.PersistentFlags().MarkHidden("kern-perf-event-map-page-num")
 
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false
