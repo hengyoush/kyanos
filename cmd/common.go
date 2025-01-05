@@ -71,6 +71,11 @@ func startAgent() {
 	options.ContainerName = ContainerName
 	options.PodName = PodName
 
+	options.SyscallMapSize = SyscallMapSize
+	options.SslMapSize = SslMapSize
+	options.ConnMapSize = ConnMapSize
+	options.KernMapSize = KernMapSize
+
 	InitLog()
 	common.AgentLog.Infoln("Kyanos starting...")
 	if viper.GetBool(common.DaemonVarName) {
