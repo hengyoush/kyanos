@@ -58,10 +58,6 @@ var CriRuntimeEndpoint string
 var ContainerId string
 var ContainerName string
 var PodName string
-var SyscallMapSize int
-var SslMapSize int
-var ConnMapSize int
-var KernMapSize int
 
 func init() {
 	rootCmd.PersistentFlags().StringSliceVarP(&FilterPids, "pids", "p", []string{}, "Filter by pids, seperate by ','")
@@ -94,11 +90,11 @@ func init() {
 			fmt.Sprintf("(default: uses in order the first successful one of [%s])",
 				strings.Join(getDefaultCriRuntimeEndpoint(), ", ")))
 
-	// mapsize
-	rootCmd.PersistentFlags().IntVar(&SyscallMapSize, "syscall-mapsize", 2048, "eBPF map size for syscall data events buffer. default:2048 * PAGESIZE.")
-	rootCmd.PersistentFlags().IntVar(&SslMapSize, "ssl-mapsize", 512, "eBPF map size for ssl data events buffer. default:512 * PAGESIZE.")
-	rootCmd.PersistentFlags().IntVar(&ConnMapSize, "conn-mapsize", 4, "eBPF map size for conn data events buffer. default:4 * PAGESIZE.")
-	rootCmd.PersistentFlags().IntVar(&KernMapSize, "kern-mapsize", 32, "eBPF map size for kern events buffer. default:32 * PAGESIZE.")
+	// pageNum of eBPF map
+	rootCmd.PersistentFlags().IntVar(&options.SyscallPerfEventMapPageNum, "syscall-perf-event-map-page-num", 2048, "pageNum of eBPF map size for syscall data events buffer")
+	rootCmd.PersistentFlags().IntVar(&options.SslPerfEventMapPageNum, "ssl-perf-event-map-page-num", 512, "pageNum of eBPF map size for ssl data events buffer")
+	rootCmd.PersistentFlags().IntVar(&options.ConnPerfEventMapPageNum, "conn-perf-event-map-page-num", 4, "pageNum of eBPF map size for conn data events buffer")
+	rootCmd.PersistentFlags().IntVar(&options.KernPerfEventMapPageNum, "kern-perf-event-map-page-num", 32, "pageNum of eBPF map size for kern events buffer")
 
 	// internal
 	rootCmd.PersistentFlags().BoolVar(&options.PerformanceMode, "performance-mode", true, "--performance false")

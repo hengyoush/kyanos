@@ -23,10 +23,6 @@ type ConnManagerInitHook func(*conn.ConnManager)
 
 const perfEventDataBufferSize = 30 * 1024 * 1024
 const perfEventControlBufferSize = 1 * 1024 * 1024
-const defaultSyscallMapSize = 2048
-const defaultSslMapSize = 512
-const defaultConnMapSize = 4
-const defaultKernMapSize = 32
 
 type AgentOptions struct {
 	Stopper                chan os.Signal
@@ -69,10 +65,10 @@ type AgentOptions struct {
 	Kv                  *compatible.KernelVersion
 	LoadPorgressChannel chan string
 
-	SyscallMapSize int
-	SslMapSize     int
-	ConnMapSize    int
-	KernMapSize    int
+	SyscallPerfEventMapPageNum int
+	SslPerfEventMapPageNum     int
+	ConnPerfEventMapPageNum    int
+	KernPerfEventMapPageNum    int
 }
 
 func (o AgentOptions) FilterByContainer() bool {
@@ -126,18 +122,6 @@ func ValidateAndRepairOptions(options AgentOptions) AgentOptions {
 	}
 	if newOptions.CriRuntimeEndpoint != "" {
 		newOptions.CriRuntimeEndpoint = getEndpoint(newOptions.CriRuntimeEndpoint)
-	}
-	if newOptions.SyscallMapSize == 0 {
-		newOptions.SyscallMapSize = defaultSyscallMapSize
-	}
-	if newOptions.SslMapSize == 0 {
-		newOptions.SslMapSize = defaultSslMapSize
-	}
-	if newOptions.ConnMapSize == 0 {
-		newOptions.ConnMapSize = defaultConnMapSize
-	}
-	if newOptions.KernMapSize == 0 {
-		newOptions.KernMapSize = defaultKernMapSize
 	}
 	newOptions.WatchOptions.Init()
 	newOptions.LoadPorgressChannel = make(chan string, 10)

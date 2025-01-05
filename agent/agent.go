@@ -112,19 +112,19 @@ func SetupAgent(options ac.AgentOptions) {
 		_bf.Links = bf.Links
 		_bf.Objs = bf.Objs
 
-		err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), options.SyscallMapSize, options.CustomSyscallEventHook)
+		err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), options.SyscallPerfEventMapPageNum, options.CustomSyscallEventHook)
 		if err != nil {
 			return
 		}
-		err = bpf.PullSslDataEvents(ctx, pm.GetSslEventsChannels(), options.SslMapSize, options.CustomSslEventHook)
+		err = bpf.PullSslDataEvents(ctx, pm.GetSslEventsChannels(), options.SslPerfEventMapPageNum, options.CustomSslEventHook)
 		if err != nil {
 			return
 		}
-		err = bpf.PullConnDataEvents(ctx, pm.GetConnEventsChannels(), options.ConnMapSize, options.CustomConnEventHook)
+		err = bpf.PullConnDataEvents(ctx, pm.GetConnEventsChannels(), options.ConnPerfEventMapPageNum, options.CustomConnEventHook)
 		if err != nil {
 			return
 		}
-		err = bpf.PullKernEvents(ctx, pm.GetKernEventsChannels(), options.KernMapSize, options.CustomKernEventHook)
+		err = bpf.PullKernEvents(ctx, pm.GetKernEventsChannels(), options.KernPerfEventMapPageNum, options.CustomKernEventHook)
 		if err != nil {
 			return
 		}
