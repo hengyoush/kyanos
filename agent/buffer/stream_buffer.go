@@ -128,7 +128,11 @@ func (sb *StreamBuffer) FindTimestampBySeq(targetSeq uint64) (uint64, bool) {
 	return value.(uint64), true
 }
 
-func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
+func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) bool {
+	_, found := sb.timestamps.Get(seq)
+	if found {
+		return false
+	}
 	dataLen := uint64(len(data))
 	newBuffer := &Buffer{
 		buf: data,
@@ -137,16 +141,16 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
 	if sb.IsEmpty() {
 		sb.updateTimestamp(seq, timestamp)
 		sb.buffers = append(sb.buffers, newBuffer)
-		return
+		return true
 	}
 	if sb.Position0()-int(seq) >= maxBytesGap {
-		return
+		return true
 	}
 	if int(seq)-sb.PositionN() >= maxBytesGap {
 		sb.Clear()
 		sb.buffers = append(sb.buffers, newBuffer)
 		sb.updateTimestamp(seq, timestamp)
-		return
+		return true
 	}
 
 	leftIndex, leftBuffer := sb.findLeftBufferBySeq(seq)
@@ -180,6 +184,7 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) {
 	}
 	sb.updateTimestamp(seq, timestamp)
 	sb.shrinkBufferUntilSizeBelowCapacity()
+	return true
 }
 
 func (sb *StreamBuffer) updateTimestamp(seq uint64, timestamp uint64) {

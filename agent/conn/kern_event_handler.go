@@ -7,6 +7,7 @@ import (
 	"kyanos/common"
 	"kyanos/monitor"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/jefurry/logrus"
@@ -85,7 +86,7 @@ func (s *KernEventStream) AddSyscallEvent(event *bpf.SyscallEventData) {
 	s.AddKernEvent(&event.SyscallEvent.Ke)
 }
 
-func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
+func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 	s.kernEventsMu.Lock()
 	defer s.kernEventsMu.Unlock()
 	s.discardEventsIfNeeded()
@@ -98,9 +99,24 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 		index, found := slices.BinarySearchFunc(kernEvtSlice, KernEvent{seq: event.Seq}, func(i KernEvent, j KernEvent) int {
 			return cmp.Compare(i.seq, j.seq)
 		})
+		isNicEvnt := event.Step == bpf.AgentStepTDEV_OUT || event.Step == bpf.AgentStepTDEV_IN
+
 		var kernEvent *KernEvent
 		if found {
-			kernEvent = &kernEvtSlice[index]
+			oldKernEvent := &kernEvtSlice[index]
+			if oldKernEvent.timestamp > event.Ts && !isNicEvnt {
+				// this is a duplicate event which belongs to a future conn
+				oldKernEvent.seq = event.Seq
+				oldKernEvent.len = int(event.Len)
+				oldKernEvent.timestamp = event.Ts
+				oldKernEvent.step = event.Step
+				kernEvent = oldKernEvent
+			} else if !isNicEvnt {
+				kernEvent = &kernEvtSlice[index]
+				return false
+			} else {
+				kernEvent = &kernEvtSlice[index]
+			}
 		} else {
 			kernEvent = &KernEvent{
 				seq:       event.Seq,
@@ -110,20 +126,22 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 			}
 		}
 
-		if event.Step == bpf.AgentStepTDEV_OUT || event.Step == bpf.AgentStepTDEV_IN {
+		if isNicEvnt {
 			if kernEvent.attributes == nil {
 				kernEvent.attributes = make(map[string]any)
 			}
-			ifname, err := common.GetInterfaceNameByIndex(int(event.Ifindex), int(event.ConnIdS.TgidFd>>32))
+			ifname, err := getInterfaceNameByIndex(int(event.Ifindex), int(event.ConnIdS.TgidFd>>32))
 			if err != nil {
 				ifname = "unknown"
 			}
-			kernEvent.UpdateIfTimestampAttr(ifname, int64(event.Ts))
-		} else if found {
-			return
-			// panic("found duplicate kern event on same seq")
+			updated := kernEvent.UpdateIfTimestampAttr(ifname, int64(event.Ts))
+			if !updated {
+				return false
+			}
 		}
-		kernEvtSlice = slices.Insert(kernEvtSlice, index, *kernEvent)
+		if !found {
+			kernEvtSlice = slices.Insert(kernEvtSlice, index, *kernEvent)
+		}
 		if len(kernEvtSlice) > s.maxLen {
 			if common.ConntrackLog.Level >= logrus.DebugLevel {
 				common.ConntrackLog.Debugf("kern event stream size: %d exceed maxLen", len(kernEvtSlice))
@@ -134,6 +152,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) {
 		}
 		s.kernEvents[event.Step] = kernEvtSlice
 	}
+	return true
 }
 
 func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []SslEvent {
@@ -289,8 +308,63 @@ func (kernevent *KernEvent) GetAttributes() map[string]any {
 	return kernevent.attributes
 }
 
-func (kernevent *KernEvent) UpdateIfTimestampAttr(ifname string, time int64) {
+func (kernevent *KernEvent) UpdateIfTimestampAttr(ifname string, time int64) bool {
+	if timestamp, ok := kernevent.attributes["time-"+ifname]; ok {
+		if ts, valid := timestamp.(int64); valid {
+			if ts < time {
+				return false
+			}
+		}
+	}
+
 	kernevent.attributes["time-"+ifname] = time
+	return true
+}
+
+func (kernevent *KernEvent) GetMaxIfItmestampAttr() (int64, string, bool) {
+	maxTimestamp := int64(0)
+	var maxIfname string
+	found := false
+	for key, value := range kernevent.attributes {
+		if strings.HasPrefix(key, "time-") {
+			if timestamp, ok := value.(int64); ok {
+				if timestamp > maxTimestamp {
+					maxTimestamp = timestamp
+					maxIfname = strings.TrimPrefix(key, "time-")
+					found = true
+				}
+			}
+		}
+	}
+	return maxTimestamp, maxIfname, found
+}
+
+func (kernevent *KernEvent) GetMinIfItmestampAttr() (int64, string, bool) {
+	minTimestamp := int64(^uint64(0) >> 1) // Max int64 value
+	var minIfname string
+	found := false
+	for key, value := range kernevent.attributes {
+		if strings.HasPrefix(key, "time-") {
+			if timestamp, ok := value.(int64); ok {
+				if timestamp < minTimestamp {
+					minTimestamp = timestamp
+					minIfname = strings.TrimPrefix(key, "time-")
+					found = true
+				}
+			}
+		}
+	}
+	return minTimestamp, minIfname, found
+}
+
+func (kernevent *KernEvent) GetTimestampByIfname(ifname string) (int64, bool) {
+	key := "time-" + ifname
+	if timestamp, ok := kernevent.attributes[key]; ok {
+		if ts, valid := timestamp.(int64); valid {
+			return ts, true
+		}
+	}
+	return 0, false
 }
 
 type SslEvent struct {

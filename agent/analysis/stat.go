@@ -181,7 +181,10 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		// because we could missed some nicIngressEvents, the total duration may be negative
 		annotatedRecord.StartTs = math.MaxUint64
 		if hasNicInEvents {
-			annotatedRecord.StartTs = min(events.nicIngressEvents[0].GetTimestamp(), annotatedRecord.StartTs)
+			nicInTimestamp, _, ok := events.nicIngressEvents[0].GetMinIfItmestampAttr()
+			if ok {
+				annotatedRecord.StartTs = min(uint64(nicInTimestamp), annotatedRecord.StartTs)
+			}
 		}
 		if hasTcpInEvents {
 			annotatedRecord.StartTs = min(events.tcpInEvents[0].GetTimestamp(), annotatedRecord.StartTs)
@@ -193,7 +196,10 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			annotatedRecord.StartTs = min(events.readSyscallEvents[0].GetTimestamp(), annotatedRecord.StartTs)
 		}
 		if hasDevOutEvents {
-			annotatedRecord.EndTs = events.devOutEvents[len(events.devOutEvents)-1].GetTimestamp()
+			devOutTimestamp, _, ok := events.devOutEvents[len(events.devOutEvents)-1].GetMaxIfItmestampAttr()
+			if ok {
+				annotatedRecord.EndTs = uint64(devOutTimestamp)
+			}
 		}
 		if connection.IsSsl() {
 			annotatedRecord.ReqPlainTextSize = events.ingressMessage.ByteSize()
@@ -221,12 +227,12 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.RespNicEventDetails = KernEventsToNicEventDetails(events.devOutEvents)
 	} else {
 		if hasWriteSyscallEvents {
-			annotatedRecord.StartTs = events.writeSyscallEvents[0].GetTimestamp()
+			annotatedRecord.StartTs = findMinTimestamp(events.writeSyscallEvents)
 		} else {
 			annotatedRecord.StartTs = events.egressMessage.TimestampNs()
 		}
 		if hasReadSyscallEvents {
-			annotatedRecord.EndTs = events.readSyscallEvents[len(events.readSyscallEvents)-1].GetTimestamp()
+			annotatedRecord.EndTs = findMaxTimestamp(events.readSyscallEvents)
 		} else {
 			annotatedRecord.EndTs = events.ingressMessage.TimestampNs()
 		}
@@ -242,7 +248,31 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			annotatedRecord.TotalDuration = float64(events.ingressMessage.TimestampNs()) - float64(events.egressMessage.TimestampNs())
 		}
 		if hasNicInEvents && hasDevOutEvents {
-			annotatedRecord.BlackBoxDuration = float64(events.nicIngressEvents[len(events.nicIngressEvents)-1].GetTimestamp()) - float64(events.devOutEvents[0].GetTimestamp())
+			nicIngressTimestamp := int64(0)
+			for _, nicIngressEvent := range events.nicIngressEvents {
+				_nicIngressTimestamp, _, ok := nicIngressEvent.GetMinIfItmestampAttr()
+				if ok {
+					nicIngressTimestamp = max(nicIngressTimestamp, _nicIngressTimestamp)
+				}
+			}
+
+			if nicIngressTimestamp != 0 {
+				nicEgressTimestamp := int64(math.MaxInt64)
+				for _, devOutEvent := range events.devOutEvents {
+					_nicEgressTimestamp, _, ok := devOutEvent.GetMaxIfItmestampAttr()
+					if ok {
+						nicEgressTimestamp = min(nicEgressTimestamp, _nicEgressTimestamp)
+					}
+				}
+				if nicEgressTimestamp != int64(math.MaxInt64) {
+					annotatedRecord.BlackBoxDuration = float64(nicIngressTimestamp) - float64(nicEgressTimestamp)
+				} else {
+					annotatedRecord.BlackBoxDuration = -1
+				}
+				nicEgressTimestamp++
+			} else {
+				annotatedRecord.BlackBoxDuration = -1
+			}
 		}
 		if (hasUserCopyEvents || hasReadSyscallEvents) && hasTcpInEvents {
 			var readFromEndTime float64
@@ -290,6 +320,22 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		recordsChannel <- annotatedRecord
 	}
 	return nil
+}
+
+func findMaxTimestamp(events []conn.KernEvent) uint64 {
+	var maxTimestamp uint64 = 0
+	for _, each := range events {
+		maxTimestamp = max(maxTimestamp, each.GetTimestamp())
+	}
+	return maxTimestamp
+}
+
+func findMinTimestamp(events []conn.KernEvent) uint64 {
+	var minTimestamp uint64 = math.MaxUint64
+	for _, each := range events {
+		minTimestamp = min(minTimestamp, each.GetTimestamp())
+	}
+	return minTimestamp
 }
 
 func KernEventsToEventDetails[K analysisCommon.PacketEventDetail | analysisCommon.SyscallEventDetail](kernEvents []conn.KernEvent) []K {
