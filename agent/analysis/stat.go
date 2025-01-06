@@ -185,14 +185,11 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			if ok {
 				annotatedRecord.StartTs = min(uint64(nicInTimestamp), annotatedRecord.StartTs)
 			}
-		}
-		if hasTcpInEvents {
+		} else if hasTcpInEvents {
 			annotatedRecord.StartTs = min(events.tcpInEvents[0].GetStartTs(), annotatedRecord.StartTs)
-		}
-		if hasUserCopyEvents {
+		} else if hasUserCopyEvents {
 			annotatedRecord.StartTs = min(events.userCopyEvents[0].GetStartTs(), annotatedRecord.StartTs)
-		}
-		if hasReadSyscallEvents {
+		} else if hasReadSyscallEvents {
 			annotatedRecord.StartTs = min(events.readSyscallEvents[0].GetStartTs(), annotatedRecord.StartTs)
 		}
 		if hasDevOutEvents {
@@ -211,7 +208,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		}
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
-			annotatedRecord.BlackBoxDuration = float64(events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetEndTs()) - float64(events.readSyscallEvents[0].GetStartTs())
+			annotatedRecord.BlackBoxDuration = float64(events.writeSyscallEvents[0].GetEndTs()) - float64(events.readSyscallEvents[0].GetEndTs())
 		} else {
 			annotatedRecord.BlackBoxDuration = float64(events.egressMessage.TimestampNs()) - float64(events.ingressMessage.TimestampNs())
 		}
