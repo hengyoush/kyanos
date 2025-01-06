@@ -385,13 +385,33 @@ func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 	}
 	return true
 }
+
+func getEventTimestamp(ke *bpf.AgentKernEvt, c *Connection4, isReq bool) uint64 {
+	side := c.Side()
+	if side == common.AllSide {
+		return ke.Ts + uint64(ke.TsDelta)
+	} else if side == common.ClientSide {
+		if isReq {
+			return ke.Ts
+		} else {
+			return ke.Ts + uint64(ke.TsDelta)
+		}
+	} else {
+		if isReq {
+			return ke.Ts + uint64(ke.TsDelta)
+		} else {
+			return ke.Ts
+		}
+	}
+}
+
 func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernEvt) bool {
 	addedToBuffer := false
 	isReq, _ := isReq(c, ke)
 	if isReq {
-		addedToBuffer = c.reqStreamBuffer.Add(ke.Seq, data, ke.Ts)
+		addedToBuffer = c.reqStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
 	} else {
-		addedToBuffer = c.respStreamBuffer.Add(ke.Seq, data, ke.Ts)
+		addedToBuffer = c.respStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
 	}
 	if !addedToBuffer {
 		return false

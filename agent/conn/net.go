@@ -1,7 +1,7 @@
 package conn
 
 import (
-	"errors"
+	"kyanos/agent/metadata"
 	"kyanos/common"
 	"os"
 	"os/exec"
@@ -26,7 +26,14 @@ func init() {
 }
 
 func getInterfaceNameByIndex(index int, pid int) (string, error) {
-	netnsName, found := netnsIDMap[strconv.FormatInt(common.GetNetworkNamespaceFromPid(pid), 10)]
+	var netnsId int64
+	pidInfo := metadata.GetPidInfo(pid)
+	if pidInfo.NetNS != 0 {
+		netnsId = pidInfo.NetNS
+	} else {
+		netnsId = common.GetNetworkNamespaceFromPid(pid)
+	}
+	netnsName, found := netnsIDMap[strconv.FormatInt(netnsId, 10)]
 	if !found {
 		netnsName = "default"
 	}
@@ -37,7 +44,7 @@ func getInterfaceNameByIndex(index int, pid int) (string, error) {
 			return ifName, nil
 		}
 	}
-	return "", errors.New("interface not found")
+	return strconv.Itoa(index), nil
 }
 
 func parseIpCmdLine(line string) (int, string, bool) {

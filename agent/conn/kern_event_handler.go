@@ -61,12 +61,13 @@ func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
 		return
 	}
 	sslEvents = slices.Insert(sslEvents, index, SslEvent{
-		Seq:       event.SslEventHeader.Ke.Seq,
-		KernSeq:   event.SslEventHeader.SyscallSeq,
-		Len:       int(event.SslEventHeader.Ke.Len),
-		KernLen:   int(event.SslEventHeader.SyscallLen),
-		Timestamp: event.SslEventHeader.Ke.Ts,
-		Step:      event.SslEventHeader.Ke.Step,
+		Seq:     event.SslEventHeader.Ke.Seq,
+		KernSeq: event.SslEventHeader.SyscallSeq,
+		Len:     int(event.SslEventHeader.Ke.Len),
+		KernLen: int(event.SslEventHeader.SyscallLen),
+		startTs: event.SslEventHeader.Ke.Ts,
+		tsDelta: event.SslEventHeader.Ke.TsDelta,
+		Step:    event.SslEventHeader.Ke.Step,
 	})
 	if len(sslEvents) > s.maxLen {
 		if common.ConntrackLog.Level >= logrus.DebugLevel {
@@ -104,11 +105,12 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 		var kernEvent *KernEvent
 		if found {
 			oldKernEvent := &kernEvtSlice[index]
-			if oldKernEvent.timestamp > event.Ts && !isNicEvnt {
+			if oldKernEvent.startTs > event.Ts && !isNicEvnt {
 				// this is a duplicate event which belongs to a future conn
 				oldKernEvent.seq = event.Seq
 				oldKernEvent.len = int(event.Len)
-				oldKernEvent.timestamp = event.Ts
+				oldKernEvent.startTs = event.Ts
+				oldKernEvent.tsDelta = event.TsDelta
 				oldKernEvent.step = event.Step
 				kernEvent = oldKernEvent
 			} else if !isNicEvnt {
@@ -119,10 +121,11 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 			}
 		} else {
 			kernEvent = &KernEvent{
-				seq:       event.Seq,
-				len:       int(event.Len),
-				timestamp: event.Ts,
-				step:      event.Step,
+				seq:     event.Seq,
+				len:     int(event.Len),
+				startTs: event.Ts,
+				tsDelta: event.TsDelta,
+				step:    event.Step,
 			}
 		}
 
@@ -283,7 +286,8 @@ func (s *KernEventStream) discardEventsBySeq(seq uint64, egress bool) {
 type KernEvent struct {
 	seq        uint64
 	len        int
-	timestamp  uint64
+	startTs    uint64
+	tsDelta    uint32
 	step       bpf.AgentStepT
 	attributes map[string]any
 }
@@ -296,8 +300,16 @@ func (kernevent *KernEvent) GetLen() int {
 	return kernevent.len
 }
 
-func (kernevent *KernEvent) GetTimestamp() uint64 {
-	return kernevent.timestamp
+func (kernevent *KernEvent) GetStartTs() uint64 {
+	return kernevent.startTs
+}
+
+func (kernevent *KernEvent) GetTsDelta() uint32 {
+	return kernevent.tsDelta
+}
+
+func (kernevent *KernEvent) GetEndTs() uint64 {
+	return kernevent.startTs + uint64(kernevent.tsDelta)
 }
 
 func (kernevent *KernEvent) GetStep() bpf.AgentStepT {
@@ -368,12 +380,21 @@ func (kernevent *KernEvent) GetTimestampByIfname(ifname string) (int64, bool) {
 }
 
 type SslEvent struct {
-	Seq       uint64
-	KernSeq   uint64
-	Len       int
-	KernLen   int
-	Timestamp uint64
-	Step      bpf.AgentStepT
+	Seq     uint64
+	KernSeq uint64
+	Len     int
+	KernLen int
+	startTs uint64
+	tsDelta uint32
+	Step    bpf.AgentStepT
+}
+
+func (s *SslEvent) GetStartTs() uint64 {
+	return s.startTs
+}
+
+func (s *SslEvent) GetEndTs() uint64 {
+	return s.startTs + uint64(s.tsDelta)
 }
 
 type TcpKernEvent struct {

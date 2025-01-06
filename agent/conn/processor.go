@@ -225,7 +225,7 @@ func (p *Processor) run() {
 				if isProtocolInterested && !isSideNotMatched(p, conn) {
 					if conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 						for _, sysEvent := range conn.TempSyscallEvents {
-							if conn.timeBoundCheck(sysEvent.SyscallEvent.Ke.Ts) {
+							if conn.timeBoundCheck(sysEvent.SyscallEvent.GetEndTs()) {
 								if common.ConntrackLog.Level >= logrus.DebugLevel {
 									common.ConntrackLog.Debugf("%s process %d temp syscall events before infer\n", conn.ToString(), len(conn.TempSyscallEvents))
 								}
@@ -234,7 +234,7 @@ func (p *Processor) run() {
 						}
 						conn.TempSyscallEvents = conn.TempSyscallEvents[0:0]
 						for _, sslEvent := range conn.TempSslEvents {
-							if conn.timeBoundCheck(sslEvent.SslEventHeader.Ke.Ts) {
+							if conn.timeBoundCheck(sslEvent.SslEventHeader.GetEndTs()) {
 								if common.ConntrackLog.Level >= logrus.DebugLevel {
 									common.ConntrackLog.Debugf("%s process %d temp ssl events before infer\n", conn.ToString(), len(conn.TempSslEvents))
 								}
@@ -397,10 +397,10 @@ func (p *Processor) processOldSyscallEvents(recordChannel chan RecordWithConn) {
 
 func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChannel chan RecordWithConn) {
 	tgidFd := event.SyscallEvent.Ke.ConnIdS.TgidFd
-	conn := p.connManager.LookupConnection4ByTimestamp(tgidFd, event.SyscallEvent.Ke.Ts+common.LaunchEpochTime)
 	event.SyscallEvent.Ke.Ts += common.LaunchEpochTime
+	conn := p.connManager.LookupConnection4ByTimestamp(tgidFd, event.SyscallEvent.GetEndTs())
 
-	timeCheck := conn != nil && conn.timeBoundCheck(event.SyscallEvent.Ke.Ts)
+	timeCheck := conn != nil && conn.timeBoundCheck(event.SyscallEvent.GetEndTs())
 
 	if conn != nil && conn.Status == Closed {
 		if timeCheck {
@@ -473,9 +473,9 @@ func (p *Processor) processOldSslEvents(recordChannel chan RecordWithConn) {
 
 func (p *Processor) processSslEvent(event *bpf.SslData, recordChannel chan RecordWithConn) {
 	tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
-	conn := p.connManager.LookupConnection4ByTimestamp(tgidFd, event.SslEventHeader.Ke.Ts+common.LaunchEpochTime)
 	event.SslEventHeader.Ke.Ts += common.LaunchEpochTime
-	timeCheck := conn != nil && conn.timeBoundCheck(event.SslEventHeader.Ke.Ts)
+	conn := p.connManager.LookupConnection4ByTimestamp(tgidFd, event.SslEventHeader.GetEndTs())
+	timeCheck := conn != nil && conn.timeBoundCheck(event.SslEventHeader.GetEndTs())
 	if conn != nil && conn.Status == Closed {
 		if timeCheck {
 			conn.OnSslDataEvent(event.Buf, event, recordChannel)

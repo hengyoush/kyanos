@@ -130,7 +130,7 @@ static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
 	return conn_info->protocol != kProtocolUnknown && !conn_info->no_trace;
 }
 
-static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, enum source_function_t source_fn) {
+static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, uint32_t ts_delta, enum source_function_t source_fn) {
 	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
 		return;
@@ -148,6 +148,7 @@ static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t 
 	evt->ke.func_name[0] = (char)source_fn;
 	if (ts != 0) {
 		evt->ke.ts = ts;
+		evt->ke.ts_delta = ts_delta;
 	} else {
 		evt->ke.ts = bpf_ktime_get_ns();
 	}
@@ -156,7 +157,7 @@ static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t 
 	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t);
 	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
 }
-static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn) {
+static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, uint32_t ts_delta, const char* buf, enum source_function_t source_fn) {
 	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
 		return;
@@ -174,6 +175,7 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	evt->ke.func_name[0] = (char)source_fn;
 	if (ts != 0) {
 		evt->ke.ts = ts;
+		evt->ke.ts_delta = ts_delta;
 	} else {
 		evt->ke.ts = bpf_ktime_get_ns();
 	}
@@ -195,10 +197,10 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
 }
 static void __always_inline report_syscall_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args) {
-	report_syscall_buf(ctx, seq, conn_id_s, len, step, args->ts, args->buf, args->source_fn);
+	report_syscall_buf(ctx, seq, conn_id_s, len, step, args->start_ts, args->end_ts - args->start_ts, args->buf, args->source_fn);
 }
 
-static void __always_inline report_ssl_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, const char* buf, enum source_function_t source_fn, uint32_t syscall_seq, uint32_t syscall_len) {
+static void __always_inline report_ssl_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, uint32_t ts_delta, const char* buf, enum source_function_t source_fn, uint32_t syscall_seq, uint32_t syscall_len) {
 	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
 		return;
@@ -215,6 +217,7 @@ static void __always_inline report_ssl_buf(void* ctx, uint64_t seq, struct conn_
 	evt->ke.step = step;
 	if (ts != 0) {
 		evt->ke.ts = ts;
+		evt->ke.ts_delta = ts_delta;
 	} else {
 		evt->ke.ts = bpf_ktime_get_ns();
 	}
@@ -238,7 +241,7 @@ static void __always_inline report_ssl_buf(void* ctx, uint64_t seq, struct conn_
 	bpf_perf_event_output(ctx, &ssl_rb, BPF_F_CURRENT_CPU, evt, __len);
 }
 static void __always_inline report_ssl_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args, uint32_t syscall_seq, uint32_t syscall_len) {
-	report_ssl_buf(ctx, seq, conn_id_s, len, step, args->ts, args->buf, args->source_fn, syscall_seq, syscall_len);
+	report_ssl_buf(ctx, seq, conn_id_s, len, step, args->start_ts, args->end_ts - args->start_ts, args->buf, args->source_fn, syscall_seq, syscall_len);
 }
 static void __always_inline report_syscall_evt_vecs(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t total_size, enum step_t step, struct data_args *args) {
 	int bytes_sent = 0;
@@ -248,7 +251,7 @@ static void __always_inline report_syscall_evt_vecs(void* ctx, uint64_t seq, str
 		bpf_probe_read_user(&iov_cpy, sizeof(iov_cpy), &args->iov[i]);
 		const int bytes_remaining = total_size - bytes_sent;
 		const size_t iov_size = iov_cpy.iov_len < bytes_remaining ? iov_cpy.iov_len : bytes_remaining;
-		report_syscall_buf(ctx, seq, conn_id_s, iov_size, step, args->ts, iov_cpy.iov_base, args->source_fn);
+		report_syscall_buf(ctx, seq, conn_id_s, iov_size, step, args->start_ts, args->end_ts - args->start_ts, iov_cpy.iov_base, args->source_fn);
 		bytes_sent += iov_size;
 		seq += iov_size;
 	}
@@ -272,9 +275,10 @@ static __always_inline void process_sendfile_with_conn_info(void* ctx, struct se
 		step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 	}
 	if (conn_info->protocol != kProtocolUnknown && (!conn_info->no_trace)) {//, bytes_count
-		report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->ts, kSyscallSendfile);
+		report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->start_ts, args->end_ts - args->start_ts, kSyscallSendfile);
 	}
- }
+}
+
 static __always_inline void process_syscall_data_with_conn_info(void* ctx, struct data_args *args, uint64_t tgid_fd,
  enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, int32_t syscall_len, bool is_ssl, bool with_data) {
 	bool inferred = false;
@@ -317,7 +321,7 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		} else if (with_data) {
 			report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
 		} else {
-			report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->ts, args->source_fn);
+			report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->start_ts, args->end_ts - args->start_ts, args->source_fn);
 		}
 	}
 }

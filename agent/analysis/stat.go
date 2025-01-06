@@ -187,13 +187,13 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			}
 		}
 		if hasTcpInEvents {
-			annotatedRecord.StartTs = min(events.tcpInEvents[0].GetTimestamp(), annotatedRecord.StartTs)
+			annotatedRecord.StartTs = min(events.tcpInEvents[0].GetStartTs(), annotatedRecord.StartTs)
 		}
 		if hasUserCopyEvents {
-			annotatedRecord.StartTs = min(events.userCopyEvents[0].GetTimestamp(), annotatedRecord.StartTs)
+			annotatedRecord.StartTs = min(events.userCopyEvents[0].GetStartTs(), annotatedRecord.StartTs)
 		}
 		if hasReadSyscallEvents {
-			annotatedRecord.StartTs = min(events.readSyscallEvents[0].GetTimestamp(), annotatedRecord.StartTs)
+			annotatedRecord.StartTs = min(events.readSyscallEvents[0].GetStartTs(), annotatedRecord.StartTs)
 		}
 		if hasDevOutEvents {
 			devOutTimestamp, _, ok := events.devOutEvents[len(events.devOutEvents)-1].GetMaxIfItmestampAttr()
@@ -211,15 +211,15 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		}
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
-			annotatedRecord.BlackBoxDuration = float64(events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetTimestamp()) - float64(events.readSyscallEvents[0].GetTimestamp())
+			annotatedRecord.BlackBoxDuration = float64(events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetEndTs()) - float64(events.readSyscallEvents[0].GetStartTs())
 		} else {
 			annotatedRecord.BlackBoxDuration = float64(events.egressMessage.TimestampNs()) - float64(events.ingressMessage.TimestampNs())
 		}
 		if hasUserCopyEvents && hasTcpInEvents {
-			annotatedRecord.ReadFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp()) - float64(events.tcpInEvents[0].GetTimestamp())
+			annotatedRecord.ReadFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetStartTs()) - float64(events.tcpInEvents[0].GetStartTs())
 		}
 		if hasTcpInEvents && hasNicInEvents {
-			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetTimestamp() - events.nicIngressEvents[0].GetTimestamp())
+			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetStartTs() - events.nicIngressEvents[0].GetStartTs())
 		}
 		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.readSyscallEvents)
 		annotatedRecord.RespSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.writeSyscallEvents)
@@ -227,12 +227,12 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.RespNicEventDetails = KernEventsToNicEventDetails(events.devOutEvents)
 	} else {
 		if hasWriteSyscallEvents {
-			annotatedRecord.StartTs = findMinTimestamp(events.writeSyscallEvents)
+			annotatedRecord.StartTs = findMinTimestamp(events.writeSyscallEvents, true)
 		} else {
 			annotatedRecord.StartTs = events.egressMessage.TimestampNs()
 		}
 		if hasReadSyscallEvents {
-			annotatedRecord.EndTs = findMaxTimestamp(events.readSyscallEvents)
+			annotatedRecord.EndTs = findMaxTimestamp(events.readSyscallEvents, false)
 		} else {
 			annotatedRecord.EndTs = events.ingressMessage.TimestampNs()
 		}
@@ -277,14 +277,14 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		if (hasUserCopyEvents || hasReadSyscallEvents) && hasTcpInEvents {
 			var readFromEndTime float64
 			if hasUserCopyEvents {
-				readFromEndTime = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetTimestamp())
+				readFromEndTime = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetStartTs())
 			} else {
-				readFromEndTime = float64(events.readSyscallEvents[len(events.readSyscallEvents)-1].GetTimestamp())
+				readFromEndTime = float64(events.readSyscallEvents[len(events.readSyscallEvents)-1].GetEndTs())
 			}
-			annotatedRecord.ReadFromSocketBufferDuration = readFromEndTime - float64(events.tcpInEvents[0].GetTimestamp())
+			annotatedRecord.ReadFromSocketBufferDuration = readFromEndTime - float64(events.tcpInEvents[0].GetStartTs())
 		}
 		if hasTcpInEvents && hasNicInEvents {
-			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetTimestamp() - events.nicIngressEvents[0].GetTimestamp())
+			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetStartTs() - events.nicIngressEvents[0].GetStartTs())
 		}
 		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.writeSyscallEvents)
 		annotatedRecord.RespSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.readSyscallEvents)
@@ -322,18 +322,26 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 	return nil
 }
 
-func findMaxTimestamp(events []conn.KernEvent) uint64 {
+func findMaxTimestamp(events []conn.KernEvent, useStartTs bool) uint64 {
 	var maxTimestamp uint64 = 0
 	for _, each := range events {
-		maxTimestamp = max(maxTimestamp, each.GetTimestamp())
+		if useStartTs {
+			maxTimestamp = max(maxTimestamp, each.GetStartTs())
+		} else {
+			maxTimestamp = max(maxTimestamp, each.GetEndTs())
+		}
 	}
 	return maxTimestamp
 }
 
-func findMinTimestamp(events []conn.KernEvent) uint64 {
+func findMinTimestamp(events []conn.KernEvent, useStartTs bool) uint64 {
 	var minTimestamp uint64 = math.MaxUint64
 	for _, each := range events {
-		minTimestamp = min(minTimestamp, each.GetTimestamp())
+		if useStartTs {
+			minTimestamp = min(minTimestamp, each.GetStartTs())
+		} else {
+			minTimestamp = min(minTimestamp, each.GetEndTs())
+		}
 	}
 	return minTimestamp
 }
@@ -346,7 +354,7 @@ func KernEventsToEventDetails[K analysisCommon.PacketEventDetail | analysisCommo
 	for _, each := range kernEvents {
 		result = append(result, K{
 			ByteSize:  each.GetLen(),
-			Timestamp: each.GetTimestamp(),
+			Timestamp: each.GetStartTs(),
 		})
 	}
 	return result
@@ -361,7 +369,7 @@ func KernEventsToNicEventDetails(kernEvents []conn.KernEvent) []analysisCommon.N
 			PacketEventDetail: analysisCommon.PacketEventDetail{
 
 				ByteSize:  each.GetLen(),
-				Timestamp: each.GetTimestamp(),
+				Timestamp: each.GetStartTs(),
 			},
 			Attributes: each.GetAttributes(),
 		})
