@@ -25,4 +25,5 @@ type RocketMQMessage struct {
 var _ protocol.ProtocolStreamParser = &RocketMQStreamParser{}
 
 type RocketMQStreamParser struct {
+	requestOpaqueMap map[int32]struct{}
 }

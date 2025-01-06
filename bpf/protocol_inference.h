@@ -137,7 +137,7 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
   bpf_probe_read_user(&frame_size, sizeof(int32_t), old_buf);
   frame_size = bpf_ntohl(frame_size);
 
-  if (frame_size <= 0 || frame_size > 64 * 1024 * 1024) {
+  if (frame_size <= 0 || frame_size > (count - 4)) {
     return kUnknown;
   }
 
@@ -152,7 +152,7 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
 
   int32_t header_data_len = header_length & 0xFFFFFF;
   // bpf_printk("header_data_len : %d", header_data_len);
-  if (header_data_len <= 0 || header_data_len > count - 8) {
+  if (header_data_len <= 0 || header_data_len != (frame_size - 4)) {
     return kUnknown;
   }
 
