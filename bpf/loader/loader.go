@@ -141,6 +141,7 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 
 	bf.attachExecEventChannels(options)
 	bf.attachExitEventChannels(options)
+
 	if !options.DisableOpensslUprobe {
 		bf.attachOpenSslUprobes(links, options)
 		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."

@@ -72,6 +72,13 @@ func (pm *ProcessorManager) GetKernEventsChannels() []chan *bpf.AgentKernEvt {
 	}
 	return channels
 }
+func (pm *ProcessorManager) GetFirstPacketEventsChannels() []chan *agentKernEvtWithConn {
+	var channels []chan *agentKernEvtWithConn = make([]chan *agentKernEvtWithConn, 0)
+	for _, each := range pm.processors {
+		channels = append(channels, each.firstPacketsEvents)
+	}
+	return channels
+}
 
 func (pm *ProcessorManager) StopAll() error {
 	pm.cancel()
@@ -81,16 +88,17 @@ func (pm *ProcessorManager) StopAll() error {
 }
 
 type Processor struct {
-	wg            *sync.WaitGroup
-	ctx           context.Context
-	connManager   *ConnManager
-	connEvents    chan *bpf.AgentConnEvtT
-	syscallEvents chan *bpf.SyscallEventData
-	sslEvents     chan *bpf.SslData
-	kernEvents    chan *bpf.AgentKernEvt
-	name          string
-	messageFilter protocol.ProtocolFilter
-	latencyFilter protocol.LatencyFilter
+	wg                 *sync.WaitGroup
+	ctx                context.Context
+	connManager        *ConnManager
+	connEvents         chan *bpf.AgentConnEvtT
+	syscallEvents      chan *bpf.SyscallEventData
+	sslEvents          chan *bpf.SslData
+	kernEvents         chan *bpf.AgentKernEvt
+	firstPacketsEvents chan *agentKernEvtWithConn
+	name               string
+	messageFilter      protocol.ProtocolFilter
+	latencyFilter      protocol.LatencyFilter
 	protocol.SizeFilter
 	side                        common.SideEnum
 	recordProcessor             *RecordsProcessor
@@ -98,10 +106,16 @@ type Processor struct {
 	tempKernEvents              []TimedEvent
 	tempSyscallEvents           []TimedSyscallEvent
 	tempSslEvents               []TimedSslEvent
+	tempFirstPacketEvents       []TimedFirstPacketEvent
 }
 
 type TimedEvent struct {
 	event     *bpf.AgentKernEvt
+	timestamp time.Time
+}
+
+type TimedFirstPacketEvent struct {
+	event     *agentKernEvtWithConn
 	timestamp time.Time
 }
 
@@ -125,6 +139,7 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.syscallEvents = make(chan *bpf.SyscallEventData)
 	p.sslEvents = make(chan *bpf.SslData)
 	p.kernEvents = make(chan *bpf.AgentKernEvt)
+	p.firstPacketsEvents = make(chan *agentKernEvtWithConn)
 	p.name = name
 	p.messageFilter = filter
 	p.latencyFilter = latencyFilter
@@ -136,7 +151,8 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 	p.conntrackCloseWaitTimeMills = conntrackCloseWaitTimeMills
 	p.tempKernEvents = make([]TimedEvent, 0, 100)           // Preallocate with a capacity of 100
 	p.tempSyscallEvents = make([]TimedSyscallEvent, 0, 100) // Preallocate with a capacity of 100
-	p.tempSslEvents = make([]TimedSslEvent, 0, 100)         // Preallocate with a capacity of 100
+	p.tempFirstPacketEvents = make([]TimedFirstPacketEvent, 0, 100)
+	p.tempSslEvents = make([]TimedSslEvent, 0, 100) // Preallocate with a capacity of 100
 	return p
 }
 
@@ -282,12 +298,47 @@ func (p *Processor) run() {
 			p.handleSslEvent(event, recordChannel)
 		case event := <-p.kernEvents:
 			p.handleKernEvent(event, recordChannel)
+		case event := <-p.firstPacketsEvents:
+			p.handleFirstPacketEvent(event, recordChannel)
 		case <-ticker.C:
 			p.processTimedKernEvents(recordChannel)
 			p.processTimedSyscallEvents(recordChannel)
 			p.processTimedSslEvents(recordChannel)
+			p.processOldFirstPacketEvents(recordChannel)
 		}
 	}
+}
+
+func (p *Processor) handleFirstPacketEvent(event *agentKernEvtWithConn, recordChannel chan RecordWithConn) {
+	// Add event to the temporary queue
+	p.tempFirstPacketEvents = append(p.tempFirstPacketEvents, TimedFirstPacketEvent{event: event, timestamp: time.Now()})
+	// Process events in the queue that have been there for more than 100ms
+	p.processOldFirstPacketEvents(recordChannel)
+}
+
+func (p *Processor) processTimedFirstPacketEvents(recordChannel chan RecordWithConn) {
+	p.processOldFirstPacketEvents(recordChannel)
+}
+
+func (p *Processor) processOldFirstPacketEvents(recordChannel chan RecordWithConn) {
+	now := time.Now()
+	lastIndex := 0
+	for i := 0; i < len(p.tempFirstPacketEvents); i++ {
+		if now.Sub(p.tempFirstPacketEvents[i].timestamp) > 100*time.Millisecond {
+			p.processFirstPacketEvent(p.tempFirstPacketEvents[i].event, recordChannel)
+			lastIndex = i + 1
+		} else {
+			break
+		}
+	}
+	p.tempFirstPacketEvents = p.tempFirstPacketEvents[lastIndex:]
+}
+
+func (p *Processor) processFirstPacketEvent(event *agentKernEvtWithConn, recordChannel chan RecordWithConn) {
+	// log
+	event.Ts += common.LaunchEpochTime
+	common.BPFEventLog.Debugf("[first-packet]%s", FormatKernEvt(event.AgentKernEvt, event.Connection4))
+	event.Connection4.OnKernEvent(event.AgentKernEvt)
 }
 
 func (p *Processor) handleKernEvent(event *bpf.AgentKernEvt, recordChannel chan RecordWithConn) {

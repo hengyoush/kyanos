@@ -17,6 +17,7 @@
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 const struct in6_addr *in6_addr_unused __attribute__((unused));
+const struct first_packet_evt *first_packet_evt_unused __attribute__((unused));
 const struct kern_evt *kern_evt_unused __attribute__((unused));
 const struct kern_evt_ssl_data *kern_evt_ssl_data_unused __attribute__((unused));
 const struct conn_evt_t *conn_evt_t_unused __attribute__((unused));
@@ -206,46 +207,59 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	int len = param->len;
 	const char *func_name = param->func_name;
 	enum step_t step = param->step;
-	// struct kern_evt _evt = {0};
-	// struct kern_evt* evt = &_evt;
-
+	
 	int zero = 0;
-	struct kern_evt* evt = bpf_map_lookup_elem(&kern_evt_t_map, &zero);
-	if(!evt) {
-		return;
-	}
-	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
- 
-	if (conn_id_s == NULL || conn_id_s->no_trace) {
-		return;
-	}
-	uint64_t tgid_fd = conn_id_s->tgid_fd;
-	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
-	if (conn_info == NULL || conn_info->protocol == kProtocolUnknown) {
-		return;
-	}
 
-	bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
 	u32 tcpseq = 0;
 	BPF_CORE_READ_INTO(&tcpseq, tcp, seq);
 	tcpseq  = bpf_htonl(tcpseq);
-	evt->seq = (uint64_t)(tcpseq - seq); 
-	// evt->tcp_seq = bpf_ntohl(_(tcp->seq));
+	uint64_t relative_seq = (uint64_t)(tcpseq - seq); 
+
+	
 	u32 doff = 0;
 	bpf_probe_read_kernel(&doff, sizeof(doff), (void*)tcp + 12);
 	doff = (doff&255) >> 4;
 	u64 hdr_len = doff << 2;
-	evt->len = len - hdr_len;
-	evt->ts = bpf_ktime_get_ns();
-	evt->ts_delta = 0;
-	evt->step = step;
-	evt->ifindex = param->ifindex;
-	// evt->flags = _(((u8 *)tcp)[13]);
-	bpf_probe_read_kernel(&evt->flags, sizeof(uint8_t), &(((u8 *)tcp)[13]));
-	// bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
-	// my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
-
-	bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt));
+	uint32_t len_minus_hdr = len - hdr_len;
+	
+	bool has_conn_info = true;
+	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
+	has_conn_info = conn_id_s != NULL && !conn_id_s->no_trace;
+	// if (has_conn_info) {
+	// 	uint64_t tgid_fd = conn_id_s->tgid_fd;
+	// 	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+	// 	if (conn_info == NULL || conn_info->protocol == kProtocolUnknown) {
+	// 		return;
+	// 	}
+	// }
+	if (has_conn_info) {
+		struct kern_evt* evt = bpf_map_lookup_elem(&kern_evt_t_map, &zero);
+		if(!evt) {
+			return;
+		}
+		evt->seq = relative_seq; 
+		evt->len = len_minus_hdr;
+		evt->ts = bpf_ktime_get_ns();
+		evt->ts_delta = 0;
+		evt->step = step;
+		evt->ifindex = param->ifindex;
+		bpf_probe_read_kernel(&evt->flags, sizeof(uint8_t), &(((u8 *)tcp)[13]));
+		bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
+		bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt));
+	} else if (relative_seq == 1 && len_minus_hdr > 0) {
+		// fist packet
+		struct first_packet_evt* evt = bpf_map_lookup_elem(&first_packet_evt_map, &zero);
+		if(!evt) {
+			return;
+		}
+		evt->ts = bpf_ktime_get_ns();
+		evt->step = step;
+		evt->len = len_minus_hdr;
+		evt->key = *key;
+		evt->ifindex = param->ifindex;
+		bpf_probe_read_kernel(&evt->flags, sizeof(uint8_t), &(((u8 *)tcp)[13]));
+		bpf_perf_event_output(ctx, &first_packet_rb, BPF_F_CURRENT_CPU, evt, sizeof(struct first_packet_evt));
+	} 
 }
 
 #define DEBUG 0
@@ -841,6 +855,7 @@ MY_BPF_HASH(accept_args_map, uint64_t, struct accept_args)
 MY_BPF_HASH(connect_args_map, uint64_t, struct connect_args)
 MY_BPF_HASH(close_args_map, uint64_t, struct close_args)
 MY_BPF_HASH(write_args_map, uint64_t, struct data_args)
+MY_BPF_HASH(active_sendfile_args_map, uint64_t, struct sendfile_args)
 MY_BPF_HASH(read_args_map, uint64_t, struct data_args)
 MY_BPF_HASH(enabled_remote_port_map, uint16_t, uint8_t)
 MY_BPF_HASH(enabled_local_port_map, uint16_t, uint8_t)

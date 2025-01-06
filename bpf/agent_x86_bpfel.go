@@ -98,6 +98,16 @@ const (
 	AgentEndpointRoleTKRoleUnknown AgentEndpointRoleT = 4
 )
 
+type AgentFirstPacketEvt struct {
+	Ts      uint64
+	Len     uint32
+	Flags   uint8
+	_       [3]byte
+	Ifindex uint32
+	Step    AgentStepT
+	Key     AgentSockKey
+}
+
 type AgentIn6Addr struct{ In6U struct{ U6Addr8 [16]uint8 } }
 
 type AgentKernEvt struct {
@@ -328,6 +338,8 @@ type AgentMapSpecs struct {
 	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
+	FirstPacketEvtMap     *ebpf.MapSpec `ebpf:"first_packet_evt_map"`
+	FirstPacketRb         *ebpf.MapSpec `ebpf:"first_packet_rb"`
 	GoCommonSymaddrsMap   *ebpf.MapSpec `ebpf:"go_common_symaddrs_map"`
 	GoSslUserSpaceCallMap *ebpf.MapSpec `ebpf:"go_ssl_user_space_call_map"`
 	KernEvtT_map          *ebpf.MapSpec `ebpf:"kern_evt_t_map"`
@@ -383,6 +395,8 @@ type AgentMaps struct {
 	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
+	FirstPacketEvtMap     *ebpf.Map `ebpf:"first_packet_evt_map"`
+	FirstPacketRb         *ebpf.Map `ebpf:"first_packet_rb"`
 	GoCommonSymaddrsMap   *ebpf.Map `ebpf:"go_common_symaddrs_map"`
 	GoSslUserSpaceCallMap *ebpf.Map `ebpf:"go_ssl_user_space_call_map"`
 	KernEvtT_map          *ebpf.Map `ebpf:"kern_evt_t_map"`
@@ -421,6 +435,8 @@ func (m *AgentMaps) Close() error {
 		m.FilterNetnsMap,
 		m.FilterPidMap,
 		m.FilterPidnsMap,
+		m.FirstPacketEvtMap,
+		m.FirstPacketRb,
 		m.GoCommonSymaddrsMap,
 		m.GoSslUserSpaceCallMap,
 		m.KernEvtT_map,

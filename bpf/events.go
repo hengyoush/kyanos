@@ -307,6 +307,58 @@ func parseConnEvent(record []byte) (*AgentConnEvtT, error) {
 	return &event, nil
 }
 
+func PullFirstPacketEvents(ctx context.Context, channel chan *AgentFirstPacketEvt, perfCPUBufferPageNum int) error {
+	pageSize := os.Getpagesize()
+	perCPUBuffer := pageSize * perfCPUBufferPageNum
+	eventSize := int(unsafe.Sizeof(AgentFirstPacketEvt{}))
+	if eventSize >= perCPUBuffer {
+		perCPUBuffer = perCPUBuffer * (1 + (eventSize / perCPUBuffer))
+	}
+	reader, err := perf.NewReader(GetMapFromObjs(Objs, "FirstPacketRb"), perCPUBuffer)
+	if err == nil {
+		go func(*perf.Reader) {
+			defer reader.Close()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				record, err := reader.Read()
+				if err != nil {
+					if errors.Is(err, perf.ErrClosed) {
+						common.BPFLog.Debug("[firstPacketReader] Received signal, exiting..")
+						return
+					}
+					common.BPFLog.Debugf("[firstPacketReader] reading from reader: %s\n", err)
+					continue
+				}
+
+				if evt, err := parseFirstPacketEvent(record.RawSample); err != nil {
+					common.AgentLog.Errorf("[firstPacketReader] first packet event err: %s\n", err)
+					continue
+				} else {
+					channel <- evt
+				}
+			}
+		}(reader)
+	}
+	if err != nil {
+		common.BPFLog.Warningf("[bpf] set up perf reader failed: %s\n", err)
+	}
+	return err
+}
+
+func parseFirstPacketEvent(record []byte) (*AgentFirstPacketEvt, error) {
+	var event AgentFirstPacketEvt
+	err := binary.Read(bytes.NewBuffer(record), binary.LittleEndian, &event)
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
 func PullKernEvents(ctx context.Context, channels []chan *AgentKernEvt, perfCPUBufferPageNum int, hook KernEventHook) error {
 	pageSize := os.Getpagesize()
 	perCPUBuffer := pageSize * perfCPUBufferPageNum

@@ -55,13 +55,6 @@ struct {
 	__uint(map_flags, 0);
 } active_ssl_write_args_map SEC(".maps");
 
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(key_size, sizeof(uint64_t));
-	__uint(value_size, sizeof(struct sendfile_args));
-	__uint(max_entries, 65535);
-	__uint(map_flags, 0);
-} active_sendfile_args_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -86,6 +79,13 @@ struct {
     __uint(key_size, sizeof(u32));
     __uint(value_size, sizeof(u32));
 } ssl_rb SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(u32));
+} first_packet_rb SEC(".maps");
+
 struct {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(key_size, sizeof(u32));
@@ -95,6 +95,7 @@ struct {
 MY_BPF_HASH(conn_info_map, uint64_t, struct conn_info_t);
 MY_BPF_ARRAY_PERCPU(syscall_data_map, struct kern_evt_data)
 MY_BPF_ARRAY_PERCPU(ssl_data_map, struct kern_evt_ssl_data)
+MY_BPF_ARRAY_PERCPU(first_packet_evt_map, struct first_packet_evt)
 
 const int32_t kInvalidFD = -1;
 

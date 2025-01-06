@@ -22,6 +22,8 @@ import (
 var RecordFunc func(protocol.Record, *Connection4) error
 var OnCloseRecordFunc func(*Connection4) error
 
+var ConnectionMap *sync.Map = new(sync.Map)
+
 type Connection4 struct {
 	LocalIp    net.IP
 	RemoteIp   net.IP
@@ -93,6 +95,8 @@ func NewConnFromEvent(event *bpf.AgentConnEvtT, p *Processor) *Connection4 {
 	}
 	conn.StreamEvents = NewKernEventStream(conn, 300)
 	conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
+	sockKey, _ := conn.extractSockKeys()
+	ConnectionMap.Store(sockKey, conn)
 	return conn
 }
 
@@ -136,12 +140,25 @@ func InitConnManager() *ConnManager {
 				return true
 			})
 			for _, tgidFd := range _needsDelete {
-				connManager.connMap.Delete(tgidFd)
+				c, loaded := connManager.connMap.LoadAndDelete(tgidFd)
+				if loaded {
+					conn := c.(*Connection4)
+					RemoveConnFromSockKeyMap(conn)
+				}
 			}
 			atomic.AddInt64(&connManager.connectionClosed, int64(len(_needsDelete)))
 		}
 	}()
 	return connManager
+}
+
+func RemoveConnFromSockKeyMap(c *Connection4) {
+	key, _ := c.extractSockKeys()
+	ConnectionMap.Delete(key)
+	for _, prev := range c.prevConn {
+		key, _ := prev.extractSockKeys()
+		ConnectionMap.Delete(key)
+	}
 }
 
 func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
@@ -152,6 +169,7 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 				common.ConntrackLog.Debugf("[AddConnection4] %s find existed conn with same tgidfd but ip port not same: %s", conn.ToString(), existedConn.ToString())
 			}
 			prevConn := existedConn.prevConn
+			existedConn.prevConn = nil
 			deleteEndIdx := -1
 			for idx := len(prevConn) - 1; idx >= 0; idx-- {
 				if prevConn[idx].Status == Closed {
@@ -160,6 +178,10 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 				}
 			}
 			if deleteEndIdx != -1 {
+				deleted := prevConn[:deleteEndIdx+1]
+				for _, conn := range deleted {
+					RemoveConnFromSockKeyMap(conn)
+				}
 				prevConn = prevConn[deleteEndIdx+1:]
 				atomic.AddInt64(&c.connectionClosed, int64(deleteEndIdx)+1)
 			}

@@ -181,6 +181,16 @@ struct kern_evt {
   struct conn_id_s_t conn_id_s;
   enum step_t step;
 };
+
+struct first_packet_evt {
+	uint64_t ts;
+	uint32_t len;
+  uint8_t flags;
+	uint32_t ifindex;
+  enum step_t step;
+  struct sock_key key;
+};
+
 #define MAX_MSG_SIZE 30720
 struct kern_evt_data {
   struct kern_evt ke;

@@ -99,7 +99,6 @@ type GoTlsProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type GoTlsMapSpecs struct {
-	ActiveSendfileArgsMap *ebpf.MapSpec `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ActiveTlsConnOpMap    *ebpf.MapSpec `ebpf:"active_tls_conn_op_map"`
@@ -109,6 +108,8 @@ type GoTlsMapSpecs struct {
 	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
+	FirstPacketEvtMap     *ebpf.MapSpec `ebpf:"first_packet_evt_map"`
+	FirstPacketRb         *ebpf.MapSpec `ebpf:"first_packet_rb"`
 	GoCommonSymaddrsMap   *ebpf.MapSpec `ebpf:"go_common_symaddrs_map"`
 	GoSslUserSpaceCallMap *ebpf.MapSpec `ebpf:"go_ssl_user_space_call_map"`
 	GoTlsSymaddrsMap      *ebpf.MapSpec `ebpf:"go_tls_symaddrs_map"`
@@ -140,7 +141,6 @@ func (o *GoTlsObjects) Close() error {
 //
 // It can be passed to LoadGoTlsObjects or ebpf.CollectionSpec.LoadAndAssign.
 type GoTlsMaps struct {
-	ActiveSendfileArgsMap *ebpf.Map `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ActiveTlsConnOpMap    *ebpf.Map `ebpf:"active_tls_conn_op_map"`
@@ -150,6 +150,8 @@ type GoTlsMaps struct {
 	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
+	FirstPacketEvtMap     *ebpf.Map `ebpf:"first_packet_evt_map"`
+	FirstPacketRb         *ebpf.Map `ebpf:"first_packet_rb"`
 	GoCommonSymaddrsMap   *ebpf.Map `ebpf:"go_common_symaddrs_map"`
 	GoSslUserSpaceCallMap *ebpf.Map `ebpf:"go_ssl_user_space_call_map"`
 	GoTlsSymaddrsMap      *ebpf.Map `ebpf:"go_tls_symaddrs_map"`
@@ -164,7 +166,6 @@ type GoTlsMaps struct {
 
 func (m *GoTlsMaps) Close() error {
 	return _GoTlsClose(
-		m.ActiveSendfileArgsMap,
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.ActiveTlsConnOpMap,
@@ -174,6 +175,8 @@ func (m *GoTlsMaps) Close() error {
 		m.FilterNetnsMap,
 		m.FilterPidMap,
 		m.FilterPidnsMap,
+		m.FirstPacketEvtMap,
+		m.FirstPacketRb,
 		m.GoCommonSymaddrsMap,
 		m.GoSslUserSpaceCallMap,
 		m.GoTlsSymaddrsMap,

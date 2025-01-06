@@ -71,7 +71,6 @@ type Openssl320ProgramSpecs struct {
 //
 // It can be passed ebpf.CollectionSpec.Assign.
 type Openssl320MapSpecs struct {
-	ActiveSendfileArgsMap *ebpf.MapSpec `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
@@ -80,6 +79,8 @@ type Openssl320MapSpecs struct {
 	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.MapSpec `ebpf:"filter_pidns_map"`
+	FirstPacketEvtMap     *ebpf.MapSpec `ebpf:"first_packet_evt_map"`
+	FirstPacketRb         *ebpf.MapSpec `ebpf:"first_packet_rb"`
 	Rb                    *ebpf.MapSpec `ebpf:"rb"`
 	SslDataMap            *ebpf.MapSpec `ebpf:"ssl_data_map"`
 	SslRb                 *ebpf.MapSpec `ebpf:"ssl_rb"`
@@ -107,7 +108,6 @@ func (o *Openssl320Objects) Close() error {
 //
 // It can be passed to LoadOpenssl320Objects or ebpf.CollectionSpec.LoadAndAssign.
 type Openssl320Maps struct {
-	ActiveSendfileArgsMap *ebpf.Map `ebpf:"active_sendfile_args_map"`
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
@@ -116,6 +116,8 @@ type Openssl320Maps struct {
 	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
 	FilterPidnsMap        *ebpf.Map `ebpf:"filter_pidns_map"`
+	FirstPacketEvtMap     *ebpf.Map `ebpf:"first_packet_evt_map"`
+	FirstPacketRb         *ebpf.Map `ebpf:"first_packet_rb"`
 	Rb                    *ebpf.Map `ebpf:"rb"`
 	SslDataMap            *ebpf.Map `ebpf:"ssl_data_map"`
 	SslRb                 *ebpf.Map `ebpf:"ssl_rb"`
@@ -126,7 +128,6 @@ type Openssl320Maps struct {
 
 func (m *Openssl320Maps) Close() error {
 	return _Openssl320Close(
-		m.ActiveSendfileArgsMap,
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.ConnEvtRb,
@@ -135,6 +136,8 @@ func (m *Openssl320Maps) Close() error {
 		m.FilterNetnsMap,
 		m.FilterPidMap,
 		m.FilterPidnsMap,
+		m.FirstPacketEvtMap,
+		m.FirstPacketRb,
 		m.Rb,
 		m.SslDataMap,
 		m.SslRb,
