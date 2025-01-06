@@ -8,9 +8,19 @@ import (
 	"fmt"
 	"kyanos/common"
 	"os"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/cilium/ebpf/perf"
+)
+
+var (
+	ProcessExitLostSamplesCnt atomic.Uint64
+	ProcessExecLostSamplesCnt atomic.Uint64
+	SyscallDataLostSamplesCnt atomic.Uint64
+	SslDataLostSamplesCnt     atomic.Uint64
+	ConnDataLogSamplesCnt     atomic.Uint64
+	KernLostSamplesCnt        atomic.Uint64
 )
 
 func PullProcessExitEvents(ctx context.Context, channels []chan *AgentProcessExitEvent) error {
@@ -37,6 +47,11 @@ func PullProcessExitEvents(ctx context.Context, channels []chan *AgentProcessExi
 						return
 					}
 					common.BPFLog.Debugf("[dataReader] reading from reader: %s\n", err)
+					continue
+				}
+				if record.LostSamples > 0 {
+					ProcessExitLostSamplesCnt.Add(record.LostSamples)
+					common.BPFLog.Warningf("[dataReader] lost %d process exit events\n", record.LostSamples)
 					continue
 				}
 
@@ -91,6 +106,11 @@ func PullProcessExecEvents(ctx context.Context, channels *[]chan *AgentProcessEx
 					common.BPFLog.Debugf("[dataReader] reading from reader: %s\n", err)
 					continue
 				}
+				if record.LostSamples > 0 {
+					ProcessExecLostSamplesCnt.Add(record.LostSamples)
+					common.BPFLog.Warningf("[dataReader] lost %d process exec event\n", record.LostSamples)
+					continue
+				}
 
 				if evt, err := parseExecEvent(record.RawSample); err != nil {
 					common.AgentLog.Errorf("[dataReader] handleKernEvt err: %s\n", err)
@@ -141,6 +161,12 @@ func PullSyscallDataEvents(ctx context.Context, channels []chan *SyscallEventDat
 						return
 					}
 					common.BPFLog.Debugf("[dataReader] reading from reader: %s\n", err)
+					continue
+				}
+
+				if record.LostSamples > 0 {
+					SyscallDataLostSamplesCnt.Add(record.LostSamples)
+					common.BPFLog.Warningf("[dataReader] lost %d syscall data events\n", record.LostSamples)
 					continue
 				}
 
@@ -212,6 +238,12 @@ func PullSslDataEvents(ctx context.Context, channels []chan *SslData, perfCPUBuf
 					continue
 				}
 
+				if record.LostSamples > 0 {
+					SslDataLostSamplesCnt.Add(record.LostSamples)
+					common.BPFLog.Warningf("[dataReader] lost %d ssl data events\n", record.LostSamples)
+					continue
+				}
+
 				if evt, err := parseSslDataEvent(record.RawSample); err != nil {
 					common.AgentLog.Errorf("[dataReader] ssl data event err: %s\n", err)
 					continue
@@ -276,6 +308,11 @@ func PullConnDataEvents(ctx context.Context, channels []chan *AgentConnEvtT, per
 					common.BPFLog.Debugf("[dataReader] reading from reader: %s\n", err)
 					continue
 				}
+				if record.LostSamples > 0 {
+					ConnDataLogSamplesCnt.Add(record.LostSamples)
+					common.BPFLog.Warningf("[dataReader] lost %d conn data events\n", record.LostSamples)
+					continue
+				}
 
 				if evt, err := parseConnEvent(record.RawSample); err != nil {
 					common.AgentLog.Errorf("[dataReader] conn event err: %s\n", err)
@@ -331,6 +368,11 @@ func PullKernEvents(ctx context.Context, channels []chan *AgentKernEvt, perfCPUB
 						return
 					}
 					common.BPFLog.Debugf("[dataReader] reading from reader: %s\n", err)
+					continue
+				}
+				if record.LostSamples > 0 {
+					KernLostSamplesCnt.Add(record.LostSamples)
+					common.BPFLog.Warningf("[dataReader] lost %d kern events\n", record.LostSamples)
 					continue
 				}
 
