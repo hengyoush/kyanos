@@ -73,6 +73,7 @@ type AgentLagacyKernel310ProgramSpecs struct {
 	TracepointNetifReceiveSkb            *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSchedSchedProcessExit      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exit"`
+	TracepointSkbCopyDatagramIovec       *ebpf.ProgramSpec `ebpf:"tracepoint__skb_copy_datagram_iovec"`
 	TracepointSyscallsSysEnterAccept4    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_close"`
 	TracepointSyscallsSysEnterConnect    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_connect"`
@@ -258,6 +259,7 @@ type AgentLagacyKernel310Programs struct {
 	TracepointNetifReceiveSkb            *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSchedSchedProcessExit      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exit"`
+	TracepointSkbCopyDatagramIovec       *ebpf.Program `ebpf:"tracepoint__skb_copy_datagram_iovec"`
 	TracepointSyscallsSysEnterAccept4    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_accept4"`
 	TracepointSyscallsSysEnterClose      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_close"`
 	TracepointSyscallsSysEnterConnect    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_connect"`
@@ -307,6 +309,7 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 		p.TracepointNetifReceiveSkb,
 		p.TracepointSchedSchedProcessExec,
 		p.TracepointSchedSchedProcessExit,
+		p.TracepointSkbCopyDatagramIovec,
 		p.TracepointSyscallsSysEnterAccept4,
 		p.TracepointSyscallsSysEnterClose,
 		p.TracepointSyscallsSysEnterConnect,

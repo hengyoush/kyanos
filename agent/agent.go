@@ -35,8 +35,11 @@ func SetupAgent(options ac.AgentOptions) {
 		return
 	}
 
-	if os.Geteuid() != 0 {
-		common.AgentLog.Error("Kyanos requires root privileges to run. Please run kyanos with sudo.")
+	if ok, err := ac.HasPermission(); err != nil {
+		common.AgentLog.Error("check capabilities failed: ", err)
+		return
+	} else if !ok {
+		common.AgentLog.Error("Kyanos requires CAP_BPF to run. Please run kyanos with sudo or run container in privilege mode.")
 		return
 	}
 
@@ -109,19 +112,19 @@ func SetupAgent(options ac.AgentOptions) {
 		_bf.Links = bf.Links
 		_bf.Objs = bf.Objs
 
-		err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), 2048, options.CustomSyscallEventHook)
+		err = bpf.PullSyscallDataEvents(ctx, pm.GetSyscallEventsChannels(), options.SyscallPerfEventMapPageNum, options.CustomSyscallEventHook)
 		if err != nil {
 			return
 		}
-		err = bpf.PullSslDataEvents(ctx, pm.GetSslEventsChannels(), 512, options.CustomSslEventHook)
+		err = bpf.PullSslDataEvents(ctx, pm.GetSslEventsChannels(), options.SslPerfEventMapPageNum, options.CustomSslEventHook)
 		if err != nil {
 			return
 		}
-		err = bpf.PullConnDataEvents(ctx, pm.GetConnEventsChannels(), 4, options.CustomConnEventHook)
+		err = bpf.PullConnDataEvents(ctx, pm.GetConnEventsChannels(), options.ConnPerfEventMapPageNum, options.CustomConnEventHook)
 		if err != nil {
 			return
 		}
-		err = bpf.PullKernEvents(ctx, pm.GetKernEventsChannels(), 32, options.CustomKernEventHook)
+		err = bpf.PullKernEvents(ctx, pm.GetKernEventsChannels(), options.KernPerfEventMapPageNum, options.CustomKernEventHook)
 		if err != nil {
 			return
 		}

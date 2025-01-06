@@ -16,6 +16,9 @@ func main() {
 		return
 	}
 
+	// 打印当前pid
+	fmt.Printf("Current PID: %d\n", os.Getpid())
+
 	// 获取 URL 和请求次数
 	url := os.Args[1]
 	requestCount, err := strconv.Atoi(os.Args[2])
