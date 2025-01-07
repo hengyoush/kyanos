@@ -176,6 +176,10 @@ Here are the options available for filtering by each protocol:
 | Request Codes    | `request-codes`   | `--request-codes 10,11` <br> Only observe requests with the codes 10 and 11.               |
 | Languages        | `languages`       | `--languages Java,Go` <br> Only observe requests from applications written in Java and Go. |
 
+> For the meaning and usage of Request Codes, please refer to [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/RequestCode.java).
+
+> For more supported languages, please refer to [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java).
+
 
 #### MySQL Protocol Filtering
 

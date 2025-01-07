@@ -149,6 +149,10 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 | 请求代码 | `request-codes` | `--request-codes 10,11` 只观察请求代码为 10 和 11的                     |
 | 语言     | `languages`     | `--languages Java,Go ` 只观察使用 Java 和 Go 编写的应用程序发出的请求。 |
 
+> 有关请求代码的含义和值，请参阅 [这里](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/RequestCode.java)。
+
+> 更多支持的语言，请参阅 [这里](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java)。
+
 
 #### MYSQL 协议过滤
 
