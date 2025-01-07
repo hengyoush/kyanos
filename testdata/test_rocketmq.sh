@@ -56,7 +56,7 @@ EOF
 }
 
 function test_rocketmq() {
-    pip --break-system-packages install rocketmq 
+    pip install --break-system-packages  rocketmq 
 
     create_docker_compose_file
 
