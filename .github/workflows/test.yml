@@ -137,7 +137,7 @@ jobs:
           cmd: |
             apt-get update
             apt-get install -y dnsutils
-            apt-get install docker-compose-plugin
+            apt-get install -y docker-compose-plugin
             # install btf
             if [ -f "/sys/kernel/btf/vmlinux" ]; then  
               mkdir -p /var/lib/kyanos/btf
