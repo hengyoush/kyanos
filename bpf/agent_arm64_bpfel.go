@@ -198,21 +198,22 @@ const (
 type AgentTrafficProtocolT uint32
 
 const (
-	AgentTrafficProtocolTKProtocolUnset   AgentTrafficProtocolT = 0
-	AgentTrafficProtocolTKProtocolUnknown AgentTrafficProtocolT = 1
-	AgentTrafficProtocolTKProtocolHTTP    AgentTrafficProtocolT = 2
-	AgentTrafficProtocolTKProtocolHTTP2   AgentTrafficProtocolT = 3
-	AgentTrafficProtocolTKProtocolMySQL   AgentTrafficProtocolT = 4
-	AgentTrafficProtocolTKProtocolCQL     AgentTrafficProtocolT = 5
-	AgentTrafficProtocolTKProtocolPGSQL   AgentTrafficProtocolT = 6
-	AgentTrafficProtocolTKProtocolDNS     AgentTrafficProtocolT = 7
-	AgentTrafficProtocolTKProtocolRedis   AgentTrafficProtocolT = 8
-	AgentTrafficProtocolTKProtocolNATS    AgentTrafficProtocolT = 9
-	AgentTrafficProtocolTKProtocolMongo   AgentTrafficProtocolT = 10
-	AgentTrafficProtocolTKProtocolKafka   AgentTrafficProtocolT = 11
-	AgentTrafficProtocolTKProtocolMux     AgentTrafficProtocolT = 12
-	AgentTrafficProtocolTKProtocolAMQP    AgentTrafficProtocolT = 13
-	AgentTrafficProtocolTKNumProtocols    AgentTrafficProtocolT = 14
+	AgentTrafficProtocolTKProtocolUnset    AgentTrafficProtocolT = 0
+	AgentTrafficProtocolTKProtocolUnknown  AgentTrafficProtocolT = 1
+	AgentTrafficProtocolTKProtocolHTTP     AgentTrafficProtocolT = 2
+	AgentTrafficProtocolTKProtocolHTTP2    AgentTrafficProtocolT = 3
+	AgentTrafficProtocolTKProtocolMySQL    AgentTrafficProtocolT = 4
+	AgentTrafficProtocolTKProtocolCQL      AgentTrafficProtocolT = 5
+	AgentTrafficProtocolTKProtocolPGSQL    AgentTrafficProtocolT = 6
+	AgentTrafficProtocolTKProtocolDNS      AgentTrafficProtocolT = 7
+	AgentTrafficProtocolTKProtocolRedis    AgentTrafficProtocolT = 8
+	AgentTrafficProtocolTKProtocolNATS     AgentTrafficProtocolT = 9
+	AgentTrafficProtocolTKProtocolMongo    AgentTrafficProtocolT = 10
+	AgentTrafficProtocolTKProtocolKafka    AgentTrafficProtocolT = 11
+	AgentTrafficProtocolTKProtocolMux      AgentTrafficProtocolT = 12
+	AgentTrafficProtocolTKProtocolAMQP     AgentTrafficProtocolT = 13
+	AgentTrafficProtocolTKProtocolRocketMQ AgentTrafficProtocolT = 14
+	AgentTrafficProtocolTKNumProtocols     AgentTrafficProtocolT = 15
 )
 
 // LoadAgent returns the embedded CollectionSpec for Agent.

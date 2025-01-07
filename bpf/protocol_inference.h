@@ -127,6 +127,65 @@ static __always_inline enum message_type_t is_http_protocol(const char *old_buf,
   return kUnknown;
 }
 
+static __always_inline enum message_type_t is_rocketmq_protocol(
+    const char *old_buf, size_t count) {
+  if (count < 16) {
+    return kUnknown;
+  }
+
+  int32_t frame_size;
+  bpf_probe_read_user(&frame_size, sizeof(int32_t), old_buf);
+  frame_size = bpf_ntohl(frame_size);
+
+  if (frame_size <= 0 || frame_size > (count - 4)) {
+    return kUnknown;
+  }
+
+  int32_t header_length = 0;
+  bpf_probe_read_user(&header_length, sizeof(int32_t), old_buf + 4);
+  header_length = bpf_ntohl(header_length);
+
+  char serialized_type = (header_length >> 24) & 0xFF;
+  if (serialized_type != 0x0 && serialized_type != 0x1) {
+    return kUnknown;
+  }
+
+  int32_t header_data_len = header_length & 0xFFFFFF;
+  // bpf_printk("header_data_len : %d", header_data_len);
+  if (header_data_len <= 0 || header_data_len != (frame_size - 4)) {
+    return kUnknown;
+  }
+
+  if (serialized_type == 0x0) {  // json format
+    char buf[8] = {};
+    bpf_probe_read_user(buf, 8, old_buf + 8);
+    if (buf[0] != '{' || buf[1] != '"' || buf[2] != 'c' || buf[3] != 'o' ||
+        buf[4] != 'd' || buf[5] != 'e' || buf[6] != '"' || buf[7] != ':') {
+      // {"code":
+      return kUnknown;
+    }
+  } else if (serialized_type == 0x1) {
+    uint16_t request_code = 0;
+    uint8_t l_flag = 0;
+    uint16_t v_flag = 0;
+
+    bpf_probe_read_user(&request_code, sizeof(uint16_t), old_buf + 8);
+    bpf_probe_read_user(&l_flag, sizeof(uint8_t), old_buf + 10);
+    bpf_probe_read_user(&v_flag, sizeof(uint16_t), old_buf + 11);
+
+    // rocketmq/remoting/protocol/RequestCode.java
+    request_code = bpf_ntohl(request_code);
+    if (request_code < 10) {
+      return kUnknown;
+    }
+
+    if (l_flag > 13) {
+      return kUnknown;
+    }
+  }
+  return kRequest;
+}
+
 static __always_inline struct protocol_message_t infer_protocol(const char *buf, size_t count, struct conn_info_t *conn_info) {
   struct protocol_message_t protocol_message;
   protocol_message.protocol = kProtocolUnknown;
@@ -137,6 +196,8 @@ static __always_inline struct protocol_message_t infer_protocol(const char *buf,
     protocol_message.protocol = kProtocolMySQL;
   } else if (is_redis_protocol(buf, count)) {
     protocol_message.protocol = kProtocolRedis;
+  } else if (is_rocketmq_protocol(buf, count)) {
+    protocol_message.protocol = kProtocolRocketMQ;
   }
   conn_info->prev_count = count;
   if (count == 4) {
