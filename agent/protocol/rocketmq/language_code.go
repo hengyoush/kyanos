@@ -22,11 +22,11 @@ const (
 	OMS                         // 11
 	RUST                        // 12
 	NODE_JS                     // 13
-	UNKNOWN
+	UNKNOWN_LANGUAGE
 )
 
-// convertToLanguageCode converts a string to a LanguageCode.
-func convertToLanguageCode(language string) (LanguageCode, error) {
+// ConvertToLanguageCode converts a string to a LanguageCode.
+func ConvertToLanguageCode(language string) (LanguageCode, error) {
 	switch language {
 	case "JAVA":
 		return JAVA, nil

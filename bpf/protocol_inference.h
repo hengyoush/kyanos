@@ -157,7 +157,6 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
   }
 
   if (serialized_type == 0x0) {  // json format
-    bpf_printk("json");
     char buf[8] = {};
     bpf_probe_read_user(buf, 8, old_buf + 8);
     if (buf[0] != '{' || buf[1] != '"' || buf[2] != 'c' || buf[3] != 'o' ||
