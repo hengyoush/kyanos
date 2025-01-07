@@ -48,21 +48,21 @@ func getInterfaceNameByIndex(index int, pid int) (string, error) {
 }
 
 func parseIpCmdLine(line string) (int, string, bool) {
-	// 使用正则表达式匹配接口索引和接口名称
-	// 假设接口索引是以数字开头，后面跟着冒号和接口名称
+	// Use regular expressions to match interface index and interface name
+	// Assume the interface index starts with a number, followed by a colon and the interface name
 	re := regexp.MustCompile(`^(\d+):\s*([^:]+)`)
 	match := re.FindStringSubmatch(line)
 	if len(match) < 3 {
-		return 0, "", false // 没有匹配到
+		return 0, "", false // No match found
 	}
 
 	index, err := strconv.Atoi(match[1])
 	if err != nil {
-		return 0, "", false // 转换索引失败
+		return 0, "", false // Failed to convert index
 	}
 
 	interfaceName := match[2]
-	return index, interfaceName, true // 成功提取
+	return index, interfaceName, true // Successfully extracted
 }
 
 var (
@@ -76,17 +76,17 @@ func init() {
 func GetAllNICs() (map[string]map[string]string, error) {
 	result := make(map[string]map[string]string)
 
-	// 默认命名空间
+	// Default namespace
 	defaultNS, err := exec.Command("ip", "link", "show").Output()
 	if err != nil {
 		return nil, err
 	}
 	result["default"] = parseLinkOutput(string(defaultNS))
 
-	// 自定义网络命名空间
+	// Custom network namespaces
 	nsList, err := exec.Command("ip", "netns", "list").Output()
 	if err != nil {
-		// 若命令失败，可能没有任何自定义网络命名空间
+		// If the command fails, there may be no custom network namespaces
 		return result, nil
 	}
 	namespaces := strings.Split(strings.TrimSpace(string(nsList)), "\n")
@@ -99,7 +99,7 @@ func GetAllNICs() (map[string]map[string]string, error) {
 		nsName := parts[0]
 		nsOutput, err := exec.Command("ip", "netns", "exec", nsName, "ip", "link", "show").Output()
 		if err != nil {
-			// 忽略该命名空间的错误
+			// Ignore errors for this namespace
 			continue
 		}
 		result[nsName] = parseLinkOutput(string(nsOutput))
