@@ -33,6 +33,8 @@ jobs:
           sudo apt install -y git
           sudo apt-get -y install pkg-config
           sudo apt install -y libelf-dev
+          sudo apt install -y docker-compose
+
 
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
           sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main"
