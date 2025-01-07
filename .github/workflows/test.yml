@@ -33,7 +33,6 @@ jobs:
           sudo apt install -y git
           sudo apt-get -y install pkg-config
           sudo apt install -y libelf-dev
-          sudo apt install -y docker-compose
 
 
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key|sudo apt-key add -
@@ -139,6 +138,7 @@ jobs:
           cmd: |
             apt-get update
             apt-get install -y dnsutils
+            sudo apt install -y docker-compose
             # install btf
             if [ -f "/sys/kernel/btf/vmlinux" ]; then  
               mkdir -p /var/lib/kyanos/btf
