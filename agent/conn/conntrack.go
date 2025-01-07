@@ -460,7 +460,7 @@ func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChan
 
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
-		panic("no protocol parser!")
+		return
 	}
 
 	records := parser.Match(&c.ReqQueue, &c.RespQueue)
@@ -493,6 +493,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
+		return true
 		panic("no protocol parser!")
 	}
 

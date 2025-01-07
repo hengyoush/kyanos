@@ -454,7 +454,7 @@ func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChann
 	timeCheck := conn != nil && conn.timeBoundCheck(event.SyscallEvent.GetEndTs())
 
 	if conn != nil && conn.Status == Closed {
-		if timeCheck {
+		if timeCheck && conn.ProtocolInferred() {
 			conn.OnSyscallEvent(event.Buf, event, recordChannel)
 		} else {
 			conn.AddSyscallEvent(event)
@@ -528,7 +528,7 @@ func (p *Processor) processSslEvent(event *bpf.SslData, recordChannel chan Recor
 	conn := p.connManager.LookupConnection4ByTimestamp(tgidFd, event.SslEventHeader.GetEndTs())
 	timeCheck := conn != nil && conn.timeBoundCheck(event.SslEventHeader.GetEndTs())
 	if conn != nil && conn.Status == Closed {
-		if timeCheck {
+		if timeCheck && conn.ProtocolInferred() {
 			conn.OnSslDataEvent(event.Buf, event, recordChannel)
 		} else {
 			conn.AddSslEvent(event)

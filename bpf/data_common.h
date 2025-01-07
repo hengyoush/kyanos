@@ -56,6 +56,7 @@ struct {
 } active_ssl_write_args_map SEC(".maps");
 
 
+
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(key_size, sizeof(uint64_t));
@@ -318,12 +319,14 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 			uint64_t syscall_seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 			seq = (direct == kEgress ?  conn_info->ssl_write_bytes : conn_info->ssl_read_bytes) + 1;
 			report_ssl_evt(ctx, seq, &conn_id_s, bytes_count, step, args, syscall_len < 0 ? 0 : (syscall_seq - syscall_len), syscall_len < 0 ? 0 : syscall_len);
-			// bpf_printk("report ssl evt, seq: %lld len: %d",)
+			bpf_printk("report ssl evt, seq: %lld len: %d", seq, bytes_count);
 		} else if (with_data) {
 			report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
 		} else {
 			report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->start_ts, args->end_ts - args->start_ts, args->source_fn);
 		}
+	} else {
+		bpf_printk("no trace, bytes_count:%d", bytes_count);
 	}
 }
 

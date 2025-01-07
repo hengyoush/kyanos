@@ -64,6 +64,11 @@ type AgentOptions struct {
 	Ctx                 context.Context
 	Kv                  *compatible.KernelVersion
 	LoadPorgressChannel chan string
+
+	SyscallPerfEventMapPageNum int
+	SslPerfEventMapPageNum     int
+	ConnPerfEventMapPageNum    int
+	KernPerfEventMapPageNum    int
 }
 
 func (o AgentOptions) FilterByContainer() bool {

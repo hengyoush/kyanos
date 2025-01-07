@@ -225,6 +225,11 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	bool has_conn_info = true;
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
 	has_conn_info = conn_id_s != NULL && !conn_id_s->no_trace;
+	if (has_conn_info) {
+		uint64_t tgid_fd = conn_id_s->tgid_fd;
+		struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
+		has_conn_info = conn_info != NULL && conn_info->protocol != kProtocolUnknown;
+	}
 	// if (has_conn_info) {
 	// 	uint64_t tgid_fd = conn_id_s->tgid_fd;
 	// 	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);

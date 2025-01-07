@@ -208,7 +208,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		}
 		if hasReadSyscallEvents && hasWriteSyscallEvents {
-			annotatedRecord.BlackBoxDuration = float64(events.writeSyscallEvents[0].GetEndTs()) - float64(events.readSyscallEvents[0].GetEndTs())
+			annotatedRecord.BlackBoxDuration = float64(events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetEndTs()) - float64(events.readSyscallEvents[0].GetStartTs())
 		} else {
 			annotatedRecord.BlackBoxDuration = float64(events.egressMessage.TimestampNs()) - float64(events.ingressMessage.TimestampNs())
 		}

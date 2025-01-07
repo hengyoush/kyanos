@@ -143,7 +143,15 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	bf.attachExitEventChannels(options)
 
 	if !options.DisableOpensslUprobe {
-		bf.attachOpenSslUprobes(links, options)
+		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, 10)
+		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
+		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedEventChannel}
+		if options.ProcessExecEventChannel != nil {
+			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
+		}
+		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
+
+		attachOpenSslUprobes(links, options, options.Kv, bf.Objs)
 		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
 	attachSchedProgs(links)
@@ -167,10 +175,6 @@ func (bf *BPF) attachExecEventChannels(options *ac.AgentOptions) {
 		}
 		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
 	}
-}
-
-func (bf *BPF) attachOpenSslUprobes(links *list.List, options *ac.AgentOptions) {
-	attachOpenSslUprobes(links, options, options.Kv, bf.Objs)
 }
 
 func (bf *BPF) attachExitEventChannels(options *ac.AgentOptions) {
@@ -339,6 +343,8 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 						if err != nil {
 							common.AgentLog.Errorf("Failed update  FilterPidMap: %s\n", err)
 						}
+					} else {
+						common.AgentLog.Debugf("Not matched: %d %s\n", execEvent.Pid, options.FilterComm)
 					}
 				}
 			}
