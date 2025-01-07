@@ -43,7 +43,7 @@ var rocketmqCmd *cobra.Command = &cobra.Command{
 }
 
 func init() {
-	rocketmqCmd.Flags().Int32Slice("request-codes", []int32{}, "Specify the request codes to monitor (e.g., 100, 200), separated by ','")
+	rocketmqCmd.Flags().Int32Slice("request-codes", []int32{}, "Specify the request codes to monitor (e.g., 10, 11), separated by ','")
 	rocketmqCmd.Flags().StringSlice("languages", []string{}, "Specify the languages to monitor (e.g., Java, Go, Rust, CPP), separated by ','")
 
 	rocketmqCmd.PersistentFlags().SortFlags = false

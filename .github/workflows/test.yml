@@ -389,6 +389,20 @@ jobs:
                 bash /host/testdata/test_redis.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
             fi
 
+      - name: Test RocketMQ
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
+                bash /host/testdata/test_rocketmq.sh 'sudo /host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else  
+                bash /host/testdata/test_rocketmq.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
+            fi
+
       - name: Test k8s
         if: ${{ startsWith(matrix.kernel, '6.') }}
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19

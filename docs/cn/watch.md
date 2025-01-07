@@ -142,6 +142,14 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 | 请求 Key      | `keys`       | `--keys foo,bar ` 只观察请求 key 为 foo 和 bar        |
 | 请求 key 前缀 | `key-prefix` | `--method foo:bar ` 只观察请求的 key 前缀为 foo\: bar |
 
+#### RocketMQ 协议过滤
+
+| 过滤条件 | 命令行 flag     | 示例                                                                    |
+| :------- | :-------------- | :---------------------------------------------------------------------- |
+| 请求代码 | `request-codes` | `--request-codes 10,11` 只观察请求代码为 10 和 11的                     |
+| 语言     | `languages`     | `--languages Java,Go ` 只观察使用 Java 和 Go 编写的应用程序发出的请求。 |
+
+
 #### MYSQL 协议过滤
 
 > 已支持 MySQL 协议抓取，根据条件过滤仍在实现中...
