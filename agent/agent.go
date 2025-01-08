@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"kyanos/agent/analysis"
 	anc "kyanos/agent/analysis/common"
@@ -15,6 +16,7 @@ import (
 	"kyanos/bpf"
 	"kyanos/bpf/loader"
 	"kyanos/common"
+	"kyanos/version"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -29,6 +31,12 @@ import (
 )
 
 func SetupAgent(options ac.AgentOptions) {
+	err := version.UpgradeDetect()
+	if err != nil {
+		if errors.Is(err, version.ErrBehindLatest) {
+			common.AgentLog.Warn(err)
+		}
+	}
 	if enabled, err := common.IsEnableBPF(); err == nil && !enabled {
 		common.AgentLog.Error("BPF is not enabled in your kernel. This might be because your kernel version is too old. " +
 			"Please check the requirements for Kyanos at https://kyanos.io/quickstart.html#installation-requirements.")
