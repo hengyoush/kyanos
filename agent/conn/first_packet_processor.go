@@ -74,7 +74,7 @@ func (p *FirstPacketProcessor) processEvent(event *timedFirstPacketEvent) {
 		channel := p.channels[int(conn.(*Connection4).TgidFd)%len(p.channels)]
 		connId := &bpf.AgentConnIdS_t{
 			TgidFd:  conn.(*Connection4).TgidFd,
-			NoTrace: false,
+			NoTrace: conn.(*Connection4).tracable,
 		}
 		common.BPFEventLog.Debugf("%s First packet event: %+v", conn.(*Connection4).ToString(), event.FirstPacketEvent)
 		kernEvent := timedFirstPacketEventAsKernEvent(event, connId)
@@ -90,7 +90,7 @@ func (p *FirstPacketProcessor) extractTgidFdFromSockKey(key *bpf.AgentSockKey) (
 	sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
 	var connIds bpf.AgentConnIdS_t
 	err := sockKeyConnIdMap.Lookup(key, &connIds)
-	if err == nil && !connIds.NoTrace {
+	if err == nil && connIds.NoTrace <= bpf.AgentConnTraceStateTTraceable {
 		return &connIds, nil
 	}
 	return nil, err

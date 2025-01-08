@@ -289,6 +289,32 @@ func init() {
 Add e2e tests for the corresponding protocol in the testdata directory. You can
 refer to the implementation of other protocols (e.g., `test_redis.sh`).
 
+Then add your test steps in ./github/workflows/test.yml:
+
+```yaml
+- name: Your Test name
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then
+                bash /host/testdata/YOUR_TEST_SCRIPT.sh 'sudo /host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else
+                bash /host/testdata/YOUR_TEST_SCRIPT.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
+            fi
+```
+
+💡 Hint: Initially, you can place your test at the beginning of the workflow to
+quickly execute your test and identify issues.
+
+### Add Protocol Parsing Unit Tests
+
+Add unit tests for the three functions of your `ProtocolParser`, simulating the
+corresponding protocol input cases to complete the tests.
+
 ## Others
 
 ### Debugging Suggestions

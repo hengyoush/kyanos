@@ -74,7 +74,7 @@ static __always_inline void process_ssl_data(struct pt_regs* ctx, uint64_t id,
         bpf_probe_read_user(&ex_bytes, sizeof(size_t), args->ssl_ex_len);
         bytes_count = ex_bytes;
         // bpf_printk("exlen: %d ,bc :%d", ex_bytes, bytes_count);
-    } else if (bytes_count < 0) {
+    } else if (bytes_count <= 0) {
         // bpf_printk("bc<0 :%d", bytes_count);
         return ;
     } else {
@@ -83,6 +83,7 @@ static __always_inline void process_ssl_data(struct pt_regs* ctx, uint64_t id,
     uint64_t tgid_fd = gen_tgid_fd(id>>32, args->fd);
     struct conn_info_t* conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
     if (conn_info) {
+        // bpf_printk("conn_info , tgid: %d, bc: %d, fd:%d", id>>32, bytes_count, args->fd);
         conn_info->ssl = true;
         process_syscall_data_with_conn_info(ctx, args, tgid_fd, direction, bytes_count, conn_info, syscall_len, true, true);
         if (direction == kEgress) {
@@ -90,6 +91,8 @@ static __always_inline void process_ssl_data(struct pt_regs* ctx, uint64_t id,
         } else {
             conn_info->ssl_read_bytes += bytes_count;
         }
+    } else {
+        // bpf_printk("conn_info not found, tgid: %d, bc: %d, fd:%d", id>>32, bytes_count, args->fd);
     }
 
 }
@@ -255,6 +258,9 @@ static __always_inline int do_SSL_write_ret(struct pt_regs* ctx, bool is_ex_call
         // bpf_printk("do_SSL_write_ret, tgid: %lld, fd: %d, bc: %d", id>>32, fd, PT_REGS_RC(ctx));
         data_arg->fd = fd;
         process_ssl_data(ctx, id, kEgress, data_arg, is_ex_call, nested_syscall_fd_ptr->syscall_len);
+    } else {
+        // bpf_printk("do_SSL_write_ret data arg no, tgid: %lld, fd: %d, bc: %d", id>>32, fd, PT_REGS_RC(ctx));
+
     }
 
     return 0;

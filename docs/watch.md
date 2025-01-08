@@ -66,7 +66,7 @@ The second section contains the **request and response content**, split into
 Request and Response parts. Content exceeding 1024 bytes is truncated, but you
 can adjust this limit using the `--max-print-bytes` option.
 
-## JSON Output
+## JSON Output <Badge type="tip" text="1.5.0" />
 
 If you need to process the captured data programmatically, you can use the
 `--json-output` flag to output the results in JSON format:
@@ -170,16 +170,18 @@ Here are the options available for filtering by each protocol:
 | Request Key        | `keys`            | `--keys foo,bar` <br> Only observe requests with the keys `foo` and `bar`.                  |
 | Request Key Prefix | `key-prefix`      | `--key-prefix foo:bar` <br> Only observe requests with keys that have the prefix `foo:bar`. |
 
-#### RocketMQ Protocol Filtering
+#### RocketMQ Protocol Filtering <Badge type="tip" text="1.5.0" />
+
 | Filter Condition | Command Line Flag | Example                                                                                    |
 | ---------------- | ----------------- | ------------------------------------------------------------------------------------------ |
 | Request Codes    | `request-codes`   | `--request-codes 10,11` <br> Only observe requests with the codes 10 and 11.               |
 | Languages        | `languages`       | `--languages Java,Go` <br> Only observe requests from applications written in Java and Go. |
 
-> For the meaning and usage of Request Codes, please refer to [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/RequestCode.java).
+> For the meaning and usage of Request Codes, please refer to
+> [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/RequestCode.java).
 
-> For more supported languages, please refer to [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java).
-
+> For more supported languages, please refer to
+> [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java).
 
 #### MySQL Protocol Filtering
 

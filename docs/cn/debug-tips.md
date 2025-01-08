@@ -58,6 +58,11 @@ OK
 > 调试协议解析相关代码时可以使用：`--bpf-event-log-level 5 --conntrack-log-level 5 --protocol-log-level 5 --debug-output`
 > 选项就基本上足够了。
 
+## eBPF 相关
+
+协议推断代码可以通过 `bpf_printk`
+打印日志调试，参考：https://nakryiko.com/posts/bpf-tips-printk/。
+
 ## IDE 调试相关
 
 VSCODE 直接打开项目即可，.vscode/launch.json 添加配置如下：

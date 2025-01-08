@@ -21,8 +21,8 @@ type AgentConnEvtT struct {
 
 type AgentConnIdS_t struct {
 	TgidFd  uint64
-	NoTrace bool
-	_       [7]byte
+	NoTrace AgentConnTraceStateT
+	_       [4]byte
 }
 
 type AgentConnInfoT struct {
@@ -63,10 +63,21 @@ type AgentConnInfoT struct {
 	PrevCount           uint64
 	PrevBuf             [4]int8
 	PrependLengthHeader bool
-	NoTrace             bool
+	_                   [3]byte
+	NoTrace             AgentConnTraceStateT
 	Ssl                 bool
-	_                   [1]byte
+	_                   [3]byte
 }
+
+type AgentConnTraceStateT uint32
+
+const (
+	AgentConnTraceStateTUnset              AgentConnTraceStateT = 0
+	AgentConnTraceStateTTraceable          AgentConnTraceStateT = 1
+	AgentConnTraceStateTProtocolNotMatched AgentConnTraceStateT = 2
+	AgentConnTraceStateTProtocolUnknown    AgentConnTraceStateT = 3
+	AgentConnTraceStateTOther              AgentConnTraceStateT = 4
+)
 
 type AgentConnTypeT uint32
 
