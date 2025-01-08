@@ -28,9 +28,9 @@ builds:
     ldflags:
       - -s
       - -w
-      - -X "kyanos/cmd.Version={{.Version}}"
-      - -X "kyanos/cmd.CommitID={{.Commit}}"
-      - -X "kyanos/cmd.BuildTime={{.Date}}"
+      - -X "kyanos/version.Version={{.Version}}"
+      - -X "kyanos/version.CommitID={{.Commit}}"
+      - -X "kyanos/version.BuildTime={{.Date}}"
       - -linkmode 'external'
       - -extldflags "-static"
     goos:
@@ -55,9 +55,9 @@ builds:
     ldflags:
       - -s
       - -w
-      - -X "kyanos/cmd.Version={{.Version}}"
-      - -X "kyanos/cmd.CommitID={{.Commit}}"
-      - -X "kyanos/cmd.BuildTime={{.Date}}"
+      - -X "kyanos/version.Version={{.Version}}"
+      - -X "kyanos/version.CommitID={{.Commit}}"
+      - -X "kyanos/version.BuildTime={{.Date}}"
       - -linkmode 'external'
       - -extldflags "-static"
     goos:
