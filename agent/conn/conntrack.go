@@ -22,6 +22,8 @@ import (
 var RecordFunc func(protocol.Record, *Connection4) error
 var OnCloseRecordFunc func(*Connection4) error
 
+var ConnectionMap *sync.Map = new(sync.Map)
+
 type Connection4 struct {
 	LocalIp    net.IP
 	RemoteIp   net.IP
@@ -93,6 +95,8 @@ func NewConnFromEvent(event *bpf.AgentConnEvtT, p *Processor) *Connection4 {
 	}
 	conn.StreamEvents = NewKernEventStream(conn, 300)
 	conn.ConnectStartTs = event.Ts + common.LaunchEpochTime
+	sockKey, _ := conn.extractSockKeys()
+	ConnectionMap.Store(sockKey, conn)
 	return conn
 }
 
@@ -136,12 +140,25 @@ func InitConnManager() *ConnManager {
 				return true
 			})
 			for _, tgidFd := range _needsDelete {
-				connManager.connMap.Delete(tgidFd)
+				c, loaded := connManager.connMap.LoadAndDelete(tgidFd)
+				if loaded {
+					conn := c.(*Connection4)
+					RemoveConnFromSockKeyMap(conn)
+				}
 			}
 			atomic.AddInt64(&connManager.connectionClosed, int64(len(_needsDelete)))
 		}
 	}()
 	return connManager
+}
+
+func RemoveConnFromSockKeyMap(c *Connection4) {
+	key, _ := c.extractSockKeys()
+	ConnectionMap.Delete(key)
+	for _, prev := range c.prevConn {
+		key, _ := prev.extractSockKeys()
+		ConnectionMap.Delete(key)
+	}
 }
 
 func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
@@ -152,6 +169,7 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 				common.ConntrackLog.Debugf("[AddConnection4] %s find existed conn with same tgidfd but ip port not same: %s", conn.ToString(), existedConn.ToString())
 			}
 			prevConn := existedConn.prevConn
+			existedConn.prevConn = nil
 			deleteEndIdx := -1
 			for idx := len(prevConn) - 1; idx >= 0; idx-- {
 				if prevConn[idx].Status == Closed {
@@ -160,6 +178,10 @@ func (c *ConnManager) AddConnection4(TgidFd uint64, conn *Connection4) error {
 				}
 			}
 			if deleteEndIdx != -1 {
+				deleted := prevConn[:deleteEndIdx+1]
+				for _, conn := range deleted {
+					RemoveConnFromSockKeyMap(conn)
+				}
 				prevConn = prevConn[deleteEndIdx+1:]
 				atomic.AddInt64(&c.connectionClosed, int64(deleteEndIdx)+1)
 			}
@@ -209,7 +231,7 @@ func (c *ConnManager) FindConnection4Exactly(TgidFd uint64) *Connection4 {
 	}
 }
 
-func (c *ConnManager) FindConnection4Or(TgidFd uint64, ts uint64) *Connection4 {
+func (c *ConnManager) LookupConnection4ByTimestamp(TgidFd uint64, ts uint64) *Connection4 {
 	v, _ := c.connMap.Load(TgidFd)
 	connection, _ := v.(*Connection4)
 	if connection == nil {
@@ -219,14 +241,8 @@ func (c *ConnManager) FindConnection4Or(TgidFd uint64, ts uint64) *Connection4 {
 			return connection
 		} else {
 			curConnList := connection.prevConn
-			if len(curConnList) > 0 {
-				lastPrevConn := curConnList[len(curConnList)-1]
-				if lastPrevConn.CloseTs != 0 && lastPrevConn.CloseTs < ts {
-					return connection
-				}
-			}
 			for idx := len(curConnList) - 1; idx >= 0; idx-- {
-				if curConnList[idx].ConnectStartTs < ts {
+				if curConnList[idx].timeBoundCheck(ts) {
 					return curConnList[idx]
 				}
 			}
@@ -263,6 +279,19 @@ func (c *Connection4) AddSslEvent(e *bpf.SslData) {
 
 func (c *Connection4) ProtocolInferred() bool {
 	return (c.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown) && (c.Protocol != bpf.AgentTrafficProtocolTKProtocolUnset)
+}
+
+func (c *Connection4) timeBoundCheck(toCheck uint64) bool {
+	if c.ConnectStartTs == 0 {
+		return true
+	}
+	if toCheck < c.ConnectStartTs {
+		return false
+	}
+	if c.CloseTs != 0 && toCheck > c.CloseTs {
+		return false
+	}
+	return true
 }
 
 func (c *Connection4) extractSockKeys() (bpf.AgentSockKey, bpf.AgentSockKey) {
@@ -349,7 +378,10 @@ func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m
 func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 	isReq, ok := isReq(c, event)
 	if event.Len > 0 {
-		c.StreamEvents.AddKernEvent(event)
+		alreadyExisted := c.StreamEvents.AddKernEvent(event)
+		if !alreadyExisted {
+			return false
+		}
 	} else if ok {
 		if (event.Flags&uint8(common.TCP_FLAGS_SYN) != 0) && !isReq && event.Step == bpf.AgentStepTIP_IN {
 			// 接收到Server给的Syn包
@@ -375,12 +407,36 @@ func (c *Connection4) OnKernEvent(event *bpf.AgentKernEvt) bool {
 	}
 	return true
 }
-func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernEvt) {
+
+func getEventTimestamp(ke *bpf.AgentKernEvt, c *Connection4, isReq bool) uint64 {
+	side := c.Side()
+	if side == common.AllSide {
+		return ke.Ts + uint64(ke.TsDelta)
+	} else if side == common.ClientSide {
+		if isReq {
+			return ke.Ts
+		} else {
+			return ke.Ts + uint64(ke.TsDelta)
+		}
+	} else {
+		if isReq {
+			return ke.Ts + uint64(ke.TsDelta)
+		} else {
+			return ke.Ts
+		}
+	}
+}
+
+func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernEvt) bool {
+	addedToBuffer := false
 	isReq, _ := isReq(c, ke)
 	if isReq {
-		c.reqStreamBuffer.Add(ke.Seq, data, ke.Ts)
+		addedToBuffer = c.reqStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
 	} else {
-		c.respStreamBuffer.Add(ke.Seq, data, ke.Ts)
+		addedToBuffer = c.respStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
+	}
+	if !addedToBuffer {
+		return false
 	}
 	reqSteamMessageType := protocol.Request
 	if c.Role == bpf.AgentEndpointRoleTKRoleUnknown {
@@ -392,6 +448,7 @@ func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernE
 	}
 	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, ke)
 	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, ke)
+	return true
 }
 func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChannel chan RecordWithConn) {
 	if len(data) > 0 {
@@ -403,7 +460,7 @@ func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChan
 
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
-		panic("no protocol parser!")
+		return
 	}
 
 	records := parser.Match(&c.ReqQueue, &c.RespQueue)
@@ -413,25 +470,30 @@ func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChan
 		}
 	}
 }
-func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, recordChannel chan RecordWithConn) {
+func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, recordChannel chan RecordWithConn) bool {
+	addedToBuffer := true
 	if len(data) > 0 {
 		if c.ssl {
 			if common.ConntrackLog.Level >= logrus.WarnLevel {
 				common.ConntrackLog.Warnf("%s is ssl, but receive syscall event with data!", c.ToString())
 			}
 		} else {
-			c.addDataToBufferAndTryParse(data, &event.SyscallEvent.Ke)
+			addedToBuffer = c.addDataToBufferAndTryParse(data, &event.SyscallEvent.Ke)
 		}
 	} else if event.SyscallEvent.GetSourceFunction() == bpf.AgentSourceFunctionTKSyscallSendfile {
 		// sendfile has no data, so we need to fill a fake data
 		common.ConntrackLog.Errorln("sendfile has no data, so we need to fill a fake data")
 		fakeData := make([]byte, event.SyscallEvent.Ke.Len)
-		c.addDataToBufferAndTryParse(fakeData, &event.SyscallEvent.Ke)
+		addedToBuffer = c.addDataToBufferAndTryParse(fakeData, &event.SyscallEvent.Ke)
+	}
+	if !addedToBuffer {
+		return false
 	}
 	c.StreamEvents.AddSyscallEvent(event)
 
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
+		return true
 		panic("no protocol parser!")
 	}
 
@@ -441,6 +503,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 			recordChannel <- RecordWithConn{record, c}
 		}
 	}
+	return true
 }
 
 func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, ke *bpf.AgentKernEvt) {

@@ -128,6 +128,11 @@ func SetupAgent(options ac.AgentOptions) {
 		if err != nil {
 			return
 		}
+		firstPacketChannel := make(chan *bpf.AgentFirstPacketEvt, 10)
+		firstPacketProcessor := conn.NewFirstPacketProcessor(firstPacketChannel, pm.GetFirstPacketEventsChannels())
+		go firstPacketProcessor.Start()
+		err = bpf.PullFirstPacketEvents(ctx, firstPacketChannel, options.FirstPacketEventMapPageNum)
+
 		err = _bf.AttachProgs(&options)
 		if err != nil {
 			return

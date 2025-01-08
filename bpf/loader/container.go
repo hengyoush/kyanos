@@ -124,18 +124,3 @@ func removeNonFilterAbleContainers(containers []types.Container) []types.Contain
 	}
 	return final
 }
-
-func initProcExitEventChannel(ctx context.Context) chan *bpf.AgentProcessExitEvent {
-	ch := make(chan *bpf.AgentProcessExitEvent, 10)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case evt := <-ch:
-				common.DeleteIfIdxToNameEntry(int(evt.Pid))
-			}
-		}
-	}()
-	return ch
-}

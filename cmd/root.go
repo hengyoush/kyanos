@@ -95,6 +95,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&options.SslPerfEventMapPageNum, "ssl-perf-event-map-page-num", 512, "pageNum of eBPF map size for ssl data events buffer")
 	rootCmd.PersistentFlags().IntVar(&options.ConnPerfEventMapPageNum, "conn-perf-event-map-page-num", 4, "pageNum of eBPF map size for conn data events buffer")
 	rootCmd.PersistentFlags().IntVar(&options.KernPerfEventMapPageNum, "kern-perf-event-map-page-num", 32, "pageNum of eBPF map size for kern events buffer")
+	rootCmd.PersistentFlags().IntVar(&options.FirstPacketEventMapPageNum, "first-packet-event-map-page-num", 32, "pageNum of eBPF map size for first packet events buffer")
 
 	// internal
 	rootCmd.PersistentFlags().BoolVar(&options.PerformanceMode, "performance-mode", true, "--performance false")
@@ -116,6 +117,7 @@ func init() {
 	rootCmd.PersistentFlags().MarkHidden("ssl-perf-event-map-page-num")
 	rootCmd.PersistentFlags().MarkHidden("conn-perf-event-map-page-num")
 	rootCmd.PersistentFlags().MarkHidden("kern-perf-event-map-page-num")
+	rootCmd.PersistentFlags().MarkHidden("first-packet-event-map-page-num")
 
 	rootCmd.Flags().SortFlags = false
 	rootCmd.PersistentFlags().SortFlags = false

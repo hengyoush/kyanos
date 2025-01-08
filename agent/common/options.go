@@ -69,6 +69,7 @@ type AgentOptions struct {
 	SslPerfEventMapPageNum     int
 	ConnPerfEventMapPageNum    int
 	KernPerfEventMapPageNum    int
+	FirstPacketEventMapPageNum int
 }
 
 func (o AgentOptions) FilterByContainer() bool {

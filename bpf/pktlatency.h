@@ -174,6 +174,7 @@ struct conn_id_s_t {
 struct kern_evt {
 	char func_name[FUNC_NAME_LIMIT];
 	uint64_t ts;
+	uint32_t ts_delta;
 	uint64_t seq;
 	uint32_t len;
   uint8_t flags;
@@ -181,6 +182,16 @@ struct kern_evt {
   struct conn_id_s_t conn_id_s;
   enum step_t step;
 };
+
+struct first_packet_evt {
+	uint64_t ts;
+	uint32_t len;
+  uint8_t flags;
+	uint32_t ifindex;
+  enum step_t step;
+  struct sock_key key;
+};
+
 #define MAX_MSG_SIZE 30720
 struct kern_evt_data {
   struct kern_evt ke;
@@ -236,7 +247,8 @@ struct data_args {
   // For sendmmsg()
   unsigned int* msg_len;
   size_t* ssl_ex_len;
-  uint64_t ts;
+  uint64_t start_ts; 
+  uint64_t end_ts;
 };
 struct close_args {
   uint32_t fd;
@@ -246,7 +258,8 @@ struct sendfile_args {
   int32_t out_fd;
   int32_t in_fd;
   size_t count;
-  uint64_t ts;
+  uint64_t start_ts; 
+  uint64_t end_ts;
 };
 
 struct connect_args {
@@ -426,4 +439,4 @@ struct nf_conn___older_52 {
     struct nf_conntrack_tuple_hash___custom tuplehash[IP_CT_DIR_MAX];
 } __attribute__((preserve_access_index));
 
-#endif		
+#endif

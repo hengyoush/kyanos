@@ -110,6 +110,7 @@ static __always_inline int do_SSL_read_entry_offset(struct pt_regs* ctx, bool is
     read_args.source_fn = kSSLRead;
     read_args.fd = fd;
     read_args.buf = buf;
+    read_args.start_ts = bpf_ktime_get_ns();
     bpf_map_update_elem(&active_ssl_read_args_map, &id, &read_args, BPF_ANY);
     set_conn_as_ssl(tgid, fd);
     return BPF_OK;
@@ -120,6 +121,7 @@ static __always_inline int do_SSL_read_ret_offset(struct pt_regs* ctx) {
 
     struct data_args* read_args = bpf_map_lookup_elem(&active_ssl_read_args_map, &id);
     if (read_args != NULL) {
+        read_args->end_ts = bpf_ktime_get_ns();
         process_ssl_data(ctx, id, kIngress, read_args, false, 0);
     }
 
@@ -143,6 +145,7 @@ static __always_inline int do_SSL_write_entry_offset(struct pt_regs* ctx, bool i
     write_args.source_fn = kSSLWrite;
     write_args.fd = fd;
     write_args.buf = buf;
+    write_args.start_ts = bpf_ktime_get_ns();
     bpf_map_update_elem(&active_ssl_write_args_map, &id, &write_args, BPF_ANY);
     set_conn_as_ssl(tgid, fd);
     return BPF_OK;
@@ -154,6 +157,7 @@ static __always_inline int do_SSL_write_ret_offset(struct pt_regs* ctx) {
 
     struct data_args* write_args = bpf_map_lookup_elem(&active_ssl_write_args_map, &id);
     if (write_args != NULL) {
+        write_args->end_ts = bpf_ktime_get_ns();
         process_ssl_data(ctx, id, kEgress, write_args, false, 0);
     }
 
@@ -177,6 +181,7 @@ static __always_inline int do_SSL_read_entry(struct pt_regs* ctx, bool is_ex_cal
     struct data_args read_args = {};
     read_args.source_fn = kSSLRead;
     read_args.buf = buf;
+    read_args.start_ts = bpf_ktime_get_ns();
     if (is_ex_call) {
         size_t* ssl_ex_len = (size_t*)PT_REGS_PARM4(ctx);
         read_args.ssl_ex_len = ssl_ex_len;
@@ -198,6 +203,7 @@ static __always_inline int do_SSL_read_ret(struct pt_regs* ctx, bool is_ex_call)
 
     struct data_args* data_arg = bpf_map_lookup_elem(&active_ssl_read_args_map, &id);
     if (data_arg) {
+        data_arg->end_ts = bpf_ktime_get_ns();
         // bpf_printk("bc: %d", PT_REGS_RC(ctx));
         data_arg->fd = fd;
         process_ssl_data(ctx, id, kIngress, data_arg, is_ex_call, nested_syscall_fd_ptr->syscall_len);
@@ -223,6 +229,7 @@ static __always_inline int do_SSL_write_entry(struct pt_regs* ctx, bool is_ex_ca
     struct data_args write_args = {};
     write_args.source_fn = kSSLWrite;
     write_args.buf = buf;
+    write_args.start_ts = bpf_ktime_get_ns();
     if (is_ex_call) {
         size_t* ssl_ex_len = (size_t*)PT_REGS_PARM4(ctx);
         write_args.ssl_ex_len = ssl_ex_len;
@@ -244,6 +251,7 @@ static __always_inline int do_SSL_write_ret(struct pt_regs* ctx, bool is_ex_call
 
     struct data_args* data_arg = bpf_map_lookup_elem(&active_ssl_write_args_map, &id);
     if (data_arg) {
+        data_arg->end_ts = bpf_ktime_get_ns();
         // bpf_printk("do_SSL_write_ret, tgid: %lld, fd: %d, bc: %d", id>>32, fd, PT_REGS_RC(ctx));
         data_arg->fd = fd;
         process_ssl_data(ctx, id, kEgress, data_arg, is_ex_call, nested_syscall_fd_ptr->syscall_len);

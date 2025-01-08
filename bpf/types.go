@@ -9,6 +9,14 @@ func (s SyscallEvent) GetSourceFunction() AgentSourceFunctionT {
 	return AgentSourceFunctionT(s.Ke.FuncName[0])
 }
 
+func (s SyscallEvent) GetStartTs() uint64 {
+	return s.Ke.Ts
+}
+
+func (s SyscallEvent) GetEndTs() uint64 {
+	return s.Ke.Ts + uint64(s.Ke.TsDelta)
+}
+
 type SyscallEventData struct {
 	SyscallEvent SyscallEvent
 	Buf          []byte
@@ -18,6 +26,14 @@ type SslEventHeader struct {
 	SyscallSeq uint64
 	SyscallLen uint32
 	BufSize    uint32
+}
+
+func (s SslEventHeader) GetStartTs() uint64 {
+	return s.Ke.Ts
+}
+
+func (s SslEventHeader) GetEndTs() uint64 {
+	return s.Ke.Ts + uint64(s.Ke.TsDelta)
 }
 
 type SslData struct {
