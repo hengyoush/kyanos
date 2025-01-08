@@ -47,10 +47,10 @@ type Connection4 struct {
 
 	reqStreamBuffer          *buffer.StreamBuffer
 	respStreamBuffer         *buffer.StreamBuffer
-	ReqQueue                 []protocol.ParsedMessage
+	ReqQueue                 map[protocol.StreamId]*protocol.ParsedMessageQueue
+	RespQueue                map[protocol.StreamId]*protocol.ParsedMessageQueue
 	lastReqMadeProgressTime  int64
 	lastRespMadeProgressTime int64
-	RespQueue                []protocol.ParsedMessage
 	StreamEvents             *KernEventStream
 	protocolParsers          map[bpf.AgentTrafficProtocolT]protocol.ProtocolStreamParser
 
@@ -83,8 +83,8 @@ func NewConnFromEvent(event *bpf.AgentConnEvtT, p *Processor) *Connection4 {
 
 		reqStreamBuffer:  buffer.New(1024 * 1024),
 		respStreamBuffer: buffer.New(1024 * 1024),
-		ReqQueue:         make([]protocol.ParsedMessage, 0),
-		RespQueue:        make([]protocol.ParsedMessage, 0),
+		ReqQueue:         make(map[protocol.StreamId]*protocol.ParsedMessageQueue),
+		RespQueue:        make(map[protocol.StreamId]*protocol.ParsedMessageQueue),
 
 		prevConn: []*Connection4{},
 
@@ -446,8 +446,8 @@ func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernE
 	if c.Role == bpf.AgentEndpointRoleTKRoleUnknown {
 		respSteamMessageType = protocol.Unknown
 	}
-	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, &c.ReqQueue, ke)
-	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, &c.RespQueue, ke)
+	c.parseStreamBuffer(c.reqStreamBuffer, reqSteamMessageType, c.ReqQueue, ke)
+	c.parseStreamBuffer(c.respStreamBuffer, respSteamMessageType, c.RespQueue, ke)
 	return true
 }
 func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChannel chan RecordWithConn) {
@@ -463,7 +463,7 @@ func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChan
 		return
 	}
 
-	records := parser.Match(&c.ReqQueue, &c.RespQueue)
+	records := parser.Match(c.ReqQueue, c.RespQueue)
 	if len(records) != 0 {
 		for _, record := range records {
 			recordChannel <- RecordWithConn{record, c}
@@ -497,7 +497,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 		panic("no protocol parser!")
 	}
 
-	records := parser.Match(&c.ReqQueue, &c.RespQueue)
+	records := parser.Match(c.ReqQueue, c.RespQueue)
 	if len(records) != 0 {
 		for _, record := range records {
 			recordChannel <- RecordWithConn{record, c}
@@ -506,7 +506,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 	return true
 }
 
-func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue *[]protocol.ParsedMessage, ke *bpf.AgentKernEvt) {
+func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, resultQueue map[protocol.StreamId]*protocol.ParsedMessageQueue, ke *bpf.AgentKernEvt) {
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
 		return
@@ -547,7 +547,14 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 				if len(parseResult.ParsedMessages) > 0 && parseResult.ParsedMessages[0].IsReq() != (messageType == protocol.Request) {
 					streamBuffer.RemovePrefix(parseResult.ReadBytes)
 				} else {
-					*resultQueue = append(*resultQueue, parseResult.ParsedMessages...)
+					for _, parsedMessage := range parseResult.ParsedMessages {
+						streamId := parsedMessage.StreamId()
+						if resultQueue[streamId] == nil {
+							queue := protocol.ParsedMessageQueue(make([]protocol.ParsedMessage, 0))
+							resultQueue[streamId] = &queue
+						}
+						*resultQueue[streamId] = append(*resultQueue[streamId], parsedMessage)
+					}
 					streamBuffer.RemovePrefix(parseResult.ReadBytes)
 				}
 			}
@@ -744,6 +751,6 @@ func (c *Connection4) GetProtocolParser(p bpf.AgentTrafficProtocolT) protocol.Pr
 func (c *Connection4) resetParseProgress() {
 	c.reqStreamBuffer.Clear()
 	c.respStreamBuffer.Clear()
-	c.ReqQueue = c.ReqQueue[:]
-	c.RespQueue = c.RespQueue[:]
+	c.ReqQueue = make(map[protocol.StreamId]*protocol.ParsedMessageQueue)
+	c.RespQueue = make(map[protocol.StreamId]*protocol.ParsedMessageQueue)
 }

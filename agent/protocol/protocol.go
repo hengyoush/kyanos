@@ -9,9 +9,12 @@ import (
 
 type ProtocolCreator func() ProtocolStreamParser
 
+type StreamId int64
+
+type ParsedMessageQueue []ParsedMessage
+
 var ParsersMap map[bpf.AgentTrafficProtocolT]ProtocolCreator = make(map[bpf.AgentTrafficProtocolT]ProtocolCreator)
 
-// TODO 修改未每一个processor有自己的parser
 func GetParserByProtocol(protocol bpf.AgentTrafficProtocolT) ProtocolStreamParser {
 	parserCreator, ok := ParsersMap[protocol]
 	if ok {
@@ -60,7 +63,7 @@ func (r *Record) String(opt RecordToStringOptions) string {
 type ProtocolStreamParser interface {
 	ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult
 	FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int
-	Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record
+	Match(reqStreams map[StreamId]*ParsedMessageQueue, respStreams map[StreamId]*ParsedMessageQueue) []Record
 }
 
 type ParsedMessage interface {
@@ -69,6 +72,7 @@ type ParsedMessage interface {
 	ByteSize() int
 	IsReq() bool
 	Seq() uint64
+	StreamId() StreamId
 }
 
 type ParseState int

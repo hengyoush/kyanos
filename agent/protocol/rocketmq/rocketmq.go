@@ -77,6 +77,10 @@ func (r *RocketMQMessage) IsReq() bool {
 	return r.isReq
 }
 
+func (r *RocketMQMessage) StreamId() protocol.StreamId {
+	return 0
+}
+
 func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType) protocol.ParseResult {
 	buffer := streamBuffer.Head().Buffer()
 	common.ProtocolParserLog.Debugf("ParseStream received buffer length: %d", len(buffer))
@@ -279,7 +283,12 @@ func (r *RocketMQStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, m
 	return -1
 }
 
-func (r *RocketMQStreamParser) Match(reqStream *[]protocol.ParsedMessage, respStream *[]protocol.ParsedMessage) []protocol.Record {
+func (r *RocketMQStreamParser) Match(reqStreams map[protocol.StreamId]*protocol.ParsedMessageQueue, respStreams map[protocol.StreamId]*protocol.ParsedMessageQueue) []protocol.Record {
+	reqStream, ok1 := reqStreams[0]
+	respStream, ok2 := respStreams[0]
+	if !ok1 || !ok2 {
+		return []protocol.Record{}
+	}
 	common.ProtocolParserLog.Debugf("Matching %d requests with %d responses.", len(*reqStream), len(*respStream))
 	records := []protocol.Record{}
 

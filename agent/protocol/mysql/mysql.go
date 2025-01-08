@@ -57,7 +57,12 @@ func (m *MysqlParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageTyp
 	return -1
 }
 
-func (m *MysqlParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
+func (m *MysqlParser) Match(reqStreams map[StreamId]*ParsedMessageQueue, respStreams map[StreamId]*ParsedMessageQueue) []Record {
+	reqStream, ok1 := reqStreams[0]
+	respStream, ok2 := respStreams[0]
+	if !ok1 || !ok2 {
+		return []Record{}
+	}
 	records := make([]Record, 0)
 	for len(*reqStream) != 0 {
 		reqPacket := (*reqStream)[0].(*MysqlPacket)
@@ -112,13 +117,13 @@ func (m *MysqlParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMess
 	return records
 }
 
-func syncRespQueue(reqPacket *MysqlPacket, respStream *[]ParsedMessage) {
+func syncRespQueue(reqPacket *MysqlPacket, respStream *ParsedMessageQueue) {
 	for len(*respStream) != 0 && (*respStream)[0].TimestampNs() < reqPacket.TimestampNs() {
 		*respStream = (*respStream)[1:]
 	}
 }
 
-func getRespView(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []ParsedMessage {
+func getRespView(reqStream *ParsedMessageQueue, respStream *ParsedMessageQueue) []ParsedMessage {
 	count := 0
 	for _, resp := range *respStream {
 		if len(*reqStream) > 1 && resp.TimestampNs() > (*reqStream)[1].TimestampNs() {
