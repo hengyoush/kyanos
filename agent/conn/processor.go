@@ -217,6 +217,7 @@ func (p *Processor) run() {
 				// previousProtocol := conn.Protocol
 				if conn != nil && conn.Status != Closed {
 					conn.Protocol = event.ConnInfo.Protocol
+					common.ConntrackLog.Debugf("[protocol-infer][%s] protocol updated: %d", conn.ToString(), conn.Protocol)
 				} else {
 					if conn == nil {
 						missedConn := NewConnFromEvent(event, p)
@@ -226,6 +227,7 @@ func (p *Processor) run() {
 						p.connManager.AddConnection4(TgidFd, missedConn)
 						conn = missedConn
 					} else {
+						common.ConntrackLog.Debugf("[protocol-infer][%s] protocol not updated: %d", conn.ToString(), conn.Protocol)
 						continue
 					}
 				}
@@ -258,7 +260,7 @@ func (p *Processor) run() {
 							}
 						}
 						conn.TempSslEvents = conn.TempSslEvents[0:0]
-						conn.UpdateConnectionTraceable(true)
+						conn.UpdateConnectionTraceable(bpf.AgentConnTraceStateTTraceable)
 						// handle kern events
 						for _, kernEvent := range conn.TempKernEvents {
 							if conn.timeBoundCheck(kernEvent.Ts) {
@@ -275,7 +277,13 @@ func (p *Processor) run() {
 					if common.ConntrackLog.Level >= logrus.DebugLevel {
 						common.ConntrackLog.Debugf("%s discarded due to not interested, isProtocolInterested: %v, isSideNotMatched:%v", conn.ToString(), isProtocolInterested, isSideNotMatched(p, conn))
 					}
-					conn.UpdateConnectionTraceable(false)
+					if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
+						conn.UpdateConnectionTraceable(bpf.AgentConnTraceStateTProtocolUnknown)
+					} else if !isProtocolInterested {
+						conn.UpdateConnectionTraceable(bpf.AgentConnTraceStateTProtocolNotMatched)
+					} else {
+						conn.UpdateConnectionTraceable(bpf.AgentConnTraceStateTOther)
+					}
 					// conn.OnClose(true)
 				}
 			}
@@ -464,7 +472,7 @@ func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChann
 		}
 		return
 	}
-	if conn != nil && !conn.tracable {
+	if conn != nil && !conn.IsTraceble() {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[syscall][no-trace][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
 		}
@@ -538,7 +546,7 @@ func (p *Processor) processSslEvent(event *bpf.SslData, recordChannel chan Recor
 		}
 		return
 	}
-	if conn != nil && !conn.tracable {
+	if conn != nil && !conn.IsTraceble() {
 		conn.AddSslEvent(event)
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[ssl][no-trace][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
@@ -576,12 +584,12 @@ func onRoleChanged(p *Processor, conn *Connection4) {
 		if common.ConntrackLog.Level >= logrus.DebugLevel {
 			common.ConntrackLog.Debugf("[onRoleChanged] %s discarded due to not matched by side", conn.ToString())
 		}
-		conn.UpdateConnectionTraceable(false)
+		conn.UpdateConnectionTraceable(bpf.AgentConnTraceStateTOther)
 	} else {
 		if common.ConntrackLog.Level >= logrus.DebugLevel {
 			common.ConntrackLog.Debugf("[onRoleChanged] %s actived due to matched by side", conn.ToString())
 		}
-		conn.UpdateConnectionTraceable(true)
+		conn.UpdateConnectionTraceable(bpf.AgentConnTraceStateTTraceable)
 	}
 }
 

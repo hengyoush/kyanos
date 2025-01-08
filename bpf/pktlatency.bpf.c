@@ -31,6 +31,7 @@ const enum conn_type_t *conn_type_t_unused __attribute__((unused));
 const enum endpoint_role_t *endpoint_role_unused  __attribute__((unused));
 const enum traffic_direction_t *traffic_direction_t_unused __attribute__((unused));
 const enum traffic_protocol_t *traffic_protocol_t_unused __attribute__((unused));
+const enum conn_trace_state_t *conn_trace_state_t_unused __attribute__((unused));
 const enum source_function_t *source_function_t_unused __attribute__((unused));
 const enum control_value_index_t *control_value_index_t_unused __attribute__((unused));
 const enum step_t *step_t_unused __attribute__((unused));
@@ -177,7 +178,7 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 	}
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
  
-	if (conn_id_s == NULL || conn_id_s->no_trace) {
+	if (conn_id_s == NULL || conn_id_s->no_trace > traceable) {
 		return;
 	}
 	uint64_t tgid_fd = conn_id_s->tgid_fd;
@@ -224,7 +225,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	
 	bool has_conn_info = true;
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
-	has_conn_info = conn_id_s != NULL && !conn_id_s->no_trace;
+	has_conn_info = conn_id_s != NULL && conn_id_s->no_trace <= traceable;
 	if (has_conn_info) {
 		uint64_t tgid_fd = conn_id_s->tgid_fd;
 		struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
@@ -1363,6 +1364,7 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	if (direct == kEgress) {
 		conn_info->write_bytes += bytes_count;
 	} else {
+		// bpf_printk("read+bytes, tgid:%u, fd: %d, bytes_count:%d", tgid, args->fd, bytes_count);
 		conn_info->read_bytes += bytes_count;
 	}
 }

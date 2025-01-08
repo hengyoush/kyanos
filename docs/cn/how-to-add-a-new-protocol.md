@@ -200,6 +200,8 @@ Warn:
 
 1. 新协议的规则可能会导致误报或漏报，导致影响其他协议的准确性。
 2. 规则的顺序很重要。
+3. 不要在最终的 eBPF 代码中出现字符串字面量，例如使用 `bpf_printk`
+   打印日志（如果你在调试当然允许），低版本的内核不支持
 
 出于这些原因，你需要注意以下几个事情：
 
@@ -241,10 +243,38 @@ func init() {
 }
 ```
 
-## Step.6-添加 e2e 测试
+## Step.6-添加测试
+
+### 添加 e2e 测试
 
 在 testdata 目录下添加对应协议的 e2e 测试，可以参考其他协议的写法（比如
 `test_redis.sh` 等）。
+
+然后在 ./github/workflows/test.yml 中添加你的测试步骤：
+
+```yaml
+- name: Your Test name
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then
+                bash /host/testdata/YOUR_TEST_SCRIPT.sh 'sudo /host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else
+                bash /host/testdata/YOUR_TEST_SCRIPT.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
+            fi
+```
+
+💡
+Hint: 一开始可以将你的测试放在 workflow 的前面，这样能很快执行到你的测试，便于发现问题。
+
+### 添加协议解析单元测试
+
+给你的 `ProtoclParser`
+的三个 function 添加单元测试，模拟对应协议的输入 case 完成测试。
 
 ## 其他
 

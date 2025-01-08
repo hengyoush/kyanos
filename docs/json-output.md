@@ -1,4 +1,4 @@
-# JSON Output Format
+# JSON Output Format <Badge type="tip" text="1.5.0" />
 
 This document describes the JSON output format when using kyanos with the
 `--json-output` flag.
