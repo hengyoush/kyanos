@@ -486,7 +486,7 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 		}
 	} else if event.SyscallEvent.GetSourceFunction() == bpf.AgentSourceFunctionTKSyscallSendfile {
 		// sendfile has no data, so we need to fill a fake data
-		common.ConntrackLog.Errorln("sendfile has no data, so we need to fill a fake data")
+		common.ConntrackLog.Debug("sendfile has no data, so we need to fill a fake data")
 		fakeData := make([]byte, event.SyscallEvent.Ke.Len)
 		addedToBuffer = c.addDataToBufferAndTryParse(fakeData, &event.SyscallEvent.Ke)
 	}
