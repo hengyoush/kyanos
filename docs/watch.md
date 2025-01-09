@@ -66,7 +66,7 @@ The second section contains the **request and response content**, split into
 Request and Response parts. Content exceeding 1024 bytes is truncated, but you
 can adjust this limit using the `--max-print-bytes` option.
 
-## JSON Output
+## JSON Output <Badge type="tip" text="1.5.0" />
 
 If you need to process the captured data programmatically, you can use the
 `--json-output` flag to output the results in JSON format:
@@ -170,7 +170,7 @@ Here are the options available for filtering by each protocol:
 | Request Key        | `keys`            | `--keys foo,bar` <br> Only observe requests with the keys `foo` and `bar`.                  |
 | Request Key Prefix | `key-prefix`      | `--key-prefix foo:bar` <br> Only observe requests with keys that have the prefix `foo:bar`. |
 
-#### RocketMQ Protocol Filtering
+#### RocketMQ Protocol Filtering <Badge type="tip" text="1.5.0" />
 
 | Filter Condition | Command Line Flag | Example                                                                                    |
 | ---------------- | ----------------- | ------------------------------------------------------------------------------------------ |

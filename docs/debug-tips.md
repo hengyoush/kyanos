@@ -89,6 +89,11 @@ Open the project directly in VSCODE, and add the following configuration to
 
 Make sure to add the `--debug-output` parameter.
 
+## eBPF Related
+
+Protocol inference code can be debugged by printing logs using `bpf_printk`,
+refer to: https://nakryiko.com/posts/bpf-tips-printk/.
+
 ## Source Code Structure
 
 ```

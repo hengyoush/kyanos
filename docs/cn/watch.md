@@ -55,7 +55,7 @@ kyanos watch
 **请求响应的具体内容**，分为 Request 和 Response 两部分，超过 1024 字节会截断展示（通过
 `--max-print-bytes` 选项可以调整这个限制）。
 
-## JSON 输出
+## JSON 输出 <Badge type="tip" text="1.5.0" />
 
 如果你需要以编程方式处理采集到的数据，可以使用 `--json-output`
 参数将结果输出为 JSON 格式：
@@ -142,11 +142,11 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 | 请求 Key      | `keys`       | `--keys foo,bar ` 只观察请求 key 为 foo 和 bar        |
 | 请求 key 前缀 | `key-prefix` | `--method foo:bar ` 只观察请求的 key 前缀为 foo\: bar |
 
-#### RocketMQ 协议过滤
+#### RocketMQ 协议过滤 <Badge type="tip" text="1.5.0" />
 
 | 过滤条件 | 命令行 flag     | 示例                                                                    |
 | :------- | :-------------- | :---------------------------------------------------------------------- |
-| 请求代码 | `request-codes` | `--request-codes 10,11` 只观察请求代码为 10 和 11 的                     |
+| 请求代码 | `request-codes` | `--request-codes 10,11` 只观察请求代码为 10 和 11 的                    |
 | 语言     | `languages`     | `--languages Java,Go ` 只观察使用 Java 和 Go 编写的应用程序发出的请求。 |
 
 > 有关请求代码的含义和值，请参阅

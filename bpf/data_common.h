@@ -129,7 +129,7 @@ static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
 	// 		return true;
 	// }
 
-	return conn_info->protocol != kProtocolUnknown && !conn_info->no_trace;
+	return conn_info->protocol != kProtocolUnknown && conn_info->no_trace <= traceable ;
 }
 
 static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, uint32_t ts_delta, enum source_function_t source_fn) {
@@ -276,7 +276,7 @@ static __always_inline void process_sendfile_with_conn_info(void* ctx, struct se
 	} else {
 		step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 	}
-	if (conn_info->protocol != kProtocolUnknown && (!conn_info->no_trace)) {//, bytes_count
+	if (conn_info->protocol != kProtocolUnknown && ( conn_info->no_trace <= traceable)) {//, bytes_count
 		report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->start_ts, args->end_ts - args->start_ts, kSyscallSendfile);
 	}
 }
@@ -286,12 +286,12 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 	bool inferred = false;
 	if ((conn_info->protocol == kProtocolUnset || conn_info->protocol == kProtocolUnknown) && with_data) {
 		enum traffic_protocol_t before_infer = conn_info->protocol;
-		// bpf_printk("[protocol infer]:start, bc:%d", bytes_count);
+		// bpf_printk("SSL[protocol infer]:start, bc:%d", bytes_count);
 		// conn_info->protocol = protocol_message.protocol;
 		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, conn_info);
 		if (before_infer != protocol_message.protocol) {
 			conn_info->protocol = protocol_message.protocol;
-			// bpf_printk("[protocol infer]: %d, func: %d", conn_info->protocol, args->source_fn);
+			// bpf_printk("SSL[protocol infer]: %d, func: %d", conn_info->protocol, args->source_fn);
 			
 			if (conn_info->role == kRoleUnknown && protocol_message.type != kUnknown) {
 				conn_info->role = ((direct == kEgress) ^ (protocol_message.type == kResponse))
@@ -313,20 +313,24 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 	} else {
 		step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 	}
-	 
-	if (conn_info->protocol != kProtocolUnknown && (inferred || !conn_info->no_trace)) {//, bytes_count
+	
+	if (conn_info->protocol != kProtocolUnknown && (inferred || conn_info->no_trace <= traceable) ||
+		// condition below is for the case when protocol is already inffered in previous syscall
+		// but user space have not yet updated the conn_info.no_trace to traceable.
+		// so when conn_info.protocol is not unknown but the cause of trace state is unknown, we still trace data.
+		 (conn_info->protocol != kProtocolUnknown && conn_info->no_trace == protocol_unknown)) {
 		if (is_ssl) {
 			uint64_t syscall_seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 			seq = (direct == kEgress ?  conn_info->ssl_write_bytes : conn_info->ssl_read_bytes) + 1;
 			report_ssl_evt(ctx, seq, &conn_id_s, bytes_count, step, args, syscall_len < 0 ? 0 : (syscall_seq - syscall_len), syscall_len < 0 ? 0 : syscall_len);
-			// bpf_printk("report ssl evt, seq: %lld len: %d", seq, bytes_count);
+			// bpf_printk("SSLreport ssl evt, seq: %lld len: %d, syscall_len:%d", seq, bytes_count, syscall_len);
 		} else if (with_data) {
 			report_syscall_evt(ctx, seq, &conn_id_s, bytes_count, step, args);
 		} else {
 			report_syscall_buf_without_data(ctx, seq, &conn_id_s, bytes_count, step, args->start_ts, args->end_ts - args->start_ts, args->source_fn);
 		}
 	} else {
-		// bpf_printk("no trace, bytes_count:%d", bytes_count);
+		// bpf_printk("SSLno trace, bytes_count:%d,p:%d,infer:%d", bytes_count,conn_info->protocol,inferred);
 	}
 }
 

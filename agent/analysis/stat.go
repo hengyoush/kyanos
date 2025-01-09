@@ -202,20 +202,23 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			annotatedRecord.ReqPlainTextSize = events.ingressMessage.ByteSize()
 			annotatedRecord.RespPlainTextSize = events.egressMessage.ByteSize()
 		}
+		canCalculateReadPathTime := !connection.IsSsl() || isKernEvtCanMatchSslEvt(events.sslReadSyscallEvents)
+		canCalculateWritePathTime := !connection.IsSsl() || isKernEvtCanMatchSslEvt(events.sslWriteSyscallEvents)
 		annotatedRecord.ReqSize = events.ingressKernLen
 		annotatedRecord.RespSize = events.egressKernLen
-		if annotatedRecord.StartTs != math.MaxUint64 && hasDevOutEvents {
+		if annotatedRecord.StartTs != math.MaxUint64 && hasDevOutEvents &&
+			(canCalculateReadPathTime && canCalculateWritePathTime) {
 			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		}
-		if hasReadSyscallEvents && hasWriteSyscallEvents {
+		if hasReadSyscallEvents && hasWriteSyscallEvents && canCalculateReadPathTime && canCalculateWritePathTime {
 			annotatedRecord.BlackBoxDuration = float64(events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetEndTs()) - float64(events.readSyscallEvents[0].GetStartTs())
 		} else {
 			annotatedRecord.BlackBoxDuration = float64(events.egressMessage.TimestampNs()) - float64(events.ingressMessage.TimestampNs())
 		}
-		if hasUserCopyEvents && hasTcpInEvents {
+		if hasUserCopyEvents && hasTcpInEvents && canCalculateReadPathTime {
 			annotatedRecord.ReadFromSocketBufferDuration = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetStartTs()) - float64(events.tcpInEvents[0].GetStartTs())
 		}
-		if hasTcpInEvents && hasNicInEvents {
+		if hasTcpInEvents && hasNicInEvents && canCalculateWritePathTime {
 			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetStartTs() - events.nicIngressEvents[0].GetStartTs())
 		}
 		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.readSyscallEvents)
@@ -223,12 +226,14 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.ReqNicEventDetails = KernEventsToNicEventDetails(events.nicIngressEvents)
 		annotatedRecord.RespNicEventDetails = KernEventsToNicEventDetails(events.devOutEvents)
 	} else {
-		if hasWriteSyscallEvents {
+		canCalculateReadPathTime := !connection.IsSsl() || isKernEvtCanMatchSslEvt(events.sslReadSyscallEvents)
+		canCalculateWritePathTime := !connection.IsSsl() || isKernEvtCanMatchSslEvt(events.sslWriteSyscallEvents)
+		if hasWriteSyscallEvents && canCalculateWritePathTime {
 			annotatedRecord.StartTs = findMinTimestamp(events.writeSyscallEvents, true)
 		} else {
 			annotatedRecord.StartTs = events.egressMessage.TimestampNs()
 		}
-		if hasReadSyscallEvents {
+		if hasReadSyscallEvents && canCalculateReadPathTime {
 			annotatedRecord.EndTs = findMaxTimestamp(events.readSyscallEvents, false)
 		} else {
 			annotatedRecord.EndTs = events.ingressMessage.TimestampNs()
@@ -239,12 +244,12 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		}
 		annotatedRecord.ReqSize = events.egressKernLen
 		annotatedRecord.RespSize = events.ingressKernLen
-		if hasReadSyscallEvents && hasWriteSyscallEvents {
+		if hasReadSyscallEvents && hasWriteSyscallEvents && canCalculateReadPathTime && canCalculateWritePathTime {
 			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		} else {
 			annotatedRecord.TotalDuration = float64(events.ingressMessage.TimestampNs()) - float64(events.egressMessage.TimestampNs())
 		}
-		if hasNicInEvents && hasDevOutEvents {
+		if hasNicInEvents && hasDevOutEvents && canCalculateReadPathTime && canCalculateWritePathTime {
 			nicIngressTimestamp := int64(0)
 			for _, nicIngressEvent := range events.nicIngressEvents {
 				_nicIngressTimestamp, _, ok := nicIngressEvent.GetMinIfItmestampAttr()
@@ -271,7 +276,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 				annotatedRecord.BlackBoxDuration = -1
 			}
 		}
-		if (hasUserCopyEvents || hasReadSyscallEvents) && hasTcpInEvents {
+		if (hasUserCopyEvents || hasReadSyscallEvents) && hasTcpInEvents && canCalculateReadPathTime {
 			var readFromEndTime float64
 			if hasUserCopyEvents {
 				readFromEndTime = float64(events.userCopyEvents[len(events.userCopyEvents)-1].GetStartTs())
@@ -280,7 +285,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			}
 			annotatedRecord.ReadFromSocketBufferDuration = readFromEndTime - float64(events.tcpInEvents[0].GetStartTs())
 		}
-		if hasTcpInEvents && hasNicInEvents {
+		if hasTcpInEvents && hasNicInEvents && canCalculateReadPathTime {
 			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetStartTs() - events.nicIngressEvents[0].GetStartTs())
 		}
 		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.writeSyscallEvents)
@@ -317,6 +322,17 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		recordsChannel <- annotatedRecord
 	}
 	return nil
+}
+
+// some syscalls are not nested int ssl events, so we need to check if all ssl events have kernLen>0
+// otherwise, we can't calculate the duration related to kern events because the kern seq is not valid
+func isKernEvtCanMatchSslEvt(events []conn.SslEvent) bool {
+	for _, each := range events {
+		if each.KernLen == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func findMaxTimestamp(events []conn.KernEvent, useStartTs bool) uint64 {

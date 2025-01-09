@@ -91,6 +91,14 @@ enum source_function_t {
   kSSLRead,
 };
 
+enum conn_trace_state_t {
+  unset = 0,
+  traceable,
+  protocol_not_matched,
+  protocol_unknown,
+  other,
+};
+
 enum control_value_index_t {
   // This specify one pid to monitor. This is used during test to eliminate noise.
   // TODO: We need a more robust mechanism for production use, which should be able to:
@@ -168,7 +176,7 @@ struct conn_id_t {
 
 struct conn_id_s_t {
 	uint64_t tgid_fd;
-  bool no_trace;
+  enum conn_trace_state_t no_trace;
 };
 
 struct kern_evt {
@@ -303,7 +311,7 @@ struct conn_info_t {
   char prev_buf[4];
   bool prepend_length_header;
   
-  bool no_trace;
+  enum conn_trace_state_t no_trace;
   bool ssl;
 };
 

@@ -45,10 +45,33 @@ with the `--btf` option when starting kyanos.
 
 ## How to understand the visualization of kernel time in the watch results?
 
-![kyanos time detail](/timedetail.jpg)  
-In the image, `eth0@if483` is the container NIC, and `eth0` is the host NIC.  
-The upper part of the image shows the request from the process sending to the
-NIC, and the lower part shows the response from the NIC to the process.
+![kyanos time detail](/faq-time-detail.png)  
+Each block represents a node that the packet passes through. Starting from the
+top, the first is Process, representing the request sent from the process to the
+second node on the right, eth0@if483, which is the internal network card device
+of the container. The following (used:0.02ms) indicates that it took 0.02ms from
+the previous node process to the internal network card of the container.
+
+By analogy, the next node on the right is eth0, which is the host network card,
+and it can be seen that it took 0.02ms from the container network card to the
+virtual machine network card.
+
+Then the request is sent from the network card, and it takes 13.37ms to receive
+the response from the network card (as shown by the downward arrow in the
+figure). After that, the response receiving process starts from right to left.
+
+Then the container receives the response, which takes 0.06ms, and then it takes
+0.06ms to copy the response data to the TCP buffer. Finally, it takes 0.11ms for
+the process to read the data from the buffer.
+
+You can clearly see the process and time consumption of the request from the
+process sending to the network card, and the response from the network card
+copying to the Socket buffer and being read by the process.
+
+## No HTTP traffic observed after running kyanos?
+
+Make sure the protocol you want to monitor is not HTTP2, as kyanos does not
+currently support it.
 
 ## Incorrect terminal table colors after running (e.g., unable to select records in the table)
 

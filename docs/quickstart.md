@@ -11,14 +11,15 @@ next: false
 
 **Kernel Version Requirements**
 
+For amd64:
+
 - 3.x: Kernel version 3.10.0-957 and above
 - 4.x: Kernel version 4.14 and above
 - 5.x, 6.x: Fully supported
 
-**Architecture Support**
+For arm64
 
-- amd64
-- arm64
+- 5.5 and above
 
 ## Installation and Running {#prerequire}
 

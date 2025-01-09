@@ -35,7 +35,7 @@ type Connection4 struct {
 
 	ssl bool
 
-	tracable      bool
+	tracable      bpf.AgentConnTraceStateT
 	onRoleChanged func()
 
 	TempKernEvents    []*bpf.AgentKernEvt
@@ -75,7 +75,7 @@ func NewConnFromEvent(event *bpf.AgentConnEvtT, p *Processor) *Connection4 {
 		Role:       event.ConnInfo.Role,
 		TgidFd:     TgidFd,
 		Status:     Connected,
-		tracable:   true,
+		tracable:   bpf.AgentConnTraceStateTUnset,
 
 		MessageFilter: p.messageFilter,
 		LatencyFilter: p.latencyFilter,
@@ -330,37 +330,37 @@ func (c *Connection4) OnClose(needClearBpfMap bool) {
 	monitor.UnregisterMetricExporter(c.StreamEvents)
 }
 
-func (c *Connection4) UpdateConnectionTraceable(traceable bool) {
-	if c.tracable == traceable {
+func (c *Connection4) UpdateConnectionTraceable(traceableState bpf.AgentConnTraceStateT) {
+	if c.tracable == traceableState {
 		return
 	}
-	c.tracable = traceable
+	c.tracable = traceableState
 	key, _ := c.extractSockKeys()
 	sockKeyConnIdMap := bpf.GetMapFromObjs(bpf.Objs, "SockKeyConnIdMap")
-	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap, traceable)
+	c.doUpdateConnIdMapProtocolToUnknwon(key, sockKeyConnIdMap, traceableState)
 	// c.doUpdateConnIdMapProtocolToUnknwon(revKey, sockKeyConnIdMap, traceable)
 
 	connInfoMap := bpf.GetMapFromObjs(bpf.Objs, "ConnInfoMap")
 	connInfo := bpf.AgentConnInfoT{}
 	err := connInfoMap.Lookup(c.TgidFd, &connInfo)
 	if err == nil {
-		connInfo.NoTrace = !traceable
+		connInfo.NoTrace = traceableState
 		connInfoMap.Update(c.TgidFd, &connInfo, ebpf.UpdateExist)
 		if common.ConntrackLog.Level >= logrus.DebugLevel {
-			common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v success!", c.ToString(), traceable)
+			common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v success!", c.ToString(), traceableState)
 		}
 	} else {
 		if common.ConntrackLog.Level >= logrus.DebugLevel {
-			common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v, but no entry in map found!", c.ToString(), traceable)
+			common.ConntrackLog.Debugf("try to update %s conn_info_map to traceable: %v, but no entry in map found!", c.ToString(), traceableState)
 		}
 	}
 }
 
-func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m *ebpf.Map, traceable bool) {
+func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m *ebpf.Map, traceable bpf.AgentConnTraceStateT) {
 	var connIds bpf.AgentConnIdS_t
 	err := m.Lookup(&key, &connIds)
 	if err == nil {
-		connIds.NoTrace = !traceable
+		connIds.NoTrace = traceable
 		m.Update(&key, &connIds, ebpf.UpdateExist)
 		if common.ConntrackLog.Level >= logrus.DebugLevel {
 			common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, success, sock key: %v", c.ToString(), traceable, key)
@@ -370,6 +370,10 @@ func (c *Connection4) doUpdateConnIdMapProtocolToUnknwon(key bpf.AgentSockKey, m
 			common.ConntrackLog.Debugf("try to update %s conn_id_map to traceable: %v, but no entry in map found! key: %v", c.ToString(), traceable, key)
 		}
 	}
+}
+
+func (c *Connection4) IsTraceble() bool {
+	return c.tracable <= bpf.AgentConnTraceStateTTraceable
 }
 
 //	func (c *Connection4) OnCloseWithoutClearBpfMap() {

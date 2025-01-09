@@ -15,6 +15,7 @@ require (
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/emirpasic/gods v1.18.1
 	github.com/go-logr/logr v1.4.2
+	github.com/google/go-github/v68 v68.0.0
 	github.com/google/gops v0.3.28
 	github.com/hashicorp/go-version v1.7.0
 	github.com/jefurry/logrus v2.0.6+incompatible
@@ -70,6 +71,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
