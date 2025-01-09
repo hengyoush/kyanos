@@ -135,6 +135,10 @@ func (m *MysqlResponse) IsReq() bool {
 	return false
 }
 
+func (m *MysqlResponse) StreamId() StreamId {
+	return 0
+}
+
 const (
 	Unknwon RespStatus = iota
 	None
@@ -296,6 +300,10 @@ func (m *MysqlPacket) FormatToString() string {
 
 func (m *MysqlPacket) IsReq() bool {
 	return m.isReq
+}
+
+func (req *MysqlPacket) StreamId() StreamId {
+	return 0
 }
 
 type MysqlRequestPacket struct {

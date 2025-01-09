@@ -82,6 +82,7 @@ type ParsedMessage interface {
 	ByteSize() int
 	IsReq() bool
 	Seq() uint64
+	StreamId() StreamId
 }
 ```
 
@@ -92,6 +93,7 @@ type ParsedMessage interface {
 | `ByteSize()`       | 返回消息的字节大小。                                                       |
 | `IsReq()`          | 判断消息是否为请求。                                                       |
 | `Seq()`            | 返回消息的字节流序列号, 可以从 `streamBuffer.Head().LeftBoundary()` 获取。 |
+| `StreamId()`       | 返回消息的 StreamId, 一般的协议可以直接返回 0，用于 HTTP2 这种多路复用的协议。 |
 
 HTTP 的例子：
 
@@ -118,7 +120,7 @@ type ParsedHttpRequest struct {
 type ProtocolStreamParser interface {
 	ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult
 	FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int
-	Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record
+	Match(reqStream *ParsedMessageQueue, respStream *ParsedMessageQueue) []Record
 }
 ```
 

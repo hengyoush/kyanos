@@ -106,13 +106,14 @@ type ParsedMessage interface {
 }
 ```
 
-| Method Name        | Function                                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------------------------- |
-| `FormatToString()` | Formats the message into a string representation.                                                     |
-| `TimestampNs()`    | Returns the timestamp of the message (in nanoseconds).                                                |
-| `ByteSize()`       | Returns the byte size of the message.                                                                 |
-| `IsReq()`          | Determines if the message is a request.                                                               |
-| `Seq()`            | Returns the sequence number of the byte stream.(Obtain Seq from `streamBuffer.Head().LeftBoundary()`) |
+| Method Name        | Function                                                                                                                                |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `FormatToString()` | Formats the message into a string representation.                                                                                       |
+| `TimestampNs()`    | Returns the timestamp of the message (in nanoseconds).                                                                                  |
+| `ByteSize()`       | Returns the byte size of the message.                                                                                                   |
+| `IsReq()`          | Determines if the message is a request.                                                                                                 |
+| `Seq()`            | Returns the sequence number of the byte stream.(Obtain Seq from `streamBuffer.Head().LeftBoundary()`)                                   |
+| `StreamId()`       | Return the StreamId of the message. For most protocols, you can directly return 0. This is used for multiplexed protocols like HTTP2.。 |
 
 Example for HTTP:
 
@@ -142,7 +143,7 @@ interface:
 type ProtocolStreamParser interface {
 	ParseStream(streamBuffer *buffer.StreamBuffer, messageType MessageType) ParseResult
 	FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int
-	Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record
+	Match(reqStream *ParsedMessageQueue, respStream *ParsedMessageQueue) []Record
 }
 ```
 

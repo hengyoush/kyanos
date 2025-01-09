@@ -30,7 +30,12 @@ var HTTP_BOUNDARY_MARKER = "\r\n\r\n"
 type HTTPStreamParser struct {
 }
 
-func (h *HTTPStreamParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
+func (h *HTTPStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue, respStreams map[StreamId]*ParsedMessageQueue) []Record {
+	reqStream, ok1 := reqStreams[0]
+	respStream, ok2 := respStreams[0]
+	if !ok1 || !ok2 {
+		return []Record{}
+	}
 	return matchByTimestamp(reqStream, respStream)
 }
 
@@ -214,6 +219,10 @@ func (req *ParsedHttpRequest) IsReq() bool {
 	return true
 }
 
+func (req *ParsedHttpRequest) StreamId() StreamId {
+	return 0
+}
+
 type ParsedHttpResponse struct {
 	FrameBase
 	buf []byte
@@ -231,6 +240,10 @@ func (resp *ParsedHttpResponse) FormatToString() string {
 }
 func (resp *ParsedHttpResponse) IsReq() bool {
 	return false
+}
+
+func (req *ParsedHttpResponse) StreamId() StreamId {
+	return 0
 }
 
 var _ ProtocolFilter = HttpFilter{}

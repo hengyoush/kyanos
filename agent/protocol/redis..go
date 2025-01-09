@@ -360,6 +360,10 @@ func (m *RedisMessage) FormatToString() string {
 	return fmt.Sprintf("base=[%s] command=[%s] payload=[%s]", m.FrameBase.String(), m.command, m.payload)
 }
 
+func (req *RedisMessage) StreamId() StreamId {
+	return 0
+}
+
 func (r *RedisStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
 	head := streamBuffer.Head().Buffer()
 	for ; startPos < len(head); startPos++ {
@@ -374,7 +378,12 @@ func (r *RedisStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, mess
 	return -1
 }
 
-func (r *RedisStreamParser) Match(reqStream *[]ParsedMessage, respStream *[]ParsedMessage) []Record {
+func (r *RedisStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue, respStreams map[StreamId]*ParsedMessageQueue) []Record {
+	reqStream, ok1 := reqStreams[0]
+	respStream, ok2 := respStreams[0]
+	if !ok1 || !ok2 {
+		return []Record{}
+	}
 	return matchByTimestamp(reqStream, respStream)
 }
 func ParseSize(decoder *BinaryDecoder) (int, error) {
