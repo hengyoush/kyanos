@@ -1244,15 +1244,17 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		tcp_sk = get_socket_from_fd(args->fd);
 		if (tcp_sk) {
 			int zero = 0;
-			// struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
-			struct conn_info_t _new_conn_info = {};
-			struct conn_info_t *new_conn_info = &_new_conn_info;
+			struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			// struct conn_info_t _new_conn_info = {};
+			// struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
 				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info);
 				if (created) {
 					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 				}
+			} else {
+				return;
 			}
 		}
 	} 
@@ -1301,7 +1303,8 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		// conn_id_s.direct = direct;
 		enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 		if (should_trace_conn(conn_info)) {
-			report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args);
+			report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args, conn_info->prepend_length_header);
+			conn_info->prepend_length_header = false;
 		}
 	} else {
 		// only report syscall event without data 
@@ -1338,15 +1341,17 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 		tcp_sk = get_socket_from_fd(args->fd);
 		if (tcp_sk) {
 			int zero = 0;
-			// struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
-			struct conn_info_t _new_conn_info = {};
-			struct conn_info_t *new_conn_info = &_new_conn_info;
+			struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
+			// struct conn_info_t _new_conn_info = {};
+			// struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
 				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info);
 				if (created) {
 					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 				}
+			} else {
+				return;
 			}
 		}
 	} 
