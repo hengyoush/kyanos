@@ -431,12 +431,40 @@ func getEventTimestamp(ke *bpf.AgentKernEvt, c *Connection4, isReq bool) uint64 
 	}
 }
 
+func extractHeaderEvent(data []byte, ke *bpf.AgentKernEvt, c *Connection4) *bpf.SyscallEventData {
+	if !ke.PrependLengthHeader {
+		return nil
+	}
+
+	header := make([]byte, 4)
+	headerEvt := *ke
+	headerEvt.Len = 4
+	headerEvt.Seq = ke.Seq - 4
+	headerEvt.PrependLengthHeader = false
+
+	headerSyscallEvt := bpf.SyscallEventData{
+		SyscallEvent: bpf.SyscallEvent{
+			Ke:      headerEvt,
+			BufSize: 4,
+		},
+		Buf: header,
+	}
+	return &headerSyscallEvt
+}
+
 func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernEvt) bool {
 	addedToBuffer := false
 	isReq, _ := isReq(c, ke)
+	headerEvt := extractHeaderEvent(data, ke, c)
 	if isReq {
+		if headerEvt != nil {
+			c.reqStreamBuffer.Add(headerEvt.SyscallEvent.Ke.Seq, headerEvt.Buf, getEventTimestamp(ke, c, isReq))
+		}
 		addedToBuffer = c.reqStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
 	} else {
+		if headerEvt != nil {
+			c.respStreamBuffer.Add(headerEvt.SyscallEvent.Ke.Seq, headerEvt.Buf, getEventTimestamp(ke, c, isReq))
+		}
 		addedToBuffer = c.respStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
 	}
 	if !addedToBuffer {
