@@ -122,19 +122,20 @@ type AgentFirstPacketEvt struct {
 type AgentIn6Addr struct{ In6U struct{ U6Addr8 [16]uint8 } }
 
 type AgentKernEvt struct {
-	FuncName [16]int8
-	Ts       uint64
-	TsDelta  uint32
-	_        [4]byte
-	Seq      uint64
-	Len      uint32
-	Flags    uint8
-	_        [3]byte
-	Ifindex  uint32
-	_        [4]byte
-	ConnIdS  AgentConnIdS_t
-	Step     AgentStepT
-	_        [4]byte
+	FuncName            [16]int8
+	Ts                  uint64
+	TsDelta             uint32
+	_                   [4]byte
+	Seq                 uint64
+	Len                 uint32
+	Flags               uint8
+	PrependLengthHeader bool
+	_                   [2]byte
+	Ifindex             uint32
+	_                   [4]byte
+	ConnIdS             AgentConnIdS_t
+	Step                AgentStepT
+	_                   [4]byte
 }
 
 type AgentKernEvtData struct {

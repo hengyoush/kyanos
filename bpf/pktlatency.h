@@ -186,6 +186,7 @@ struct kern_evt {
 	uint64_t seq;
 	uint32_t len;
   uint8_t flags;
+  bool prepend_length_header;
 	uint32_t ifindex;
   struct conn_id_s_t conn_id_s;
   enum step_t step;
