@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"reflect"
 )
 
 type MetadataReqTopic struct {
@@ -22,4 +23,19 @@ type MetadataReq struct {
 
 func (m MetadataReq) ToJSON() ([]byte, error) {
 	return json.Marshal(m)
+}
+
+func vectorsEqual[T any](lhs, rhs []T) bool {
+	return len(lhs) == len(rhs) && reflect.DeepEqual(lhs, rhs)
+}
+
+func (lhs MetadataReqTopic) Equal(rhs MetadataReqTopic) bool {
+	return lhs.TopicID == rhs.TopicID && lhs.Name == rhs.Name
+}
+
+func (lhs MetadataReq) Equal(rhs MetadataReq) bool {
+	return lhs.AllowAutoTopicCreation == rhs.AllowAutoTopicCreation &&
+		lhs.IncludeClusterAuthorizedOperations == rhs.IncludeClusterAuthorizedOperations &&
+		lhs.IncludeTopicAuthorizedOperations == rhs.IncludeTopicAuthorizedOperations &&
+		vectorsEqual(lhs.Topics, rhs.Topics)
 }

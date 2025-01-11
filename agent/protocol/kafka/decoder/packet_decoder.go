@@ -123,7 +123,7 @@ func (pd *PacketDecoder) ExtractCompactString() (string, error) {
 		return "", err
 	}
 	// length N + 1 is encoded.
-	len -= -1
+	len -= 1
 	if len < 0 {
 		return "", errors.New("Compact String has negative length.")
 	}
@@ -136,7 +136,7 @@ func (pd *PacketDecoder) ExtractCompactNullableString() (string, error) {
 		return "", err
 	}
 	// length N + 1 is encoded.
-	len -= -1
+	len -= 1
 	if len < -1 {
 		return "", errors.New("Compact String has negative length.")
 	}
@@ -269,6 +269,12 @@ func (pd *PacketDecoder) ExtractReqHeader(req *common.Request) (bool, error) {
 		return false, err
 	}
 	req.Apikey = common.APIKey(apiKey)
+	apiVersion, err := pd.ExtractInt16()
+	if err != nil {
+		return false, err
+	}
+	req.ApiVersion = apiVersion
+
 	pd.SetAPIInfo(req.Apikey, req.ApiVersion)
 	_, err = pd.ExtractInt32()
 	if err != nil {
@@ -361,10 +367,10 @@ func (pd *PacketDecoder) MarkOffset(_len int32) error {
 	if _len < 0 {
 		return errors.New("length cannot be negative")
 	}
-	if int(_len) > len(pd.binaryDecoder.Buf()) {
+	if int(_len) > pd.binaryDecoder.RemainingBytes() {
 		return errors.New("not enough bytes in MarkOffset")
 	}
-	pd.markedBufs = append(pd.markedBufs, pd.binaryDecoder.Buf()[_len:])
+	pd.markedBufs = append(pd.markedBufs, pd.binaryDecoder.SubBuf(int(_len)))
 	return nil
 }
 
