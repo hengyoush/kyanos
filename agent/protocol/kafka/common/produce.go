@@ -73,3 +73,107 @@ type ProduceResp struct {
 func (p ProduceResp) ToJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
+
+func (lhs ProduceReqPartition) Equal(rhs ProduceReqPartition) bool {
+	return lhs.Index == rhs.Index && lhs.MessageSet.Equals(rhs.MessageSet)
+}
+
+func (lhs ProduceReqTopic) Equal(rhs ProduceReqTopic) bool {
+	if lhs.Name != rhs.Name {
+		return false
+	}
+	if len(lhs.Partitions) != len(rhs.Partitions) {
+		return false
+	}
+	for i := range lhs.Partitions {
+		if !lhs.Partitions[i].Equal(rhs.Partitions[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (lhs ProduceReq) Equal(rhs ProduceReq) bool {
+	if lhs.TransactionalID != rhs.TransactionalID {
+		return false
+	}
+	if lhs.Acks != rhs.Acks {
+		return false
+	}
+	if lhs.TimeoutMs != rhs.TimeoutMs {
+		return false
+	}
+	if len(lhs.Topics) != len(rhs.Topics) {
+		return false
+	}
+	for i := range lhs.Topics {
+		if !lhs.Topics[i].Equal(rhs.Topics[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (lhs RecordError) Equal(rhs RecordError) bool {
+	return lhs.BatchIndex == rhs.BatchIndex && lhs.ErrorMessage == rhs.ErrorMessage
+}
+
+func (lhs ProduceRespPartition) Equal(rhs ProduceRespPartition) bool {
+	if lhs.Index != rhs.Index {
+		return false
+	}
+	if lhs.ErrorCode != rhs.ErrorCode {
+		return false
+	}
+	if lhs.BaseOffset != rhs.BaseOffset {
+		return false
+	}
+	if lhs.LogAppendTimeMs != rhs.LogAppendTimeMs {
+		return false
+	}
+	if lhs.LogStartOffset != rhs.LogStartOffset {
+		return false
+	}
+	if lhs.ErrorMessage != rhs.ErrorMessage {
+		return false
+	}
+	if len(lhs.RecordErrors) != len(rhs.RecordErrors) {
+		return false
+	}
+	for i := range lhs.RecordErrors {
+		if !lhs.RecordErrors[i].Equal(rhs.RecordErrors[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (lhs ProduceRespTopic) Equal(rhs ProduceRespTopic) bool {
+	if lhs.Name != rhs.Name {
+		return false
+	}
+	if len(lhs.Partitions) != len(rhs.Partitions) {
+		return false
+	}
+	for i := range lhs.Partitions {
+		if !lhs.Partitions[i].Equal(rhs.Partitions[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (lhs ProduceResp) Equal(rhs ProduceResp) bool {
+	if lhs.ThrottleTimeMs != rhs.ThrottleTimeMs {
+		return false
+	}
+	if len(lhs.Topics) != len(rhs.Topics) {
+		return false
+	}
+	for i := range lhs.Topics {
+		if !lhs.Topics[i].Equal(rhs.Topics[i]) {
+			return false
+		}
+	}
+	return true
+}

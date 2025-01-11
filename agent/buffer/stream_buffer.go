@@ -60,7 +60,7 @@ func (sb *StreamBuffer) IsEmpty() bool {
 	return len(sb.buffers) == 0
 }
 func (sb *StreamBuffer) Clear() {
-	sb.buffers = sb.buffers[:]
+	sb.buffers = sb.buffers[0:0]
 	sb.timestamps.Clear()
 }
 func (sb *StreamBuffer) RemovePrefix(length int) {

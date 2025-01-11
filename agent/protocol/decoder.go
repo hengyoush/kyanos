@@ -14,9 +14,15 @@ type BinaryDecoder struct {
 func NewBinaryDecoder(buf []byte) *BinaryDecoder {
 	return &BinaryDecoder{buf: buf, str: string(buf)}
 }
+func (b *BinaryDecoder) RemainingBytes() int {
+	return len(b.str)
+}
 
 func (b *BinaryDecoder) Buf() []byte {
 	return b.buf
+}
+func (b *BinaryDecoder) SubBuf(length int) []byte {
+	return b.buf[len(b.buf)-len(b.str)+length:]
 }
 
 func (b *BinaryDecoder) SetBuf(buf []byte) {
