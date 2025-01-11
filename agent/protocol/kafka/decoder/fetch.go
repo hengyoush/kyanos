@@ -16,6 +16,8 @@ func (pd *PacketDecoder) ExtractFetchReqPartition() (FetchReqPartition, error) {
 		if err != nil {
 			return r, err
 		}
+	} else {
+		r.CurrentLeaderEpoch = -1
 	}
 	r.FetchOffset, err = pd.ExtractInt64()
 	if err != nil {
@@ -26,12 +28,16 @@ func (pd *PacketDecoder) ExtractFetchReqPartition() (FetchReqPartition, error) {
 		if err != nil {
 			return r, err
 		}
+	} else {
+		r.LastFetchedEpoch = -1
 	}
 	if pd.apiVersion >= 5 {
 		r.LogStartOffset, err = pd.ExtractInt64()
 		if err != nil {
 			return r, err
 		}
+	} else {
+		r.LogStartOffset = -1
 	}
 	r.PartitionMaxBytes, err = pd.ExtractInt32()
 	if err != nil {
@@ -159,7 +165,11 @@ func (pd *PacketDecoder) ExtractFetchRespAbortedTransaction() (FetchRespAbortedT
 }
 
 func (pd *PacketDecoder) ExtractFetchRespPartition() (FetchRespPartition, error) {
-	var r FetchRespPartition
+	var r FetchRespPartition = FetchRespPartition{
+		LastStableOffset:     -1,
+		LogStartOffset:       -1,
+		PreferredReadReplica: -1,
+	}
 	var err error
 	r.Index, err = pd.ExtractInt32()
 	if err != nil {

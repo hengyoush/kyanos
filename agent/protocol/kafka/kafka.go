@@ -77,7 +77,6 @@ func (k *KafkaStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, mess
 	return -1
 }
 
-// ParseStream implements protocol.ProtocolStreamParser.
 func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType) protocol.ParseResult {
 	buf := streamBuffer.Head().Buffer()
 	var minPacketLength int32
@@ -107,13 +106,18 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 	var requestApiVersion int16
 	if messageType == protocol.Request {
 		requestApiKeyInt, err := protocol.ExtractBEInt[int16](binaryDecoder)
-		if err != nil || common.IsValidAPIKey(requestApiKeyInt) {
+		if err != nil || !common.IsValidAPIKey(requestApiKeyInt) {
 			return protocol.ParseResult{
 				ParseState: protocol.Invalid,
 			}
 		}
 		requestApiKey = common.APIKey(requestApiKeyInt)
 		requestApiVersion, err = protocol.ExtractBEInt[int16](binaryDecoder)
+		if err != nil {
+			return protocol.ParseResult{
+				ParseState: protocol.Invalid,
+			}
+		}
 		if !common.IsSupportedAPIVersion(requestApiKey, requestApiVersion) {
 			return protocol.ParseResult{
 				ParseState: protocol.Invalid,
@@ -145,7 +149,7 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 	}
 	parseResult := common.Packet{
 		FrameBase:     fb,
-		CorrelationId: correlationId,
+		CorrelationID: correlationId,
 		Msg:           string(msg),
 	}
 	parseResult.SetIsReq(messageType == protocol.Request)
@@ -167,12 +171,12 @@ func (k *KafkaStreamParser) Match(reqStreams map[protocol.StreamId]*protocol.Par
 	}
 	correlationIdMap := make(map[int32]*common.Packet)
 	for _, respMsg := range *respStream {
-		correlationIdMap[respMsg.(*common.Packet).CorrelationId] = respMsg.(*common.Packet)
+		correlationIdMap[respMsg.(*common.Packet).CorrelationID] = respMsg.(*common.Packet)
 	}
 
 	for _, reqMsg := range *reqStream {
 		req := reqMsg.(*common.Packet)
-		resp, ok := correlationIdMap[req.CorrelationId]
+		resp, ok := correlationIdMap[req.CorrelationID]
 		if ok {
 			r, err := processReqRespPair(req, resp)
 			if err == nil {
@@ -181,14 +185,14 @@ func (k *KafkaStreamParser) Match(reqStreams map[protocol.StreamId]*protocol.Par
 				errorCnt++
 			}
 			req.Consumed = true
-			delete(correlationIdMap, req.CorrelationId)
-			delete(k.correlationIdMap, req.CorrelationId)
+			delete(correlationIdMap, req.CorrelationID)
+			delete(k.correlationIdMap, req.CorrelationID)
 		}
 	}
 
 	// Resp packets left in the map don't have a matched request.
 	for _, resp := range correlationIdMap {
-		kc.ProtocolParserLog.Debugf("Response packet without a matching request: %v", resp.CorrelationId)
+		kc.ProtocolParserLog.Debugf("Response packet without a matching request: %v", resp.CorrelationID)
 		errorCnt++
 	}
 
@@ -203,7 +207,7 @@ func (k *KafkaStreamParser) Match(reqStreams map[protocol.StreamId]*protocol.Par
 	if i > 0 {
 		*reqStream = (*reqStream)[i:]
 	}
-	*respStream = (*respStream)[:]
+	*respStream = (*respStream)[0:0]
 	return records
 }
 
@@ -396,4 +400,14 @@ var _ protocol.ProtocolStreamParser = &KafkaStreamParser{}
 
 type KafkaStreamParser struct {
 	correlationIdMap map[int32]struct{}
+}
+
+func NewKafkaStreamParser() *KafkaStreamParser {
+	return &KafkaStreamParser{
+		correlationIdMap: make(map[int32]struct{}),
+	}
+}
+
+func (parser *KafkaStreamParser) GetCorrelationIdMap() map[int32]struct{} {
+	return parser.correlationIdMap
 }

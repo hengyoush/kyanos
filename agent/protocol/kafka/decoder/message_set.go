@@ -127,7 +127,10 @@ func (pd *PacketDecoder) ExtractRecordBatch(offset *int32) (common.RecordBatch, 
 }
 
 func (pd *PacketDecoder) ExtractMessageSet() (common.MessageSet, error) {
-	var messageSet common.MessageSet
+	var messageSet common.MessageSet = common.MessageSet{
+		Size:          0,
+		RecordBatches: []common.RecordBatch{},
+	}
 	var err error
 	offset := int32(0)
 

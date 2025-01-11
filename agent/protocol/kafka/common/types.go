@@ -301,7 +301,7 @@ var _ protocol.ParsedMessage = &Response{}
 
 type Packet struct {
 	protocol.FrameBase
-	CorrelationId int32
+	CorrelationID int32
 	Msg           string
 	Consumed      bool
 	isReq         bool

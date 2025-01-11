@@ -91,3 +91,107 @@ type FetchResp struct {
 func (p FetchResp) ToJSON() ([]byte, error) {
 	return json.Marshal(p)
 }
+
+func (p FetchReqPartition) Equals(other FetchReqPartition) bool {
+	return p.Index == other.Index &&
+		p.CurrentLeaderEpoch == other.CurrentLeaderEpoch &&
+		p.FetchOffset == other.FetchOffset &&
+		p.LastFetchedEpoch == other.LastFetchedEpoch &&
+		p.LogStartOffset == other.LogStartOffset &&
+		p.PartitionMaxBytes == other.PartitionMaxBytes
+}
+
+func (p FetchReqTopic) Equals(other FetchReqTopic) bool {
+	if p.Name != other.Name || len(p.Partitions) != len(other.Partitions) {
+		return false
+	}
+	for i := range p.Partitions {
+		if !p.Partitions[i].Equals(other.Partitions[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p FetchForgottenTopicsData) Equals(other FetchForgottenTopicsData) bool {
+	if p.Name != other.Name || len(p.PartitionIndices) != len(other.PartitionIndices) {
+		return false
+	}
+	for i := range p.PartitionIndices {
+		if p.PartitionIndices[i] != other.PartitionIndices[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (p FetchReq) Equals(other FetchReq) bool {
+	if p.ReplicaID != other.ReplicaID ||
+		p.SessionID != other.SessionID ||
+		len(p.Topics) != len(other.Topics) ||
+		len(p.ForgottenTopics) != len(other.ForgottenTopics) {
+		return false
+	}
+	for i := range p.Topics {
+		if !p.Topics[i].Equals(other.Topics[i]) {
+			return false
+		}
+	}
+	for i := range p.ForgottenTopics {
+		if !p.ForgottenTopics[i].Equals(other.ForgottenTopics[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p FetchRespAbortedTransaction) Equals(other FetchRespAbortedTransaction) bool {
+	return p.ProducerID == other.ProducerID &&
+		p.FirstOffset == other.FirstOffset
+}
+
+func (p FetchRespPartition) Equals(other FetchRespPartition) bool {
+	if p.Index != other.Index ||
+		p.ErrorCode != other.ErrorCode ||
+		p.HighWatermark != other.HighWatermark ||
+		p.LastStableOffset != other.LastStableOffset ||
+		p.LogStartOffset != other.LogStartOffset ||
+		p.PreferredReadReplica != other.PreferredReadReplica ||
+		!p.MessageSet.Equals(other.MessageSet) ||
+		len(p.AbortedTransactions) != len(other.AbortedTransactions) {
+		return false
+	}
+	for i := range p.AbortedTransactions {
+		if !p.AbortedTransactions[i].Equals(other.AbortedTransactions[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p FetchRespTopic) Equals(other FetchRespTopic) bool {
+	if p.Name != other.Name || len(p.Partitions) != len(other.Partitions) {
+		return false
+	}
+	for i := range p.Partitions {
+		if !p.Partitions[i].Equals(other.Partitions[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p FetchResp) Equals(other FetchResp) bool {
+	if p.ThrottleTimeMs != other.ThrottleTimeMs ||
+		p.ErrorCode != other.ErrorCode ||
+		p.SessionID != other.SessionID ||
+		len(p.Topics) != len(other.Topics) {
+		return false
+	}
+	for i := range p.Topics {
+		if !p.Topics[i].Equals(other.Topics[i]) {
+			return false
+		}
+	}
+	return true
+}
