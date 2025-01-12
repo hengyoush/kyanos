@@ -586,25 +586,25 @@ func TestSslEventsCanRelatedToKernEvents(t *testing.T) {
 			bpf.AttachSyscallWriteExit,
 			bpf.AttachKProbeSecuritySocketSendmsgEntry,
 			bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN)
 			},
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY)
 			},
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN)
 			},
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN)
 			},
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT)
 			},
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_OUT)
 			},
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTQDISC_OUT)
 			},
 		},
@@ -964,7 +964,7 @@ func TestIpXmit(t *testing.T) {
 			bpf.AttachSyscallWriteEntry,
 			bpf.AttachSyscallWriteExit,
 			bpf.AttachKProbeSecuritySocketSendmsgEntry,
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT)
 			},
 		},
@@ -994,10 +994,10 @@ func TestDevQueueXmit(t *testing.T) {
 		bpf.AttachSyscallWriteEntry,
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
-		func() link.Link {
+		func() (link.Link, error) {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT)
 		},
-		func() link.Link {
+		func() (link.Link, error) {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTQDISC_OUT)
 		},
 	}, "GET DevQueueXmit\n", Write, Read,
@@ -1029,10 +1029,10 @@ func TestDevHardStartXmit(t *testing.T) {
 			bpf.AttachSyscallWriteEntry,
 			bpf.AttachSyscallWriteExit,
 			bpf.AttachKProbeSecuritySocketSendmsgEntry,
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_OUT)
 			},
-			func() link.Link {
+			func() (link.Link, error) {
 				return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_OUT)
 			},
 		}, "GET DevHardStartXmit\n", Write, Read,
@@ -1110,10 +1110,10 @@ func TestIpRcvCore(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		func() link.Link {
+		func() (link.Link, error) {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN)
 		},
-		func() link.Link {
+		func() (link.Link, error) {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTIP_IN)
 		},
 	},
@@ -1150,10 +1150,10 @@ func TestTcpV4DoRcv(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		func() link.Link {
+		func() (link.Link, error) {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN)
 		},
-		func() link.Link {
+		func() (link.Link, error) {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTTCP_IN)
 		},
 	},
@@ -1190,10 +1190,10 @@ func TestSkbCopyDatagramIter(t *testing.T) {
 		bpf.AttachSyscallWriteExit,
 		bpf.AttachKProbeSecuritySocketSendmsgEntry,
 		bpf.AttachKProbeSecuritySocketRecvmsgEntry,
-		func() link.Link {
+		func() (link.Link, error) {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTDEV_IN)
 		},
-		func() link.Link {
+		func() (link.Link, error) {
 			return ApplyKernelVersionFunctions(t, bpf.AgentStepTUSER_COPY)
 		},
 	},
