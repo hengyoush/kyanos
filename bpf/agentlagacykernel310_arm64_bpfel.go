@@ -110,6 +110,7 @@ type AgentLagacyKernel310MapSpecs struct {
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	CloseArgsMap          *ebpf.MapSpec `ebpf:"close_args_map"`
+	ConnEvtMap            *ebpf.MapSpec `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
 	ConnInfoT_map         *ebpf.MapSpec `ebpf:"conn_info_t_map"`
@@ -167,6 +168,7 @@ type AgentLagacyKernel310Maps struct {
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	CloseArgsMap          *ebpf.Map `ebpf:"close_args_map"`
+	ConnEvtMap            *ebpf.Map `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
 	ConnInfoT_map         *ebpf.Map `ebpf:"conn_info_t_map"`
@@ -207,6 +209,7 @@ func (m *AgentLagacyKernel310Maps) Close() error {
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.CloseArgsMap,
+		m.ConnEvtMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
 		m.ConnInfoT_map,

@@ -27,13 +27,14 @@ func ExtractUnsignedVarintCore(maxLength int, binaryDecoder *protocol.BinaryDeco
 		if err != nil {
 			return 0, err
 		}
-		if b&kFirstBitMask == 0 {
-			value |= int64(b) << i
+		b64 := int64(b)
+		if b64&kFirstBitMask == 0 {
+			value |= b64 << i
 			return value, nil
 		}
-		value |= int64(b&kLastSevenBitMask) << i
+		value |= int64(b64&kLastSevenBitMask) << i
 	}
-	return 0, errors.New("Extract Varint Core failure")
+	return 0, errors.New("extract varint core failure")
 }
 func ExtractVarintCore(maxLength int, binaryDecoder *protocol.BinaryDecoder) (int64, error) {
 	value, err := ExtractUnsignedVarintCore(maxLength, binaryDecoder)

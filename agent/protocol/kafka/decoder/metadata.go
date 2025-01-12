@@ -55,9 +55,11 @@ func (pd *PacketDecoder) ExtractMetadataReq() (MetadataReq, error) {
 		if err != nil {
 			return r, err
 		}
-		r.IncludeTopicAuthorizedOperations, err = pd.ExtractBool()
-		if err != nil {
-			return r, err
+		if pd.apiVersion <= 10 {
+			r.IncludeTopicAuthorizedOperations, err = pd.ExtractBool()
+			if err != nil {
+				return r, err
+			}
 		}
 	}
 

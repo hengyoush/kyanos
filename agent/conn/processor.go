@@ -298,7 +298,7 @@ func (p *Processor) run() {
 			}
 
 			if common.ConntrackLog.Level >= logrus.DebugLevel {
-				common.ConntrackLog.Debugf("[conn][ts=%d] %s | type: %s, protocol: %d, \n", event.Ts, conn.ToString(), eventType, conn.Protocol)
+				common.ConntrackLog.Debugf("[conn][ts=%d] %s | type: %s, protocol: %d, role: %v\n", event.Ts, conn.ToString(), eventType, conn.Protocol, event.ConnInfo.Role)
 			}
 		case event := <-p.syscallEvents:
 			p.handleSyscallEvent(event, recordChannel)
