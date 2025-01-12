@@ -161,6 +161,22 @@ jobs:
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
 
+      - name: Test Kafka
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -euxo pipefail
+            uname -a
+            cat /etc/issue
+            pushd /host
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
+                bash /host/testdata/test_kafka.sh 'sudo /host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else  
+                bash /host/testdata/test_kafka.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
+            fi
+            popd
+
       - name: Test CAP_BPF privilege check
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
         if: ${{ !contains(fromJSON('["4.19-20240912.022020", "5.4-20240912.022020"]'), matrix.kernel) }}
@@ -173,7 +189,6 @@ jobs:
             pushd /host
             bash /host/testdata/run_cap_bpf_test.sh "" "CAP_BPF"
             popd
-
 
       - name: Test CAP_SYS_ADMIN privilege check
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19

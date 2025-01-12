@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"encoding/binary"
 	"fmt"
 	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
@@ -449,6 +450,10 @@ func extractHeaderEvent(data []byte, ke *bpf.AgentKernEvt, c *Connection4) *bpf.
 		},
 		Buf: header,
 	}
+	binary.LittleEndian.PutUint32(header, uint32(ke.LengthHeader))
+	if common.ConntrackLog.Level >= logrus.DebugLevel {
+		common.ConntrackLog.Debugf("extract header event: %v", headerSyscallEvt)
+	}
 	return &headerSyscallEvt
 }
 
@@ -552,7 +557,12 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		// TODO
 		startPos = 0
 	}
-	streamBuffer.RemovePrefix(startPos)
+	if startPos > 0 {
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("[parseStreamBuffer] %s Removed streambuffer some head data(%d bytes) due to find boundary from %s queue", c.ToString(), startPos, messageType.String())
+		}
+		streamBuffer.RemovePrefix(startPos)
+	}
 	originPos := streamBuffer.Position0()
 	// var parseState protocol.ParseState
 	for !stop && !streamBuffer.IsEmpty() {

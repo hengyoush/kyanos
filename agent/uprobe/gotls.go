@@ -63,6 +63,9 @@ func LoadGoTlsUprobe() error {
 	return nil
 }
 func AttachGoTlsProbes(pid int) ([]link.Link, error) {
+	if goTlsObjs == nil {
+		return nil, errors.New("GoTlsObjs not loaded")
+	}
 	elfFile, f, err := GetElfFile(pid)
 	if err != nil {
 		return nil, err

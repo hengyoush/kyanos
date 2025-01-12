@@ -78,6 +78,126 @@ const (
 	KDescribeProducers
 )
 
+// API KEY to string
+func (k APIKey) String() string {
+	switch k {
+	case KProduce:
+		return "Produce"
+	case KFetch:
+		return "Fetch"
+	case KListOffsets:
+		return "ListOffsets"
+	case KMetadata:
+		return "Metadata"
+	case KLeaderAndIsr:
+		return "LeaderAndIsr"
+	case KStopReplica:
+		return "StopReplica"
+	case KUpdateMetadata:
+		return "UpdateMetadata"
+	case KControlledShutdown:
+		return "ControlledShutdown"
+	case KOffsetCommit:
+		return "OffsetCommit"
+	case KOffsetFetch:
+		return "OffsetFetch"
+	case KFindCoordinator:
+		return "FindCoordinator"
+	case KJoinGroup:
+		return "JoinGroup"
+	case KHeartbeat:
+		return "Heartbeat"
+	case KLeaveGroup:
+		return "LeaveGroup"
+	case KSyncGroup:
+		return "SyncGroup"
+	case KDescribeGroups:
+		return "DescribeGroups"
+	case KListGroups:
+		return "ListGroups"
+	case KSaslHandshake:
+		return "SaslHandshake"
+	case KApiVersions:
+		return "ApiVersions"
+	case KCreateTopics:
+		return "CreateTopics"
+	case KDeleteTopics:
+		return "DeleteTopics"
+	case KDeleteRecords:
+		return "DeleteRecords"
+	case KInitProducerId:
+		return "InitProducerId"
+	case KOffsetForLeaderEpoch:
+		return "OffsetForLeaderEpoch"
+	case KAddPartitionsToTxn:
+		return "AddPartitionsToTxn"
+	case KAddOffsetsToTxn:
+		return "AddOffsetsToTxn"
+	case KEndTxn:
+		return "EndTxn"
+	case KWriteTxnMarkers:
+		return "WriteTxnMarkers"
+	case KTxnOffsetCommit:
+		return "TxnOffsetCommit"
+	case KDescribeAcls:
+		return "DescribeAcls"
+	case KCreateAcls:
+		return "CreateAcls"
+	case KDeleteAcls:
+		return "DeleteAcls"
+	case KDescribeConfigs:
+		return "DescribeConfigs"
+	case KAlterConfigs:
+		return "AlterConfigs"
+	case KAlterReplicaLogDirs:
+		return "AlterReplicaLogDirs"
+	case KDescribeLogDirs:
+		return "DescribeLogDirs"
+	case KSaslAuthenticate:
+		return "SaslAuthenticate"
+	case KCreatePartitions:
+		return "CreatePartitions"
+	case KCreateDelegationToken:
+		return "CreateDelegationToken"
+	case KReneDelegationToken:
+		return "ReneDelegationToken"
+	case KExpireDelegationToken:
+		return "ExpireDelegationToken"
+	case KDescribeDelegationToken:
+		return "DescribeDelegationToken"
+	case KDeleteGroups:
+		return "DeleteGroups"
+	case KElectLeaders:
+		return "ElectLeaders"
+	case KIncrementalAlterConfigs:
+		return "IncrementalAlterConfigs"
+	case KAlterPartitionReassignments:
+		return "AlterPartitionReassignments"
+	case KListPartitionReassignments:
+		return "ListPartitionReassignments"
+	case KOffsetDelete:
+		return "OffsetDelete"
+	case KDescribeClientQuotas:
+		return "DescribeClientQuotas"
+	case KAlterClientQuotas:
+		return "AlterClientQuotas"
+	case KDescribeUserScramCredentials:
+		return "DescribeUserScramCredentials"
+	case KAlterUserScramCredentials:
+		return "AlterUserScramCredentials"
+	case KAlterIsr:
+		return "AlterIsr"
+	case KUpdateFeatures:
+		return "UpdateFeatures"
+	case KDescribeCluster:
+		return "DescribeCluster"
+	case KDescribeProducers:
+		return "DescribeProducers"
+	default:
+		return "Unknown"
+	}
+}
+
 type ErrorCode int16
 
 const (
@@ -204,9 +324,9 @@ type APIVersionData struct {
 // TODO(chengruizhe): Needs updating for new opcodes.
 var APIVersionMap = map[APIKey]APIVersionData{
 	// Setting min supported version to 1 to help finding frame boundary.
-	KProduce:                      {1, 9, 9},
-	KFetch:                        {0, 12, 12},
-	KListOffsets:                  {0, 7, 6},
+	KProduce:                      {1, 12, 9},
+	KFetch:                        {0, 17, 12},
+	KListOffsets:                  {0, 9, 6},
 	KMetadata:                     {0, 12, 9},
 	KLeaderAndIsr:                 {0, 5, 4},
 	KStopReplica:                  {0, 3, 2},
@@ -222,11 +342,11 @@ var APIVersionMap = map[APIKey]APIVersionData{
 	KDescribeGroups:               {0, 5, 5},
 	KListGroups:                   {0, 4, 3},
 	KSaslHandshake:                {0, 1, -1},
-	KApiVersions:                  {0, 3, 3},
+	KApiVersions:                  {0, 4, 3},
 	KCreateTopics:                 {0, 7, 5},
 	KDeleteTopics:                 {0, 6, 4},
 	KDeleteRecords:                {0, 2, 2},
-	KInitProducerId:               {0, 4, 2},
+	KInitProducerId:               {0, 5, 2},
 	KOffsetForLeaderEpoch:         {0, 4, 4},
 	KAddPartitionsToTxn:           {0, 3, 3},
 	KAddOffsetsToTxn:              {0, 3, 3},
@@ -280,7 +400,7 @@ func IsValidAPIKey(apiKey int16) bool {
 
 func IsSupportedAPIVersion(apiKey APIKey, apiVersion int16) bool {
 	if versionData, ok := APIVersionMap[apiKey]; ok {
-		return apiVersion >= versionData.MinVersion && apiVersion <= versionData.MaxVersion
+		return apiVersion >= versionData.MinVersion && apiVersion <= int16(KMaxAPIVersion)
 	}
 	return false
 }
@@ -292,7 +412,7 @@ const (
 	KCorrelationIDLength int32 = 4
 	KMinReqPacketLength  int32 = KMessageLengthBytes + KAPIKeyLength + KAPIVersionLength + KCorrelationIDLength
 	KMinRespPacketLength int32 = KMessageLengthBytes + KCorrelationIDLength
-	KMaxAPIVersion       int32 = 12
+	KMaxAPIVersion       int32 = 17
 )
 
 var _ protocol.ParsedMessage = &Packet{}
@@ -337,7 +457,7 @@ func (p *Packet) StreamId() protocol.StreamId {
 }
 
 func (r *Request) FormatToString() string {
-	panic("unimplemented")
+	return fmt.Sprintf("[FrameBase: %s] Apikey: %s, ApiVersion: %d, ClientId: %s, Msg: %s", r.FrameBase.String(), r.Apikey.String(), r.ApiVersion, r.ClientId, r.Msg)
 }
 
 func (r *Request) IsReq() bool {
@@ -349,7 +469,7 @@ func (r *Request) StreamId() protocol.StreamId {
 }
 
 func (r *Response) FormatToString() string {
-	panic("unimplemented")
+	return r.Msg
 }
 
 func (r *Response) IsReq() bool {

@@ -190,6 +190,7 @@ struct kern_evt {
 	uint32_t ifindex;
   struct conn_id_s_t conn_id_s;
   enum step_t step;
+  uint32_t length_header;
 };
 
 struct first_packet_evt {
@@ -392,8 +393,8 @@ struct {													\
 
 
 #define IP_H_LEN	(sizeof(struct iphdr))
-#define PROTOCOL_VEC_LIMIT 3
-#define LOOP_LIMIT 2
+#define PROTOCOL_VEC_LIMIT 1
+#define LOOP_LIMIT 3
 
 
 #define TP_ARGS(dst, idx, ctx) \

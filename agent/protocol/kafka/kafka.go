@@ -69,6 +69,22 @@ func (k *KafkaStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, mess
 			if _, ok := k.correlationIdMap[correlationId]; !ok {
 				continue
 			}
+		} else {
+			clientIdLength, err := protocol.ExtractBEInt[int16](binaryDecoder)
+			if err != nil {
+				continue
+			}
+			if clientIdLength > 0 {
+				clientId, err := binaryDecoder.ExtractString(int(clientIdLength))
+				if err != nil {
+					continue
+				}
+				if k.clientId != "" && k.clientId != clientId {
+					continue
+				}
+			} else {
+				continue
+			}
 		}
 
 		return i
@@ -86,18 +102,21 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 		minPacketLength = common.KMinRespPacketLength
 	}
 	if len(buf) < int(minPacketLength) {
+		kc.ProtocolParserLog.Debugf("Not enough data for parsing: %v, messageType: %v", len(buf), messageType)
 		return protocol.ParseResult{
 			ParseState: protocol.NeedsMoreData,
 		}
 	}
 	binaryDecoder := protocol.NewBinaryDecoder(buf)
 	payloadLength, err := protocol.ExtractBEInt[int32](binaryDecoder)
+	kc.ProtocolParserLog.Debugf("[%v]payloadLength: %v", messageType, payloadLength)
 	if err != nil {
 		return protocol.ParseResult{
 			ParseState: protocol.Invalid,
 		}
 	}
 	if payloadLength+common.KMessageLengthBytes <= minPacketLength {
+		kc.ProtocolParserLog.Debugf("[%v]Invalid payload length: %v + %v <= %v", messageType, payloadLength, common.KMessageLengthBytes, minPacketLength)
 		return protocol.ParseResult{
 			ParseState: protocol.Invalid,
 		}
@@ -107,6 +126,7 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 	if messageType == protocol.Request {
 		requestApiKeyInt, err := protocol.ExtractBEInt[int16](binaryDecoder)
 		if err != nil || !common.IsValidAPIKey(requestApiKeyInt) {
+			kc.ProtocolParserLog.Debugf("[%v]Invalid Valid API key: %v", messageType, requestApiKeyInt)
 			return protocol.ParseResult{
 				ParseState: protocol.Invalid,
 			}
@@ -114,11 +134,14 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 		requestApiKey = common.APIKey(requestApiKeyInt)
 		requestApiVersion, err = protocol.ExtractBEInt[int16](binaryDecoder)
 		if err != nil {
+			kc.ProtocolParserLog.Debugf("[%v]Invalid API version: %v", messageType, requestApiVersion)
 			return protocol.ParseResult{
 				ParseState: protocol.Invalid,
 			}
 		}
+		kc.ProtocolParserLog.Debugf("[%v]API key: %v, API version: %v", messageType, requestApiKey, requestApiVersion)
 		if !common.IsSupportedAPIVersion(requestApiKey, requestApiVersion) {
+			kc.ProtocolParserLog.Debugf("[%v]Unsupported API version: %v", messageType, requestApiVersion)
 			return protocol.ParseResult{
 				ParseState: protocol.Invalid,
 			}
@@ -131,8 +154,10 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 			ParseState: protocol.Invalid,
 		}
 	}
+	kc.ProtocolParserLog.Debugf("[%v]correlationId: %v", messageType, correlationId)
 
 	if len(buf)-int(common.KMessageLengthBytes) < int(payloadLength) {
+		kc.ProtocolParserLog.Debugf("[%v]Not enough data for parsing2: %v - %v < %v", messageType, len(buf), common.KMessageLengthBytes, payloadLength)
 		return protocol.ParseResult{
 			ParseState: protocol.NeedsMoreData,
 		}
@@ -153,6 +178,7 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 		Msg:           string(msg),
 	}
 	parseResult.SetIsReq(messageType == protocol.Request)
+	kc.ProtocolParserLog.Debugf("[%v]Parsed message success: %v", messageType, parseResult)
 	return protocol.ParseResult{
 		ParseState:     protocol.Success,
 		ParsedMessages: []protocol.ParsedMessage{&parseResult},
@@ -166,7 +192,7 @@ func (k *KafkaStreamParser) Match(reqStreams map[protocol.StreamId]*protocol.Par
 	errorCnt := 0
 	reqStream, ok1 := reqStreams[0]
 	respStream, ok2 := respStreams[0]
-	if !ok1 || !ok2 {
+	if !ok1 || !ok2 || len(*reqStream) == 0 || len(*respStream) == 0 {
 		return records
 	}
 	correlationIdMap := make(map[int32]*common.Packet)
@@ -181,7 +207,12 @@ func (k *KafkaStreamParser) Match(reqStreams map[protocol.StreamId]*protocol.Par
 			r, err := processReqRespPair(req, resp)
 			if err == nil {
 				records = append(records, *r)
+				clientId := r.Req.(*common.Request).ClientId
+				if k.clientId == "" && clientId != "" {
+					k.clientId = clientId
+				}
 			} else {
+				kc.ProtocolParserLog.Debugf("Error processing req/resp pair: %v", err)
 				errorCnt++
 			}
 			req.Consumed = true
@@ -213,6 +244,7 @@ func (k *KafkaStreamParser) Match(reqStreams map[protocol.StreamId]*protocol.Par
 
 func ProcessReq(reqPacket *common.Packet) (*common.Request, error) {
 	req := &common.Request{}
+	req.FrameBase = reqPacket.FrameBase
 	req.SetTimeStamp(reqPacket.TimestampNs())
 	decoder := decoder.NewPacketDecoder([]byte(reqPacket.Msg))
 	_, err := decoder.ExtractReqHeader(req)
@@ -238,6 +270,7 @@ func ProcessReq(reqPacket *common.Packet) (*common.Request, error) {
 
 func ProcessResp(respPacket *common.Packet, apiKey common.APIKey, apiversion int16) (*common.Response, error) {
 	resp := &common.Response{}
+	resp.FrameBase = respPacket.FrameBase
 	resp.SetTimeStamp(respPacket.TimestampNs())
 	decoder := decoder.NewPacketDecoder([]byte(respPacket.Msg))
 	decoder.SetAPIInfo(apiKey, apiversion)
@@ -256,6 +289,7 @@ func ProcessResp(respPacket *common.Packet, apiKey common.APIKey, apiversion int
 		err = ProcessSyncGroupResp(decoder, resp)
 	default:
 		kc.ProtocolParserLog.Infof("Unparsed response API key: %v", apiKey)
+		resp.Msg = string(respPacket.Msg)
 	}
 	return resp, err
 }
@@ -268,11 +302,15 @@ func processReqRespPair(req *common.Packet, resp *common.Packet) (*protocol.Reco
 	r := &protocol.Record{}
 	reqMsg, err := ProcessReq(req)
 	if err != nil {
-		return nil, err
+		kc.ProtocolParserLog.Infof("Error processing kafka request: %v", err)
+		reqMsg.Msg = string(req.Msg)
+		// return nil, err
 	}
 	respMsg, err := ProcessResp(resp, reqMsg.Apikey, reqMsg.ApiVersion)
 	if err != nil {
-		return nil, err
+		kc.ProtocolParserLog.Infof("Error processing kafka response: %v", err)
+		respMsg.Msg = string(resp.Msg)
+		// return nil, err
 	}
 	r.Req = reqMsg
 	r.Resp = respMsg
@@ -400,6 +438,7 @@ var _ protocol.ProtocolStreamParser = &KafkaStreamParser{}
 
 type KafkaStreamParser struct {
 	correlationIdMap map[int32]struct{}
+	clientId         string
 }
 
 func NewKafkaStreamParser() *KafkaStreamParser {
@@ -410,4 +449,12 @@ func NewKafkaStreamParser() *KafkaStreamParser {
 
 func (parser *KafkaStreamParser) GetCorrelationIdMap() map[int32]struct{} {
 	return parser.correlationIdMap
+}
+
+func (parser *KafkaStreamParser) setClientId(clientId string) {
+	parser.clientId = clientId
+}
+
+func (parser *KafkaStreamParser) getClientId() string {
+	return parser.clientId
 }

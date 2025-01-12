@@ -1277,7 +1277,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 				buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
 				if (buf_size != 0) {
 					enum traffic_protocol_t before_infer = conn_info->protocol;
-					struct protocol_message_t protocol_message = infer_protocol(iov_cpy.iov_base, buf_size, conn_info);
+					struct protocol_message_t protocol_message = infer_protocol(iov_cpy.iov_base, buf_size, bytes_count, conn_info);
 					
 					if (before_infer != protocol_message.protocol) {
 						conn_info->protocol = protocol_message.protocol;
@@ -1303,7 +1303,11 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		// conn_id_s.direct = direct;
 		enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 		if (should_trace_conn(conn_info)) {
-			report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args, conn_info->prepend_length_header);
+			uint32_t length_header = 0;
+			if (conn_info->prepend_length_header) {
+				bpf_probe_read(&length_header, sizeof(uint32_t), conn_info->prev_buf);
+			}
+			report_syscall_evt_vecs(ctx, seq, &conn_id_s, bytes_count, step, args, conn_info->prepend_length_header, length_header);
 			conn_info->prepend_length_header = false;
 		}
 	} else {
