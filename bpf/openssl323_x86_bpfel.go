@@ -73,6 +73,7 @@ type Openssl323ProgramSpecs struct {
 type Openssl323MapSpecs struct {
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
+	ConnEvtMap            *ebpf.MapSpec `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
 	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
@@ -110,6 +111,7 @@ func (o *Openssl323Objects) Close() error {
 type Openssl323Maps struct {
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
+	ConnEvtMap            *ebpf.Map `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
 	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
@@ -130,6 +132,7 @@ func (m *Openssl323Maps) Close() error {
 	return _Openssl323Close(
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
+		m.ConnEvtMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
 		m.FilterMntnsMap,
