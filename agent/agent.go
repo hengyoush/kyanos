@@ -98,13 +98,14 @@ func SetupAgent(options ac.AgentOptions) {
 
 	var _bf loader.BPF
 	go func(_bf *loader.BPF) {
+		defer wg.Done()
 		options.LoadPorgressChannel <- "🍩 Kyanos starting..."
 		kernelVersion := compatible.GetCurrentKernelVersion()
 		options.Kv = &kernelVersion
 		var err error
 		defer func() {
 			if err != nil {
-				common.AgentLog.Error("Failed to load BPF programs: ", err)
+				common.AgentLog.Errorf("Failed to load BPF programs: %+v", errors.Unwrap(errors.Unwrap(err)))
 				_bf.Err = err
 				options.LoadPorgressChannel <- "❌ Kyanos start failed"
 				options.LoadPorgressChannel <- "quit"
@@ -151,7 +152,6 @@ func SetupAgent(options ac.AgentOptions) {
 			time.Sleep(500 * time.Millisecond)
 			options.LoadPorgressChannel <- "quit"
 		}
-		defer wg.Done()
 	}(&_bf)
 	defer func() {
 		_bf.Close()

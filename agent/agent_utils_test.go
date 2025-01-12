@@ -52,7 +52,11 @@ func StartAgent0(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 			progs := list.New()
 			for _, each := range bpfAttachFunctions {
 				if each != nil {
-					progs.PushBack(each())
+					l, err := each()
+					if err != nil {
+						log.Fatalf("Attach failed: %v", err)
+					}
+					progs.PushBack(l)
 				}
 			}
 			return progs
@@ -777,7 +781,7 @@ func min(a, b int) int {
 // 	compatilbeMode = b
 // }
 
-func ApplyKernelVersionFunctions(t *testing.T, step bpf.AgentStepT) link.Link {
+func ApplyKernelVersionFunctions(t *testing.T, step bpf.AgentStepT) (link.Link, error) {
 	v := compatible.GetCurrentKernelVersion()
 	if step == bpf.AgentStepTNIC_IN {
 		if v.SupportCapability(compatible.SupportXDP) {
@@ -785,7 +789,7 @@ func ApplyKernelVersionFunctions(t *testing.T, step bpf.AgentStepT) link.Link {
 			if err != nil {
 				t.Fatal(err)
 			} else {
-				return l
+				return l, nil
 			}
 		} else {
 			t.FailNow()
@@ -813,11 +817,11 @@ func ApplyKernelVersionFunctions(t *testing.T, step bpf.AgentStepT) link.Link {
 				log.Fatalf("Attach failed: %v, functions: %v", err, functions)
 			}
 		} else {
-			return l
+			return l, nil
 		}
 	}
 	t.FailNow()
-	return nil
+	return nil, nil
 }
 
 func KernRcvTestWithHTTP(t *testing.T, progs []bpf.AttachBpfProgFunction, kernEvtFilter FindInterestedKernEventOptions, kernEvtAsserts KernDataEventAssertConditions) {
