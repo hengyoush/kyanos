@@ -327,6 +327,7 @@ func ProcessProduceReq(decoder *decoder.PacketDecoder, req *common.Request) erro
 		return err
 	}
 	req.Msg = string(jsonData)
+	req.OriginReq = r
 	return nil
 }
 
@@ -340,6 +341,7 @@ func ProcessProduceResp(decoder *decoder.PacketDecoder, resp *common.Response) e
 		return err
 	}
 	resp.Msg = string(jsonData)
+	resp.OriginResp = r
 	return nil
 }
 
@@ -353,6 +355,7 @@ func ProcessFetchReq(decoder *decoder.PacketDecoder, req *common.Request) error 
 		return err
 	}
 	req.Msg = string(jsonData)
+	req.OriginReq = r
 	return nil
 }
 
@@ -366,6 +369,7 @@ func ProcessFetchResp(decoder *decoder.PacketDecoder, resp *common.Response) err
 		return err
 	}
 	resp.Msg = string(jsonData)
+	resp.OriginResp = r
 	return nil
 }
 

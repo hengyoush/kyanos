@@ -183,6 +183,20 @@ Here are the options available for filtering by each protocol:
 > For more supported languages, please refer to
 > [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java).
 
+#### Kafka Protocol Filtering <Badge type="tip" text="1.5.0" />
+
+| Filter Condition | Command Line Flag | Example |
+| :--------------- | :---------------- | :------ |
+| Topic Name       | `topic`           | `--topic quickstart-events` |
+| Producer         | `producer`        | `--producer` Observe producer requests, useful when specifying a topic, default is true |
+| Consumer         | `consumer`        | `--consumer` Observe consumer requests, useful when specifying a topic, default is true |
+| Request Code     | `apikeys`         | `--apikeys 10,11` Only observe Kafka APIKEYs 10 and 11 |
+
+
+> For the meaning and values of API Keys, refer to
+> [here](https://kafka.apache.org/protocol#protocol_api_keys).
+
+
 #### MySQL Protocol Filtering
 
 > MySQL protocol capturing is supported, but filtering by conditions is still in
