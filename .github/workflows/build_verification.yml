@@ -3,9 +3,9 @@ name: Build Verification
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "dev","feature/*" ]
+    branches: [ "main", "dev","feature/*","unstable" ]
   pull_request:
-    branches: [ "main", "dev","feature/*" ]
+    branches: [ "main", "dev","feature/*","unstable" ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
