@@ -155,6 +155,20 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 > 更多支持的语言，请参阅
 > [这里](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java)。
 
+
+#### Kafka 协议过滤 <Badge type="tip" text="1.5.0" />
+
+| 过滤条件 | 命令行 flag     | 示例                                                                    |
+| :------- | :-------------- | :---------------------------------------------------------------------- |
+| 主题名称 | `topic` | `--topic quickstart-events`                  |
+| 生产者 | `producer` | `--producer` 观察 producer 的请求，指定topic时有用，默认为true                  |
+| 消费者 | `consumer` | `--consumer` 观察 consumer 的请求，指定topic时有用，默认为true                    |
+| 请求代码 | `apikeys` | `--apikeys 10,11` 只观察Kafka APIKEY为 10 和 11 的                    |
+
+> 有关API Key的含义和值，请参阅
+> [这里](https://kafka.apache.org/protocol#protocol_api_keys)。
+
+
 #### MYSQL 协议过滤
 
 > 已支持 MySQL 协议抓取，根据条件过滤仍在实现中...

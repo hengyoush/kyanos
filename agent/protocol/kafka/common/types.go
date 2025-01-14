@@ -76,6 +76,7 @@ const (
 	_ // Placeholder for 58-59
 	KDescribeCluster
 	KDescribeProducers
+	KApiKeyNone
 )
 
 // API KEY to string
@@ -433,11 +434,13 @@ type Request struct {
 	ApiVersion int16
 	ClientId   string
 	Msg        string
+	OriginReq  any
 }
 
 type Response struct {
 	protocol.FrameBase
-	Msg string
+	Msg        string
+	OriginResp any
 }
 
 func (p *Packet) FormatToString() string {
