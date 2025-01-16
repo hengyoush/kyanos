@@ -710,7 +710,7 @@ func (c *Connection4) getLastProgressTime(sb *buffer.StreamBuffer) int64 {
 	}
 }
 
-const maxAllowStuckTime = 1000
+const maxAllowStuckTime = 1000000
 
 func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 	if c.getLastProgressTime(sb) == 0 {
