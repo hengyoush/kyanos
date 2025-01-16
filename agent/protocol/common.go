@@ -4,7 +4,7 @@ import (
 	"kyanos/agent/buffer"
 )
 
-func matchByTimestamp(reqStream *ParsedMessageQueue, respStream *ParsedMessageQueue) []Record {
+func MatchByTimestamp(reqStream *ParsedMessageQueue, respStream *ParsedMessageQueue) []Record {
 	if len(*reqStream) == 0 || len(*respStream) == 0 {
 		return nil
 	}
