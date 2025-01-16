@@ -9,7 +9,7 @@ import (
 var maxRecords int
 var supportedProtocols = []string{"http", "redis", "mysql"}
 var watchCmd = &cobra.Command{
-	Use: "watch [http|redis|mysql|rocketmq] [flags]",
+	Use: "watch [http|redis|mysql|rocketmq|mongodb] [flags]",
 	Example: `
 sudo kyanos watch
 sudo kyanos watch http --side server --pid 1234 --path /foo/bar --host ubuntu.com

@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"reflect"
 	"strings"
 )
 
@@ -48,6 +49,10 @@ func (d *BinaryDecoder) ReadBytes() int {
 var ResourceNotAvailble = NewResourceNotAvailbleError("Insufficient number of bytes.")
 var NotFound = NewNotFoundError("Could not find sentinel character")
 
+func (d *BinaryDecoder) RemovePrefix(size int32) {
+	d.str = d.str[size:]
+}
+
 /*
 Extract until encounter the input string.
 
@@ -82,4 +87,60 @@ func (d *BinaryDecoder) ExtractByte() (byte, error) {
 	d.str = d.str[1:]
 	d.readBytes++
 	return x, nil
+}
+
+func (d *BinaryDecoder) GetSize() int {
+	return len(d.str)
+}
+
+func ExtractBEInt[TIntType int32 | uint32 | uint8](d *BinaryDecoder) (TIntType, error) {
+	typeSize := int(reflect.TypeOf(TIntType(0)).Size())
+	if len(d.str) < typeSize {
+		return 0, ResourceNotAvailble
+	}
+	var x TIntType = 0
+	for i := 0; i < typeSize; i++ {
+		x = TIntType(d.str[i]) | (x << 8)
+	}
+	d.str = d.str[typeSize:]
+	d.readBytes += typeSize
+	return x, nil
+}
+
+func ExtractLEInt[TIntType int32 | uint32 | uint8](d *BinaryDecoder) (TIntType, error) {
+	typeSize := int(reflect.TypeOf(TIntType(0)).Size())
+	if len(d.str) < typeSize {
+		return 0, ResourceNotAvailble
+	}
+	var x TIntType = 0
+	for i := 0; i < typeSize; i++ {
+		x = TIntType(d.str[typeSize-1-i]) | (x << 8)
+	}
+	d.str = d.str[typeSize:]
+	d.readBytes += typeSize
+	return x, nil
+}
+
+func BEndianBytesToInt[TIntType int32 | uint32 | uint8](d *BinaryDecoder) TIntType {
+	typeSize := int(reflect.TypeOf(TIntType(0)).Size())
+	if len(d.str) < typeSize {
+		return 0
+	}
+	var x TIntType = 0
+	for i := 0; i < typeSize; i++ {
+		x = TIntType(d.str[i]) | (x << 8)
+	}
+	return x
+}
+
+func LEndianBytesToInt[TIntType int32 | uint32 | uint8](d *BinaryDecoder) TIntType {
+	typeSize := int(reflect.TypeOf(TIntType(0)).Size())
+	if len(d.str) < 4 {
+		return 0
+	}
+	var x TIntType = 0
+	for i := 0; i < typeSize; i++ {
+		x = TIntType(d.str[typeSize-1-i]) | (x << 8)
+	}
+	return x
 }
