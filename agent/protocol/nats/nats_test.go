@@ -1,7 +1,6 @@
 package nats
 
 import (
-	"kyanos/agent/protocol"
 	"strings"
 	"testing"
 )
@@ -9,36 +8,33 @@ import (
 func TestInfoParser(t *testing.T) {
 	payload := []byte("INFO {\"server_id\":\"test_id\",\"server_name\":\"test_name\",\"version\":\"1.0.0\",\"go_version\":\"1.15\",\"host\":\"localhost\",\"port\":4222,\"max_payload\":1048576,\"tls_required\":false}\r\n")
 	parser := &Info{}
-	result := parser.Parse(payload, 0, protocol.Unknown, nil)
+	msg, prased := parser.ParseData(payload)
 
-	if result.ParseState != protocol.Success {
-		t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+	if prased < 0 {
+		t.Errorf("Expected ParseState to be Success, got %v", prased)
 	}
-
-	if len(result.ParsedMessages) != 1 {
-		t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+	if msg == nil {
+		t.Fatal("Expected Result to be Success, got nil")
 	}
-
-	msg := result.ParsedMessages[0].(*Info)
 	if msg.ServerID != "test_id" {
 		t.Errorf("Expected ServerID to be 'test_id', got '%s'", msg.ServerID)
+	}
+	if msg.ServerName != "test_name" {
+		t.Errorf("Expected ServerName to be 'test_name', got '%s'", msg.ServerName)
 	}
 }
 
 func TestConnectParser(t *testing.T) {
 	payload := []byte("CONNECT {\"verbose\":true,\"pedantic\":false,\"tls_required\":true,\"name\":\"test_client\",\"version\":\"1.0.0\"}\r\n")
 	parser := &Connect{}
-	result := parser.Parse(payload, 0, protocol.Unknown, nil)
+	msg, prased := parser.ParseData(payload)
 
-	if result.ParseState != protocol.Success {
-		t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+	if prased < 0 {
+		t.Errorf("Expected ParseState to be Success, got %v", prased)
 	}
-
-	if len(result.ParsedMessages) != 1 {
-		t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+	if msg == nil {
+		t.Fatal("Expected Result to be Success, got nil")
 	}
-
-	msg := result.ParsedMessages[0].(*Connect)
 	if !msg.Verbose {
 		t.Errorf("Expected Verbose to be true, got %v", msg.Verbose)
 	}
@@ -99,24 +95,20 @@ func TestPubParser(t *testing.T) {
 
 	for _, tt := range pubTests {
 		t.Run(tt.Name, func(t *testing.T) {
-			result := parser.Parse(tt.Bytes, 0, protocol.Unknown, nil)
+			msg, prased := parser.ParseData(tt.Bytes)
 
 			if tt.ExpectedError {
-				if result.ParseState == protocol.Success {
+				if prased < 0 {
 					t.Errorf("Expected ParseState to be Failure, got Success")
 				}
 				return
 			}
-
-			if result.ParseState != protocol.Success {
-				t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+			if prased < 0 {
+				t.Errorf("Expected ParseState to be Success, got %v", prased)
 			}
-
-			if len(result.ParsedMessages) != 1 {
-				t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+			if msg == nil {
+				t.Fatal("Expected Result to be Success, got nil")
 			}
-
-			msg := result.ParsedMessages[0].(*Pub)
 			if msg.Subject != tt.Subject {
 				t.Errorf("Expected Subject to be '%s', got '%s'", tt.Subject, msg.Subject)
 			}
@@ -194,24 +186,20 @@ func TestHpubParser(t *testing.T) {
 
 	for _, tt := range hpubTests {
 		t.Run(tt.Name, func(t *testing.T) {
-			result := parser.Parse(tt.Bytes, 0, protocol.Unknown, nil)
+			msg, prased := parser.ParseData(tt.Bytes)
 
 			if tt.ExpectedError {
-				if result.ParseState == protocol.Success {
+				if prased < 0 {
 					t.Errorf("Expected ParseState to be Failure, got Success")
 				}
 				return
 			}
-
-			if result.ParseState != protocol.Success {
-				t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+			if prased < 0 {
+				t.Errorf("Expected ParseState to be Success, got %v", prased)
 			}
-
-			if len(result.ParsedMessages) != 1 {
-				t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+			if msg == nil {
+				t.Fatal("Expected Result to be Success, got nil")
 			}
-
-			msg := result.ParsedMessages[0].(*Hpub)
 			if msg.Subject != tt.Subject {
 				t.Errorf("Expected Subject to be '%s', got '%s'", tt.Subject, msg.Subject)
 			}
@@ -269,24 +257,20 @@ func TestSubParser(t *testing.T) {
 
 	for _, tt := range subTests {
 		t.Run(tt.Name, func(t *testing.T) {
-			result := parser.Parse(tt.Bytes, 0, protocol.Unknown, nil)
+			msg, prased := parser.ParseData(tt.Bytes)
 
 			if tt.ExpectedError {
-				if result.ParseState == protocol.Success {
+				if prased < 0 {
 					t.Errorf("Expected ParseState to be Failure, got Success")
 				}
 				return
 			}
-
-			if result.ParseState != protocol.Success {
-				t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+			if prased < 0 {
+				t.Errorf("Expected ParseState to be Success, got %v", prased)
 			}
-
-			if len(result.ParsedMessages) != 1 {
-				t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+			if msg == nil {
+				t.Fatal("Expected Result to be Success, got nil")
 			}
-
-			msg := result.ParsedMessages[0].(*Sub)
 			if msg.Subject != tt.Subject {
 				t.Errorf("Expected Subject to be '%s', got '%s'", tt.Subject, msg.Subject)
 			}
@@ -335,24 +319,20 @@ func TestUnsubParser(t *testing.T) {
 
 	for _, tt := range unsubTests {
 		t.Run(tt.Name, func(t *testing.T) {
-			result := parser.Parse(tt.Bytes, 0, protocol.Unknown, nil)
+			msg, prased := parser.ParseData(tt.Bytes)
 
 			if tt.ExpectedError {
-				if result.ParseState == protocol.Success {
+				if prased < 0 {
 					t.Errorf("Expected ParseState to be Failure, got Success")
 				}
 				return
 			}
-
-			if result.ParseState != protocol.Success {
-				t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+			if prased < 0 {
+				t.Errorf("Expected ParseState to be Success, got %v", prased)
 			}
-
-			if len(result.ParsedMessages) != 1 {
-				t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+			if msg == nil {
+				t.Fatal("Expected Result to be Success, got nil")
 			}
-
-			msg := result.ParsedMessages[0].(*Unsub)
 			if msg.Sid != tt.Sid {
 				t.Errorf("Expected Sid to be '%s', got '%s'", tt.Sid, msg.Sid)
 			}
@@ -404,20 +384,20 @@ func TestMsgParser(t *testing.T) {
 
 	for _, tt := range msgTests {
 		t.Run(tt.Name, func(t *testing.T) {
-			result := parser.Parse(tt.Bytes, 0, protocol.Unknown, nil)
+			msg, prased := parser.ParseData(tt.Bytes)
 
 			if tt.ExpectedError {
-				if result.ParseState == protocol.Success {
+				if prased < 0 {
 					t.Errorf("Expected ParseState to be Failure, got Success")
 				}
 				return
 			}
-			if len(result.ParsedMessages) != 1 {
-				t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
-				return
+			if prased < 0 {
+				t.Errorf("Expected ParseState to be Success, got %v", prased)
 			}
-
-			msg := result.ParsedMessages[0].(*Msg)
+			if msg == nil {
+				t.Fatal("Expected Result to be Success, got nil")
+			}
 			if msg.Subject != tt.Subject {
 				t.Errorf("Expected Subject to be '%s', got '%s'", tt.Subject, msg.Subject)
 			}
@@ -505,24 +485,20 @@ func TestHmsgParser(t *testing.T) {
 
 	for _, tt := range hmsgTests {
 		t.Run(tt.Name, func(t *testing.T) {
-			result := parser.Parse(tt.Bytes, 0, protocol.Unknown, nil)
+			msg, prased := parser.ParseData(tt.Bytes)
 
 			if tt.ExpectedError {
-				if result.ParseState == protocol.Success {
+				if prased < 0 {
 					t.Errorf("Expected ParseState to be Failure, got Success")
 				}
 				return
 			}
-
-			if result.ParseState != protocol.Success {
-				t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+			if prased < 0 {
+				t.Errorf("Expected ParseState to be Success, got %v", prased)
 			}
-
-			if len(result.ParsedMessages) != 1 {
-				t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+			if msg == nil {
+				t.Fatal("Expected Result to be Success, got nil")
 			}
-
-			msg := result.ParsedMessages[0].(*Hmsg)
 			if msg.Subject != tt.Subject {
 				t.Errorf("Expected Subject to be '%s', got '%s'", tt.Subject, msg.Subject)
 			}
@@ -552,17 +528,14 @@ func TestHmsgParser(t *testing.T) {
 func TestPingParser(t *testing.T) {
 	payload := []byte("PING\r\n")
 	parser := &Ping{}
-	result := parser.Parse(payload, 0, protocol.Unknown, nil)
+	msg, prased := parser.ParseData(payload)
 
-	if result.ParseState != protocol.Success {
-		t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+	if prased < 0 {
+		t.Errorf("Expected ParseState to be Success, got %v", prased)
 	}
-
-	if len(result.ParsedMessages) != 1 {
-		t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+	if msg == nil {
+		t.Fatal("Expected Result to be Success, got nil")
 	}
-
-	msg := result.ParsedMessages[0].(*Ping)
 	if msg.ProtocolCode != PING {
 		t.Errorf("Expected ProtocolCode to be PING, got %v", msg.ProtocolCode)
 	}
@@ -571,17 +544,14 @@ func TestPingParser(t *testing.T) {
 func TestPongParser(t *testing.T) {
 	payload := []byte("PONG\r\n")
 	parser := &Pong{}
-	result := parser.Parse(payload, 0, protocol.Unknown, nil)
+	msg, prased := parser.ParseData(payload)
 
-	if result.ParseState != protocol.Success {
-		t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+	if prased < 0 {
+		t.Errorf("Expected ParseState to be Success, got %v", prased)
 	}
-
-	if len(result.ParsedMessages) != 1 {
-		t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+	if msg == nil {
+		t.Fatal("Expected Result to be Success, got nil")
 	}
-
-	msg := result.ParsedMessages[0].(*Pong)
 	if msg.ProtocolCode != PONG {
 		t.Errorf("Expected ProtocolCode to be PONG, got %v", msg.ProtocolCode)
 	}
@@ -590,17 +560,14 @@ func TestPongParser(t *testing.T) {
 func TestOkParser(t *testing.T) {
 	payload := []byte("+OK\r\n")
 	parser := &Ok{}
-	result := parser.Parse(payload, 0, protocol.Unknown, nil)
+	msg, prased := parser.ParseData(payload)
 
-	if result.ParseState != protocol.Success {
-		t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+	if prased < 0 {
+		t.Errorf("Expected ParseState to be Success, got %v", prased)
 	}
-
-	if len(result.ParsedMessages) != 1 {
-		t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+	if msg == nil {
+		t.Fatal("Expected Result to be Success, got nil")
 	}
-
-	msg := result.ParsedMessages[0].(*Ok)
 	if msg.ProtocolCode != OK {
 		t.Errorf("Expected ProtocolCode to be OK, got %v", msg.ProtocolCode)
 	}
@@ -609,17 +576,14 @@ func TestOkParser(t *testing.T) {
 func TestErrParser(t *testing.T) {
 	payload := []byte("-ERR 'Unknown Protocol Operation'\r\n")
 	parser := &Err{}
-	result := parser.Parse(payload, 0, protocol.Unknown, nil)
+	msg, prased := parser.ParseData(payload)
 
-	if result.ParseState != protocol.Success {
-		t.Errorf("Expected ParseState to be Success, got %v", result.ParseState)
+	if prased < 0 {
+		t.Errorf("Expected ParseState to be Success, got %v", prased)
 	}
-
-	if len(result.ParsedMessages) != 1 {
-		t.Errorf("Expected 1 parsed message, got %d", len(result.ParsedMessages))
+	if msg == nil {
+		t.Fatal("Expected Result to be Success, got nil")
 	}
-
-	msg := result.ParsedMessages[0].(*Err)
 	if msg.ErrorMessage != "'Unknown Protocol Operation'" {
 		t.Errorf("Expected ErrorMessage to be 'test error message', got '%s'", msg.ErrorMessage)
 	}

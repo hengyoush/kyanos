@@ -132,7 +132,7 @@ static __always_inline bool is_nats_info(const char *old_buf, size_t count) {
     return false;
 
   char buf[20];
-  int len = 20;
+  size_t len = 20;
   if (count < 20)
     len = count;
   bpf_probe_read_user(buf, len, old_buf);
@@ -150,7 +150,7 @@ static __always_inline bool is_nats_info(const char *old_buf, size_t count) {
 
   // NATS allows arbitrary whitespace after INFO
   // we only check the first 20 bytes due to eBPF limitations
-  for (int p = 5; p < len; p++)
+  for (size_t p = 5; p < len; p++)
     if (buf[p] == '{')
       return true;
     else if (buf[p] != ' ' && buf[p] != '\t')
@@ -163,7 +163,7 @@ static __always_inline bool is_nats_connect(const char *old_buf, size_t count) {
     return false;
 
   char buf[20];
-  int len = 20;
+  size_t len = 20;
   if (count < 20)
     len = count;
   bpf_probe_read_user(buf, len, old_buf);
@@ -188,7 +188,7 @@ static __always_inline bool is_nats_connect(const char *old_buf, size_t count) {
 
   // NATS allows arbitrary whitespace after CONNECT
   // we only check the first 20 bytes due to eBPF limitations
-  for (int p = 8; p < len; p++)
+  for (size_t p = 8; p < len; p++)
     if (buf[p] == '{')
       return true;
     else if (buf[p] != ' ' && buf[p] != '\t')

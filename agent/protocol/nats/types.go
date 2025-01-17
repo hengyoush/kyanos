@@ -1,7 +1,6 @@
 package nats
 
 import (
-	"kyanos/agent/buffer"
 	"kyanos/agent/protocol"
 )
 
@@ -21,7 +20,7 @@ type NatsMessage struct {
 }
 
 type NatsProtocolParser interface {
-	Parse(payload []byte, offset int, messageType protocol.MessageType, streamBuffer *buffer.StreamBuffer) protocol.ParseResult
+	Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int)
 }
 
 type Info struct {
