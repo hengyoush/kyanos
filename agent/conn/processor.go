@@ -309,10 +309,10 @@ func (p *Processor) run() {
 		case event := <-p.firstPacketsEvents:
 			p.handleFirstPacketEvent(event, recordChannel)
 		case <-ticker.C:
-			p.processTimedKernEvents(recordChannel)
-			p.processTimedSyscallEvents(recordChannel)
 			p.processTimedSslEvents(recordChannel)
+			p.processTimedKernEvents(recordChannel)
 			p.processOldFirstPacketEvents(recordChannel)
+			p.processTimedSyscallEvents(recordChannel)
 		}
 	}
 }

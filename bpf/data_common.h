@@ -124,14 +124,6 @@ static bool __always_inline report_conn_evt(void* ctx, struct conn_info_t *conn_
 }
 
 static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
-	// conn_info->laddr.in4.sin_port
-	// bpf_printk("conn_info->laddr.in4.sin_port: %d, %d", 
-	// 	conn_info->laddr.in4.sin_port,conn_info->raddr.in4.sin_port);
-	// if (conn_info->laddr.in4.sin_port == target_port || 
-	// 	conn_info->raddr.in4.sin_port == target_port) {
-	// 		return true;
-	// }
-
 	return conn_info->protocol != kProtocolUnknown && conn_info->no_trace <= traceable ;
 }
 
@@ -205,6 +197,8 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 	evt->buf_size = amount_copied; 
 	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t) + amount_copied;
 	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
+
+	// bpf_printk("len:%d, amount_copied:%d", len, amount_copied);
 }
 static void __always_inline report_syscall_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args, bool prepend_length_header, uint32_t length_header) {
 	report_syscall_buf(ctx, seq, conn_id_s, len, step, args->start_ts, args->end_ts - args->start_ts, args->buf, args->source_fn, prepend_length_header, length_header);
@@ -265,6 +259,9 @@ static void __always_inline report_syscall_evt_vecs(void* ctx, uint64_t seq, str
 		prepend_length_header = false;
 		bytes_sent += iov_size;
 		seq += iov_size;
+	}
+	if (bytes_sent < total_size) {
+		report_syscall_buf_without_data(ctx, seq, conn_id_s, total_size - bytes_sent, step, args->start_ts, args->end_ts - args->start_ts, args->source_fn);
 	}
 }
 
