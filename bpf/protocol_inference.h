@@ -132,29 +132,27 @@ static __always_inline bool is_nats_info(const char *old_buf, size_t count) {
     return false;
 
   char buf[20];
-  size_t len = 20;
-  if (count < 20)
-    len = count;
-  bpf_probe_read_user(buf, len, old_buf);
+  bpf_probe_read_user(buf, 5, old_buf);
   // info
-  if (buf[0] != 'I' && buf[0] != 'i')
+  if ((buf[0] != 'I' && buf[0] != 'i') || (buf[1] != 'N' && buf[1] != 'n') ||
+      (buf[2] != 'F' && buf[2] != 'f') || (buf[3] != 'O' && buf[3] != 'o') ||
+      (buf[4] != ' ' && buf[4] != '\t')) {
     return false;
-  if (buf[1] != 'N' && buf[1] != 'n')
-    return false;
-  if (buf[2] != 'F' && buf[2] != 'f')
-    return false;
-  if (buf[3] != 'O' && buf[3] != 'o')
-    return false;
-  if (buf[4] != ' ' && buf[4] != '\t')
-    return false;
+  }
 
   // NATS allows arbitrary whitespace after INFO
   // we only check the first 20 bytes due to eBPF limitations
-  for (size_t p = 5; p < len; p++)
+  if (count < 20)
+    return false;
+  bpf_probe_read_user(buf, 20, old_buf);
+
+#pragma unroll
+  for (size_t p = 5; p < 20; p++) {
     if (buf[p] == '{')
       return true;
     else if (buf[p] != ' ' && buf[p] != '\t')
       return false;
+  }
   return false;
 }
 
@@ -163,36 +161,28 @@ static __always_inline bool is_nats_connect(const char *old_buf, size_t count) {
     return false;
 
   char buf[20];
-  size_t len = 20;
-  if (count < 20)
-    len = count;
-  bpf_probe_read_user(buf, len, old_buf);
-
+  bpf_probe_read_user(buf, 8, old_buf);
   // connect
-  if (buf[0] != 'C' && buf[0] != 'c')
+  if ((buf[0] != 'C' && buf[0] != 'c') || (buf[1] != 'O' && buf[1] != 'o') ||
+      (buf[2] != 'N' && buf[2] != 'n') || (buf[3] != 'N' && buf[3] != 'n') ||
+      (buf[4] != 'E' && buf[4] != 'e') || (buf[5] != 'C' && buf[5] != 'c') ||
+      (buf[6] != 'T' && buf[6] != 't') || (buf[7] != ' ' && buf[7] != '\t')) {
     return false;
-  if (buf[1] != 'O' && buf[1] != 'o')
-    return false;
-  if (buf[2] != 'N' && buf[2] != 'n')
-    return false;
-  if (buf[3] != 'N' && buf[3] != 'n')
-    return false;
-  if (buf[4] != 'E' && buf[4] != 'e')
-    return false;
-  if (buf[5] != 'C' && buf[5] != 'c')
-    return false;
-  if (buf[6] != 'T' && buf[6] != 't')
-    return false;
-  if (buf[7] != ' ' && buf[7] != '\t')
-    return false;
+  }
 
   // NATS allows arbitrary whitespace after CONNECT
   // we only check the first 20 bytes due to eBPF limitations
-  for (size_t p = 8; p < len; p++)
+  if (count < 20)
+    return false;
+  bpf_probe_read_user(buf, 20, old_buf);
+
+#pragma unroll
+  for (size_t p = 8; p < 20; p++) {
     if (buf[p] == '{')
       return true;
     else if (buf[p] != ' ' && buf[p] != '\t')
       return false;
+  }
   return false;
 }
 
