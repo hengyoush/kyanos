@@ -9,7 +9,7 @@ LNAME_REMOTE_PORT="${FILE_PREFIX}_filter_by_remote_port.log"
 LNAME_LOCAL_PORT="${FILE_PREFIX}_filter_by_local_port.log"
 
 function test_filter_by_remote_ip() {
-    remote_ip=$(dig example.com +short)
+    remote_ip=$(dig example.com +short | head -n 1)
     timeout 20 ${CMD} watch --debug-output http --remote-ips "$remote_ip" 2>&1  | tee "${LNAME_IP}" &
     sleep 10
     curl http://"$remote_ip" &>/dev/null || true
