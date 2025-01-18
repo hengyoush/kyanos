@@ -36,7 +36,7 @@ func (h *HTTPStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue, re
 	if !ok1 || !ok2 {
 		return []Record{}
 	}
-	return matchByTimestamp(reqStream, respStream)
+	return MatchByTimestamp(reqStream, respStream)
 }
 
 func (h *HTTPStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {

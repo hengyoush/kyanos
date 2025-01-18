@@ -177,6 +177,13 @@ Here are the options available for filtering by each protocol:
 | Request Codes    | `request-codes`   | `--request-codes 10,11` <br> Only observe requests with the codes 10 and 11.               |
 | Languages        | `languages`       | `--languages Java,Go` <br> Only observe requests from applications written in Java and Go. |
 
+#### NATS Protocol Filtering <Badge type="tip" text="1.5.0" />
+
+| Filter Condition | Command Line Flag | Example                                                                                    |
+| ---------------- | ----------------- | ------------------------------------------------------------------------------------------ |
+| Protocol Codes   | `protocols`       | `--protocols PUB,PING` <br> Only observe requests with the protocol PUB and PING.          |
+| Subjects         | `subjects`        | `--subjects demo,echo` <br> Only observe requests with the subject `demo` and `echo`.      |
+
 > For the meaning and usage of Request Codes, please refer to
 > [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/RequestCode.java).
 
