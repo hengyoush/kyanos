@@ -379,20 +379,21 @@ func (p *Processor) processKernEvent(event *bpf.AgentKernEvt, recordChannel chan
 	tgidFd := event.ConnIdS.TgidFd
 	event.Ts += common.LaunchEpochTime
 	conn := p.connManager.LookupConnection4ByTimestamp(tgidFd, event.Ts)
-	timeCheck := conn != nil && conn.timeBoundCheck(event.Ts)
-	if conn != nil && conn.Status == Closed {
-		if timeCheck {
-			conn.OnKernEvent(event)
-		} else {
-			conn.AddKernEvent(event)
-		}
 
+	if conn == nil {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
-			common.BPFEventLog.Debugf("[closed conn]%s", FormatKernEvt(event, conn))
+			common.BPFEventLog.Debugf("[no conn]%s", FormatKernEvt(event, conn))
 		}
 		return
 	}
-	if event.Len > 0 && conn != nil && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
+	if !conn.IsTraceble() {
+		if common.BPFEventLog.Level >= logrus.DebugLevel {
+			common.BPFEventLog.Debugf("[no-trace]%s", FormatKernEvt(event, conn))
+		}
+		return
+	}
+
+	if event.Len > 0 && conn.Protocol != bpf.AgentTrafficProtocolTKProtocolUnknown {
 		if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 			added := conn.OnKernEvent(event)
 
@@ -410,16 +411,12 @@ func (p *Processor) processKernEvent(event *bpf.AgentKernEvt, recordChannel chan
 			}
 			conn.OnKernEvent(event)
 		}
-	} else if event.Len > 0 && conn != nil {
+	} else if event.Len > 0 {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[protocol-unknown]%s\n", FormatKernEvt(event, conn))
 		}
-	} else if event.Len == 0 && conn != nil {
+	} else if event.Len == 0 {
 		conn.OnKernEvent(event)
-	} else if conn == nil {
-		if common.BPFEventLog.Level >= logrus.DebugLevel {
-			common.BPFEventLog.Debugf("[no-conn]%s\n", FormatKernEvt(event, conn))
-		}
 	} else {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[other]%s\n", FormatKernEvt(event, conn))
@@ -461,24 +458,19 @@ func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChann
 
 	timeCheck := conn != nil && conn.timeBoundCheck(event.SyscallEvent.GetEndTs())
 
-	if conn != nil && conn.Status == Closed {
-		if timeCheck && conn.ProtocolInferred() {
-			conn.OnSyscallEvent(event.Buf, event, recordChannel)
-		} else {
-			conn.AddSyscallEvent(event)
-		}
+	if conn == nil {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
-			common.BPFEventLog.Debugf("[syscall][closed conn][len=%d][ts=%d][fn=%d][check=%v]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, event.SyscallEvent.GetSourceFunction(), timeCheck, conn.ToString(), string(event.Buf))
+			common.BPFEventLog.Debugf("[syscall][no conn][ts=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 		}
 		return
 	}
-	if conn != nil && !conn.IsTraceble() {
+	if !conn.IsTraceble() {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[syscall][no-trace][len=%d][ts=%d]%s | %s", event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Ts, conn.ToString(), string(event.Buf))
 		}
 		return
 	}
-	if conn != nil && conn.ProtocolInferred() && timeCheck {
+	if conn.ProtocolInferred() && timeCheck {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d][fn=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, event.SyscallEvent.GetSourceFunction(), conn.ToString(), string(event.Buf))
 		}
@@ -487,19 +479,19 @@ func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChann
 		if addedToBuffer {
 			conn.AddSyscallEvent(event)
 		}
-	} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
+	} else if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 		conn.AddSyscallEvent(event)
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[syscall][protocol unset][ts=%d][len=%d]%s | %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 		}
 
-	} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
+	} else if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[syscall][protocol unknown][ts=%d][len=%d]%s | %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.BufSize, conn.ToString(), string(event.Buf))
 		}
 	} else {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
-			common.BPFEventLog.Debugf("[syscall][no conn][ts=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
+			common.BPFEventLog.Debugf("[syscall][other][ts=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 		}
 	}
 }
@@ -534,37 +526,31 @@ func (p *Processor) processSslEvent(event *bpf.SslData, recordChannel chan Recor
 	tgidFd := event.SslEventHeader.Ke.ConnIdS.TgidFd
 	event.SslEventHeader.Ke.Ts += common.LaunchEpochTime
 	conn := p.connManager.LookupConnection4ByTimestamp(tgidFd, event.SslEventHeader.GetEndTs())
-	timeCheck := conn != nil && conn.timeBoundCheck(event.SslEventHeader.GetEndTs())
-	if conn != nil && conn.Status == Closed {
-		if timeCheck && conn.ProtocolInferred() {
-			conn.OnSslDataEvent(event.Buf, event, recordChannel)
-		} else {
-			conn.AddSslEvent(event)
-		}
+	if conn == nil {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
-			common.BPFEventLog.Debugf("[ssl][closed conn][len=%d][ts=%d][check=%v]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, timeCheck, conn.ToString(), string(event.Buf))
+			common.BPFEventLog.Debugf("[ssl][no conn][tgid=%d fd=%d][len=%d] %s", tgidFd>>32, uint32(tgidFd), event.SslEventHeader.BufSize, string(event.Buf))
 		}
 		return
 	}
-	if conn != nil && !conn.IsTraceble() {
-		conn.AddSslEvent(event)
+	if !conn.IsTraceble() {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[ssl][no-trace][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
 		}
 		return
 	}
-	if conn != nil && conn.ProtocolInferred() {
+
+	if conn.ProtocolInferred() {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[ssl][len=%d][ts=%d]%s | %s", event.SslEventHeader.BufSize, event.SslEventHeader.Ke.Ts, conn.ToString(), string(event.Buf))
 		}
 
 		conn.OnSslDataEvent(event.Buf, event, recordChannel)
-	} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
+	} else if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 		conn.AddSslEvent(event)
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[ssl][protocol unset][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))
 		}
-	} else if conn != nil && conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
+	} else if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnknown {
 		conn.AddSslEvent(event)
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[ssl][protocol unknown][len=%d]%s | %s", event.SslEventHeader.BufSize, conn.ToString(), string(event.Buf))

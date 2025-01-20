@@ -226,10 +226,11 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	bool has_conn_info = true;
 	struct conn_id_s_t* conn_id_s = bpf_map_lookup_elem(&sock_key_conn_id_map, key);
 	has_conn_info = conn_id_s != NULL && conn_id_s->no_trace <= traceable;
+	bool is_protocol_not_unknown = false;
 	if (has_conn_info) {
 		uint64_t tgid_fd = conn_id_s->tgid_fd;
 		struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
-		has_conn_info = conn_info != NULL && conn_info->protocol != kProtocolUnknown;
+		has_conn_info = conn_info != NULL && (is_protocol_not_unknown = conn_info->protocol != kProtocolUnknown);
 	}
 	// if (has_conn_info) {
 	// 	uint64_t tgid_fd = conn_id_s->tgid_fd;
@@ -252,7 +253,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 		bpf_probe_read_kernel(&evt->flags, sizeof(uint8_t), &(((u8 *)tcp)[13]));
 		bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
 		bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt));
-	} else if (conn_id_s == NULL && relative_seq == 1 && len_minus_hdr > 0 && (step == DEV_IN || step == TCP_IN)) {
+	} else if (conn_id_s == NULL && relative_seq == 1 && len_minus_hdr > 0 && (step == DEV_IN || step == TCP_IN) && is_protocol_not_unknown) {
 		// fist packet
 		struct first_packet_evt* evt = bpf_map_lookup_elem(&first_packet_evt_map, &zero);
 		if(!evt) {

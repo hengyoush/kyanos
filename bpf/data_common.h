@@ -323,7 +323,7 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 	}
 	
-	if (conn_info->protocol != kProtocolUnknown && (inferred || conn_info->no_trace <= traceable) ||
+	if ((conn_info->protocol != kProtocolUnknown && (inferred || conn_info->no_trace <= traceable)) ||
 		// condition below is for the case when protocol is already inffered in previous syscall
 		// but user space have not yet updated the conn_info.no_trace to traceable.
 		// so when conn_info.protocol is not unknown but the cause of trace state is unknown, we still trace data.
