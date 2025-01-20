@@ -158,7 +158,7 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 		}
 		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
 
-		attachOpenSslUprobes(links, options, options.Kv, bf.Objs)
+		attachUprobes(links, options, options.Kv, bf.Objs)
 		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
 	attachSchedProgs(links)
@@ -683,7 +683,7 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 	return linkList, nil
 }
 
-func attachOpenSslUprobes(links *list.List, options *ac.AgentOptions, kernelVersion *compatible.KernelVersion, objs any) {
+func attachUprobes(links *list.List, options *ac.AgentOptions, kernelVersion *compatible.KernelVersion, objs any) {
 	pids, err := common.GetAllPids()
 	loadGoTlsErr := uprobe.LoadGoTlsUprobe()
 	if loadGoTlsErr != nil {

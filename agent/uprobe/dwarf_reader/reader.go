@@ -190,18 +190,45 @@ func GetStructMemberInfo(structName string, tag dwarf.Tag, memberName string, me
 		}
 		return &memberInfo, nil
 	}
-	return nil, errors.New(fmt.Sprintf("Could not find member %s in struct %s.", memberName, structName))
+	return nil, fmt.Errorf("could not find member %s in struct %s", memberName, structName)
 }
 
 func GetMemberOffset(die *dwarf.Entry) (int64, error) {
+	const DW_OP_plus_uconst = 0x23
+	const DW_OP_consts = 0x11
+	const DW_OP_plus = 0x22
+
 	if die.Tag != dwarf.TagMember {
 		panic("not a member")
 	}
 	attr := die.AttrField(dwarf.AttrDataMemberLoc)
 	if attr == nil {
-		return 0, errors.New(fmt.Sprintf("can't find DW_AT_data_member_location"))
+		return 0, fmt.Errorf("can't find DW_AT_data_member_location")
 	}
-	return attr.Val.(int64), nil
+	var offset int64
+	switch val := attr.Val.(type) {
+	case int64:
+		return attr.Val.(int64), nil
+	case []byte:
+		if len(val) == 0 {
+			return 0, nil
+		}
+		b := MakeBuf(nil, UnknownFormat{}, "location", 0, val)
+		op := b.Uint8()
+		switch op {
+		case DW_OP_plus_uconst: // DW_OP_plus_uconst, Handle opcode sequence [DW_OP_plus_uconst <uleb128>]
+			offset = int64(b.Uint())
+		case DW_OP_consts: // DW_OP_consts, Handle opcode sequence [DW_OP_consts <sleb128> DW_OP_plus]
+			offset = b.Int()
+			op = b.Uint8()
+			if op != DW_OP_plus {
+				return -1, fmt.Errorf("unexpected opcode 0x%x exptect: 0x%x", op, DW_OP_plus)
+			}
+		default:
+			return -1, fmt.Errorf("unknown opcode: %x", op)
+		}
+	}
+	return offset, nil
 }
 
 func GetNumPrimitives(die *dwarf.Entry, reader *dwarf.Reader) (int, error) {
