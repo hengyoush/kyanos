@@ -30,7 +30,14 @@ const (
 type Section struct {
 	kind      uint8
 	length    int32
-	documents []string
+	Documents []string
+}
+
+func (s *Section) Kind() uint8 {
+	return s.kind
+}
+func (s *Section) Length() int32 {
+	return s.length
 }
 
 const (

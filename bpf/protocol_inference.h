@@ -259,14 +259,6 @@ static __inline enum message_type_t is_mongo_protocol(const char* old_buf, size_
       opcode == kOPGetMore || opcode == kOPDelete || opcode == kOPKillCursors ||
       opcode == kOPCompressed || opcode == kOPMsg) {
     if (response_to == 0) {
-      bpf_printk("count : %d", count);
-      bpf_printk("message_length : %d", message_length);
-      bpf_printk("request_id : %d", request_id);
-      bpf_printk("response_to : %d", response_to);
-      bpf_printk("opcode : %d", opcode);
-      for (int i = 0; i < 16; i++) {
-        bpf_printk("buf[%d] : %d", i, buf[i]);
-      }
       return kRequest;
     }
   }
