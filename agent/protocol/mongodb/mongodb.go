@@ -17,30 +17,28 @@ type MongoDBFrame struct {
 	FrameBase
 	// Message Header Fields
 	// Length of the mongodb header and the wire protocol data.
-	length     int32
-	requestId  int32
-	responseTo int32
-	opCode     int32
+	Length     int32
+	RequestId  int32
+	ResponseTo int32
+	OpCode     int32
 
 	// OP_MSG Fields
 	// Relevant flag bits
-	checksumPresent bool
-	moreToCome      bool
-	exhaustAllowed  bool
-	sections        []Section
-	opMsgType       string
-	frame_body      string
-	checksum        uint32
-	isHandshake     bool
-	consumed        bool
+	ChecksumPresent bool
+	MoreToCome      bool
+	ExhaustAllowed  bool
+	Sections        []Section
+	OpMsgType       string
+	Frame_body      string
+	Checksum        uint32
+	IsHandshake     bool
+	Consumed        bool
 	isReq           bool
-
-	// cmd   int32
 }
 
 // FormatToString implements protocol.ParsedMessage.
 func (m *MongoDBFrame) FormatToString() string {
-	return fmt.Sprintf("MongoDB base=[%s]  Msg=[%s]", m.FrameBase.String(), m.frame_body)
+	return fmt.Sprintf("MongoDB base=[%s]  Msg=[%s]", m.FrameBase.String(), m.Frame_body)
 }
 
 // IsReq implements protocol.ParsedMessage.
@@ -48,15 +46,19 @@ func (m *MongoDBFrame) IsReq() bool {
 	return m.isReq
 }
 
+func (m *MongoDBFrame) SetReq(req bool) {
+	m.isReq = req
+}
+
 func (m *MongoDBFrame) StreamId() StreamId {
-	if m.responseTo == 0 {
-		return StreamId(m.requestId)
+	if m.ResponseTo == 0 {
+		return StreamId(m.RequestId)
 	}
-	return StreamId(m.responseTo)
+	return StreamId(m.ResponseTo)
 }
 
 func (m *MongoDBFrame) ByteSize() int {
-	return len(m.frame_body)
+	return int(m.Length)
 }
 
 type MongoDBStreamParser struct {
@@ -144,10 +146,10 @@ func (m *MongoDBStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, mes
 	// frameBase.SetTimeStamp(ts)
 	mongoDBFrame := &MongoDBFrame{
 		FrameBase:  frameBase,
-		length:     length,
-		requestId:  requestId,
-		responseTo: respondTo,
-		opCode:     opCode,
+		Length:     length,
+		RequestId:  requestId,
+		ResponseTo: respondTo,
+		OpCode:     opCode,
 		isReq:      messageType == Request,
 	}
 
@@ -181,17 +183,6 @@ func (m *MongoDBStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue,
 	records := make([]Record, 0)
 	var errorCount int = 0
 
-	// reqMap := make(map[int32][]MongoDBFrame)
-	// for _, msg := range *reqStream {
-	// 	req := msg.(*MongoDBFrame)
-	// 	reqMap[req.requestId] = append(reqMap[req.requestId], *req)
-	// }
-	// respMap := make(map[int32][]MongoDBFrame)
-	// for _, msg := range *reqStream {
-	// 	reps := msg.(*MongoDBFrame)
-	// 	respMap[reps.responseTo] = append(respMap[reps.responseTo], *reps)
-	// }
-
 	for i := range m.State.StreamOrder {
 		streamIdPair := &m.State.StreamOrder[i]
 		streamId := streamIdPair.StreamId
@@ -206,7 +197,7 @@ func (m *MongoDBStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue,
 		latestRespTs := uint64(0)
 		for i := range *respDeque {
 			respFrame := (*respDeque)[i].(*MongoDBFrame)
-			if respFrame.consumed {
+			if respFrame.Consumed {
 				continue
 			}
 			latestRespTs = respFrame.TimestampNs()
@@ -222,7 +213,7 @@ func (m *MongoDBStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue,
 
 			if reqFrame == nil || reqFrame.TimestampNs() > latestRespTs {
 				//log.Printf("Did not find a request frame that is earlier than the response. Response's responseTo: %d", respFrame.ResponseTo)
-				respFrame.consumed = true
+				respFrame.Consumed = true
 				errorCount++
 				break
 			}
@@ -230,8 +221,8 @@ func (m *MongoDBStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue,
 			FindMoreToComeResponses(respStreams, &errorCount, respFrame, &latestRespTs)
 
 			// Stitch the request/response and add it to records
-			reqFrame.consumed = true
-			respFrame.consumed = true
+			reqFrame.Consumed = true
+			respFrame.Consumed = true
 			FlattenSections(reqFrame)
 			FlattenSections(respFrame)
 
@@ -249,10 +240,10 @@ func (m *MongoDBStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue,
 		eraseUntilIndex := 0
 		for eraseUntilIndex < len(*reqDeque) {
 			reqFrame := (*reqDeque)[eraseUntilIndex].(*MongoDBFrame)
-			if !(reqFrame.consumed || reqFrame.TimestampNs() < latestRespTs) {
+			if !(reqFrame.Consumed || reqFrame.TimestampNs() < latestRespTs) {
 				break
 			}
-			if !reqFrame.consumed {
+			if !reqFrame.Consumed {
 				errorCount++
 			}
 			eraseUntilIndex++
@@ -269,7 +260,7 @@ func (m *MongoDBStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue,
 	for streamId, respDeque := range respStreams {
 		for _, resp := range *respDeque {
 			respFrame := resp.(*MongoDBFrame)
-			if !respFrame.consumed {
+			if !respFrame.Consumed {
 				errorCount++
 			}
 		}
@@ -283,7 +274,7 @@ func (m *MongoDBStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue,
 		}
 	}
 
-	//return RecordsWithErrorCount{Records: records, ErrorCount: errorCount}
+	// return RecordsWithErrorCount{Records: records, ErrorCount: errorCount}
 	return records
 }
 
@@ -298,7 +289,7 @@ func init() {
 }
 
 func ProcessPayload(decoder *BinaryDecoder, mongoDBFrame *MongoDBFrame) ParseState {
-	switch mongoDBFrame.opCode {
+	switch mongoDBFrame.OpCode {
 	case kOPMsg:
 		return ProcessOpMsg(decoder, mongoDBFrame)
 	case kOPCompressed:
@@ -318,23 +309,23 @@ func ProcessOpMsg(decoder *BinaryDecoder, mongoDBFrame *MongoDBFrame) ParseState
 
 	// Find relevant flag bit information and ensure remaining bits are not set.
 	// Bits 0-15 are required and bits 16-31 are optional.
-	mongoDBFrame.checksumPresent = (flagBits & kChecksumBitmask) == kChecksumBitmask
-	mongoDBFrame.moreToCome = (flagBits & kMoreToComeBitmask) == kMoreToComeBitmask
-	mongoDBFrame.exhaustAllowed = (flagBits & kExhaustAllowedBitmask) == kExhaustAllowedBitmask
+	mongoDBFrame.ChecksumPresent = (flagBits & kChecksumBitmask) == kChecksumBitmask
+	mongoDBFrame.MoreToCome = (flagBits & kMoreToComeBitmask) == kMoreToComeBitmask
+	mongoDBFrame.ExhaustAllowed = (flagBits & kExhaustAllowedBitmask) == kExhaustAllowedBitmask
 	if flagBits&kRequiredUnsetBitmask != 0 {
 		return Invalid
 	}
 
 	// Determine the number of checksum bytes in the buffer.
 	var checksumBytes int32
-	if mongoDBFrame.checksumPresent {
+	if mongoDBFrame.ChecksumPresent {
 		checksumBytes = 4
 	} else {
 		checksumBytes = 0
 	}
 
 	// Get the section(s) data from the buffer.
-	allSectionsLength := mongoDBFrame.length - int32(kHeaderAndFlagSize) - int32(checksumBytes)
+	allSectionsLength := mongoDBFrame.Length - int32(kHeaderAndFlagSize) - int32(checksumBytes)
 	for allSectionsLength > 0 {
 		var section Section
 		section.kind, err = ExtractLEInt[uint8](decoder)
@@ -360,7 +351,7 @@ func ProcessOpMsg(decoder *BinaryDecoder, mongoDBFrame *MongoDBFrame) ParseState
 				return Invalid
 			}
 			// Get the sequence identifier (command argument).
-			seqIdentifier, err := decoder.ExtractStringUntil("\x00") //pixie '\0'?
+			seqIdentifier, err := decoder.ExtractStringUntil("\x00")
 			if err != nil {
 				return Invalid
 			}
@@ -388,7 +379,7 @@ func ProcessOpMsg(decoder *BinaryDecoder, mongoDBFrame *MongoDBFrame) ParseState
 
 			// Check if section_body contains an empty document.
 			if len(sectionBody) == int(kSectionLengthSize) {
-				section.documents = append(section.documents, "")
+				section.Documents = append(section.Documents, "")
 				remainingSectionLength -= documentLength
 				continue
 			}
@@ -415,28 +406,24 @@ func ProcessOpMsg(decoder *BinaryDecoder, mongoDBFrame *MongoDBFrame) ParseState
 					opMsgType = element.Key
 					break
 				}
-				// for key := range doc {
-				// 	opMsgType = key
-				// 	break
-				// }
 				switch opMsgType {
 				case kInsert, kDelete, kUpdate, kFind, kCursor:
-					mongoDBFrame.opMsgType = opMsgType
+					mongoDBFrame.OpMsgType = opMsgType
 				case kHello, kIsMaster, kIsMasterAlternate:
 					// The frame is a handshaking message.
-					mongoDBFrame.opMsgType = opMsgType
-					mongoDBFrame.isHandshake = true
+					mongoDBFrame.OpMsgType = opMsgType
+					mongoDBFrame.IsHandshake = true
 				default:
 					// The frame is a response message, find the "ok" key and its value.
 					if okValue, ok := doc["ok"]; ok {
 						switch v := okValue.(type) {
 						case map[string]interface{}:
 							for key, value := range v {
-								mongoDBFrame.opMsgType = fmt.Sprintf("ok: {%s: %v}", key, value)
+								mongoDBFrame.OpMsgType = fmt.Sprintf("ok: {%s: %v}", key, value)
 								break
 							}
 						case float64:
-							mongoDBFrame.opMsgType = fmt.Sprintf("ok: %d", int(v))
+							mongoDBFrame.OpMsgType = fmt.Sprintf("ok: %d", int(v))
 						}
 					} else {
 						return Invalid
@@ -445,18 +432,26 @@ func ProcessOpMsg(decoder *BinaryDecoder, mongoDBFrame *MongoDBFrame) ParseState
 				}
 			}
 
-			section.documents = append(section.documents, string(jsonDoc))
+			section.Documents = append(section.Documents, string(jsonDoc))
 			remainingSectionLength -= documentLength
 		}
-		mongoDBFrame.sections = append(mongoDBFrame.sections, section)
+		mongoDBFrame.Sections = append(mongoDBFrame.Sections, section)
 		allSectionsLength -= (section.length + int32(kSectionKindSize))
 	}
 	// Get the checksum data, if necessary.
-	if mongoDBFrame.checksumPresent {
-		mongoDBFrame.checksum, err = ExtractLEInt[uint32](decoder)
+	if mongoDBFrame.ChecksumPresent {
+		mongoDBFrame.Checksum, err = ExtractLEInt[uint32](decoder)
 		if err != nil {
 			return Invalid
 		}
 	}
 	return Success
+}
+
+func NewMongoDBStreamParser() *MongoDBStreamParser {
+	return &MongoDBStreamParser{
+		State: &State{
+			StreamOrder: make([]StreamOrderPair, 0),
+		},
+	}
 }
