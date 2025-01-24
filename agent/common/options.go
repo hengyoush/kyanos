@@ -48,6 +48,7 @@ type AgentOptions struct {
 	WatchOptions                watch.WatchOptions
 	PerformanceMode             bool
 	ConntrackCloseWaitTimeMills int
+	StartGopsServer             bool
 
 	FilterComm              string
 	ProcessExecEventChannel chan *bpf.AgentProcessExecEvent

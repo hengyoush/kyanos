@@ -103,6 +103,8 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "data-perf-event-buffer-size", 30*1024*1024, "--data-perf-event-buffer-size 1024")
 	rootCmd.PersistentFlags().IntVar(&options.ConntrackCloseWaitTimeMills, "conntrack-close-wait-time-mills", 100, "--conntrack-close-wait-time-mills 100")
 
+	rootCmd.PersistentFlags().BoolVar(&options.StartGopsServer, "gops", false, "start gops server")
+
 	rootCmd.PersistentFlags().MarkHidden("default-log-level")
 	rootCmd.PersistentFlags().MarkHidden("agent-log-level")
 	rootCmd.PersistentFlags().MarkHidden("bpf-event-log-level")
