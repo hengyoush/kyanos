@@ -26,11 +26,14 @@ import (
 	"syscall"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/cilium/ebpf/rlimit"
 	gops "github.com/google/gops/agent"
 )
 
 func SetupAgent(options ac.AgentOptions) {
+	startGopsServer(options)
 	err := version.UpgradeDetect()
 	if err != nil {
 		if errors.Is(err, version.ErrBehindLatest) {
@@ -57,7 +60,6 @@ func SetupAgent(options ac.AgentOptions) {
 		common.AgentLog.Warnf("Your terminal does not support 256 colors, ui may display incorrectly")
 	}
 
-	// startGopsServer(options)
 	options = ac.ValidateAndRepairOptions(options)
 	common.LaunchEpochTime = GetMachineStartTimeNano()
 	stopper := options.Stopper
@@ -242,7 +244,7 @@ Submit issue: https://github.com/hengyoush/kyanos/issues
 }
 
 func startGopsServer(opts ac.AgentOptions) {
-	if opts.WatchOptions.DebugOutput {
+	if opts.StartGopsServer {
 		if err := gops.Listen(gops.Options{}); err != nil {
 			common.AgentLog.Fatalf("agent.Listen err: %v", err)
 		} else {
