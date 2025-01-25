@@ -2,6 +2,7 @@ package analysis
 
 import (
 	analysisCommon "kyanos/agent/analysis/common"
+	. "kyanos/agent/common"
 	"kyanos/agent/conn"
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
@@ -12,12 +13,16 @@ import (
 )
 
 var outputLog *logrus.Logger = logrus.New()
+var traceDevEvent bool
+var traceSocketEvent bool
 
 type StatRecorder struct {
 }
 
-func InitStatRecorder() *StatRecorder {
+func InitStatRecorder(options *AgentOptions) *StatRecorder {
 	sr := new(StatRecorder)
+	traceDevEvent = options.TraceDevEvent
+	traceSocketEvent = options.TraceSocketEvent
 	return sr
 }
 
@@ -118,14 +123,18 @@ func prepareEvents(r protocol.Record, connection *conn.Connection4) *events {
 	writeSyscallEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTSYSCALL_OUT, egressKernSeq, egressKernLen)
 	readSyscallEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTSYSCALL_IN, ingressKernSeq, ingressKernLen)
 
-	devOutEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTDEV_OUT, egressKernSeq, egressKernLen)
-	nicIngressEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTNIC_IN, ingressKernSeq, ingressKernLen)
-	userCopyEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, ingressKernSeq, ingressKernLen)
-	tcpInEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTTCP_IN, ingressKernSeq, ingressKernLen)
-
-	if len(nicIngressEvents) == 0 {
-		nicIngressEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTDEV_IN, ingressKernSeq, ingressKernLen)
+	if traceDevEvent {
+		devOutEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTDEV_OUT, egressKernSeq, egressKernLen)
+		nicIngressEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTNIC_IN, ingressKernSeq, ingressKernLen)
+		if len(nicIngressEvents) == 0 {
+			nicIngressEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTDEV_IN, ingressKernSeq, ingressKernLen)
+		}
 	}
+	if traceSocketEvent {
+		userCopyEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTUSER_COPY, ingressKernSeq, ingressKernLen)
+		tcpInEvents = streamEvents.FindEventsBySeqAndLen(bpf.AgentStepTTCP_IN, ingressKernSeq, ingressKernLen)
+	}
+
 	events.sslReadSyscallEvents = sslReadSyscallEvents
 	events.sslWriteSyscallEvents = sslWriteSyscallEvents
 
@@ -220,6 +229,9 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		}
 		if hasTcpInEvents && hasNicInEvents && canCalculateWritePathTime {
 			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetStartTs() - events.nicIngressEvents[0].GetStartTs())
+		}
+		if !traceDevEvent {
+			annotatedRecord.TotalDuration = annotatedRecord.BlackBoxDuration
 		}
 		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.readSyscallEvents)
 		annotatedRecord.RespSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.writeSyscallEvents)

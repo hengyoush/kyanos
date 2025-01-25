@@ -149,7 +149,7 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	bf.attachExecEventChannels(options)
 	bf.attachExitEventChannels(options)
 
-	if !options.DisableOpensslUprobe {
+	if options.TraceSslEvent {
 		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, 10)
 		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
 		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedEventChannel}
@@ -173,7 +173,7 @@ func (bf *BPF) attachExecEventChannels(options *ac.AgentOptions) {
 	execEventChannelForMetadata := make(chan *bpf.AgentProcessExecEvent, execEventChannelBufferSize)
 	execEventChannels = append(execEventChannels, execEventChannelForMetadata)
 	metadata.StartHandleSchedExecEvent(execEventChannelForMetadata, options.Ctx)
-	if !options.DisableOpensslUprobe {
+	if options.TraceSslEvent {
 		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, execEventChannelBufferSize)
 		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
 		execEventChannels = append(execEventChannels, uprobeSchedEventChannel)
@@ -488,6 +488,9 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 		if options.PerformanceMode && isNonCriticalStep {
 			continue
 		}
+		if !traceStep(*options, step) {
+			continue
+		}
 		for idx, function := range functions {
 			var err error
 			var l link.Link
@@ -756,4 +759,18 @@ func getNonCriticalSteps() map[bpf.AgentStepT]bool {
 		bpf.AgentStepTQDISC_OUT: true,
 		bpf.AgentStepTIP_IN:     true,
 	}
+}
+
+var stepToOptions = map[bpf.AgentStepT]func(ac.AgentOptions) bool{
+	bpf.AgentStepTDEV_IN:    func(options ac.AgentOptions) bool { return options.TraceDevEvent },
+	bpf.AgentStepTDEV_OUT:   func(options ac.AgentOptions) bool { return options.TraceDevEvent },
+	bpf.AgentStepTTCP_IN:    func(options ac.AgentOptions) bool { return options.TraceSocketEvent },
+	bpf.AgentStepTUSER_COPY: func(options ac.AgentOptions) bool { return options.TraceSocketEvent },
+}
+
+func traceStep(options ac.AgentOptions, step bpf.AgentStepT) bool {
+	if f, ok := stepToOptions[step]; ok {
+		return f(options)
+	}
+	return true
 }
