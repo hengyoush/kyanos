@@ -149,7 +149,7 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	bf.attachExecEventChannels(options)
 	bf.attachExitEventChannels(options)
 
-	if options.TraceSslEvent {
+	if options.WatchOptions.TraceSslEvent {
 		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, 10)
 		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
 		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedEventChannel}
@@ -173,7 +173,7 @@ func (bf *BPF) attachExecEventChannels(options *ac.AgentOptions) {
 	execEventChannelForMetadata := make(chan *bpf.AgentProcessExecEvent, execEventChannelBufferSize)
 	execEventChannels = append(execEventChannels, execEventChannelForMetadata)
 	metadata.StartHandleSchedExecEvent(execEventChannelForMetadata, options.Ctx)
-	if options.TraceSslEvent {
+	if options.WatchOptions.TraceSslEvent {
 		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, execEventChannelBufferSize)
 		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
 		execEventChannels = append(execEventChannels, uprobeSchedEventChannel)
@@ -762,10 +762,10 @@ func getNonCriticalSteps() map[bpf.AgentStepT]bool {
 }
 
 var stepToOptions = map[bpf.AgentStepT]func(ac.AgentOptions) bool{
-	bpf.AgentStepTDEV_IN:    func(options ac.AgentOptions) bool { return options.TraceDevEvent },
-	bpf.AgentStepTDEV_OUT:   func(options ac.AgentOptions) bool { return options.TraceDevEvent },
-	bpf.AgentStepTTCP_IN:    func(options ac.AgentOptions) bool { return options.TraceSocketEvent },
-	bpf.AgentStepTUSER_COPY: func(options ac.AgentOptions) bool { return options.TraceSocketEvent },
+	bpf.AgentStepTDEV_IN:    func(options ac.AgentOptions) bool { return options.WatchOptions.TraceDevEvent },
+	bpf.AgentStepTDEV_OUT:   func(options ac.AgentOptions) bool { return options.WatchOptions.TraceDevEvent },
+	bpf.AgentStepTTCP_IN:    func(options ac.AgentOptions) bool { return options.WatchOptions.TraceSocketEvent },
+	bpf.AgentStepTUSER_COPY: func(options ac.AgentOptions) bool { return options.WatchOptions.TraceSocketEvent },
 }
 
 func traceStep(options ac.AgentOptions, step bpf.AgentStepT) bool {

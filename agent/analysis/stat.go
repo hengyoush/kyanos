@@ -21,8 +21,8 @@ type StatRecorder struct {
 
 func InitStatRecorder(options *AgentOptions) *StatRecorder {
 	sr := new(StatRecorder)
-	traceDevEvent = options.TraceDevEvent
-	traceSocketEvent = options.TraceSocketEvent
+	traceDevEvent = options.WatchOptions.TraceDevEvent
+	traceSocketEvent = options.WatchOptions.TraceSocketEvent
 	return sr
 }
 
@@ -233,6 +233,11 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		if !traceDevEvent {
 			annotatedRecord.TotalDuration = annotatedRecord.BlackBoxDuration
 		}
+		if !traceSocketEvent && hasNicInEvents && canCalculateReadPathTime {
+			if nicInTimestamp, _, ok := events.nicIngressEvents[0].GetMinIfItmestampAttr(); ok {
+				annotatedRecord.ReadFromSocketBufferDuration = float64(events.readSyscallEvents[len(events.readSyscallEvents)-1].GetEndTs() - uint64(nicInTimestamp))
+			}
+		}
 		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.readSyscallEvents)
 		annotatedRecord.RespSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.writeSyscallEvents)
 		annotatedRecord.ReqNicEventDetails = KernEventsToNicEventDetails(events.nicIngressEvents)
@@ -300,19 +305,25 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		if hasTcpInEvents && hasNicInEvents && canCalculateReadPathTime {
 			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetStartTs() - events.nicIngressEvents[0].GetStartTs())
 		}
+		if !traceSocketEvent && hasNicInEvents && canCalculateReadPathTime {
+			if _nicIngressTimestamp, _, ok := events.nicIngressEvents[0].GetMinIfItmestampAttr(); ok {
+				annotatedRecord.ReadFromSocketBufferDuration = float64(events.readSyscallEvents[len(events.readSyscallEvents)-1].GetEndTs() - uint64(_nicIngressTimestamp))
+			}
+
+		}
 		annotatedRecord.ReqSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.writeSyscallEvents)
 		annotatedRecord.RespSyscallEventDetails = KernEventsToEventDetails[analysisCommon.SyscallEventDetail](events.readSyscallEvents)
 		annotatedRecord.ReqNicEventDetails = KernEventsToNicEventDetails(events.devOutEvents)
 		annotatedRecord.RespNicEventDetails = KernEventsToNicEventDetails(events.nicIngressEvents)
 	}
+
 	streamEvents.MarkNeedDiscardSeq(events.egressKernSeq+uint64(events.egressKernLen), true)
 	streamEvents.MarkNeedDiscardSeq(events.ingressKernSeq+uint64(events.ingressKernLen), false)
 	if connection.IsSsl() {
 		streamEvents.MarkNeedDiscardSslSeq(events.egressSeq+uint64(events.egressMessage.ByteSize()), true)
 		streamEvents.MarkNeedDiscardSslSeq(events.ingressSeq+uint64(events.ingressMessage.ByteSize()), false)
 	}
-	// streamEvents.DiscardEventsBySeq(events.egressKernSeq+uint64(events.egressKernLen), true)
-	// streamEvents.DiscardEventsBySeq(events.ingressKernSeq+uint64(events.ingressKernLen), false)
+
 	if recordsChannel == nil {
 		outputLog.Infoln(annotatedRecord.String(analysisCommon.AnnotatedRecordToStringOptions{
 			Nano: false,

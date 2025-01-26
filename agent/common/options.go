@@ -45,9 +45,6 @@ type AgentOptions struct {
 	PerfEventBufferSizeForData  int
 	PerfEventBufferSizeForEvent int
 	WatchOptions                watch.WatchOptions
-	TraceDevEvent               bool
-	TraceSocketEvent            bool
-	TraceSslEvent               bool
 	PerformanceMode             bool
 	ConntrackCloseWaitTimeMills int
 	StartGopsServer             bool
