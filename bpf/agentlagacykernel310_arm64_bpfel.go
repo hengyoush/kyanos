@@ -70,6 +70,7 @@ type AgentLagacyKernel310ProgramSpecs struct {
 	TcpRcvEstablished                    *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                           *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                             *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
+	TcpV6DoRcv                           *ebpf.ProgramSpec `ebpf:"tcp_v6_do_rcv"`
 	TracepointNetifReceiveSkb            *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSchedSchedProcessExit      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exit"`
@@ -265,6 +266,7 @@ type AgentLagacyKernel310Programs struct {
 	TcpRcvEstablished                    *ebpf.Program `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                           *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                             *ebpf.Program `ebpf:"tcp_v4_rcv"`
+	TcpV6DoRcv                           *ebpf.Program `ebpf:"tcp_v6_do_rcv"`
 	TracepointNetifReceiveSkb            *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSchedSchedProcessExit      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exit"`
@@ -315,6 +317,7 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 		p.TcpRcvEstablished,
 		p.TcpV4DoRcv,
 		p.TcpV4Rcv,
+		p.TcpV6DoRcv,
 		p.TracepointNetifReceiveSkb,
 		p.TracepointSchedSchedProcessExec,
 		p.TracepointSchedSchedProcessExit,

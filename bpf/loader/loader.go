@@ -509,14 +509,18 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 					if isNonCriticalStep {
 						common.AgentLog.Debugf("Attach failed: %v, functions: %v skip it because it's a non-criticalstep", err, functions)
 					} else {
-						return nil, fmt.Errorf("Attach failed: %v, functions: %v", err, functions)
+						return nil, fmt.Errorf("attach failed: %v, functions: %v", err, functions)
 					}
 				} else {
 					common.AgentLog.Debugf("Attach failed but has fallback: %v, functions: %v", err, functions)
 				}
 			} else {
 				linkList.PushBack(l)
-				break
+				if idx < len(functions)-1 && !functions[idx+1].IsBackup() {
+					continue
+				} else {
+					break
+				}
 			}
 		}
 	}
