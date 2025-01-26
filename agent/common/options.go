@@ -44,7 +44,6 @@ type AgentOptions struct {
 	anc.AnalysisOptions
 	PerfEventBufferSizeForData  int
 	PerfEventBufferSizeForEvent int
-	DisableOpensslUprobe        bool
 	WatchOptions                watch.WatchOptions
 	PerformanceMode             bool
 	ConntrackCloseWaitTimeMills int

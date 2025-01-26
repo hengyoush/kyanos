@@ -76,7 +76,7 @@ func SetupAgent(options ac.AgentOptions) {
 	if options.ConnManagerInitHook != nil {
 		options.ConnManagerInitHook(connManager)
 	}
-	statRecorder := analysis.InitStatRecorder()
+	statRecorder := analysis.InitStatRecorder(&options)
 
 	var recordsChannel chan *anc.AnnotatedRecord = nil
 	recordsChannel = make(chan *anc.AnnotatedRecord, 1000)

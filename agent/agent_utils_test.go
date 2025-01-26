@@ -72,7 +72,6 @@ func StartAgent0(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 		agent.SetupAgent(ac.AgentOptions{
 			Stopper:                agentStopper,
 			LoadBpfProgramFunction: loadBpfProgramFunction,
-			DisableOpensslUprobe:   customAgentOptions.DisableOpensslUprobe,
 			CustomSyscallEventHook: func(evt *bpf.SyscallEventData) {
 				if syscallEventList != nil {
 					*syscallEventList = append(*syscallEventList, *evt)
