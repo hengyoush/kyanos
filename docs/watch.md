@@ -55,41 +55,19 @@ a specific request-response:
 
 ![kyanos watch result detail](/watch-result-detail.jpg)
 
-In the details view, the first section shows **latency details** with each block
-representing a step in the data packet's journey—such as the process, network
-card, and Socket buffer.  
-Each block displays the time taken between these points, allowing you to trace
-the flow from when a request is sent by the process to when a response is
-received, with step-by-step latency.
+The first part of the details page is **Latency Details**. Each block represents a node that the data packet passes through, such as processes, network cards, socket buffers, etc. Below each block, there is a latency value, which indicates the time taken from the previous node to this node. You can clearly see the process of the request being sent from the process to the network card, and the response being copied from the network card to be read by the process, along with the latency of each step.
 
-The second section contains the **request and response content**, split into
-Request and Response parts. Content exceeding 1024 bytes is truncated, but you
-can adjust this limit using the `--max-print-bytes` option.
 
-## JSON Output <Badge type="tip" text="1.5.0" />
+> [!TIP]
+>
+> If you want to see the latency for **copying data from the network card to the TCP buffer** and **reading data from the buffer to the process**, you can add `--trace-socket-event` to the watch options:
+> ![kyanos watch result detail with socket event](/watch-result-detail-with-socket-event.jpg)
+> You will see an additional Socket block in the latency visualization chart.
 
-If you need to process the captured data programmatically, you can use the
-`--json-output` flag to output the results in JSON format:
 
-```bash
-# Output to terminal
-kyanos watch --json-output=stdout
+The second part is **Basic Information of the Request and Response**, which includes the start and end times of the request and response, the size of the request and response, etc.
 
-# Output to a file
-kyanos watch --json-output=/path/to/custom.json
-```
-
-The JSON output will contain detailed information for each request-response pair
-including:
-
-- Timestamps for request and response
-- Connection details (addresses and ports)
-- Protocol-specific information
-- Detailed latency metrics
-- Request and response content
-
-For the complete JSON output format specification, please refer to the
-[JSON Output Format](./json-output.md) documentation.
+The third part is **Specific Content of the Request and Response**, divided into Request and Response sections. Content exceeding `1024` bytes will be truncated for display, but you can adjust this limit using the `--max-print-bytes` option.
 
 ## How to Filter Requests and Responses ? {#how-to-filter}
 
@@ -214,3 +192,29 @@ Here are the options available for filtering by each protocol:
 
 This flexibility allows you to tailor your traffic capture to your specific
 needs, ensuring you gather only the most relevant request-response data.
+
+
+## JSON Output <Badge type="tip" text="1.5.0" />
+
+If you need to process the captured data programmatically, you can use the
+`--json-output` flag to output the results in JSON format:
+
+```bash
+# Output to terminal
+kyanos watch --json-output=stdout
+
+# Output to a file
+kyanos watch --json-output=/path/to/custom.json
+```
+
+The JSON output will contain detailed information for each request-response pair
+including:
+
+- Timestamps for request and response
+- Connection details (addresses and ports)
+- Protocol-specific information
+- Detailed latency metrics
+- Request and response content
+
+For the complete JSON output format specification, please refer to the
+[JSON Output Format](./json-output.md) documentation.

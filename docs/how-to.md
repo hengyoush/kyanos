@@ -33,16 +33,11 @@ Press `Enter` to access the details view:
 
 ![kyanos watch result detail](/watch-result-detail.jpg)
 
-In the details view, the first section is **Latency Details**. Each block
-represents a "node" that the data packet passes through, such as the process,
-network interface, and socket buffer.  
-Each block includes a time value indicating the time elapsed from the previous
-node to this node, showing the process flow from the process sending the request
-to the network interface, to the response being copied to the socket buffer, and
-finally read by the process, with each step’s duration displayed.
+The first part of the details page is **Latency Details**. Each block represents a node that the data packet passes through, such as processes, network cards, socket buffers, etc. Below each block, there is a latency value, which indicates the time taken from the previous node to this node. You can clearly see the process of the request being sent from the process to the network card, and the response being copied from the network card to be read by the process, along with the latency of each step.
 
-The second section provides **Detailed Request and Response Content**, split
-into Request and Response parts, and truncates content over `1024` bytes.
+The second part is **Basic Information of the Request and Response**, which includes the start and end times of the request and response, the size of the request and response, etc.
+
+The third part is **Specific Content of the Request and Response**, divided into Request and Response sections. Content exceeding `1024` bytes will be truncated for display.
 
 For more precise traffic capture, such as HTTP traffic:
 

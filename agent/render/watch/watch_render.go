@@ -225,9 +225,9 @@ func NewModel(options WatchOptions, records *[]*common.AnnotatedRecord, initialW
 func initWatchCols(wide bool) {
 	cols = make([]watchCol, 0)
 	cols = []watchCol{idCol, startTimeCol, connCol, protoCol, totalTimeCol, reqSizeCol, respSizeCol}
-	cols = append(cols, netInternalCol, readSocketCol)
 	if wide {
 		cols = slices.Insert(cols, 2, processCol)
+		cols = append(cols, netInternalCol, readSocketCol)
 	}
 }
 
