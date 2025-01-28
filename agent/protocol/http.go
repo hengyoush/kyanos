@@ -78,7 +78,7 @@ func (h *HTTPStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messa
 	return -1
 }
 
-func (h *HTTPStreamParser) ParseRequest(buf string, messageType MessageType, timestamp uint64, seq uint64) ParseResult {
+func (h *HTTPStreamParser) ParseRequest(buf string, messageType MessageType, timestamp uint64, seq uint32) ParseResult {
 	reader := strings.NewReader(buf)
 	bufioReader := bufio.NewReader(reader)
 	req, err := http.ReadRequest(bufioReader)
@@ -112,10 +112,10 @@ func (h *HTTPStreamParser) ParseRequest(buf string, messageType MessageType, tim
 			}
 		}
 		readIndex := common.GetBufioReaderReadIndex(bufioReader)
-		parseResult.ReadBytes = readIndex
+		parseResult.ReadBytes = uint32(readIndex)
 		parseResult.ParsedMessages = []ParsedMessage{
 			&ParsedHttpRequest{
-				FrameBase: NewFrameBase(timestamp, readIndex, seq),
+				FrameBase: NewFrameBase(timestamp, uint32(readIndex), seq),
 				Host:      req.Host,
 				Method:    req.Method,
 				Path:      req.URL.Path,
@@ -127,7 +127,7 @@ func (h *HTTPStreamParser) ParseRequest(buf string, messageType MessageType, tim
 	}
 }
 
-func (h *HTTPStreamParser) ParseResponse(buf string, messageType MessageType, timestamp uint64, seq uint64, streamBuffer *buffer.StreamBuffer) ParseResult {
+func (h *HTTPStreamParser) ParseResponse(buf string, messageType MessageType, timestamp uint64, seq uint32, streamBuffer *buffer.StreamBuffer) ParseResult {
 	reader := strings.NewReader(buf)
 	bufioReader := bufio.NewReader(reader)
 	resp, err := http.ReadResponse(bufioReader, nil)
@@ -149,10 +149,10 @@ func (h *HTTPStreamParser) ParseResponse(buf string, messageType MessageType, ti
 			ParseState: NeedsMoreData,
 		}
 	}
-	parseResult.ReadBytes = readIndex
+	parseResult.ReadBytes = uint32(readIndex)
 	parseResult.ParsedMessages = []ParsedMessage{
 		&ParsedHttpResponse{
-			FrameBase: NewFrameBase(timestamp, readIndex, seq),
+			FrameBase: NewFrameBase(timestamp, uint32(readIndex), seq),
 			buf:       []byte(buf[:readIndex]),
 		},
 	}
@@ -160,7 +160,7 @@ func (h *HTTPStreamParser) ParseResponse(buf string, messageType MessageType, ti
 	return parseResult
 }
 
-func (h *HTTPStreamParser) handleReadResponseError(err error, buf string, streamBuffer *buffer.StreamBuffer, messageType MessageType, timestamp uint64, seq uint64) ParseResult {
+func (h *HTTPStreamParser) handleReadResponseError(err error, buf string, streamBuffer *buffer.StreamBuffer, messageType MessageType, timestamp uint64, seq uint32) ParseResult {
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
 		return ParseResult{
 			ParseState: NeedsMoreData,
@@ -172,14 +172,14 @@ func (h *HTTPStreamParser) handleReadResponseError(err error, buf string, stream
 	}
 }
 
-func (h *HTTPStreamParser) handleReadBodyError(err error, buf string, streamBuffer *buffer.StreamBuffer, messageType MessageType, timestamp uint64, seq uint64) ParseResult {
+func (h *HTTPStreamParser) handleReadBodyError(err error, buf string, streamBuffer *buffer.StreamBuffer, messageType MessageType, timestamp uint64, seq uint32) ParseResult {
 	parseResult := ParseResult{}
 	boundary := h.FindBoundary(streamBuffer, messageType, 0)
 	if boundary > 0 {
-		parseResult.ReadBytes = boundary
+		parseResult.ReadBytes = uint32(boundary)
 		parseResult.ParsedMessages = []ParsedMessage{
 			&ParsedHttpResponse{
-				FrameBase: NewFrameBase(timestamp, boundary, seq),
+				FrameBase: NewFrameBase(timestamp, uint32(boundary), seq),
 				buf:       []byte(buf[:boundary]),
 			},
 		}
@@ -188,7 +188,7 @@ func (h *HTTPStreamParser) handleReadBodyError(err error, buf string, streamBuff
 	} else if fakeDataIdx, _ := fakeDataMarkIndex([]byte(buf)); fakeDataIdx != -1 {
 		fakeDataSize := getFakeDataSize([]byte(buf), fakeDataIdx)
 		if len(buf) >= fakeDataIdx+int(fakeDataSize)+fakeDataMarkLen {
-			parseResult.ReadBytes = fakeDataIdx + int(fakeDataSize) + fakeDataMarkLen
+			parseResult.ReadBytes = uint32(fakeDataIdx + int(fakeDataSize) + fakeDataMarkLen)
 			parseResult.ParsedMessages = []ParsedMessage{
 				&ParsedHttpResponse{
 					FrameBase: NewFrameBase(timestamp, parseResult.ReadBytes, seq),

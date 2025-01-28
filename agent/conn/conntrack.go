@@ -593,7 +593,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		if common.ConntrackLog.Level >= logrus.DebugLevel {
 			common.ConntrackLog.Debugf("[parseStreamBuffer] %s Removed streambuffer some head data(%d bytes) due to find boundary from %s queue", c.ToString(), startPos, messageType.String())
 		}
-		streamBuffer.RemovePrefix(startPos)
+		streamBuffer.RemovePrefix(uint32(startPos))
 	}
 	originPos := streamBuffer.Position0()
 	// var parseState protocol.ParseState
@@ -635,17 +635,17 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		case protocol.Invalid:
 			pos := parser.FindBoundary(streamBuffer, messageType, 1)
 			if pos != -1 {
-				streamBuffer.RemovePrefix(pos)
+				streamBuffer.RemovePrefix(uint32(pos))
 				if common.ConntrackLog.Level >= logrus.DebugLevel {
 					common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue(found boundary) and continue", c.ToString(), pos, messageType.String())
 				}
 				stop = false
 			} else if c.progressIsStucked(streamBuffer) {
-				if streamBuffer.Head().Len() > int(ke.Len) {
+				if streamBuffer.Head().Len() > ke.Len {
 					if common.ConntrackLog.Level >= logrus.DebugLevel {
-						common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue", c.ToString(), streamBuffer.Head().Len()-int(ke.Len), messageType.String())
+						common.ConntrackLog.Debugf("[parseStreamBuffer] Invalid, %s Removed streambuffer some head data(%d bytes) due to stuck from %s queue", c.ToString(), streamBuffer.Head().Len()-ke.Len, messageType.String())
 					}
-					streamBuffer.RemovePrefix(streamBuffer.Head().Len() - int(ke.Len))
+					streamBuffer.RemovePrefix(streamBuffer.Head().Len() - ke.Len)
 					stop = false
 				} else {
 					removed := c.checkProgress(streamBuffer)
@@ -687,7 +687,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		}
 	}
 	curProgress := streamBuffer.Position0()
-	if streamBuffer.IsEmpty() || curProgress != int(originPos) {
+	if streamBuffer.IsEmpty() || curProgress != originPos {
 		c.updateProgressTime(streamBuffer)
 	}
 	// if parseState == protocol.Invalid {
@@ -717,7 +717,7 @@ func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 		c.updateProgressTime(sb)
 		return false
 	}
-	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
+	headTime, ok := sb.FindTimestampBySeq(sb.Position0())
 	stuckDuration := time.Now().UnixMilli() - int64(common.NanoToMills(headTime))
 	if !ok || stuckDuration > maxAllowStuckTime {
 		return true
@@ -732,7 +732,7 @@ func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
 		c.updateProgressTime(sb)
 		return false
 	}
-	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
+	headTime, ok := sb.FindTimestampBySeq(sb.Position0())
 	now := time.Now().UnixMilli()
 	headTimeMills := int64(common.NanoToMills(headTime))
 	if !ok || now-headTimeMills > maxAllowStuckTime {

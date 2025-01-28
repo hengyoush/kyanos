@@ -269,18 +269,18 @@ func (m *MysqlParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType
 	}
 
 	packet.msg = string(buf[kPacketHeaderLength : kPacketHeaderLength+packetLength])
-	fb, ok := CreateFrameBase(streamBuffer, kPacketHeaderLength+packetLength)
+	fb, ok := CreateFrameBase(streamBuffer, uint32(kPacketHeaderLength+packetLength))
 	if !ok {
 		return ParseResult{
 			ParseState: Ignore,
-			ReadBytes:  kPacketHeaderLength + packetLength,
+			ReadBytes:  uint32(kPacketHeaderLength + packetLength),
 		}
 	} else {
 		packet.FrameBase = fb
 		return ParseResult{
 			ParseState:     Success,
 			ParsedMessages: []ParsedMessage{&packet},
-			ReadBytes:      kPacketHeaderLength + packetLength,
+			ReadBytes:      uint32(kPacketHeaderLength + packetLength),
 		}
 	}
 }

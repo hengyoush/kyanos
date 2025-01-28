@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"kyanos/agent/buffer"
+	"math"
 	"math/rand"
 	"testing"
 
@@ -201,4 +202,21 @@ func TestTreeMap(t *testing.T) {
 		}
 		fmt.Println(key)
 	}
+}
+
+func TestRemovePrefixPartially2(t *testing.T) {
+	initSeq := 21321321321
+	m := math.MaxInt - initSeq
+	fmt.Println(int32(m))
+	curSeq := 0
+	s := uint32(curSeq - initSeq)
+	fmt.Println(s)
+
+	curSeq = 10
+	s = uint32(curSeq - initSeq)
+	fmt.Println(int(s))
+
+	curSeq = 21321321320
+	s = uint32(curSeq - initSeq)
+	fmt.Println(int(s))
 }

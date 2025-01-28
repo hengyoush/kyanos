@@ -177,18 +177,18 @@ func AssertConnEvent(t *testing.T, connectEvent bpf.AgentConnEvtT, assert ConnEv
 	}
 	readBytes := connectEvent.ConnInfo.ReadBytes
 	expectReadBytes := assert.expectReadBytes
-	if expectReadBytes >= 0 && readBytes != uint64(expectReadBytes) {
+	if expectReadBytes >= 0 && readBytes != uint32(expectReadBytes) {
 		t.Fatalf("ReadBytes Incorrect: %d != %d", readBytes, expectReadBytes)
 	}
-	if assert.expectReadBytesPredicator != nil && !assert.expectReadBytesPredicator(readBytes) {
+	if assert.expectReadBytesPredicator != nil && !assert.expectReadBytesPredicator(uint64(readBytes)) {
 		t.Fatalf("ReadBytes Predicate return false: %d", readBytes)
 	}
 	writeBytes := connectEvent.ConnInfo.WriteBytes
 	expectWriteBytes := assert.expectWriteBytes
-	if expectWriteBytes >= 0 && writeBytes != uint64(expectWriteBytes) {
+	if expectWriteBytes >= 0 && writeBytes != uint32(expectWriteBytes) {
 		t.Fatalf("WriteBytes Incorrect: %d != %d", writeBytes, expectWriteBytes)
 	}
-	if assert.expectWriteBytesPredicator != nil && !assert.expectWriteBytesPredicator(writeBytes) {
+	if assert.expectWriteBytesPredicator != nil && !assert.expectWriteBytesPredicator(uint64(writeBytes)) {
 		t.Fatalf("WriteBytes Predicate return false: %d", writeBytes)
 	}
 	expectConnEventType := assert.expectConnEventType

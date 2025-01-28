@@ -117,7 +117,7 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 	message, err := r.parseHeader(headerBody, serializedType)
 	if err != nil {
 		common.ProtocolParserLog.Errorf("Failed to parse header: %v", err)
-		return protocol.ParseResult{ParseState: protocol.Invalid, ReadBytes: int(frameSize)}
+		return protocol.ParseResult{ParseState: protocol.Invalid, ReadBytes: uint32(frameSize)}
 	}
 
 	if frameSize > 4+int(headerDataLen) {
@@ -126,13 +126,13 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 	}
 
 	message.isReq = messageType == protocol.Request
-	fb, ok := protocol.CreateFrameBase(streamBuffer, frameSize)
+	fb, ok := protocol.CreateFrameBase(streamBuffer, uint32(frameSize))
 
 	if !ok {
 		common.ProtocolParserLog.Debugf("Failed to create FrameBase for frameSize=%d", frameSize)
 		return protocol.ParseResult{
 			ParseState: protocol.Ignore,
-			ReadBytes:  frameSize,
+			ReadBytes:  uint32(frameSize),
 		}
 	}
 
@@ -140,7 +140,7 @@ func (r *RocketMQStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, me
 	message.FrameBase = fb
 	return protocol.ParseResult{
 		ParseState:     protocol.Success,
-		ReadBytes:      frameSize,
+		ReadBytes:      uint32(frameSize),
 		ParsedMessages: []protocol.ParsedMessage{message},
 	}
 

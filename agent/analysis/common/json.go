@@ -22,10 +22,10 @@ type annotatedRecordAlias struct {
 	BlackBoxDuration           float64              `json:"black_box_duration_ms"`
 	ReadSocketDuration         float64              `json:"read_socket_duration_ms"`
 	CopyToSocketBufferDuration float64              `json:"copy_to_socket_buffer_duration_ms"`
-	ReqSize                    int                  `json:"req_size_bytes"`
-	RespSize                   int                  `json:"resp_size_bytes"`
-	ReqPlainTextSize           int                  `json:"req_plain_text_size_bytes"`
-	RespPlainTextSize          int                  `json:"resp_plain_text_size_bytes"`
+	ReqSize                    uint32               `json:"req_size_bytes"`
+	RespSize                   uint32               `json:"resp_size_bytes"`
+	ReqPlainTextSize           uint32               `json:"req_plain_text_size_bytes"`
+	RespPlainTextSize          uint32               `json:"resp_plain_text_size_bytes"`
 	Request                    string               `json:"request"`
 	Response                   string               `json:"response"`
 	ReqSyscallEventDetails     []SyscallEventDetail `json:"req_syscall_events"`

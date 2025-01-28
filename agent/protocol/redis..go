@@ -409,7 +409,7 @@ func ParseSize(decoder *BinaryDecoder) (int, error) {
 	}
 	return size, nil
 }
-func ParseBulkString(decoder *BinaryDecoder, timestamp uint64, seq uint64) (string, error) {
+func ParseBulkString(decoder *BinaryDecoder, timestamp uint64, seq uint32) (string, error) {
 	const maxLen int = 512 * 1024 * 1024
 	length, err := ParseSize(decoder)
 	if err != nil {
@@ -429,14 +429,14 @@ func ParseBulkString(decoder *BinaryDecoder, timestamp uint64, seq uint64) (stri
 	return str, nil
 }
 
-func ParseArray(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMessage, error) {
+func ParseArray(decoder *BinaryDecoder, timestamp uint64, seq uint32) (*RedisMessage, error) {
 	size, err := ParseSize(decoder)
 	if err != nil {
 		return nil, err
 	}
 	if size == kNullSize {
 		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			FrameBase: NewFrameBase(timestamp, uint32(decoder.readBytes), seq),
 			payload:   "[NULL]",
 		}, nil
 	}
@@ -450,7 +450,7 @@ func ParseArray(decoder *BinaryDecoder, timestamp uint64, seq uint64) (*RedisMes
 	}
 
 	ret := &RedisMessage{
-		FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), uint64(decoder.readBytes)),
+		FrameBase: NewFrameBase(timestamp, uint32(decoder.readBytes), uint32(decoder.readBytes)),
 		isReq:     true,
 	}
 	cmd, payload := getCmdAndArgs(msgSlice)
@@ -502,7 +502,7 @@ func getCmdAndArgs(payloads []ParsedMessage) (string, string) {
 	return cmd, finalPayload
 }
 
-func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedMessage, error) {
+func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint32) (ParsedMessage, error) {
 
 	typeMarker, err := decoder.ExtractByte()
 	if err != nil {
@@ -516,7 +516,7 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 			return nil, err
 		}
 		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			FrameBase: NewFrameBase(timestamp, uint32(decoder.readBytes), seq),
 			payload:   str,
 			status:    SuccessStatus,
 			isReq:     false,
@@ -527,7 +527,7 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 			return nil, err
 		}
 		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			FrameBase: NewFrameBase(timestamp, uint32(decoder.readBytes), seq),
 			payload:   str,
 			status:    SuccessStatus,
 			isReq:     false,
@@ -538,7 +538,7 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 			return nil, err
 		}
 		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			FrameBase: NewFrameBase(timestamp, uint32(decoder.readBytes), seq),
 			payload:   "-" + str,
 			status:    FailStatus,
 			isReq:     false,
@@ -549,7 +549,7 @@ func ParseMessage(decoder *BinaryDecoder, timestamp uint64, seq uint64) (ParsedM
 			return nil, err
 		}
 		return &RedisMessage{
-			FrameBase: NewFrameBase(timestamp, int(decoder.readBytes), seq),
+			FrameBase: NewFrameBase(timestamp, uint32(decoder.readBytes), seq),
 			payload:   str,
 			status:    SuccessStatus,
 			isReq:     false,
