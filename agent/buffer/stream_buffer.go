@@ -3,12 +3,14 @@ package buffer
 import (
 	"cmp"
 	"fmt"
+	"math"
 	"slices"
 
 	"github.com/emirpasic/gods/maps/treemap"
 )
 
 var maxBytesGap int = 1024 * 1024 * 1
+var maxBytesGapIndicateTcpSeqOverflow uint32 = math.MaxUint32 / 2
 
 type StreamBuffer struct {
 	buffers    []*Buffer
@@ -41,19 +43,19 @@ func (sb *StreamBuffer) Buffers() []*Buffer {
 	return sb.buffers
 }
 
-func (sb *StreamBuffer) Position0() int {
+func (sb *StreamBuffer) Position0() uint64 {
 	if sb.IsEmpty() {
 		return 0
 	}
-	return int(sb.buffers[0].seq)
+	return sb.buffers[0].seq
 }
 
-func (sb *StreamBuffer) PositionN() int {
+func (sb *StreamBuffer) PositionN() uint64 {
 	if sb.IsEmpty() {
 		return 0
 	}
 	lastBuffer := sb.buffers[len(sb.buffers)-1]
-	return int(lastBuffer.RightBoundary())
+	return lastBuffer.RightBoundary()
 }
 
 func (sb *StreamBuffer) IsEmpty() bool {
@@ -96,7 +98,7 @@ func (sb *StreamBuffer) shrinkHeadBuffer() {
 }
 func (sb *StreamBuffer) shrinkBufferUntilSizeBelowCapacity() {
 	var lastDelete *Buffer
-	for !sb.IsEmpty() && sb.PositionN()-sb.Position0() > sb.capacity {
+	for !sb.IsEmpty() && sb.PositionN()-sb.Position0() > uint64(sb.capacity) {
 		lastDelete = sb.buffers[0]
 		sb.buffers = sb.buffers[1:]
 	}
@@ -143,10 +145,20 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) bool {
 		sb.buffers = append(sb.buffers, newBuffer)
 		return true
 	}
-	if sb.Position0()-int(seq) >= maxBytesGap {
+	// if the new data seq is too old, like tcp seq overflow, we should discard the old data
+	// (may be we have a better way to handle this...)
+	if int64(sb.PositionN()-seq) >= int64(maxBytesGapIndicateTcpSeqOverflow) {
+		sb.Clear()
+		sb.buffers = append(sb.buffers, newBuffer)
+		sb.updateTimestamp(seq, timestamp)
 		return true
 	}
-	if int(seq)-sb.PositionN() >= maxBytesGap {
+	// if the data is too old, we should clear the buffer
+	if int64(sb.Position0()-seq) >= int64(maxBytesGap) {
+		return true
+	}
+	// if we have a large gap, we should discard the old data
+	if int64(seq-sb.PositionN()) >= int64(maxBytesGap) {
 		sb.Clear()
 		sb.buffers = append(sb.buffers, newBuffer)
 		sb.updateTimestamp(seq, timestamp)
