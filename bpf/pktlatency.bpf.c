@@ -214,7 +214,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	u32 tcpseq = 0;
 	BPF_CORE_READ_INTO(&tcpseq, tcp, seq);
 	tcpseq  = bpf_htonl(tcpseq);
-	uint64_t relative_seq = (uint64_t)(tcpseq - seq); 
+	uint32_t relative_seq = (uint32_t)(tcpseq - seq); 
 
 	
 	u32 doff = 0;
@@ -1296,7 +1296,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		}
 
 		// bpf_printk("start trace data(vecs)!, bytes_count:%d,func:%d", bytes_count, args->source_fn);		
-		uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+		uint32_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 		struct conn_id_s_t conn_id_s;
 		conn_id_s.tgid_fd = tgid_fd;
 		// conn_id_s.direct = direct;
@@ -1311,7 +1311,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		}
 	} else {
 		// only report syscall event without data 
-		uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+		uint32_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 		struct conn_id_s_t conn_id_s;
 		conn_id_s.tgid_fd = tgid_fd;
 		enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;

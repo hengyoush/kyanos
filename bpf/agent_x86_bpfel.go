@@ -125,8 +125,7 @@ type AgentKernEvt struct {
 	FuncName            [16]int8
 	Ts                  uint64
 	TsDelta             uint32
-	_                   [4]byte
-	Seq                 uint64
+	Seq                 uint32
 	Len                 uint32
 	Flags               uint8
 	PrependLengthHeader bool
@@ -147,10 +146,11 @@ type AgentKernEvtData struct {
 
 type AgentKernEvtSslData struct {
 	Ke         AgentKernEvt
-	SyscallSeq uint64
+	SyscallSeq uint32
 	SyscallLen uint32
 	BufSize    uint32
 	Msg        [30720]int8
+	_          [4]byte
 }
 
 type AgentProcessExecEvent struct{ Pid int32 }

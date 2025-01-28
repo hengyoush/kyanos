@@ -54,15 +54,15 @@ func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
 	} else {
 		sslEvents = s.sslOutEvents
 	}
-	index, found := slices.BinarySearchFunc(sslEvents, SslEvent{Seq: event.SslEventHeader.Ke.Seq}, func(i SslEvent, j SslEvent) int {
+	index, found := slices.BinarySearchFunc(sslEvents, SslEvent{Seq: uint64(event.SslEventHeader.Ke.Seq)}, func(i SslEvent, j SslEvent) int {
 		return cmp.Compare(i.Seq, j.Seq)
 	})
 	if found {
 		return
 	}
 	sslEvents = slices.Insert(sslEvents, index, SslEvent{
-		Seq:     event.SslEventHeader.Ke.Seq,
-		KernSeq: event.SslEventHeader.SyscallSeq,
+		Seq:     uint64(event.SslEventHeader.Ke.Seq),
+		KernSeq: uint64(event.SslEventHeader.SyscallSeq),
 		Len:     int(event.SslEventHeader.Ke.Len),
 		KernLen: int(event.SslEventHeader.SyscallLen),
 		startTs: event.SslEventHeader.Ke.Ts,
@@ -97,7 +97,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 		}
 
 		kernEvtSlice := s.kernEvents[event.Step]
-		index, found := slices.BinarySearchFunc(kernEvtSlice, KernEvent{seq: event.Seq}, func(i KernEvent, j KernEvent) int {
+		index, found := slices.BinarySearchFunc(kernEvtSlice, KernEvent{seq: uint64(event.Seq)}, func(i KernEvent, j KernEvent) int {
 			return cmp.Compare(i.seq, j.seq)
 		})
 		isNicEvnt := event.Step == bpf.AgentStepTDEV_OUT || event.Step == bpf.AgentStepTDEV_IN
@@ -107,7 +107,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 			oldKernEvent := &kernEvtSlice[index]
 			if oldKernEvent.startTs > event.Ts && !isNicEvnt {
 				// this is a duplicate event which belongs to a future conn
-				oldKernEvent.seq = event.Seq
+				oldKernEvent.seq = uint64(event.Seq)
 				oldKernEvent.len = int(event.Len)
 				oldKernEvent.startTs = event.Ts
 				oldKernEvent.tsDelta = event.TsDelta
@@ -121,7 +121,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 			}
 		} else {
 			kernEvent = &KernEvent{
-				seq:     event.Seq,
+				seq:     uint64(event.Seq),
 				len:     int(event.Len),
 				startTs: event.Ts,
 				tsDelta: event.TsDelta,

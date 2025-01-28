@@ -463,14 +463,14 @@ func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernE
 	headerEvt := extractHeaderEvent(data, ke, c)
 	if isReq {
 		if headerEvt != nil {
-			c.reqStreamBuffer.Add(headerEvt.SyscallEvent.Ke.Seq, headerEvt.Buf, getEventTimestamp(ke, c, isReq))
+			c.reqStreamBuffer.Add(uint64(headerEvt.SyscallEvent.Ke.Seq), headerEvt.Buf, getEventTimestamp(ke, c, isReq))
 		}
-		addedToBuffer = c.reqStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
+		addedToBuffer = c.reqStreamBuffer.Add(uint64(ke.Seq), data, getEventTimestamp(ke, c, isReq))
 	} else {
 		if headerEvt != nil {
-			c.respStreamBuffer.Add(headerEvt.SyscallEvent.Ke.Seq, headerEvt.Buf, getEventTimestamp(ke, c, isReq))
+			c.respStreamBuffer.Add(uint64(headerEvt.SyscallEvent.Ke.Seq), headerEvt.Buf, getEventTimestamp(ke, c, isReq))
 		}
-		addedToBuffer = c.respStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
+		addedToBuffer = c.respStreamBuffer.Add(uint64(ke.Seq), data, getEventTimestamp(ke, c, isReq))
 	}
 	if !addedToBuffer {
 		return false
@@ -687,7 +687,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		}
 	}
 	curProgress := streamBuffer.Position0()
-	if streamBuffer.IsEmpty() || curProgress != int(originPos) {
+	if streamBuffer.IsEmpty() || curProgress != originPos {
 		c.updateProgressTime(streamBuffer)
 	}
 	// if parseState == protocol.Invalid {
