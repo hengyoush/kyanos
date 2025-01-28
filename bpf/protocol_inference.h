@@ -213,6 +213,60 @@ static __always_inline enum message_type_t is_http_protocol(const char *old_buf,
   return kUnknown;
 }
 
+
+// MongoDB protocol
+static __inline enum message_type_t is_mongo_protocol(const char* old_buf, size_t count) {
+  // Reference:
+  // https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/#std-label-wp-request-opcodes.
+  // Note: Response side inference for Mongo is not robust, and is not attempted to avoid
+  // confusion with other protocols, especially MySQL.
+  static const int32_t kOPUpdate = 2001;
+  static const int32_t kOPInsert = 2002;
+  static const int32_t kReserved = 2003;
+  static const int32_t kOPQuery = 2004;
+  static const int32_t kOPGetMore = 2005;
+  static const int32_t kOPDelete = 2006;
+  static const int32_t kOPKillCursors = 2007;
+  static const int32_t kOPCompressed = 2012;
+  static const int32_t kOPMsg = 2013;
+
+  static const int32_t kMongoHeaderLength = 16;
+
+  if (count < kMongoHeaderLength) {
+    return kUnknown;
+  }
+
+  char buf[17] = {};
+  bpf_probe_read_user(buf, 17, old_buf);
+
+  int32_t* buf4 = (int32_t*)buf;
+  int32_t message_length = buf4[0];
+
+  if (message_length < kMongoHeaderLength) {
+    return kUnknown;
+  }
+
+  int32_t request_id = buf4[1];
+
+  if (request_id < 0) {
+    return kUnknown;
+  }
+
+  int32_t response_to = buf4[2];
+  int32_t opcode = buf4[3];
+
+  if (opcode == kOPUpdate || opcode == kOPInsert || opcode == kReserved || opcode == kOPQuery ||
+      opcode == kOPGetMore || opcode == kOPDelete || opcode == kOPKillCursors ||
+      opcode == kOPCompressed || opcode == kOPMsg) {
+    if (response_to == 0) {
+      return kRequest;
+    }
+  }
+
+  return kUnknown;
+}
+
+
 static __always_inline enum message_type_t is_rocketmq_protocol(
     const char *old_buf, size_t count) {
   if (count < 16) {
@@ -280,6 +334,8 @@ static __always_inline struct protocol_message_t infer_protocol(const char *buf,
 
   if ((protocol_message.type = is_http_protocol(buf, count)) != kUnknown) {
     protocol_message.protocol = kProtocolHTTP;
+  } else if ((protocol_message.type = is_mongo_protocol(buf, count)) != kUnknown)  {
+    protocol_message.protocol = kProtocolMongo;
   } else if ((protocol_message.type = is_mysql_protocol(buf, count, conn_info)) != kUnknown)  {
     protocol_message.protocol = kProtocolMySQL;
   } else if ((protocol_message.type = is_rocketmq_protocol(buf, count)) != kUnknown) {
