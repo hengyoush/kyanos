@@ -233,7 +233,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		if !traceDevEvent {
 			annotatedRecord.TotalDuration = annotatedRecord.BlackBoxDuration
 		}
-		if !traceSocketEvent && hasNicInEvents && canCalculateReadPathTime {
+		if !traceSocketEvent && hasNicInEvents && canCalculateReadPathTime && hasReadSyscallEvents {
 			if nicInTimestamp, _, ok := events.nicIngressEvents[0].GetMinIfItmestampAttr(); ok {
 				annotatedRecord.ReadFromSocketBufferDuration = float64(events.readSyscallEvents[len(events.readSyscallEvents)-1].GetEndTs() - uint64(nicInTimestamp))
 			}
@@ -305,7 +305,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		if hasTcpInEvents && hasNicInEvents && canCalculateReadPathTime {
 			annotatedRecord.CopyToSocketBufferDuration = float64(events.tcpInEvents[len(events.tcpInEvents)-1].GetStartTs() - events.nicIngressEvents[0].GetStartTs())
 		}
-		if !traceSocketEvent && hasNicInEvents && canCalculateReadPathTime {
+		if !traceSocketEvent && hasNicInEvents && canCalculateReadPathTime && hasReadSyscallEvents {
 			if _nicIngressTimestamp, _, ok := events.nicIngressEvents[0].GetMinIfItmestampAttr(); ok {
 				annotatedRecord.ReadFromSocketBufferDuration = float64(events.readSyscallEvents[len(events.readSyscallEvents)-1].GetEndTs() - uint64(_nicIngressTimestamp))
 			}
