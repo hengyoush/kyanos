@@ -103,10 +103,10 @@ type Processor struct {
 	side                        common.SideEnum
 	recordProcessor             *RecordsProcessor
 	conntrackCloseWaitTimeMills int
-	tempKernEvents              []TimedEvent
-	tempSyscallEvents           []TimedSyscallEvent
-	tempSslEvents               []TimedSslEvent
-	tempFirstPacketEvents       []TimedFirstPacketEvent
+	tempKernEvents              *common.RingBuffer
+	tempSyscallEvents           *common.RingBuffer
+	tempSslEvents               *common.RingBuffer
+	tempFirstPacketEvents       *common.RingBuffer
 }
 
 type TimedEvent struct {
@@ -149,10 +149,10 @@ func initProcessor(name string, wg *sync.WaitGroup, ctx context.Context, connMan
 		records: make([]RecordWithConn, 0),
 	}
 	p.conntrackCloseWaitTimeMills = conntrackCloseWaitTimeMills
-	p.tempKernEvents = make([]TimedEvent, 0, 100)           // Preallocate with a capacity of 100
-	p.tempSyscallEvents = make([]TimedSyscallEvent, 0, 100) // Preallocate with a capacity of 100
-	p.tempFirstPacketEvents = make([]TimedFirstPacketEvent, 0, 100)
-	p.tempSslEvents = make([]TimedSslEvent, 0, 100) // Preallocate with a capacity of 100
+	p.tempKernEvents = common.NewRingBuffer(1000)    // Preallocate with a capacity of 100
+	p.tempSyscallEvents = common.NewRingBuffer(1000) // Preallocate with a capacity of 100
+	p.tempFirstPacketEvents = common.NewRingBuffer(100)
+	p.tempSslEvents = common.NewRingBuffer(100) // Preallocate with a capacity of 100
 	return p
 }
 
@@ -319,7 +319,7 @@ func (p *Processor) run() {
 
 func (p *Processor) handleFirstPacketEvent(event *agentKernEvtWithConn, recordChannel chan RecordWithConn) {
 	// Add event to the temporary queue
-	p.tempFirstPacketEvents = append(p.tempFirstPacketEvents, TimedFirstPacketEvent{event: event, timestamp: time.Now()})
+	p.tempFirstPacketEvents.Write(TimedFirstPacketEvent{event: event, timestamp: time.Now()})
 	// Process events in the queue that have been there for more than 100ms
 	p.processOldFirstPacketEvents(recordChannel)
 }
@@ -330,16 +330,17 @@ func (p *Processor) processTimedFirstPacketEvents(recordChannel chan RecordWithC
 
 func (p *Processor) processOldFirstPacketEvents(recordChannel chan RecordWithConn) {
 	now := time.Now()
-	lastIndex := 0
-	for i := 0; i < len(p.tempFirstPacketEvents); i++ {
-		if now.Sub(p.tempFirstPacketEvents[i].timestamp) > 100*time.Millisecond {
-			p.processFirstPacketEvent(p.tempFirstPacketEvents[i].event, recordChannel)
-			lastIndex = i + 1
-		} else {
+	for !p.tempFirstPacketEvents.IsEmpty() {
+		_event, err := p.tempFirstPacketEvents.Peek()
+		if err != nil {
 			break
 		}
+		event := _event.(TimedFirstPacketEvent)
+		if now.Sub(event.timestamp) > 100*time.Millisecond {
+			p.processFirstPacketEvent(event.event, recordChannel)
+			p.tempFirstPacketEvents.Read()
+		}
 	}
-	p.tempFirstPacketEvents = p.tempFirstPacketEvents[lastIndex:]
 }
 
 func (p *Processor) processFirstPacketEvent(event *agentKernEvtWithConn, recordChannel chan RecordWithConn) {
@@ -351,7 +352,7 @@ func (p *Processor) processFirstPacketEvent(event *agentKernEvtWithConn, recordC
 
 func (p *Processor) handleKernEvent(event *bpf.AgentKernEvt, recordChannel chan RecordWithConn) {
 	// Add event to the temporary queue
-	p.tempKernEvents = append(p.tempKernEvents, TimedEvent{event: event, timestamp: time.Now()})
+	p.tempKernEvents.Write(TimedEvent{event: event, timestamp: time.Now()})
 
 	// Process events in the queue that have been there for more than 100ms
 	p.processOldKernEvents(recordChannel)
@@ -363,16 +364,19 @@ func (p *Processor) processTimedKernEvents(recordChannel chan RecordWithConn) {
 
 func (p *Processor) processOldKernEvents(recordChannel chan RecordWithConn) {
 	now := time.Now()
-	lastIndex := 0
-	for i := 0; i < len(p.tempKernEvents); i++ {
-		if now.Sub(p.tempKernEvents[i].timestamp) > 100*time.Millisecond {
-			p.processKernEvent(p.tempKernEvents[i].event, recordChannel)
-			lastIndex = i + 1
+	for !p.tempKernEvents.IsEmpty() {
+		_event, err := p.tempKernEvents.Peek()
+		if err != nil {
+			break
+		}
+		event := _event.(TimedEvent)
+		if now.Sub(event.timestamp) > 100*time.Millisecond {
+			p.processKernEvent(event.event, recordChannel)
+			p.tempKernEvents.Read()
 		} else {
 			break
 		}
 	}
-	p.tempKernEvents = p.tempKernEvents[lastIndex:]
 }
 
 func (p *Processor) processKernEvent(event *bpf.AgentKernEvt, recordChannel chan RecordWithConn) {
@@ -426,7 +430,7 @@ func (p *Processor) processKernEvent(event *bpf.AgentKernEvt, recordChannel chan
 
 func (p *Processor) handleSyscallEvent(event *bpf.SyscallEventData, recordChannel chan RecordWithConn) {
 	// Add event to the temporary queue
-	p.tempSyscallEvents = append(p.tempSyscallEvents, TimedSyscallEvent{event: event, timestamp: time.Now()})
+	p.tempSyscallEvents.Write(TimedSyscallEvent{event: event, timestamp: time.Now()})
 
 	// Process events in the queue that have been there for more than 100ms
 	p.processOldSyscallEvents(recordChannel)
@@ -439,16 +443,19 @@ func (p *Processor) processTimedSyscallEvents(recordChannel chan RecordWithConn)
 
 func (p *Processor) processOldSyscallEvents(recordChannel chan RecordWithConn) {
 	now := time.Now()
-	lastIndex := 0
-	for i := 0; i < len(p.tempSyscallEvents); i++ {
-		if now.Sub(p.tempSyscallEvents[i].timestamp) > 100*time.Millisecond {
-			p.processSyscallEvent(p.tempSyscallEvents[i].event, recordChannel)
-			lastIndex = i + 1
+	for !p.tempSyscallEvents.IsEmpty() {
+		_event, err := p.tempSyscallEvents.Peek()
+		if err != nil {
+			break
+		}
+		event := _event.(TimedSyscallEvent)
+		if now.Sub(event.timestamp) > 100*time.Millisecond {
+			p.processSyscallEvent(event.event, recordChannel)
+			p.tempSyscallEvents.Read()
 		} else {
 			break
 		}
 	}
-	p.tempSyscallEvents = p.tempSyscallEvents[lastIndex:]
 }
 
 func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChannel chan RecordWithConn) {
@@ -475,10 +482,7 @@ func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChann
 			common.BPFEventLog.Debugf("[syscall][len=%d][ts=%d][fn=%d]%s | %s", max(event.SyscallEvent.BufSize, event.SyscallEvent.Ke.Len), event.SyscallEvent.Ke.Ts, event.SyscallEvent.GetSourceFunction(), conn.ToString(), string(event.Buf))
 		}
 
-		addedToBuffer := conn.OnSyscallEvent(event.Buf, event, recordChannel)
-		if addedToBuffer {
-			conn.AddSyscallEvent(event)
-		}
+		conn.OnSyscallEvent(event.Buf, event, recordChannel)
 	} else if conn.Protocol == bpf.AgentTrafficProtocolTKProtocolUnset {
 		conn.AddSyscallEvent(event)
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
@@ -498,7 +502,7 @@ func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChann
 
 func (p *Processor) handleSslEvent(event *bpf.SslData, recordChannel chan RecordWithConn) {
 	// Add event to the temporary queue
-	p.tempSslEvents = append(p.tempSslEvents, TimedSslEvent{event: event, timestamp: time.Now()})
+	p.tempSslEvents.Write(TimedSslEvent{event: event, timestamp: time.Now()})
 
 	// Process events in the queue that have been there for more than 100ms
 	p.processOldSslEvents(recordChannel)
@@ -510,16 +514,19 @@ func (p *Processor) processTimedSslEvents(recordChannel chan RecordWithConn) {
 
 func (p *Processor) processOldSslEvents(recordChannel chan RecordWithConn) {
 	now := time.Now()
-	lastIndex := 0
-	for i := 0; i < len(p.tempSslEvents); i++ {
-		if now.Sub(p.tempSslEvents[i].timestamp) > 100*time.Millisecond {
-			p.processSslEvent(p.tempSslEvents[i].event, recordChannel)
-			lastIndex = i + 1
+	for !p.tempSslEvents.IsEmpty() {
+		_event, err := p.tempSslEvents.Peek()
+		if err != nil {
+			break
+		}
+		event := _event.(TimedSslEvent)
+		if now.Sub(event.timestamp) > 100*time.Millisecond {
+			p.processSslEvent(event.event, recordChannel)
+			p.tempSslEvents.Read()
 		} else {
 			break
 		}
 	}
-	p.tempSslEvents = p.tempSslEvents[lastIndex:]
 }
 
 func (p *Processor) processSslEvent(event *bpf.SslData, recordChannel chan RecordWithConn) {
