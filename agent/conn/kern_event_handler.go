@@ -6,6 +6,7 @@ import (
 	"kyanos/bpf"
 	"kyanos/common"
 	"kyanos/monitor"
+	"math"
 	"slices"
 	"strings"
 	"sync"
@@ -23,10 +24,10 @@ type KernEventStream struct {
 	sslOutEventsMu sync.RWMutex
 	maxLen         int
 
-	egressDiscardSeq     uint64
-	ingressDiscardSeq    uint64
-	egressSslDiscardSeq  uint64
-	ingressSslDiscardSeq uint64
+	egressDiscardSeq     uint32
+	ingressDiscardSeq    uint32
+	egressSslDiscardSeq  uint32
+	ingressSslDiscardSeq uint32
 }
 
 func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
@@ -63,8 +64,8 @@ func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
 	sslEvents = slices.Insert(sslEvents, index, SslEvent{
 		Seq:     event.SslEventHeader.Ke.Seq,
 		KernSeq: event.SslEventHeader.SyscallSeq,
-		Len:     int(event.SslEventHeader.Ke.Len),
-		KernLen: int(event.SslEventHeader.SyscallLen),
+		Len:     event.SslEventHeader.Ke.Len,
+		KernLen: event.SslEventHeader.SyscallLen,
 		startTs: event.SslEventHeader.Ke.Ts,
 		tsDelta: event.SslEventHeader.Ke.TsDelta,
 		Step:    event.SslEventHeader.Ke.Step,
@@ -108,7 +109,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 			if oldKernEvent.startTs > event.Ts && !isNicEvnt {
 				// this is a duplicate event which belongs to a future conn
 				oldKernEvent.seq = event.Seq
-				oldKernEvent.len = int(event.Len)
+				oldKernEvent.len = event.Len
 				oldKernEvent.startTs = event.Ts
 				oldKernEvent.tsDelta = event.TsDelta
 				oldKernEvent.step = event.Step
@@ -122,7 +123,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 		} else {
 			kernEvent = &KernEvent{
 				seq:     event.Seq,
-				len:     int(event.Len),
+				len:     event.Len,
 				startTs: event.Ts,
 				tsDelta: event.TsDelta,
 				step:    event.Step,
@@ -158,7 +159,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 	return true
 }
 
-func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []SslEvent {
+func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint32, len uint32) []SslEvent {
 	if step == bpf.AgentStepTSSL_IN {
 		s.sslInEventsMu.RLock()
 		defer s.sslInEventsMu.RUnlock()
@@ -173,14 +174,14 @@ func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint
 		sslEvents = s.sslOutEvents
 	}
 	start := seq
-	end := start + uint64(len)
+	var end uint64 = uint64(start) + uint64(len)
 	result := make([]SslEvent, 0)
 	for _, each := range sslEvents {
 		if each.Seq < start {
 			continue
 		}
 
-		if each.Seq < end {
+		if uint64(each.Seq) < end {
 			result = append(result, each)
 		} else {
 			break
@@ -190,7 +191,7 @@ func (s *KernEventStream) FindSslEventsBySeqAndLen(step bpf.AgentStepT, seq uint
 	return result
 }
 
-func (s *KernEventStream) FindEventsBySeqAndLen(step bpf.AgentStepT, seq uint64, len int) []KernEvent {
+func (s *KernEventStream) FindEventsBySeqAndLen(step bpf.AgentStepT, seq uint32, len uint32) []KernEvent {
 	s.kernEventsMu.RLock()
 	defer s.kernEventsMu.RUnlock()
 	events, ok := s.kernEvents[step]
@@ -198,30 +199,42 @@ func (s *KernEventStream) FindEventsBySeqAndLen(step bpf.AgentStepT, seq uint64,
 		return []KernEvent{}
 	}
 	start := seq
-	end := start + uint64(len)
+	var end uint64 = uint64(start) + uint64(len)
 	result := make([]KernEvent, 0)
 	for _, each := range events {
-		if each.seq <= start && each.seq+uint64(each.len) > start {
+		eachSeq := uint64(each.seq)
+		eachLen := uint64(each.len)
+		if eachSeq <= uint64(start) && eachSeq+eachLen > uint64(start) {
 			result = append(result, each)
-		} else if each.seq < end && each.seq+uint64(each.len) >= end {
+		} else if eachSeq < end && eachSeq+eachLen >= end {
 			result = append(result, each)
-		} else if each.seq >= start && each.seq+uint64(each.len) <= end {
+		} else if eachSeq >= uint64(start) && eachSeq+eachLen <= end {
 			result = append(result, each)
-		} else if each.seq > end {
+		} else if eachSeq > end {
 			break
 		}
 	}
 	return result
 }
 
-func (s *KernEventStream) MarkNeedDiscardSeq(seq uint64, egress bool) {
+func (s *KernEventStream) MarkNeedDiscardSeq(seq uint32, len uint32, egress bool) {
+	if seq+len < seq {
+		seq = math.MaxUint32
+	} else {
+		seq += len
+	}
 	if egress {
 		s.egressDiscardSeq = max(s.egressDiscardSeq, seq)
 	} else {
 		s.ingressDiscardSeq = max(s.ingressDiscardSeq, seq)
 	}
 }
-func (s *KernEventStream) MarkNeedDiscardSslSeq(seq uint64, egress bool) {
+func (s *KernEventStream) MarkNeedDiscardSslSeq(seq uint32, len uint32, egress bool) {
+	if seq+len < seq {
+		seq = math.MaxUint32
+	} else {
+		seq += len
+	}
 	if egress {
 		s.egressSslDiscardSeq = max(s.egressSslDiscardSeq, seq)
 	} else {
@@ -248,7 +261,7 @@ func (s *KernEventStream) discardEventsIfNeeded() {
 		s.discardEventsBySeq(s.ingressDiscardSeq, false)
 	}
 }
-func (s *KernEventStream) discardSslEventsBySeq(seq uint64, egress bool) {
+func (s *KernEventStream) discardSslEventsBySeq(seq uint32, egress bool) {
 	var oldevents *[]SslEvent
 	if egress {
 		oldevents = &s.sslOutEvents
@@ -264,7 +277,7 @@ func (s *KernEventStream) discardSslEventsBySeq(seq uint64, egress bool) {
 		// common.ConntrackLog.Debugf("Discarded ssl events(egress: %v) events num: %d, cur len: %d", egress, discardIdx, len(*oldevents))
 	}
 }
-func (s *KernEventStream) discardEventsBySeq(seq uint64, egress bool) {
+func (s *KernEventStream) discardEventsBySeq(seq uint32, egress bool) {
 	for step, events := range s.kernEvents {
 		if egress && !bpf.IsEgressStep(step) {
 			continue
@@ -284,19 +297,19 @@ func (s *KernEventStream) discardEventsBySeq(seq uint64, egress bool) {
 }
 
 type KernEvent struct {
-	seq        uint64
-	len        int
+	seq        uint32
+	len        uint32
 	startTs    uint64
 	tsDelta    uint32
 	step       bpf.AgentStepT
 	attributes map[string]any
 }
 
-func (kernevent *KernEvent) GetSeq() uint64 {
+func (kernevent *KernEvent) GetSeq() uint32 {
 	return kernevent.seq
 }
 
-func (kernevent *KernEvent) GetLen() int {
+func (kernevent *KernEvent) GetLen() uint32 {
 	return kernevent.len
 }
 
@@ -380,10 +393,10 @@ func (kernevent *KernEvent) GetTimestampByIfname(ifname string) (int64, bool) {
 }
 
 type SslEvent struct {
-	Seq     uint64
-	KernSeq uint64
-	Len     int
-	KernLen int
+	Seq     uint32
+	KernSeq uint32
+	Len     uint32
+	KernLen uint32
 	startTs uint64
 	tsDelta uint32
 	Step    bpf.AgentStepT

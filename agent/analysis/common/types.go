@@ -174,10 +174,10 @@ type AnnotatedRecord struct {
 	protocol.Record
 	StartTs                      uint64
 	EndTs                        uint64
-	ReqPlainTextSize             int
-	RespPlainTextSize            int
-	ReqSize                      int
-	RespSize                     int
+	ReqPlainTextSize             uint32
+	RespPlainTextSize            uint32
+	ReqSize                      uint32
+	RespSize                     uint32
 	TotalDuration                float64
 	BlackBoxDuration             float64
 	CopyToSocketBufferDuration   float64
@@ -214,7 +214,7 @@ type NicEventDetail struct {
 	Attributes map[string]any
 }
 type PacketEventDetail struct {
-	ByteSize  int
+	ByteSize  uint32
 	Timestamp uint64
 }
 

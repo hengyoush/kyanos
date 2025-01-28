@@ -30,8 +30,8 @@ func CreateAnnotedRecord() *analysisCommon.AnnotatedRecord {
 	return &analysisCommon.AnnotatedRecord{
 		StartTs:                      0,
 		EndTs:                        0,
-		ReqSize:                      -1,
-		RespSize:                     -1,
+		ReqSize:                      0,
+		RespSize:                     0,
 		TotalDuration:                -1,
 		BlackBoxDuration:             -1,
 		ReadFromSocketBufferDuration: -1,
@@ -60,11 +60,11 @@ type events struct {
 	userCopyEvents                                       []conn.KernEvent
 	tcpInEvents                                          []conn.KernEvent
 	egressMessage, ingressMessage                        protocol.ParsedMessage
-	ingressSeq, egressSeq, ingressKernSeq, egressKernSeq uint64
-	ingressKernLen, egressKernLen                        int
+	ingressSeq, egressSeq, ingressKernSeq, egressKernSeq uint32
+	ingressKernLen, egressKernLen                        uint32
 }
 
-func getKernSeqAndLen(syscallEvents []conn.SslEvent) (uint64, int) {
+func getKernSeqAndLen(syscallEvents []conn.SslEvent) (uint32, uint32) {
 	var syscallSeq int64 = -1
 	var syscallLen int
 	if len(syscallEvents) > 0 {
@@ -87,7 +87,7 @@ func getKernSeqAndLen(syscallEvents []conn.SslEvent) (uint64, int) {
 			}
 		}
 
-		return uint64(syscallSeq), syscallLen
+		return uint32(syscallSeq), uint32(syscallLen)
 	}
 	return 0, 0
 }
@@ -97,8 +97,8 @@ func prepareEvents(r protocol.Record, connection *conn.Connection4) *events {
 	var events events
 	var writeSyscallEvents, readSyscallEvents, devOutEvents, nicIngressEvents, userCopyEvents, tcpInEvents []conn.KernEvent
 	var sslWriteSyscallEvents, sslReadSyscallEvents []conn.SslEvent
-	var ingressSeq, egressSeq, ingressKernSeq, egressKernSeq uint64
-	var ingressKernLen, egressKernLen int
+	var ingressSeq, egressSeq, ingressKernSeq, egressKernSeq uint32
+	var ingressKernLen, egressKernLen uint32
 
 	egressMessage := getParsedMessageBySide(r, connection.IsServerSide(), DirectEgress)
 	ingressMessage := getParsedMessageBySide(r, connection.IsServerSide(), DirectIngress)
@@ -317,11 +317,11 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		annotatedRecord.RespNicEventDetails = KernEventsToNicEventDetails(events.nicIngressEvents)
 	}
 
-	streamEvents.MarkNeedDiscardSeq(events.egressKernSeq+uint64(events.egressKernLen), true)
-	streamEvents.MarkNeedDiscardSeq(events.ingressKernSeq+uint64(events.ingressKernLen), false)
+	streamEvents.MarkNeedDiscardSeq(events.egressKernSeq, events.egressKernLen, true)
+	streamEvents.MarkNeedDiscardSeq(events.ingressKernSeq, events.ingressKernLen, false)
 	if connection.IsSsl() {
-		streamEvents.MarkNeedDiscardSslSeq(events.egressSeq+uint64(events.egressMessage.ByteSize()), true)
-		streamEvents.MarkNeedDiscardSslSeq(events.ingressSeq+uint64(events.ingressMessage.ByteSize()), false)
+		streamEvents.MarkNeedDiscardSslSeq(events.egressSeq, events.egressMessage.ByteSize(), true)
+		streamEvents.MarkNeedDiscardSslSeq(events.ingressSeq, events.ingressMessage.ByteSize(), false)
 	}
 
 	if recordsChannel == nil {

@@ -143,19 +143,6 @@ struct sock_key {
 #define FUNC_NAME_LIMIT 16 
 #define CMD_LEN 16 
 
-// struct event {
-// 	pid_t pid;
-// 	uint32_t init_seq;
-// 	uint32_t tcp_seq;
-// 	struct sock_key *key;
-// 	uint32_t cur_seq;
-// 	uint32_t data_len;
-// 	bool is_sample;
-// 	__u64 ts;
-// 	uint32_t inode;
-// };
-
-
 struct upid_t {
   union {
     uint32_t pid;
@@ -183,7 +170,7 @@ struct kern_evt {
 	char func_name[FUNC_NAME_LIMIT];
 	uint64_t ts;
 	uint32_t ts_delta;
-	uint64_t seq;
+	uint32_t seq;
 	uint32_t len;
   uint8_t flags;
   bool prepend_length_header;
@@ -210,7 +197,7 @@ struct kern_evt_data {
 };
 struct kern_evt_ssl_data {
   struct kern_evt ke;
-	uint64_t syscall_seq;
+	uint32_t syscall_seq;
 	uint32_t syscall_len;
   uint32_t buf_size;
   char msg[MAX_MSG_SIZE];
@@ -293,10 +280,10 @@ union sockaddr_t {
 struct conn_info_t {
   // Connection identifier (PID, FD, etc.).
   struct conn_id_t conn_id;
-  uint64_t read_bytes;
-  uint64_t write_bytes;
-  uint64_t ssl_read_bytes;
-  uint64_t ssl_write_bytes;
+  uint32_t read_bytes;
+  uint32_t write_bytes;
+  uint32_t ssl_read_bytes;
+  uint32_t ssl_write_bytes;
 
   // IP address of the local endpoint.
   union sockaddr_t laddr;

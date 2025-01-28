@@ -214,7 +214,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	u32 tcpseq = 0;
 	BPF_CORE_READ_INTO(&tcpseq, tcp, seq);
 	tcpseq  = bpf_htonl(tcpseq);
-	uint64_t relative_seq = (uint64_t)(tcpseq - seq); 
+	uint32_t relative_seq = (uint32_t)(tcpseq - seq); 
 
 	
 	u32 doff = 0;
@@ -604,7 +604,7 @@ static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, 
 	body.ctx = ctx;
 	body.inital_seq = inital_seq;
 	body.key = &key;
-	body.cur_seq = seq - inital_seq;
+	body.cur_seq = (uint32_t)(seq - inital_seq);
 	body.len = len;
 	// body.func_name = SKB_COPY_FUNC_NAME;
 	body.step = USER_COPY;

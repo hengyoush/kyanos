@@ -36,7 +36,7 @@ func matchByTimestamp(reqStream *ParsedMessageQueue, respStream *ParsedMessageQu
 	return records
 }
 
-func CreateFrameBase(streamBuffer *buffer.StreamBuffer, readBytes int) (FrameBase, bool) {
+func CreateFrameBase(streamBuffer *buffer.StreamBuffer, readBytes uint32) (FrameBase, bool) {
 	seq := streamBuffer.Head().LeftBoundary()
 	ts, ok := streamBuffer.FindTimestampBySeq(seq)
 	if !ok {

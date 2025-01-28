@@ -3,27 +3,29 @@ package buffer
 import (
 	"cmp"
 	"fmt"
+	"math"
 	"slices"
 
 	"github.com/emirpasic/gods/maps/treemap"
 )
 
-var maxBytesGap int = 1024 * 1024 * 1
+var maxBytesGap uint32 = 1024 * 1024 * 1
+var maxBytesGapIndicateTcpSeqOverflow uint32 = math.MaxUint32 / 2
 
 type StreamBuffer struct {
 	buffers    []*Buffer
-	capacity   int
+	capacity   uint32
 	timestamps *treemap.Map
 }
 
-func New(capacity int) *StreamBuffer {
+func New(capacity uint32) *StreamBuffer {
 
 	return &StreamBuffer{
 		buffers:  make([]*Buffer, 0),
 		capacity: capacity,
 		timestamps: treemap.NewWith(func(a, b interface{}) int {
-			ai := a.(uint64)
-			bi := b.(uint64)
+			ai := a.(uint32)
+			bi := b.(uint32)
 			return cmp.Compare(ai, bi)
 		}),
 	}
@@ -41,19 +43,19 @@ func (sb *StreamBuffer) Buffers() []*Buffer {
 	return sb.buffers
 }
 
-func (sb *StreamBuffer) Position0() int {
+func (sb *StreamBuffer) Position0() uint32 {
 	if sb.IsEmpty() {
 		return 0
 	}
-	return int(sb.buffers[0].seq)
+	return sb.buffers[0].seq
 }
 
-func (sb *StreamBuffer) PositionN() int {
+func (sb *StreamBuffer) PositionN() uint32 {
 	if sb.IsEmpty() {
 		return 0
 	}
 	lastBuffer := sb.buffers[len(sb.buffers)-1]
-	return int(lastBuffer.RightBoundary())
+	return lastBuffer.RightBoundary()
 }
 
 func (sb *StreamBuffer) IsEmpty() bool {
@@ -63,24 +65,24 @@ func (sb *StreamBuffer) Clear() {
 	sb.buffers = sb.buffers[0:0]
 	sb.timestamps.Clear()
 }
-func (sb *StreamBuffer) RemovePrefix(length int) {
+func (sb *StreamBuffer) RemovePrefix(length uint32) {
 	if sb.IsEmpty() {
 		return
 	}
 	left := length
 	for left != 0 {
 		head := sb.Head()
-		if head.Len() > left {
+		if uint32(head.Len()) > left {
 			head.RemovePrefix(left)
 			return
 		} else {
 			sb.shrinkHeadBuffer()
-			left -= head.Len()
+			left -= uint32(head.Len())
 		}
 	}
 }
 func (sb *StreamBuffer) RemoveHead() {
-	sb.RemovePrefix(sb.Head().Len())
+	sb.RemovePrefix(uint32(sb.Head().Len()))
 }
 func (sb *StreamBuffer) IsContinugous() bool {
 	return len(sb.buffers) == 1
@@ -104,11 +106,11 @@ func (sb *StreamBuffer) shrinkBufferUntilSizeBelowCapacity() {
 		sb.cleanTimestampMapBySeqNoMoreThan(lastDelete.seq)
 	}
 }
-func (sb *StreamBuffer) cleanTimestampMapBySeqNoMoreThan(targetSeq uint64) {
-	needsDelete := make([]uint64, 0)
+func (sb *StreamBuffer) cleanTimestampMapBySeqNoMoreThan(targetSeq uint32) {
+	needsDelete := make([]uint32, 0)
 	it := sb.timestamps.Iterator()
 	for it.Next() {
-		seq := it.Key().(uint64)
+		seq := it.Key().(uint32)
 		if seq < targetSeq {
 			needsDelete = append(needsDelete, seq)
 		} else {
@@ -120,7 +122,7 @@ func (sb *StreamBuffer) cleanTimestampMapBySeqNoMoreThan(targetSeq uint64) {
 	}
 }
 
-func (sb *StreamBuffer) FindTimestampBySeq(targetSeq uint64) (uint64, bool) {
+func (sb *StreamBuffer) FindTimestampBySeq(targetSeq uint32) (uint64, bool) {
 	key, value := sb.timestamps.Floor(targetSeq)
 	if key == nil {
 		return 0, false
@@ -128,12 +130,12 @@ func (sb *StreamBuffer) FindTimestampBySeq(targetSeq uint64) (uint64, bool) {
 	return value.(uint64), true
 }
 
-func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) bool {
+func (sb *StreamBuffer) Add(seq uint32, data []byte, timestamp uint64) bool {
 	_, found := sb.timestamps.Get(seq)
 	if found {
 		return false
 	}
-	dataLen := uint64(len(data))
+	dataLen := uint32(len(data))
 	newBuffer := &Buffer{
 		buf: data,
 		seq: seq,
@@ -143,10 +145,20 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) bool {
 		sb.buffers = append(sb.buffers, newBuffer)
 		return true
 	}
-	if sb.Position0()-int(seq) >= maxBytesGap {
+	// if the gap is too large, may be tcp seq overflow, we should discard the old data
+	// (may be we have a better way to handle this...)
+	if sb.PositionN()-seq >= maxBytesGapIndicateTcpSeqOverflow {
+		sb.Clear()
+		sb.buffers = append(sb.buffers, newBuffer)
+		sb.updateTimestamp(seq, timestamp)
 		return true
 	}
-	if int(seq)-sb.PositionN() >= maxBytesGap {
+	// if the data is too old, we should clear the buffer
+	if sb.Position0()-seq >= maxBytesGap {
+		return true
+	}
+	// if we have a large gap, we should discard the old data
+	if seq-sb.PositionN() >= maxBytesGap {
 		sb.Clear()
 		sb.buffers = append(sb.buffers, newBuffer)
 		sb.updateTimestamp(seq, timestamp)
@@ -187,11 +199,11 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) bool {
 	return true
 }
 
-func (sb *StreamBuffer) updateTimestamp(seq uint64, timestamp uint64) {
+func (sb *StreamBuffer) updateTimestamp(seq uint32, timestamp uint64) {
 	sb.timestamps.Put(seq, timestamp)
 }
 
-func (sb *StreamBuffer) findLeftBufferBySeq(seq uint64) (int, *Buffer) {
+func (sb *StreamBuffer) findLeftBufferBySeq(seq uint32) (int, *Buffer) {
 	var prev *Buffer
 	for index, each := range sb.buffers {
 		if each.LeftBoundary() > seq {
@@ -202,7 +214,7 @@ func (sb *StreamBuffer) findLeftBufferBySeq(seq uint64) (int, *Buffer) {
 	return len(sb.buffers) - 1, prev
 }
 
-func (sb *StreamBuffer) findRightBufferBySeq(seq uint64) (int, *Buffer) {
+func (sb *StreamBuffer) findRightBufferBySeq(seq uint32) (int, *Buffer) {
 	var prev *Buffer
 	for index, each := range sb.buffers {
 		if each.LeftBoundary() > seq {
@@ -214,36 +226,36 @@ func (sb *StreamBuffer) findRightBufferBySeq(seq uint64) (int, *Buffer) {
 
 type Buffer struct {
 	buf []byte
-	seq uint64
+	seq uint32
 }
 
-func (b *Buffer) Len() int {
-	return len(b.buf)
+func (b *Buffer) Len() uint32 {
+	return uint32(len(b.buf))
 }
 func (b *Buffer) Buffer() []byte {
 	return b.buf
 }
 
-func (b *Buffer) LeftBoundary() uint64 {
+func (b *Buffer) LeftBoundary() uint32 {
 	return b.seq
 }
 
-func (b *Buffer) RightBoundary() uint64 {
-	return b.seq + uint64(len(b.buf))
+func (b *Buffer) RightBoundary() uint32 {
+	return b.seq + uint32(len(b.buf))
 }
-func (b *Buffer) CanFuseAsLeft(seq uint64, len uint64) bool {
+func (b *Buffer) CanFuseAsLeft(seq uint32, len uint32) bool {
 	l := seq
 	r := l + len
 	return b.RightBoundary() >= seq && b.LeftBoundary() <= seq && r >= b.RightBoundary()
 }
-func (b *Buffer) CanFuseAsRight(seq uint64, len uint64) bool {
+func (b *Buffer) CanFuseAsRight(seq uint32, len uint32) bool {
 	l := seq
 	r := seq + len
 	return b.LeftBoundary() <= r && b.RightBoundary() >= r && b.LeftBoundary() >= l
 }
-func (b *Buffer) FuseAsLeft(seq uint64, data []byte) {
+func (b *Buffer) FuseAsLeft(seq uint32, data []byte) {
 	l := seq
-	r := l + uint64(len(data))
+	r := l + uint32(len(data))
 	if seq == b.RightBoundary() {
 		b.buf = append(b.buf, data...)
 	} else if seq < b.RightBoundary() && seq >= b.LeftBoundary() {
@@ -255,9 +267,9 @@ func (b *Buffer) FuseAsLeft(seq uint64, data []byte) {
 	}
 }
 
-func (b *Buffer) FuseAsRight(seq uint64, data []byte) {
+func (b *Buffer) FuseAsRight(seq uint32, data []byte) {
 	l := seq
-	r := l + uint64(len(data))
+	r := l + uint32(len(data))
 	if r == b.LeftBoundary() {
 		b.seq = seq
 		b.buf = append(data, b.buf...)
@@ -271,11 +283,11 @@ func (b *Buffer) FuseAsRight(seq uint64, data []byte) {
 	}
 }
 
-func (b *Buffer) RemovePrefix(len int) {
-	if b.Len() > len {
+func (b *Buffer) RemovePrefix(len uint32) {
+	if uint32(b.Len()) > len {
 		b.buf = b.buf[len:]
-		b.seq += uint64(len)
-	} else if b.Len() == len {
+		b.seq += uint32(len)
+	} else if uint32(b.Len()) == len {
 		return
 	} else {
 		panic("try to remove size greater than me")

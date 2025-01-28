@@ -69,9 +69,9 @@ type ProtocolStreamParser interface {
 type ParsedMessage interface {
 	FormatToString() string
 	TimestampNs() uint64
-	ByteSize() int
+	ByteSize() uint32
 	IsReq() bool
-	Seq() uint64
+	Seq() uint32
 	StreamId() StreamId
 }
 
@@ -105,16 +105,16 @@ const (
 type ParseResult struct {
 	ParseState     ParseState
 	ParsedMessages []ParsedMessage
-	ReadBytes      int
+	ReadBytes      uint32
 }
 
 type FrameBase struct {
 	timestampNs uint64
-	byteSize    int
-	seq         uint64
+	byteSize    uint32
+	seq         uint32
 }
 
-func NewFrameBase(timestampNs uint64, byteSize int, seq uint64) FrameBase {
+func NewFrameBase(timestampNs uint64, byteSize uint32, seq uint32) FrameBase {
 	return FrameBase{timestampNs: timestampNs, byteSize: byteSize, seq: seq}
 }
 
@@ -126,14 +126,14 @@ func (f *FrameBase) TimestampNs() uint64 {
 	return f.timestampNs
 }
 
-func (f *FrameBase) ByteSize() int {
+func (f *FrameBase) ByteSize() uint32 {
 	return f.byteSize
 }
-func (f *FrameBase) IncrByteSize(incr int) {
-	f.byteSize += incr
+func (f *FrameBase) IncrByteSize(incr uint32) {
+	f.byteSize += uint32(incr)
 }
 
-func (f *FrameBase) Seq() uint64 {
+func (f *FrameBase) Seq() uint32 {
 	return f.seq
 }
 

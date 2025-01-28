@@ -23,7 +23,7 @@ type SyscallEventData struct {
 }
 type SslEventHeader struct {
 	Ke         AgentKernEvt
-	SyscallSeq uint64
+	SyscallSeq uint32
 	SyscallLen uint32
 	BufSize    uint32
 }

@@ -144,7 +144,7 @@ func TestKafkaParserParseMultipleRequests(t *testing.T) {
 	request1 := []byte(kProduceRequest)
 	request2 := []byte(kMetaDataRequest)
 	streamBuffer.Add(1, request1, uint64(time.Now().Nanosecond()))
-	streamBuffer.Add(uint64(len(request1))+1, request2, uint64(time.Now().Nanosecond()+1))
+	streamBuffer.Add(uint32(len(request1))+1, request2, uint64(time.Now().Nanosecond()+1))
 
 	parseState := KafkaStreamParser.ParseStream(streamBuffer, protocol.Request)
 	_, containsCorrelationID1 := KafkaStreamParser.GetCorrelationIdMap()[4]
@@ -166,7 +166,7 @@ func TestKafkaParserParseMultipleResponses(t *testing.T) {
 	request1 := []byte(kProduceResponse)
 	request2 := []byte(kMetaDataResponse)
 	streamBuffer.Add(1, request1, uint64(time.Now().Nanosecond()))
-	streamBuffer.Add(uint64(len(request1))+1, request2, uint64(time.Now().Nanosecond()+1))
+	streamBuffer.Add(uint32(len(request1))+1, request2, uint64(time.Now().Nanosecond()+1))
 
 	parseState := KafkaStreamParser.ParseStream(streamBuffer, protocol.Response)
 
@@ -219,7 +219,7 @@ func TestKafkaParserFindReqBoundaryAligned(t *testing.T) {
 	request1 := []byte(kProduceRequest)
 	request2 := []byte(kMetaDataRequest)
 	streamBuffer.Add(1, request1, uint64(time.Now().Nanosecond()))
-	streamBuffer.Add(uint64(len(request1)+1), request2, uint64(time.Now().Nanosecond()+1))
+	streamBuffer.Add(uint32(len(request1)+1), request2, uint64(time.Now().Nanosecond()+1))
 
 	boundary := KafkaStreamParser.FindBoundary(streamBuffer, protocol.Request, 0)
 	assert.Equal(t, boundary, 0)
@@ -234,8 +234,8 @@ func TestKafkaParserFindReqBoundaryUnAligned(t *testing.T) {
 	request1 := []byte(kProduceRequest)
 	request2 := []byte(kMetaDataRequest)
 	streamBuffer.Add(1, garbage, uint64(time.Now().Nanosecond()))
-	streamBuffer.Add(uint64(len(garbage)+1), request1, uint64(time.Now().Nanosecond()))
-	streamBuffer.Add(uint64(len(garbage)+len(request1))+1, request2, uint64(time.Now().Nanosecond()+1))
+	streamBuffer.Add(uint32(len(garbage)+1), request1, uint64(time.Now().Nanosecond()))
+	streamBuffer.Add(uint32(len(garbage)+len(request1))+1, request2, uint64(time.Now().Nanosecond()+1))
 
 	boundary := KafkaStreamParser.FindBoundary(streamBuffer, protocol.Request, 0)
 	assert.Equal(t, uint64(boundary), uint64(len(garbage)))
@@ -248,7 +248,7 @@ func TestKafkaParserFindRespBoundaryAligned(t *testing.T) {
 	request1 := []byte(kProduceResponse)
 	request2 := []byte(kMetaDataResponse)
 	streamBuffer.Add(1, request1, uint64(time.Now().Nanosecond()))
-	streamBuffer.Add(uint64(len(request1)+1), request2, uint64(time.Now().Nanosecond()+1))
+	streamBuffer.Add(uint32(len(request1)+1), request2, uint64(time.Now().Nanosecond()+1))
 
 	KafkaStreamParser.GetCorrelationIdMap()[4] = struct{}{}
 	KafkaStreamParser.GetCorrelationIdMap()[1] = struct{}{}
@@ -265,8 +265,8 @@ func TestKafkaParserFindRespBoundaryUnAligned(t *testing.T) {
 	request1 := []byte(kProduceResponse)
 	request2 := []byte(kMetaDataResponse)
 	streamBuffer.Add(1, garbage, uint64(time.Now().Nanosecond()))
-	streamBuffer.Add(uint64(len(garbage)+1), request1, uint64(time.Now().Nanosecond()))
-	streamBuffer.Add(uint64(len(garbage)+len(request1))+1, request2, uint64(time.Now().Nanosecond()+1))
+	streamBuffer.Add(uint32(len(garbage)+1), request1, uint64(time.Now().Nanosecond()))
+	streamBuffer.Add(uint32(len(garbage)+len(request1))+1, request2, uint64(time.Now().Nanosecond()+1))
 
 	KafkaStreamParser.GetCorrelationIdMap()[4] = struct{}{}
 	KafkaStreamParser.GetCorrelationIdMap()[1] = struct{}{}

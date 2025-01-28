@@ -156,7 +156,7 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 	}
 	kc.ProtocolParserLog.Debugf("[%v]correlationId: %v", messageType, correlationId)
 
-	if len(buf)-int(common.KMessageLengthBytes) < int(payloadLength) {
+	if uint32(len(buf))-uint32(common.KMessageLengthBytes) < uint32(payloadLength) {
 		kc.ProtocolParserLog.Debugf("[%v]Not enough data for parsing2: %v - %v < %v", messageType, len(buf), common.KMessageLengthBytes, payloadLength)
 		return protocol.ParseResult{
 			ParseState: protocol.NeedsMoreData,
@@ -166,7 +166,7 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 		k.correlationIdMap[correlationId] = struct{}{}
 	}
 	msg := buf[common.KMessageLengthBytes : common.KMessageLengthBytes+payloadLength]
-	fb, ok := protocol.CreateFrameBase(streamBuffer, int(common.KMessageLengthBytes+payloadLength))
+	fb, ok := protocol.CreateFrameBase(streamBuffer, uint32(common.KMessageLengthBytes+payloadLength))
 	if !ok {
 		return protocol.ParseResult{
 			ParseState: protocol.Invalid,
@@ -182,7 +182,7 @@ func (k *KafkaStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messa
 	return protocol.ParseResult{
 		ParseState:     protocol.Success,
 		ParsedMessages: []protocol.ParsedMessage{&parseResult},
-		ReadBytes:      int(common.KMessageLengthBytes + payloadLength),
+		ReadBytes:      uint32(common.KMessageLengthBytes + payloadLength),
 	}
 }
 
