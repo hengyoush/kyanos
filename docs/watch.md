@@ -148,7 +148,7 @@ Here are the options available for filtering by each protocol:
 | Request Key        | `keys`            | `--keys foo,bar` <br> Only observe requests with the keys `foo` and `bar`.                  |
 | Request Key Prefix | `key-prefix`      | `--key-prefix foo:bar` <br> Only observe requests with keys that have the prefix `foo:bar`. |
 
-#### RocketMQ Protocol Filtering <Badge type="tip" text="1.5.0" />
+#### RocketMQ Protocol Filtering <Badge type="tip" text="preview" />
 
 | Filter Condition | Command Line Flag | Example                                                                                    |
 | ---------------- | ----------------- | ------------------------------------------------------------------------------------------ |
@@ -161,14 +161,14 @@ Here are the options available for filtering by each protocol:
 > For more supported languages, please refer to
 > [here](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java).
 
-#### Kafka Protocol Filtering <Badge type="tip" text="1.5.0" />
+#### Kafka Protocol Filtering <Badge type="tip" text="preview" />
 
 | Filter Condition | Command Line Flag | Example |
 | :--------------- | :---------------- | :------ |
 | Topic Name       | `topic`           | `--topic quickstart-events` |
 | Producer         | `producer`        | `--producer` Observe producer requests, useful when specifying a topic, default is true |
 | Consumer         | `consumer`        | `--consumer` Observe consumer requests, useful when specifying a topic, default is true |
-| Request Code     | `apikeys`         | `--apikeys 10,11` Only observe Kafka APIKEYs 10 and 11 |
+| API Keys    | `apikeys`         | `--apikeys 10,11` Only observe Kafka APIKEYs 10 and 11 |
 
 
 > For the meaning and values of API Keys, refer to
@@ -194,7 +194,7 @@ This flexibility allows you to tailor your traffic capture to your specific
 needs, ensuring you gather only the most relevant request-response data.
 
 
-## JSON Output <Badge type="tip" text="1.5.0" />
+## JSON Output <Badge type="tip" text="preview" />
 
 If you need to process the captured data programmatically, you can use the
 `--json-output` flag to output the results in JSON format:

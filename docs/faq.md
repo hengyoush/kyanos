@@ -73,6 +73,12 @@ copying to the Socket buffer and being read by the process.
 Make sure the protocol you want to monitor is not HTTP2, as kyanos does not
 currently support it.
 
+## Why is the number of captured requests significantly less than the actual number of requests?
+
+In high-traffic situations, kyanos may not be able to capture complete request data. Check the kyanos logs in the `/tmp` directory. If you see logs like `[dataReader] lost xx syscall data events`, it indicates this situation.
+
+If you want to capture as many requests as possible, you can add the `--trace-dev-event=false --trace-socket-data` option. With this option, events of data passing through the network card and `socket buffer` will not be captured, and all processing power will be used to parse syscall data (currently, requests and responses are parsed through syscall data).
+
 ## Incorrect terminal table colors after running (e.g., unable to select records in the table)
 
 ![kyanos missing color](/missing-color.png)

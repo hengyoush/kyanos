@@ -272,6 +272,8 @@ type ProtocolFilter interface {
 | `FilterByRequest`  | Filters based on requests.      |
 | `FilterByResponse` | Filters based on responses.     |
 
+Additionally, you need to add the corresponding protocol name to `supportedProtocols` in `watch.go`.
+
 ## Step.5-Register Protocol Parser
 
 Add an init function in your module to write it into the `ParsersMap`, for
@@ -284,6 +286,8 @@ func init() {
 	}
 }
 ```
+
+Finally, add the corresponding protocol name translation to `ProtocolNamesMap` in `common.go`
 
 ## Step.6-Add e2e Tests
 
