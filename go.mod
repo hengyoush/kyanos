@@ -30,7 +30,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/zcalusic/sysinfo v1.1.2
 	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff
-	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
+	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c
 	golang.org/x/sys v0.28.0
 	k8s.io/cri-api v0.31.0
 	k8s.io/klog/v2 v2.130.1
