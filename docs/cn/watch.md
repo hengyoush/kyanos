@@ -130,7 +130,7 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 | 请求 Key      | `keys`       | `--keys foo,bar ` 只观察请求 key 为 foo 和 bar        |
 | 请求 key 前缀 | `key-prefix` | `--method foo:bar ` 只观察请求的 key 前缀为 foo\: bar |
 
-#### RocketMQ 协议过滤 <Badge type="tip" text="1.5.0" />
+#### RocketMQ 协议过滤 <Badge type="tip" text="preview" />
 
 | 过滤条件 | 命令行 flag     | 示例                                                                    |
 | :------- | :-------------- | :---------------------------------------------------------------------- |
@@ -144,14 +144,14 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 > [这里](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java)。
 
 
-#### Kafka 协议过滤 <Badge type="tip" text="1.5.0" />
+#### Kafka 协议过滤 <Badge type="tip" text="preview" />
 
 | 过滤条件 | 命令行 flag     | 示例                                                                    |
 | :------- | :-------------- | :---------------------------------------------------------------------- |
 | 主题名称 | `topic` | `--topic quickstart-events`                  |
 | 生产者 | `producer` | `--producer` 观察 producer 的请求，指定topic时有用，默认为true                  |
 | 消费者 | `consumer` | `--consumer` 观察 consumer 的请求，指定topic时有用，默认为true                    |
-| 请求代码 | `apikeys` | `--apikeys 10,11` 只观察Kafka APIKEY为 10 和 11 的                    |
+| API Key  | `apikeys` | `--apikeys 10,11` 只观察Kafka APIKEY为 10 和 11 的                    |
 
 > 有关API Key的含义和值，请参阅
 > [这里](https://kafka.apache.org/protocol#protocol_api_keys)。
@@ -168,7 +168,7 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 > 所有上述选项均可以组合使用，比如：`./kyanos watch redis --keys foo,bar --remote-ports 6379 --pid 12345`
 
 
-## JSON 输出 <Badge type="tip" text="1.5.0" />
+## JSON 输出 <Badge type="tip" text="preview" />
 
 如果你需要以编程方式处理采集到的数据，可以使用 `--json-output`
 参数将结果输出为 JSON 格式：

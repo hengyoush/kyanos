@@ -233,6 +233,8 @@ type ProtocolFilter interface {
 | `FilterByRequest`  | 是否根据请求进行过滤。     |
 | `FilterByResponse` | 是否根据响应进行过滤。     |
 
+另外需要在 `cmd/watch.go` 里的 `supportedProtocols` 需要添加对应的协议名称。
+
 ## Step.5-注册协议解析器
 
 在你写的模块下增加 init 函数，将其写入到 `ParsersMap` 里，例如：
@@ -244,6 +246,8 @@ func init() {
 	}
 }
 ```
+
+最后在 `bpf/common.go` 里的 `ProtocolNamesMap` 增加对应的协议名称翻译。
 
 ## Step.6-添加测试
 

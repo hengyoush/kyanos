@@ -1,4 +1,4 @@
-# JSON 输出格式 <Badge type="tip" text="1.5.0" />
+# JSON 输出格式 <Badge type="tip" text="preview" />
 
 本文档描述了使用 kyanos 的 `--json-output` 参数时的 JSON 输出格式。
 
