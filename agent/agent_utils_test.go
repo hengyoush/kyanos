@@ -95,7 +95,11 @@ func StartAgent0(bpfAttachFunctions []bpf.AttachBpfProgFunction,
 					*sslEventList = append(*sslEventList, *evt)
 				}
 			},
-			ConnManagerInitHook: connManagerInitHook,
+			ConnManagerInitHook: func(a any) {
+				if connManagerInitHook != nil {
+					connManagerInitHook(a.(*conn.ConnManager))
+				}
+			},
 		})
 	}(os.Getpid())
 
