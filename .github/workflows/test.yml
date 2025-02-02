@@ -136,7 +136,8 @@ jobs:
           provision: 'false'
           cmd: |
             apt-get update
-            apt-get install -y dnsutils
+            apt-get install -y dnsutils || true
+            apt-get install -y bind9-dnsutils || true
             # install btf
             if [ -f "/sys/kernel/btf/vmlinux" ]; then  
               mkdir -p /var/lib/kyanos/btf
