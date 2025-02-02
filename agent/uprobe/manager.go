@@ -2,6 +2,7 @@ package uprobe
 
 import (
 	"debug/elf"
+	"errors"
 	"fmt"
 	ac "kyanos/agent/common"
 	"kyanos/bpf"
@@ -34,7 +35,44 @@ func StartHandleSchedExecEvent(ch chan *bpf.AgentProcessExecEvent) {
 	}()
 }
 
+func filterPidMapLength() int {
+	l := 0
+	var filterPidMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap")
+	keyOut := uint32(0)
+	valueOut := int8(0)
+	iterate := filterPidMap.Iterate()
+	for iterate.Next(&keyOut, &valueOut) {
+		l++
+	}
+	return l
+}
+
+func matchFilter(pid int32) (bool, error) {
+	if filterPidMapLength() == 0 {
+		return true, nil
+	}
+	var filterPidMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap")
+	one := int8(1)
+	if err := filterPidMap.Lookup(&pid, &one); err != nil {
+		if errors.Is(err, ebpf.ErrKeyNotExist) {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("lookup pid %d in filterPidMap failed: %v", pid, err)
+		}
+	}
+	return true, nil
+}
+
 func handleSchedExecEvent(event *bpf.AgentProcessExecEvent) {
+	isPidmatch, err := matchFilter(event.Pid)
+	if err != nil {
+		common.UprobeLog.Errorf("matchFilter failed for pid: %d: %v", event.Pid, err)
+		return
+	}
+	if !isPidmatch {
+		common.UprobeLog.Debugf("pid %d not in filterPidMap, skip attach uprobes", event.Pid)
+		return
+	}
 	links, err := AttachSslUprobe(int(event.Pid))
 	var procName string
 	if proc, err := process.NewProcess(event.Pid); err == nil {

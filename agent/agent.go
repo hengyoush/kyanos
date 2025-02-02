@@ -34,8 +34,8 @@ import (
 
 func SetupAgent(options ac.AgentOptions) {
 	startGopsServer(options)
-	err := version.UpgradeDetect()
-	if err != nil {
+
+	if err := version.UpgradeDetect(); err != nil {
 		if errors.Is(err, version.ErrBehindLatest) {
 			common.AgentLog.Warn(err)
 		}
