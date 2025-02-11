@@ -71,6 +71,8 @@ func startAgent() {
 	options.ContainerName = ContainerName
 	options.PodName = PodName
 
+	ac.Options = &options
+
 	InitLog()
 	common.AgentLog.Infoln("Kyanos starting...")
 	if viper.GetBool(common.DaemonVarName) {

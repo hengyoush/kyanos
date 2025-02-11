@@ -15,7 +15,7 @@ import (
 
 type KernEventStream struct {
 	conn           *Connection4
-	kernEvents     map[bpf.AgentStepT][]KernEvent
+	kernEvents     map[bpf.AgentStepT]*common.RingBuffer
 	kernEventsMu   sync.RWMutex
 	sslInEvents    []SslEvent
 	sslOutEvents   []SslEvent
@@ -32,7 +32,7 @@ type KernEventStream struct {
 func NewKernEventStream(conn *Connection4, maxLen int) *KernEventStream {
 	stream := &KernEventStream{
 		conn:       conn,
-		kernEvents: make(map[bpf.AgentStepT][]KernEvent),
+		kernEvents: make(map[bpf.AgentStepT]*common.RingBuffer),
 		maxLen:     maxLen,
 	}
 	monitor.RegisterMetricExporter(stream)
@@ -54,15 +54,15 @@ func (s *KernEventStream) AddSslEvent(event *bpf.SslData) {
 	} else {
 		sslEvents = s.sslOutEvents
 	}
-	index, found := slices.BinarySearchFunc(sslEvents, SslEvent{Seq: event.SslEventHeader.Ke.Seq}, func(i SslEvent, j SslEvent) int {
+	index, found := slices.BinarySearchFunc(sslEvents, SslEvent{Seq: uint64(event.SslEventHeader.Ke.Seq)}, func(i SslEvent, j SslEvent) int {
 		return cmp.Compare(i.Seq, j.Seq)
 	})
 	if found {
 		return
 	}
 	sslEvents = slices.Insert(sslEvents, index, SslEvent{
-		Seq:     event.SslEventHeader.Ke.Seq,
-		KernSeq: event.SslEventHeader.SyscallSeq,
+		Seq:     uint64(event.SslEventHeader.Ke.Seq),
+		KernSeq: uint64(event.SslEventHeader.SyscallSeq),
 		Len:     int(event.SslEventHeader.Ke.Len),
 		KernLen: int(event.SslEventHeader.SyscallLen),
 		startTs: event.SslEventHeader.Ke.Ts,
@@ -93,35 +93,35 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 	s.discardEventsIfNeeded()
 	if event.Len > 0 {
 		if _, ok := s.kernEvents[event.Step]; !ok {
-			s.kernEvents[event.Step] = make([]KernEvent, 0)
+			s.kernEvents[event.Step] = common.NewRingBuffer(s.maxLen)
 		}
 
-		kernEvtSlice := s.kernEvents[event.Step]
-		index, found := slices.BinarySearchFunc(kernEvtSlice, KernEvent{seq: event.Seq}, func(i KernEvent, j KernEvent) int {
-			return cmp.Compare(i.seq, j.seq)
+		kernEvtRingBuffer := s.kernEvents[event.Step]
+    index, found := kernEvtRingBuffer.BinarySearch(KernEvent{seq: uint64(event.Seq)}, func(i any, j any) int {
+			return cmp.Compare(i.(KernEvent).seq, j.(KernEvent).seq)
 		})
 		isNicEvnt := event.Step == bpf.AgentStepTDEV_OUT || event.Step == bpf.AgentStepTDEV_IN
 
 		var kernEvent *KernEvent
 		if found {
-			oldKernEvent := &kernEvtSlice[index]
+			_oldKernEvent, _ := kernEvtRingBuffer.ReadIndex(index)
+			oldKernEvent := _oldKernEvent.(KernEvent)
 			if oldKernEvent.startTs > event.Ts && !isNicEvnt {
 				// this is a duplicate event which belongs to a future conn
-				oldKernEvent.seq = event.Seq
+				oldKernEvent.seq = uint64(event.Seq)
 				oldKernEvent.len = int(event.Len)
 				oldKernEvent.startTs = event.Ts
 				oldKernEvent.tsDelta = event.TsDelta
 				oldKernEvent.step = event.Step
-				kernEvent = oldKernEvent
+				kernEvent = &oldKernEvent
 			} else if !isNicEvnt {
-				kernEvent = &kernEvtSlice[index]
 				return false
 			} else {
-				kernEvent = &kernEvtSlice[index]
+				kernEvent = &oldKernEvent
 			}
 		} else {
 			kernEvent = &KernEvent{
-				seq:     event.Seq,
+				seq:     uint64(event.Seq),
 				len:     int(event.Len),
 				startTs: event.Ts,
 				tsDelta: event.TsDelta,
@@ -143,17 +143,11 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 			}
 		}
 		if !found {
-			kernEvtSlice = slices.Insert(kernEvtSlice, index, *kernEvent)
-		}
-		if len(kernEvtSlice) > s.maxLen {
-			if common.ConntrackLog.Level >= logrus.DebugLevel {
-				common.ConntrackLog.Debugf("kern event stream size: %d exceed maxLen", len(kernEvtSlice))
+			if err := kernEvtRingBuffer.Insert(index, *kernEvent); err != nil {
+				common.ConntrackLog.Debugf("kern event stream size: %d exceed maxLen", kernEvtRingBuffer.MaxCapacity())
+				return false
 			}
 		}
-		for len(kernEvtSlice) > s.maxLen {
-			kernEvtSlice = kernEvtSlice[1:]
-		}
-		s.kernEvents[event.Step] = kernEvtSlice
 	}
 	return true
 }
@@ -200,7 +194,8 @@ func (s *KernEventStream) FindEventsBySeqAndLen(step bpf.AgentStepT, seq uint64,
 	start := seq
 	end := start + uint64(len)
 	result := make([]KernEvent, 0)
-	for _, each := range events {
+	events.ForEach(func(i any) bool {
+		each := i.(KernEvent)
 		if each.seq <= start && each.seq+uint64(each.len) > start {
 			result = append(result, each)
 		} else if each.seq < end && each.seq+uint64(each.len) >= end {
@@ -208,9 +203,10 @@ func (s *KernEventStream) FindEventsBySeqAndLen(step bpf.AgentStepT, seq uint64,
 		} else if each.seq >= start && each.seq+uint64(each.len) <= end {
 			result = append(result, each)
 		} else if each.seq > end {
-			break
+			return false
 		}
-	}
+		return true
+	})
 	return result
 }
 
@@ -272,12 +268,12 @@ func (s *KernEventStream) discardEventsBySeq(seq uint64, egress bool) {
 		if !egress && !bpf.IsIngressStep(step) {
 			continue
 		}
-		index, _ := slices.BinarySearchFunc(events, KernEvent{seq: seq}, func(i KernEvent, j KernEvent) int {
-			return cmp.Compare(i.seq, j.seq)
+		index, _ := events.BinarySearch(KernEvent{seq: seq}, func(i any, j any) int {
+			return cmp.Compare(i.(KernEvent).seq, j.(KernEvent).seq)
 		})
 		discardIdx := index
 		if discardIdx > 0 {
-			s.kernEvents[step] = events[discardIdx:]
+			events.DiscardBeforeIndex(discardIdx)
 			// common.ConntrackLog.Debugf("Discarded kern events, step: %d(egress: %v) events num: %d, cur len: %d", step, egress, discardIdx, len(s.kernEvents[step]))
 		}
 	}
@@ -407,7 +403,7 @@ var _ monitor.MetricExporter = &KernEventStream{}
 func (s *KernEventStream) ExportMetrics() monitor.MetricMap {
 	allEventsNum := 0
 	for _, events := range s.kernEvents {
-		allEventsNum += len(events)
+		allEventsNum += events.Size()
 	}
 	return monitor.MetricMap{
 		"events_num": float64(allEventsNum),

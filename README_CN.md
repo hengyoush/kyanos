@@ -21,16 +21,19 @@
 
 ## Table of Contents
 
-- [What is Kyanos](#-what-is-kyanos)
-- [Examples](#-examples)
-- [Requirements](#-requirements)
-- [How to get kyanos](#-how-to-get-kyanos)
-- [Documentation](#-documentation)
-- [Usage](#-usage)
-- [How to build](#-how-to-build)
-- [Feedback and Contributions](#-feedback-and-contributions)
-- [Special Thanks](#-special-thanks)
-- [Contacts](#%EF%B8%8F-contacts)
+- [Table of Contents](#table-of-contents)
+- [🦜 What is kyanos](#-what-is-kyanos)
+- [🌰 Examples](#-examples)
+- [❗ Requirements](#-requirements)
+- [📝 Documentation](#-documentation)
+- [🎯 How to get kyanos](#-how-to-get-kyanos)
+- [⚙ Usage](#-usage)
+- [🏠 How to Build](#-how-to-build)
+- [Roadmap](#roadmap)
+- [🤝 Feedback and Contributions](#-feedback-and-contributions)
+- [🙇‍ Special Thanks](#-special-thanks)
+- [🗨️ Contacts](#️-contacts)
+- [Star History](#star-history)
 
 ## 🦜 What is kyanos
 
@@ -173,14 +176,12 @@ sudo ./kyanos watch
 
 Kyanos 的 Roadmap 展示了 Kyanos 未来的计划，如果你有功能需求，或者想提高某个特性的优先级，请在 GitHub 上提交 issue。
 
-_1.5.0_
+_1.6.0_
 
-1. 支持 openssl 3.4.0
-2. 支持解析 ipip 包
-3. 支持根据 process name 过滤数据
-4. 支持 postgresql 协议解析
-5. 支持 kafka 协议解析
-6. 完全支持 ipv6
+1. 支持 postgresql 协议解析。
+2. 支持 HTTP2 协议。
+3. 支持 DNS 协议。
+4. 支持 GnuTLS 库解析加密流量。
 
 ## 🤝 Feedback and Contributions
 

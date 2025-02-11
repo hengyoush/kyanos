@@ -12,6 +12,9 @@ type WatchOptions struct {
 	JsonOutput                   string
 	MaxRecordContentDisplayBytes int
 	MaxRecords                   int
+	TraceDevEvent                bool
+	TraceSocketEvent             bool
+	TraceSslEvent                bool
 }
 
 func (w *WatchOptions) Init() {

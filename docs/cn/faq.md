@@ -53,6 +53,11 @@ https://github.com/aquasecurity/btfhub-archive/
 
 确认你想监控的协议不是 HTTP2，因为 kyanos 目前尚未支持。
 
+## 为什么抓取到的请求数量明显少于真实的请求数量？
+在大流量的情况下 kyanos 可能抓取不到完整的请求数据，检查 `/tmp` 目录下的 kyanos 日志，如果出现 `[dataReader] lost xx syscall data events` 的日志说明正是这种情况。
+
+如果想尽可能的抓取请求可以加上 `--trace-dev-event=false --trace-socket-data` 这个选项，加上该选项后不会抓取数据经过网卡和`socket buffer`的事件，将所有处理能力用于解析 syscall 数据上（目前通过 syscall 数据解析请求和响应）
+
 ## 运行后终端表格颜色不正确（比如无法选择表格中的记录）
 
 ![kyanos missing color](/missing-color.png)

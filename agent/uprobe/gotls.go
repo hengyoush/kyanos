@@ -62,7 +62,17 @@ func LoadGoTlsUprobe() error {
 	goTlsObjs = objs
 	return nil
 }
-func AttachGoTlsProbes(pid int) ([]link.Link, error) {
+func AttachGoTlsProbes(pid int) (_links []link.Link, e error) {
+	defer func() {
+		if r := recover(); r != nil {
+			common.UprobeLog.Errorf("Recovered in AttachGoTlsProbes: %v", r)
+			_links = nil
+			e = fmt.Errorf("attachBpfProgs panic: %v", r)
+		}
+	}()
+	if goTlsObjs == nil {
+		return nil, errors.New("GoTlsObjs not loaded")
+	}
 	elfFile, f, err := GetElfFile(pid)
 	if err != nil {
 		return nil, err

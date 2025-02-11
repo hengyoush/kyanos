@@ -70,6 +70,7 @@ type AgentLagacyKernel310ProgramSpecs struct {
 	TcpRcvEstablished                    *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                           *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                             *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
+	TcpV6DoRcv                           *ebpf.ProgramSpec `ebpf:"tcp_v6_do_rcv"`
 	TracepointNetifReceiveSkb            *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSchedSchedProcessExit      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exit"`
@@ -110,6 +111,7 @@ type AgentLagacyKernel310MapSpecs struct {
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	CloseArgsMap          *ebpf.MapSpec `ebpf:"close_args_map"`
+	ConnEvtMap            *ebpf.MapSpec `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
 	ConnInfoT_map         *ebpf.MapSpec `ebpf:"conn_info_t_map"`
@@ -167,6 +169,7 @@ type AgentLagacyKernel310Maps struct {
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	CloseArgsMap          *ebpf.Map `ebpf:"close_args_map"`
+	ConnEvtMap            *ebpf.Map `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
 	ConnInfoT_map         *ebpf.Map `ebpf:"conn_info_t_map"`
@@ -207,6 +210,7 @@ func (m *AgentLagacyKernel310Maps) Close() error {
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.CloseArgsMap,
+		m.ConnEvtMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
 		m.ConnInfoT_map,
@@ -262,6 +266,7 @@ type AgentLagacyKernel310Programs struct {
 	TcpRcvEstablished                    *ebpf.Program `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                           *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                             *ebpf.Program `ebpf:"tcp_v4_rcv"`
+	TcpV6DoRcv                           *ebpf.Program `ebpf:"tcp_v6_do_rcv"`
 	TracepointNetifReceiveSkb            *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSchedSchedProcessExit      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exit"`
@@ -312,6 +317,7 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 		p.TcpRcvEstablished,
 		p.TcpV4DoRcv,
 		p.TcpV4Rcv,
+		p.TcpV6DoRcv,
 		p.TracepointNetifReceiveSkb,
 		p.TracepointSchedSchedProcessExec,
 		p.TracepointSchedSchedProcessExit,

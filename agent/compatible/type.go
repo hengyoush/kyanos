@@ -27,6 +27,27 @@ const (
 type InstrumentFunction struct {
 	KernelFunctionName string
 	BPFGoProgName      string
+	Backup             bool
+}
+
+func MakeInstrumentFunction(k string, b string) InstrumentFunction {
+	return InstrumentFunction{
+		KernelFunctionName: k,
+		BPFGoProgName:      b,
+		Backup:             false,
+	}
+}
+
+func MakeBackupInstrumentFunction(k string, b string) InstrumentFunction {
+	return InstrumentFunction{
+		KernelFunctionName: k,
+		BPFGoProgName:      b,
+		Backup:             true,
+	}
+}
+
+func (f *InstrumentFunction) IsBackup() bool {
+	return f.Backup
 }
 
 func (f *InstrumentFunction) GetRealKernelFunctionName() string {
@@ -106,13 +127,13 @@ func init() {
 	baseVersion := KernelVersion{
 		Version: "5.15.0",
 		InstrumentFunctions: map[bpf.AgentStepT][]InstrumentFunction{
-			bpf.AgentStepTIP_OUT:    {InstrumentFunction{"kprobe/__ip_queue_xmit", "IpQueueXmit"}},
-			bpf.AgentStepTQDISC_OUT: {InstrumentFunction{"kprobe/dev_queue_xmit", "DevQueueXmit"}},
-			bpf.AgentStepTDEV_OUT:   {InstrumentFunction{"kprobe/dev_hard_start_xmit", "DevHardStartXmit"}},
-			bpf.AgentStepTDEV_IN:    {InstrumentFunction{"tracepoint/net/netif_receive_skb", "TracepointNetifReceiveSkb"}},
-			bpf.AgentStepTIP_IN:     {InstrumentFunction{"kprobe/ip_rcv_core", "IpRcvCore"}},
-			bpf.AgentStepTTCP_IN:    {InstrumentFunction{"kprobe/tcp_v4_do_rcv", "TcpV4DoRcv"}},
-			bpf.AgentStepTUSER_COPY: {InstrumentFunction{"tracepoint/skb/skb_copy_datagram_iovec", "TracepointSkbCopyDatagramIovec"}},
+			bpf.AgentStepTIP_OUT:    {MakeInstrumentFunction("kprobe/__ip_queue_xmit", "IpQueueXmit")},
+			bpf.AgentStepTQDISC_OUT: {MakeInstrumentFunction("kprobe/dev_queue_xmit", "DevQueueXmit")},
+			bpf.AgentStepTDEV_OUT:   {MakeInstrumentFunction("kprobe/dev_hard_start_xmit", "DevHardStartXmit")},
+			bpf.AgentStepTDEV_IN:    {MakeInstrumentFunction("tracepoint/net/netif_receive_skb", "TracepointNetifReceiveSkb")},
+			bpf.AgentStepTIP_IN:     {MakeInstrumentFunction("kprobe/ip_rcv_core", "IpRcvCore")},
+			bpf.AgentStepTTCP_IN:    {MakeInstrumentFunction("kprobe/tcp_v4_do_rcv", "TcpV4DoRcv"), MakeInstrumentFunction("kprobe/tcp_v6_do_rcv", "TcpV6DoRcv")},
+			bpf.AgentStepTUSER_COPY: {MakeInstrumentFunction("tracepoint/skb/skb_copy_datagram_iovec", "TracepointSkbCopyDatagramIovec")},
 		},
 		Capabilities: map[Capability]bool{
 			SupportConstants:         true,
@@ -122,32 +143,32 @@ func init() {
 			SupportFilterByContainer: true,
 		},
 	}
-	baseVersion.addBackupInstrumentFunction(bpf.AgentStepTQDISC_OUT, InstrumentFunction{"kprobe/__dev_queue_xmit", "DevQueueXmit"})
+	baseVersion.addBackupInstrumentFunction(bpf.AgentStepTQDISC_OUT, MakeBackupInstrumentFunction("kprobe/__dev_queue_xmit", "DevQueueXmit"))
 	v5d15 := copyKernelVersion(baseVersion)
 	KernelVersionsMap.Put(v5d15.Version, v5d15)
 
 	v5d4 := copyKernelVersion(v5d15)
 	v5d4.Version = "5.4.0"
-	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"kprobe/ip_rcv_core.isra.0", "IpRcvCore"})
-	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"kprobe/ip_rcv_core.isra.20", "IpRcvCore"})
+	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, MakeBackupInstrumentFunction("kprobe/ip_rcv_core.isra.0", "IpRcvCore"))
+	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, MakeBackupInstrumentFunction("kprobe/ip_rcv_core.isra.20", "IpRcvCore"))
 	v5d4.removeCapability(SupportRingBuffer).removeCapability(SupportXDP)
 	KernelVersionsMap.Put(v5d4.Version, v5d4)
 
 	v4d14 := copyKernelVersion(v5d4)
 	v4d14.Version = "4.14.0"
 	v4d14.InstrumentFunctions[bpf.AgentStepTIP_OUT] =
-		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "IpQueueXmit"}}
-	v4d14.addBackupInstrumentFunction(bpf.AgentStepTIP_OUT, InstrumentFunction{"kprobe/__ip_queue_xmit", "IpQueueXmit"})
+		[]InstrumentFunction{MakeInstrumentFunction("kprobe/ip_queue_xmit", "IpQueueXmit")}
+	v4d14.addBackupInstrumentFunction(bpf.AgentStepTIP_OUT, MakeBackupInstrumentFunction("kprobe/__ip_queue_xmit", "IpQueueXmit"))
 	v4d14.InstrumentFunctions[bpf.AgentStepTIP_IN] =
-		[]InstrumentFunction{{"kprobe/ip_rcv", "IpRcvCore"}}
+		[]InstrumentFunction{MakeInstrumentFunction("kprobe/ip_rcv", "IpRcvCore")}
 	v4d14.removeCapability(SupportConstants).removeCapability(SupportRawTracepoint).removeCapability(SupportBTF).removeCapability(SupportXDP)
 	KernelVersionsMap.Put(v4d14.Version, v4d14)
 
 	v310 := copyKernelVersion(v5d4)
 	v310.Version = "3.10.0"
 	v310.InstrumentFunctions[bpf.AgentStepTIP_OUT] =
-		[]InstrumentFunction{{"kprobe/ip_queue_xmit", "IpQueueXmit2"}}
-	v310.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, InstrumentFunction{"kprobe/ip_rcv", "IpRcvCore"})
+		[]InstrumentFunction{MakeInstrumentFunction("kprobe/ip_queue_xmit", "IpQueueXmit2")}
+	v310.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, MakeBackupInstrumentFunction("kprobe/ip_rcv", "IpRcvCore"))
 	v310.removeCapability(SupportConstants).
 		removeCapability(SupportRawTracepoint).
 		removeCapability(SupportXDP).

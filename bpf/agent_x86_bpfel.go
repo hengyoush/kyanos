@@ -122,19 +122,19 @@ type AgentFirstPacketEvt struct {
 type AgentIn6Addr struct{ In6U struct{ U6Addr8 [16]uint8 } }
 
 type AgentKernEvt struct {
-	FuncName [16]int8
-	Ts       uint64
-	TsDelta  uint32
-	_        [4]byte
-	Seq      uint64
-	Len      uint32
-	Flags    uint8
-	_        [3]byte
-	Ifindex  uint32
-	_        [4]byte
-	ConnIdS  AgentConnIdS_t
-	Step     AgentStepT
-	_        [4]byte
+	FuncName            [16]int8
+	Ts                  uint64
+	TsDelta             uint32
+	Seq                 uint32
+	Len                 uint32
+	Flags               uint8
+	PrependLengthHeader bool
+	_                   [2]byte
+	Ifindex             uint32
+	_                   [4]byte
+	ConnIdS             AgentConnIdS_t
+	Step                AgentStepT
+	LengthHeader        uint32
 }
 
 type AgentKernEvtData struct {
@@ -146,10 +146,11 @@ type AgentKernEvtData struct {
 
 type AgentKernEvtSslData struct {
 	Ke         AgentKernEvt
-	SyscallSeq uint64
+	SyscallSeq uint32
 	SyscallLen uint32
 	BufSize    uint32
 	Msg        [30720]int8
+	_          [4]byte
 }
 
 type AgentProcessExecEvent struct{ Pid int32 }
@@ -297,6 +298,7 @@ type AgentProgramSpecs struct {
 	TcpRcvEstablished                    *ebpf.ProgramSpec `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                           *ebpf.ProgramSpec `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                             *ebpf.ProgramSpec `ebpf:"tcp_v4_rcv"`
+	TcpV6DoRcv                           *ebpf.ProgramSpec `ebpf:"tcp_v6_do_rcv"`
 	TracepointNetifReceiveSkb            *ebpf.ProgramSpec `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSchedSchedProcessExit      *ebpf.ProgramSpec `ebpf:"tracepoint__sched__sched_process_exit"`
@@ -337,6 +339,7 @@ type AgentMapSpecs struct {
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	CloseArgsMap          *ebpf.MapSpec `ebpf:"close_args_map"`
+	ConnEvtMap            *ebpf.MapSpec `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
 	ConnInfoT_map         *ebpf.MapSpec `ebpf:"conn_info_t_map"`
@@ -394,6 +397,7 @@ type AgentMaps struct {
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	CloseArgsMap          *ebpf.Map `ebpf:"close_args_map"`
+	ConnEvtMap            *ebpf.Map `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
 	ConnInfoT_map         *ebpf.Map `ebpf:"conn_info_t_map"`
@@ -434,6 +438,7 @@ func (m *AgentMaps) Close() error {
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.CloseArgsMap,
+		m.ConnEvtMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
 		m.ConnInfoT_map,
@@ -489,6 +494,7 @@ type AgentPrograms struct {
 	TcpRcvEstablished                    *ebpf.Program `ebpf:"tcp_rcv_established"`
 	TcpV4DoRcv                           *ebpf.Program `ebpf:"tcp_v4_do_rcv"`
 	TcpV4Rcv                             *ebpf.Program `ebpf:"tcp_v4_rcv"`
+	TcpV6DoRcv                           *ebpf.Program `ebpf:"tcp_v6_do_rcv"`
 	TracepointNetifReceiveSkb            *ebpf.Program `ebpf:"tracepoint__netif_receive_skb"`
 	TracepointSchedSchedProcessExec      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exec"`
 	TracepointSchedSchedProcessExit      *ebpf.Program `ebpf:"tracepoint__sched__sched_process_exit"`
@@ -539,6 +545,7 @@ func (p *AgentPrograms) Close() error {
 		p.TcpRcvEstablished,
 		p.TcpV4DoRcv,
 		p.TcpV4Rcv,
+		p.TcpV6DoRcv,
 		p.TracepointNetifReceiveSkb,
 		p.TracepointSchedSchedProcessExec,
 		p.TracepointSchedSchedProcessExit,

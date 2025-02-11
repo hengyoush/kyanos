@@ -9,7 +9,7 @@ LNAME_REMOTE_PORT="${FILE_PREFIX}_filter_by_remote_port.log"
 LNAME_LOCAL_PORT="${FILE_PREFIX}_filter_by_local_port.log"
 
 function test_filter_by_remote_ip() {
-    remote_ip=$(dig example.com +short | head -n 1)
+    remote_ip=$(dig example.com +short | tail -n 1)
     timeout 20 ${CMD} watch --debug-output http --remote-ips "$remote_ip" 2>&1  | tee "${LNAME_IP}" &
     sleep 10
     curl http://"$remote_ip" &>/dev/null || true
@@ -24,22 +24,22 @@ function test_filter_by_remote_port() {
     remote_port=88
     timeout 20 ${CMD} watch --debug-output http --remote-ports "$remote_port" 2>&1  | tee "${LNAME_REMOTE_PORT}" &
     sleep 10
-    curl http://example.com &>/dev/null || true
+    curl http://baidu.com &>/dev/null || true
     wait
 
     cat "${LNAME_REMOTE_PORT}"
-    if cat "${LNAME_REMOTE_PORT}" |  grep  "example.com"; then
+    if cat "${LNAME_REMOTE_PORT}" |  grep  "baidu.com"; then
         exit 1
     fi
 
     remote_port=80
     timeout 20 ${CMD} watch --debug-output http --remote-ports "$remote_port" 2>&1  | tee "${LNAME_REMOTE_PORT}" &
     sleep 10
-    curl http://example.com &>/dev/null || true
+    curl http://baidu.com &>/dev/null || true
     wait
 
     cat "${LNAME_REMOTE_PORT}"
-    if ! cat "${LNAME_REMOTE_PORT}" |  grep  "example.com"; then
+    if ! cat "${LNAME_REMOTE_PORT}" |  grep  "baidu.com"; then
         exit 1
     fi
 }

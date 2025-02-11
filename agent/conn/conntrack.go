@@ -1,8 +1,10 @@
 package conn
 
 import (
+	"encoding/binary"
 	"fmt"
 	"kyanos/agent/buffer"
+	ac "kyanos/agent/common"
 	"kyanos/agent/protocol"
 	_ "kyanos/agent/protocol/mysql"
 	"kyanos/bpf"
@@ -431,13 +433,45 @@ func getEventTimestamp(ke *bpf.AgentKernEvt, c *Connection4, isReq bool) uint64 
 	}
 }
 
+func extractHeaderEvent(data []byte, ke *bpf.AgentKernEvt, c *Connection4) *bpf.SyscallEventData {
+	if !ke.PrependLengthHeader {
+		return nil
+	}
+
+	header := make([]byte, 4)
+	headerEvt := *ke
+	headerEvt.Len = 4
+	headerEvt.Seq = ke.Seq - 4
+	headerEvt.PrependLengthHeader = false
+
+	headerSyscallEvt := bpf.SyscallEventData{
+		SyscallEvent: bpf.SyscallEvent{
+			Ke:      headerEvt,
+			BufSize: 4,
+		},
+		Buf: header,
+	}
+	binary.LittleEndian.PutUint32(header, uint32(ke.LengthHeader))
+	if common.ConntrackLog.Level >= logrus.DebugLevel {
+		common.ConntrackLog.Debugf("extract header event: %v", headerSyscallEvt)
+	}
+	return &headerSyscallEvt
+}
+
 func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernEvt) bool {
 	addedToBuffer := false
 	isReq, _ := isReq(c, ke)
+	headerEvt := extractHeaderEvent(data, ke, c)
 	if isReq {
-		addedToBuffer = c.reqStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
+		if headerEvt != nil {
+			c.reqStreamBuffer.Add(uint64(headerEvt.SyscallEvent.Ke.Seq), headerEvt.Buf, getEventTimestamp(ke, c, isReq))
+		}
+		addedToBuffer = c.reqStreamBuffer.Add(uint64(ke.Seq), data, getEventTimestamp(ke, c, isReq))
 	} else {
-		addedToBuffer = c.respStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
+		if headerEvt != nil {
+			c.respStreamBuffer.Add(uint64(headerEvt.SyscallEvent.Ke.Seq), headerEvt.Buf, getEventTimestamp(ke, c, isReq))
+		}
+		addedToBuffer = c.respStreamBuffer.Add(uint64(ke.Seq), data, getEventTimestamp(ke, c, isReq))
 	}
 	if !addedToBuffer {
 		return false
@@ -474,6 +508,29 @@ func (c *Connection4) OnSslDataEvent(data []byte, event *bpf.SslData, recordChan
 		}
 	}
 }
+
+func isSyscallFunctionMultiMessage(f bpf.AgentSourceFunctionT) bool {
+	return f == bpf.AgentSourceFunctionTKSyscallSendMMsg ||
+		f == bpf.AgentSourceFunctionTKSyscallRecvMMsg ||
+		f == bpf.AgentSourceFunctionTKSyscallWriteV ||
+		f == bpf.AgentSourceFunctionTKSyscallReadV
+}
+func fillSyscallDataIfNeeded(data []byte, event *bpf.SyscallEventData, c *Connection4) []byte {
+
+	if event.SyscallEvent.Ke.Len > event.SyscallEvent.BufSize {
+		common.ConntrackLog.Debugf("syscall read/write data too len and some data can't be captured, so we need to fill a fake data, len: %d, bufsize: %d", event.SyscallEvent.Ke.Len, event.SyscallEvent.BufSize)
+
+		fakeData, ok := protocol.MakeNewFakeData(event.SyscallEvent.Ke.Len - event.SyscallEvent.BufSize)
+		if !ok {
+			fakeData = make([]byte, event.SyscallEvent.Ke.Len-event.SyscallEvent.BufSize)
+		}
+		data = append(data, fakeData...)
+		return data
+	} else {
+		return data
+	}
+}
+
 func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, recordChannel chan RecordWithConn) bool {
 	addedToBuffer := true
 	if len(data) > 0 {
@@ -482,13 +539,23 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 				common.ConntrackLog.Warnf("%s is ssl, but receive syscall event with data!", c.ToString())
 			}
 		} else {
+			data = fillSyscallDataIfNeeded(data, event, c)
 			addedToBuffer = c.addDataToBufferAndTryParse(data, &event.SyscallEvent.Ke)
 		}
 	} else if event.SyscallEvent.GetSourceFunction() == bpf.AgentSourceFunctionTKSyscallSendfile {
 		// sendfile has no data, so we need to fill a fake data
 		common.ConntrackLog.Debug("sendfile has no data, so we need to fill a fake data")
-		fakeData := make([]byte, event.SyscallEvent.Ke.Len)
+		fakeData, ok := protocol.MakeNewFakeData(event.SyscallEvent.Ke.Len)
+		if !ok {
+			fakeData = make([]byte, event.SyscallEvent.Ke.Len)
+		}
 		addedToBuffer = c.addDataToBufferAndTryParse(fakeData, &event.SyscallEvent.Ke)
+	} else if isSyscallFunctionMultiMessage(event.SyscallEvent.GetSourceFunction()) && !c.ssl {
+		common.ConntrackLog.Debug("syscall read/write multiple message and some data can't be captured, so we need to fill a fake data")
+		fakeData, ok := protocol.MakeNewFakeData(event.SyscallEvent.Ke.Len)
+		if ok {
+			addedToBuffer = c.addDataToBufferAndTryParse(fakeData, &event.SyscallEvent.Ke)
+		}
 	}
 	if !addedToBuffer {
 		return false
@@ -498,7 +565,6 @@ func (c *Connection4) OnSyscallEvent(data []byte, event *bpf.SyscallEventData, r
 	parser := c.GetProtocolParser(c.Protocol)
 	if parser == nil {
 		return true
-		panic("no protocol parser!")
 	}
 
 	records := parser.Match(c.ReqQueue, c.RespQueue)
@@ -524,7 +590,12 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		// TODO
 		startPos = 0
 	}
-	streamBuffer.RemovePrefix(startPos)
+	if startPos > 0 {
+		if common.ConntrackLog.Level >= logrus.DebugLevel {
+			common.ConntrackLog.Debugf("[parseStreamBuffer] %s Removed streambuffer some head data(%d bytes) due to find boundary from %s queue", c.ToString(), startPos, messageType.String())
+		}
+		streamBuffer.RemovePrefix(startPos)
+	}
 	originPos := streamBuffer.Position0()
 	// var parseState protocol.ParseState
 	for !stop && !streamBuffer.IsEmpty() {
@@ -617,7 +688,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		}
 	}
 	curProgress := streamBuffer.Position0()
-	if streamBuffer.IsEmpty() || curProgress != int(originPos) {
+	if streamBuffer.IsEmpty() || curProgress != originPos {
 		c.updateProgressTime(streamBuffer)
 	}
 	// if parseState == protocol.Invalid {
@@ -640,8 +711,6 @@ func (c *Connection4) getLastProgressTime(sb *buffer.StreamBuffer) int64 {
 	}
 }
 
-const maxAllowStuckTime = 1000
-
 func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 	if c.getLastProgressTime(sb) == 0 {
 		c.updateProgressTime(sb)
@@ -649,11 +718,11 @@ func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 	}
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
 	stuckDuration := time.Now().UnixMilli() - int64(common.NanoToMills(headTime))
-	if !ok || stuckDuration > maxAllowStuckTime {
+	if !ok || stuckDuration > int64(ac.Options.MaxAllowStuckTimeMills) {
 		return true
 	}
 	if common.ConntrackLog.Level >= logrus.DebugLevel {
-		common.ConntrackLog.Debugf("%s stucked for %d ms, less than %d", c.ToString(), stuckDuration, maxAllowStuckTime)
+		common.ConntrackLog.Debugf("%s stucked for %d ms, less than %d", c.ToString(), stuckDuration, ac.Options.MaxAllowStuckTimeMills)
 	}
 	return false
 }
@@ -665,7 +734,7 @@ func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
 	now := time.Now().UnixMilli()
 	headTimeMills := int64(common.NanoToMills(headTime))
-	if !ok || now-headTimeMills > maxAllowStuckTime {
+	if !ok || now-headTimeMills > int64(ac.Options.MaxAllowStuckTimeMills) {
 		sb.RemoveHead()
 		return true
 	} else {

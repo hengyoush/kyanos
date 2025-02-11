@@ -55,7 +55,7 @@ func addNicEventsDiagram(events []common.NicEventDetail, prevNicArrow *diagrams.
 			if isReq || idx > 0 || prevNicArrow.Type != diagrams.DownArrow {
 				connectFunc(prevNicArrow, &nicShape)
 			} else {
-				// 第一个响应到达网卡
+				// first response arrives at nic
 				diagrams.AddToBottom(prevNicArrow, &nicShape)
 			}
 
@@ -85,7 +85,7 @@ func addNicEventsDiagram(events []common.NicEventDetail, prevNicArrow *diagrams.
 	}
 }
 
-func addSocketBufferDiagram(duration int64, prevDiagram *diagrams.Shape, shapes *[]*diagrams.Shape, isReq bool) *diagrams.Shape {
+func addSocketBufferDiagram(duration float64, prevDiagram *diagrams.Shape, shapes *[]*diagrams.Shape, isReq bool) *diagrams.Shape {
 	var arrowType diagrams.ShapeType
 	var connectFunc func(shape *diagrams.Shape, subShape *diagrams.Shape)
 	if isReq {
@@ -95,20 +95,24 @@ func addSocketBufferDiagram(duration int64, prevDiagram *diagrams.Shape, shapes 
 		arrowType = diagrams.LeftArrow
 		connectFunc = diagrams.AddToLeft
 	}
-	lastNicToSocketArrow := diagrams.Shape{
+	lastNicArrow := diagrams.Shape{
 		Content: "",
 		Type:    arrowType,
 	}
 	if prevDiagram != nil {
-		connectFunc(prevDiagram, &lastNicToSocketArrow)
+		connectFunc(prevDiagram, &lastNicArrow)
+	}
+	// no need to draw socket buffer if duration < 0 due to socket event missed or not traced
+	if duration <= 0 {
+		return &lastNicArrow
 	}
 	socketBuffer := diagrams.Shape{
 		Content: fmt.Sprintf(" Socket(used:%.2fms) ",
-			c.ConvertDurationToMillisecondsIfNeeded(float64(duration), false)),
+			c.ConvertDurationToMillisecondsIfNeeded(duration, false)),
 		Type: diagrams.Rectangle,
 	}
 	if prevDiagram != nil {
-		connectFunc(&lastNicToSocketArrow, &socketBuffer)
+		connectFunc(&lastNicArrow, &socketBuffer)
 	}
 	socketToAppArrow := diagrams.Shape{
 		Content: "",
@@ -117,7 +121,7 @@ func addSocketBufferDiagram(duration int64, prevDiagram *diagrams.Shape, shapes 
 	connectFunc(&socketBuffer, &socketToAppArrow)
 	defer func() {
 		if prevDiagram != nil {
-			*shapes = append(*shapes, &lastNicToSocketArrow, &socketBuffer)
+			*shapes = append(*shapes, &lastNicArrow, &socketBuffer)
 		} else {
 			*shapes = append(*shapes, &socketBuffer)
 		}
@@ -144,7 +148,7 @@ func ViewRecordTimeDetailAsFlowChartForServer(r *common.AnnotatedRecord) string 
 	shapes := make([]*diagrams.Shape, 0)
 	diagram := diagrams.New()
 	lastNicShape, _ := addNicEventsDiagram(r.ReqNicEventDetails, nil, 0, &shapes, true)
-	socketToAppArrow := addSocketBufferDiagram(int64(r.CopyToSocketBufferDuration), lastNicShape, &shapes, true)
+	socketToAppArrow := addSocketBufferDiagram(r.CopyToSocketBufferDuration, lastNicShape, &shapes, true)
 	shapes = append(shapes, socketToAppArrow)
 	applicationStart := diagrams.Shape{
 		Content: fmt.Sprintf(" Process(used:%.2fms) ", c.ConvertDurationToMillisecondsIfNeeded(r.ReadFromSocketBufferDuration, false)),
@@ -234,7 +238,7 @@ func ViewRecordTimeDetailAsFlowChartForClientSide(r *common.AnnotatedRecord) str
 	}
 	diagrams.AddToBottom(lastNicShape, &lastNicToBottomArrow)
 	lastNicShape, _ = addNicEventsDiagram(r.RespNicEventDetails, &lastNicToBottomArrow, lastNicTs, &shapes, false)
-	socketBufferToLeftArrow := addSocketBufferDiagram(int64(r.CopyToSocketBufferDuration), lastNicShape, &shapes, false)
+	socketBufferToLeftArrow := addSocketBufferDiagram(r.CopyToSocketBufferDuration, lastNicShape, &shapes, false)
 
 	applicationEnd := diagrams.Shape{
 		Content: fmt.Sprintf(" Process(used:%.2fms) ",

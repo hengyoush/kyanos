@@ -143,18 +143,6 @@ struct sock_key {
 #define FUNC_NAME_LIMIT 16 
 #define CMD_LEN 16 
 
-// struct event {
-// 	pid_t pid;
-// 	uint32_t init_seq;
-// 	uint32_t tcp_seq;
-// 	struct sock_key *key;
-// 	uint32_t cur_seq;
-// 	uint32_t data_len;
-// 	bool is_sample;
-// 	__u64 ts;
-// 	uint32_t inode;
-// };
-
 
 struct upid_t {
   union {
@@ -183,12 +171,14 @@ struct kern_evt {
 	char func_name[FUNC_NAME_LIMIT];
 	uint64_t ts;
 	uint32_t ts_delta;
-	uint64_t seq;
+	uint32_t seq;
 	uint32_t len;
   uint8_t flags;
+  bool prepend_length_header;
 	uint32_t ifindex;
   struct conn_id_s_t conn_id_s;
   enum step_t step;
+  uint32_t length_header;
 };
 
 struct first_packet_evt {
@@ -208,7 +198,7 @@ struct kern_evt_data {
 };
 struct kern_evt_ssl_data {
   struct kern_evt ke;
-	uint64_t syscall_seq;
+	uint32_t syscall_seq;
 	uint32_t syscall_len;
   uint32_t buf_size;
   char msg[MAX_MSG_SIZE];
@@ -391,8 +381,8 @@ struct {													\
 
 
 #define IP_H_LEN	(sizeof(struct iphdr))
-#define PROTOCOL_VEC_LIMIT 3
-#define LOOP_LIMIT 2
+#define PROTOCOL_VEC_LIMIT 1
+#define LOOP_LIMIT 3
 
 
 #define TP_ARGS(dst, idx, ctx) \

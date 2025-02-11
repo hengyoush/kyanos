@@ -102,6 +102,7 @@ type GoTlsMapSpecs struct {
 	ActiveSslReadArgsMap  *ebpf.MapSpec `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.MapSpec `ebpf:"active_ssl_write_args_map"`
 	ActiveTlsConnOpMap    *ebpf.MapSpec `ebpf:"active_tls_conn_op_map"`
+	ConnEvtMap            *ebpf.MapSpec `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
 	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
@@ -144,6 +145,7 @@ type GoTlsMaps struct {
 	ActiveSslReadArgsMap  *ebpf.Map `ebpf:"active_ssl_read_args_map"`
 	ActiveSslWriteArgsMap *ebpf.Map `ebpf:"active_ssl_write_args_map"`
 	ActiveTlsConnOpMap    *ebpf.Map `ebpf:"active_tls_conn_op_map"`
+	ConnEvtMap            *ebpf.Map `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
 	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
@@ -169,6 +171,7 @@ func (m *GoTlsMaps) Close() error {
 		m.ActiveSslReadArgsMap,
 		m.ActiveSslWriteArgsMap,
 		m.ActiveTlsConnOpMap,
+		m.ConnEvtMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
 		m.FilterMntnsMap,

@@ -153,7 +153,7 @@ func TestParseResponse(t *testing.T) {
 
 	parser := protocol.HTTPStreamParser{}
 
-	parseResult := parser.ParseResponse(httpMessage, protocol.Response, 10, 20)
+	parseResult := parser.ParseResponse(httpMessage, protocol.Response, 10, 20, buffer)
 
 	assert.Equal(t, protocol.Success, parseResult.ParseState)
 	assert.Equal(t, 1, len(parseResult.ParsedMessages))
