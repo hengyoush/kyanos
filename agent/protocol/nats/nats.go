@@ -49,11 +49,14 @@ func init() {
 func (parser *NatsStreamParser) Match(reqStreams map[protocol.StreamId]*protocol.ParsedMessageQueue, respStreams map[protocol.StreamId]*protocol.ParsedMessageQueue) []protocol.Record {
 	records := make([]protocol.Record, 0)
 
+	// PUB,HPUB/MSG,HMSG;PING/PONG
 	for _, id := range []protocol.StreamId{0, 1} {
 		if records_ := match(reqStreams, respStreams, id); len(records_) > 0 {
 			records = append(records, records_...)
 		}
 	}
+	// Other
+	clear(reqStreams, respStreams, 2)
 	return records
 }
 func match(reqStreams map[protocol.StreamId]*protocol.ParsedMessageQueue, respStreams map[protocol.StreamId]*protocol.ParsedMessageQueue, id protocol.StreamId) []protocol.Record {
@@ -64,9 +67,32 @@ func match(reqStreams map[protocol.StreamId]*protocol.ParsedMessageQueue, respSt
 	}
 	return protocol.MatchByTimestamp(reqStream, respStream)
 }
+func clear(reqStreams map[protocol.StreamId]*protocol.ParsedMessageQueue, respStreams map[protocol.StreamId]*protocol.ParsedMessageQueue, id protocol.StreamId) {
+	if reqStream, ok := reqStreams[id]; ok {
+		*reqStream = (*reqStream)[:0]
+	}
+	if respStream, ok := respStreams[id]; ok {
+		*respStream = (*respStream)[:0]
+	}
+}
 
 func (parser *NatsStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType, startPos int) int {
-	return 0
+	buffer := streamBuffer.Head().Buffer()
+	stream := strings.ToUpper(string(buffer[startPos:]))
+
+	boundary := -1
+	for key, parser := range natsParsersMap {
+		if index := strings.Index(stream, key); index >= 0 {
+			if parser().CheckBoundary(stream, index+len(key)) {
+				boundary = startPos + index
+				break
+			} else {
+				continue
+			}
+		}
+	}
+	common.ProtocolParserLog.Debugf("NATSStreamParser FindBoundary: %d, %s", boundary, stream)
+	return boundary
 }
 
 func (parser *NatsStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, messageType protocol.MessageType) protocol.ParseResult {
@@ -92,14 +118,14 @@ func (parser *NatsStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, m
 		}
 	}
 	offset := index - len(method)
-	msg, prasedLen := natsParser.Parse(buffer[offset:], messageType)
-	if prasedLen < 0 {
+	msg, parsedLen := natsParser.Parse(buffer[offset:], messageType)
+	if parsedLen < 0 {
 		return protocol.ParseResult{ParseState: protocol.NeedsMoreData}
 	}
 	if msg == nil {
-		return protocol.ParseResult{ParseState: protocol.Ignore, ReadBytes: prasedLen + offset}
+		return protocol.ParseResult{ParseState: protocol.Ignore, ReadBytes: parsedLen + offset}
 	}
-	return msg.packFrameBase(streamBuffer, prasedLen+offset)
+	return msg.packFrameBase(streamBuffer, parsedLen+offset)
 }
 
 func readField(buffer []byte) int {
@@ -135,10 +161,14 @@ func (msg *NatsMessage) IsReq() bool {
 }
 
 func (msg *NatsMessage) StreamId() protocol.StreamId {
-	if msg.ProtocolCode == PING || msg.ProtocolCode == PONG {
+	switch msg.ProtocolCode {
+	case MSG, HMSG, PUB, HPUB:
+		return 0
+	case PING, PONG:
 		return 1
+	default:
+		return 2
 	}
-	return 0
 }
 
 func (msg *NatsMessage) packFrameBase(streamBuffer *buffer.StreamBuffer, readBytes int) protocol.ParseResult {
@@ -160,6 +190,9 @@ func (m *Info) String() string {
 	return fmt.Sprintf("Protocol:INFO,ServerID:%v,ServerName:%v,Version:%v,GoVersion:%v,Host:%v,Port:%v,MaxPayload:%v,TLSRequired:%v",
 		m.ServerID, m.ServerName, m.Version, m.GoVersion, m.Host, m.Port, m.MaxPayload, m.TLSRequired)
 }
+func (m *Info) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Info) ParseData(payload []byte) (*Info, int) {
 	// INFO {"option_name":option_value,...}␍␊
 	packetLen := readLine(payload)
@@ -170,9 +203,6 @@ func (m *Info) ParseData(payload []byte) (*Info, int) {
 	if len(parts) != 2 {
 		return nil, packetLen
 	}
-	// if strings.ToUpper(string(parts[0])) != "INFO" {
-	// 	return nil, packetLen
-	// }
 
 	msg := Info{}
 	err := json.Unmarshal(parts[1], &msg)
@@ -187,12 +217,12 @@ func (m *Info) ParseData(payload []byte) (*Info, int) {
 }
 func (m *Info) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Info:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Info:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Info:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Connect
@@ -200,7 +230,9 @@ func (m *Connect) String() string {
 	return fmt.Sprintf("Protocol:CONNECT,Verbose:%v,Pedantic:%v,TLSRequired:%v,Name:%v,Version:%v",
 		m.Verbose, m.Pedantic, m.TLSRequired, m.Name, m.Version)
 }
-
+func (m *Connect) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Connect) ParseData(payload []byte) (*Connect, int) {
 	// CONNECT {"option_name":option_value,...}␍␊
 	packetLen := readLine(payload)
@@ -211,9 +243,6 @@ func (m *Connect) ParseData(payload []byte) (*Connect, int) {
 	if len(parts) != 2 {
 		return nil, packetLen
 	}
-	// if strings.ToUpper(string(parts[0])) != "CONNECT" {
-	// 	return nil, packetLen
-	// }
 
 	msg := Connect{}
 	err := json.Unmarshal(parts[1], &msg)
@@ -229,19 +258,21 @@ func (m *Connect) ParseData(payload []byte) (*Connect, int) {
 
 func (m *Connect) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Connect:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Connect:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Connect:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Pub
 func (m *Pub) String() string {
 	return fmt.Sprintf("Protocol:PUB,Subject:%v,ReplyTo:%v,PayloadSize:%d,Payload:%x", m.Subject, m.ReplyTo, m.PayloadSize, m.Payload)
 }
-
+func (m *Pub) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Pub) ParseData(payload []byte) (*Pub, int) {
 	// PUB <subject> [reply-to] <#bytes>␍␊[payload]␍␊
 	packetLen := readLine(payload)
@@ -252,9 +283,6 @@ func (m *Pub) ParseData(payload []byte) (*Pub, int) {
 	if len(parts) < 3 || len(parts) > 4 {
 		return nil, packetLen
 	}
-	// if strings.ToUpper(string(parts[0])) != "PUB" {
-	// 	return nil, packetLen
-	// }
 
 	msg := Pub{}
 	msg.Subject = string(parts[1])
@@ -287,12 +315,12 @@ func (m *Pub) ParseData(payload []byte) (*Pub, int) {
 
 func (m *Pub) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Pub:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Pub:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Pub:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Hpub
@@ -300,7 +328,9 @@ func (m *Hpub) String() string {
 	return fmt.Sprintf("Protocol:HPUB,Subject:%v,ReplyTo:%v,HeaderSize:%d,PayloadSize:%d,HeaderVersion:%v,Headers:%v,Payload:%x",
 		m.Subject, m.ReplyTo, m.HeaderSize, m.PayloadSize, m.HeaderVersion, m.Headers, m.Payload)
 }
-
+func (m *Hpub) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Hpub) ParseData(payload []byte) (*Hpub, int) {
 	// HPUB <subject> [reply-to] <#header bytes> <#total bytes>␍␊[headers]␍␊␍␊[payload]␍␊
 	packetLen := readLine(payload)
@@ -311,9 +341,6 @@ func (m *Hpub) ParseData(payload []byte) (*Hpub, int) {
 	if len(parts) < 4 || len(parts) > 5 {
 		return nil, packetLen
 	}
-	// if strings.ToUpper(string(parts[0])) != "HPUB" {
-	// 	return nil, packetLen
-	// }
 
 	msg := Hpub{}
 	msg.Subject = string(parts[1])
@@ -350,12 +377,12 @@ func (m *Hpub) ParseData(payload []byte) (*Hpub, int) {
 		if len(line) == 0 {
 			continue
 		}
-		parts := bytes.SplitN(line, []byte(":"), 2)
-		if len(parts) != 2 {
+		key, value, ok := strings.Cut(string(line), ":")
+		if !ok {
 			continue
 		}
-		key := string(bytes.TrimSpace(parts[0]))
-		value := string(bytes.TrimSpace(parts[1]))
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
 
 		if _, ok := msg.Headers[key]; !ok {
 			msg.Headers[key] = []string{}
@@ -374,12 +401,12 @@ func (m *Hpub) ParseData(payload []byte) (*Hpub, int) {
 
 func (m *Hpub) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Hpub:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Hpub:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Hpub:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Sub
@@ -387,7 +414,9 @@ func (m *Sub) String() string {
 	return fmt.Sprintf("Protocol:SUB,Subject:%v,QueueGroup:%v,Sid:%v",
 		m.Subject, m.QueueGroup, m.Sid)
 }
-
+func (m *Sub) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Sub) ParseData(payload []byte) (*Sub, int) {
 	// SUB <subject> [queue group] <sid>␍␊
 	packetLen := readLine(payload)
@@ -398,9 +427,6 @@ func (m *Sub) ParseData(payload []byte) (*Sub, int) {
 	if len(parts) < 3 || len(parts) > 4 {
 		return nil, packetLen
 	}
-	// if strings.ToUpper(string(parts[0])) != "SUB" {
-	// 	return nil, packetLen
-	// }
 
 	msg := Sub{}
 	msg.Subject = string(parts[1])
@@ -421,12 +447,12 @@ func (m *Sub) ParseData(payload []byte) (*Sub, int) {
 
 func (m *Sub) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Sub:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Sub:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Sub:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Unsub
@@ -434,7 +460,9 @@ func (m *Unsub) String() string {
 	return fmt.Sprintf("Protocol:UNSUB,Sid:%v,MaxMsgs:%v",
 		m.Sid, m.MaxMsgs)
 }
-
+func (m *Unsub) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Unsub) ParseData(payload []byte) (*Unsub, int) {
 	// UNSUB <sid> [max_msgs]␍␊
 	packetLen := readLine(payload)
@@ -445,9 +473,6 @@ func (m *Unsub) ParseData(payload []byte) (*Unsub, int) {
 	if len(parts) < 2 || len(parts) > 3 {
 		return nil, packetLen
 	}
-	// if strings.ToUpper(string(parts[0])) != "UNSUB" {
-	// 	return nil, packetLen
-	// }
 
 	msg := Unsub{}
 	msg.Sid = string(parts[1])
@@ -468,12 +493,12 @@ func (m *Unsub) ParseData(payload []byte) (*Unsub, int) {
 
 func (m *Unsub) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Unsub:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Unsub:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Unsub:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Msg
@@ -481,7 +506,9 @@ func (m *Msg) String() string {
 	return fmt.Sprintf("Protocol:MSG,Subject:%v,Sid:%v,ReplyTo:%v,PayloadSize:%d,Payload:%x",
 		m.Subject, m.Sid, m.ReplyTo, m.PayloadSize, m.Payload)
 }
-
+func (m *Msg) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Msg) ParseData(payload []byte) (*Msg, int) {
 	// MSG <subject> <sid> [reply-to] <#bytes>␍␊[payload]␍␊
 	packetLen := readLine(payload)
@@ -492,9 +519,6 @@ func (m *Msg) ParseData(payload []byte) (*Msg, int) {
 	if len(parts) < 4 || len(parts) > 5 {
 		return nil, packetLen
 	}
-	// if strings.ToUpper(string(parts[0])) != "MSG" {
-	// 	return nil, packetLen
-	// }
 
 	msg := Msg{}
 	msg.Subject = string(parts[1])
@@ -529,12 +553,12 @@ func (m *Msg) ParseData(payload []byte) (*Msg, int) {
 
 func (m *Msg) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Msg:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Msg:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Msg:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Hmsg
@@ -542,7 +566,9 @@ func (m *Hmsg) String() string {
 	return fmt.Sprintf("Protocol:HMSG,Subject:%v,Sid:%v,ReplyTo:%v,HeaderSize:%d,PayloadSize:%d,HeaderVersion:%v,Headers:%v,Payload:%x",
 		m.Subject, m.Sid, m.ReplyTo, m.HeaderSize, m.PayloadSize, m.HeaderVersion, m.Headers, m.Payload)
 }
-
+func (m *Hmsg) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Hmsg) ParseData(payload []byte) (*Hmsg, int) {
 	// HMSG <subject> <sid> [reply-to] <#header bytes> <#total bytes>␍␊[headers]␍␊␍␊[payload]␍␊
 	packetLen := readLine(payload)
@@ -553,9 +579,6 @@ func (m *Hmsg) ParseData(payload []byte) (*Hmsg, int) {
 	if len(parts) < 5 || len(parts) > 6 {
 		return nil, packetLen
 	}
-	// if strings.ToUpper(string(parts[0])) != "HMSG" {
-	// 	return nil, packetLen
-	// }
 
 	msg := Hmsg{}
 	msg.Subject = string(parts[1])
@@ -593,12 +616,12 @@ func (m *Hmsg) ParseData(payload []byte) (*Hmsg, int) {
 		if len(line) == 0 {
 			continue
 		}
-		parts := bytes.SplitN(line, []byte(":"), 2)
-		if len(parts) != 2 {
+		key, value, ok := strings.Cut(string(line), ":")
+		if !ok {
 			continue
 		}
-		key := string(bytes.TrimSpace(parts[0]))
-		value := string(bytes.TrimSpace(parts[1]))
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
 
 		if _, ok := msg.Headers[key]; !ok {
 			msg.Headers[key] = []string{}
@@ -617,19 +640,21 @@ func (m *Hmsg) ParseData(payload []byte) (*Hmsg, int) {
 
 func (m *Hmsg) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Hmsg:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Hmsg:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Hmsg:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Ping
 func (m *Ping) String() string {
 	return "Protocol:PING"
 }
-
+func (m *Ping) CheckBoundary(stream string, pos int) bool {
+	return true
+}
 func (m *Ping) ParseData(payload []byte) (*Ping, int) {
 	// PING␍␊
 	packetLen := readLine(payload)
@@ -639,9 +664,6 @@ func (m *Ping) ParseData(payload []byte) (*Ping, int) {
 	if packetLen < 6 {
 		return nil, packetLen
 	}
-	// if !strings.HasPrefix(strings.ToUpper(string(payload[:4])), "PING") {
-	// 	return nil, packetLen
-	// }
 
 	msg := Ping{}
 
@@ -653,19 +675,21 @@ func (m *Ping) ParseData(payload []byte) (*Ping, int) {
 
 func (m *Ping) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Ping:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Ping:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Ping:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Pong
 func (m *Pong) String() string {
 	return "Protocol:PONG"
 }
-
+func (m *Pong) CheckBoundary(stream string, pos int) bool {
+	return true
+}
 func (m *Pong) ParseData(payload []byte) (*Pong, int) {
 	// PONG␍␊
 	packetLen := readLine(payload)
@@ -675,9 +699,6 @@ func (m *Pong) ParseData(payload []byte) (*Pong, int) {
 	if packetLen < 6 {
 		return nil, packetLen
 	}
-	// if !strings.HasPrefix(strings.ToUpper(string(payload[:4])), "PONG") {
-	// 	return nil, packetLen
-	// }
 
 	msg := Pong{}
 
@@ -689,19 +710,21 @@ func (m *Pong) ParseData(payload []byte) (*Pong, int) {
 
 func (m *Pong) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Pong:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Pong:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Pong:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Ok
 func (m *Ok) String() string {
 	return "Protocol:+OK"
 }
-
+func (m *Ok) CheckBoundary(stream string, pos int) bool {
+	return true
+}
 func (m *Ok) ParseData(payload []byte) (*Ok, int) {
 	// +OK␍␊
 	packetLen := readLine(payload)
@@ -711,9 +734,6 @@ func (m *Ok) ParseData(payload []byte) (*Ok, int) {
 	if packetLen < 5 {
 		return nil, packetLen
 	}
-	// if !strings.HasPrefix(strings.ToUpper(string(payload[:3])), "+OK") {
-	// 	return nil, packetLen
-	// }
 
 	msg := Ok{}
 
@@ -725,19 +745,21 @@ func (m *Ok) ParseData(payload []byte) (*Ok, int) {
 
 func (m *Ok) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Ok:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Ok:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Ok:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }
 
 // Err
 func (m *Err) String() string {
 	return fmt.Sprintf("Protocol:-ERR,ErrorMessage:%v", m.ErrorMessage)
 }
-
+func (m *Err) CheckBoundary(stream string, pos int) bool {
+	return len(stream) > pos && (stream[pos] == ' ' || stream[pos] == '\t')
+}
 func (m *Err) ParseData(payload []byte) (*Err, int) {
 	// -ERR <error message>␍␊
 	packetLen := readLine(payload)
@@ -747,9 +769,6 @@ func (m *Err) ParseData(payload []byte) (*Err, int) {
 	if packetLen < 6 {
 		return nil, packetLen
 	}
-	// if !strings.HasPrefix(strings.ToUpper(string(payload[:4])), "-ERR") {
-	// 	return nil, packetLen
-	// }
 
 	msg := Err{}
 	msg.ErrorMessage = string(trimFiled(payload[5 : packetLen-len(_CRLF_)]))
@@ -762,10 +781,10 @@ func (m *Err) ParseData(payload []byte) (*Err, int) {
 
 func (m *Err) Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int) {
 	common.ProtocolParserLog.Debugf("NATS Parse Err:%d, %x", len(payload), string(payload))
-	msg, prasedLen := m.ParseData(payload)
-	if prasedLen < 0 || msg == nil {
-		return nil, prasedLen
+	msg, parsedLen := m.ParseData(payload)
+	if parsedLen < 0 || msg == nil {
+		return nil, parsedLen
 	}
-	common.ProtocolParserLog.Debugf("NATS Parsed Err:[%v], ReadBytes:%d", msg.String(), prasedLen)
-	return &msg.NatsMessage, prasedLen
+	common.ProtocolParserLog.Debugf("NATS Parsed Err:[%v], ReadBytes:%d", msg.String(), parsedLen)
+	return &msg.NatsMessage, parsedLen
 }

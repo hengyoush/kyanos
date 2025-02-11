@@ -21,6 +21,7 @@ type NatsMessage struct {
 
 type NatsProtocolParser interface {
 	Parse(payload []byte, messageType protocol.MessageType) (*NatsMessage, int)
+	CheckBoundary(stream string, pos int) bool
 }
 
 type Info struct {

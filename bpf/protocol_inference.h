@@ -128,11 +128,11 @@ static __always_inline enum message_type_t is_http_protocol(const char *old_buf,
 }
 
 static __always_inline bool is_nats_info(const char *old_buf, size_t count) {
-  if (count < 6)
+  if (count < 20)
     return false;
 
   char buf[20];
-  bpf_probe_read_user(buf, 5, old_buf);
+  bpf_probe_read_user(buf, 20, old_buf);
   // info
   if ((buf[0] != 'I' && buf[0] != 'i') || (buf[1] != 'N' && buf[1] != 'n') ||
       (buf[2] != 'F' && buf[2] != 'f') || (buf[3] != 'O' && buf[3] != 'o') ||
@@ -142,10 +142,6 @@ static __always_inline bool is_nats_info(const char *old_buf, size_t count) {
 
   // NATS allows arbitrary whitespace after INFO
   // we only check the first 20 bytes due to eBPF limitations
-  if (count < 20)
-    return false;
-  bpf_probe_read_user(buf, 20, old_buf);
-
 #pragma unroll
   for (size_t p = 5; p < 20; p++) {
     if (buf[p] == '{')
@@ -157,11 +153,11 @@ static __always_inline bool is_nats_info(const char *old_buf, size_t count) {
 }
 
 static __always_inline bool is_nats_connect(const char *old_buf, size_t count) {
-  if (count < 8)
+  if (count < 20)
     return false;
 
   char buf[20];
-  bpf_probe_read_user(buf, 8, old_buf);
+  bpf_probe_read_user(buf, 20, old_buf);
   // connect
   if ((buf[0] != 'C' && buf[0] != 'c') || (buf[1] != 'O' && buf[1] != 'o') ||
       (buf[2] != 'N' && buf[2] != 'n') || (buf[3] != 'N' && buf[3] != 'n') ||
@@ -172,10 +168,6 @@ static __always_inline bool is_nats_connect(const char *old_buf, size_t count) {
 
   // NATS allows arbitrary whitespace after CONNECT
   // we only check the first 20 bytes due to eBPF limitations
-  if (count < 20)
-    return false;
-  bpf_probe_read_user(buf, 20, old_buf);
-
 #pragma unroll
   for (size_t p = 8; p < 20; p++) {
     if (buf[p] == '{')
