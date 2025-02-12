@@ -2,6 +2,7 @@ package uprobe
 
 import (
 	"debug/elf"
+	"errors"
 	"fmt"
 	ac "kyanos/agent/common"
 	"kyanos/bpf"
@@ -21,6 +22,11 @@ var uprobeLinks []link.Link = make([]link.Link, 0)
 
 func StartHandleSchedExecEvent(ch chan *bpf.AgentProcessExecEvent) {
 	go func() {
+		filterByPIDEnabled, err := checkFilterByPIDEnabled()
+		if err != nil {
+			common.AgentLog.Logger.Error(err)
+			return
+		}
 		for event := range ch {
 			go func(e *bpf.AgentProcessExecEvent) {
 				// Delay some time to give the process time to map the SSL library
@@ -28,13 +34,49 @@ func StartHandleSchedExecEvent(ch chan *bpf.AgentProcessExecEvent) {
 				// at the start time.
 				// TODO: There may be a better way to handle this.
 				time.Sleep(1000 * time.Millisecond)
-				handleSchedExecEvent(e)
+				handleSchedExecEvent(filterByPIDEnabled, e)
 			}(event)
 		}
 	}()
 }
 
-func handleSchedExecEvent(event *bpf.AgentProcessExecEvent) {
+func checkFilterByPIDEnabled() (bool, error) {
+	var controlValues *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "ControlValues")
+	var enabledValue int8
+	if err := controlValues.Lookup(bpf.AgentControlValueIndexTKEnableFilterByPid, enabledValue); err != nil {
+		if errors.Is(err, ebpf.ErrKeyNotExist) {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("lookup filter enable flag failed: %w", err)
+		}
+	}
+	return enabledValue != 0, nil
+}
+
+func isPIDInFilter(pid int32) (bool, error) {
+	var filterPIDMap *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap")
+	var existsFlag int8
+	if err := filterPIDMap.Lookup(&pid, &existsFlag); err != nil {
+		if errors.Is(err, ebpf.ErrKeyNotExist) {
+			return false, nil
+		} else {
+			return false, fmt.Errorf("pid %d filter lookup failed: %w", pid, err)
+		}
+	}
+	return existsFlag != 0, nil
+}
+
+func handleSchedExecEvent(filterByPIDEnabled bool, event *bpf.AgentProcessExecEvent) {
+	if filterByPIDEnabled {
+		pidMatches, err := isPIDInFilter(event.Pid)
+		if err != nil {
+			common.UprobeLog.Errorf("PID filter check failed for %d: %v", event.Pid, err)
+			return
+		}
+		if !pidMatches {
+			return
+		}
+	}
 	links, err := AttachSslUprobe(int(event.Pid))
 	var procName string
 	if proc, err := process.NewProcess(event.Pid); err == nil {
