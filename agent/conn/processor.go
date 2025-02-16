@@ -339,6 +339,8 @@ func (p *Processor) processOldFirstPacketEvents(recordChannel chan RecordWithCon
 		if now.Sub(event.timestamp) > 100*time.Millisecond {
 			p.processFirstPacketEvent(event.event, recordChannel)
 			p.tempFirstPacketEvents.Read()
+		} else {
+			break
 		}
 	}
 }
@@ -464,7 +466,6 @@ func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChann
 	conn := p.connManager.LookupConnection4ByTimestamp(tgidFd, event.SyscallEvent.GetEndTs())
 
 	timeCheck := conn != nil && conn.timeBoundCheck(event.SyscallEvent.GetEndTs())
-
 	if conn == nil {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
 			common.BPFEventLog.Debugf("[syscall][no conn][ts=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
