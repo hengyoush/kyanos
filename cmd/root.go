@@ -100,7 +100,7 @@ func init() {
 	// internal
 	rootCmd.PersistentFlags().BoolVar(&options.PerformanceMode, "performance-mode", true, "--performance false")
 	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "kern-perf-event-buffer-size", 1*1024*1024, "--kern-perf-event-buffer-size 1024")
-	rootCmd.PersistentFlags().IntVar(&KernEvtPerfEventBufferSize, "data-perf-event-buffer-size", 30*1024*1024, "--data-perf-event-buffer-size 1024")
+	rootCmd.PersistentFlags().IntVar(&DataEvtPerfEventBufferSize, "data-perf-event-buffer-size", 30*1024*1024, "--data-perf-event-buffer-size 1024")
 	rootCmd.PersistentFlags().IntVar(&options.ConntrackCloseWaitTimeMills, "conntrack-close-wait-time-mills", 100, "--conntrack-close-wait-time-mills 100")
 	rootCmd.PersistentFlags().IntVar(&options.MaxAllowStuckTimeMills, "max-allow-stuck-time-mills", 1000, "--max-allow-stuck-time-mills 100")
 
