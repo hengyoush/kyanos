@@ -149,7 +149,7 @@ func BEndianBytesToInt[TIntType int32 | uint32 | uint8](d *BinaryDecoder) TIntTy
 
 func LEndianBytesToInt[TIntType int32 | uint32 | uint8](d *BinaryDecoder) TIntType {
 	typeSize := int(reflect.TypeOf(TIntType(0)).Size())
-	if len(d.str) < 4 {
+	if len(d.str) < typeSize {
 		return 0
 	}
 	var x TIntType = 0

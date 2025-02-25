@@ -127,7 +127,7 @@ static __inline bool should_trace_conn(struct conn_info_t *conn_info) {
 	return conn_info->protocol != kProtocolUnknown && conn_info->no_trace <= traceable ;
 }
 
-static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, uint32_t ts_delta, enum source_function_t source_fn) {
+static void __always_inline report_syscall_buf_without_data(void* ctx, uint32_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, uint32_t ts_delta, enum source_function_t source_fn) {
 	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
 		return;
@@ -154,7 +154,7 @@ static void __always_inline report_syscall_buf_without_data(void* ctx, uint64_t 
 	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t);
 	bpf_perf_event_output(ctx, &syscall_rb, BPF_F_CURRENT_CPU, evt, __len);
 }
-static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len,
+static void __always_inline report_syscall_buf(void* ctx, uint32_t seq, struct conn_id_s_t *conn_id_s, size_t len,
  enum step_t step, uint64_t ts, uint32_t ts_delta, const char* buf, enum source_function_t source_fn, bool prepend_length_header, uint32_t length_header) {
 	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
@@ -200,11 +200,11 @@ static void __always_inline report_syscall_buf(void* ctx, uint64_t seq, struct c
 
 	// bpf_printk("len:%d, amount_copied:%d", len, amount_copied);
 }
-static void __always_inline report_syscall_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args, bool prepend_length_header, uint32_t length_header) {
+static void __always_inline report_syscall_evt(void* ctx, uint32_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args, bool prepend_length_header, uint32_t length_header) {
 	report_syscall_buf(ctx, seq, conn_id_s, len, step, args->start_ts, args->end_ts - args->start_ts, args->buf, args->source_fn, prepend_length_header, length_header);
 }
 
-static void __always_inline report_ssl_buf(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, uint32_t ts_delta, const char* buf, enum source_function_t source_fn, uint32_t syscall_seq, uint32_t syscall_len) {
+static void __always_inline report_ssl_buf(void* ctx, uint32_t seq, struct conn_id_s_t *conn_id_s, size_t len, enum step_t step, uint64_t ts, uint32_t ts_delta, const char* buf, enum source_function_t source_fn, uint32_t syscall_seq, uint32_t syscall_len) {
 	size_t _len = len < MAX_MSG_SIZE ? len : MAX_MSG_SIZE;
 	if (_len == 0) {
 		return;
@@ -244,10 +244,10 @@ static void __always_inline report_ssl_buf(void* ctx, uint64_t seq, struct conn_
 	size_t __len = sizeof(struct kern_evt) + sizeof(uint32_t) + sizeof(uint64_t)+ sizeof(uint32_t) + amount_copied;
 	bpf_perf_event_output(ctx, &ssl_rb, BPF_F_CURRENT_CPU, evt, __len);
 }
-static void __always_inline report_ssl_evt(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args, uint32_t syscall_seq, uint32_t syscall_len) {
+static void __always_inline report_ssl_evt(void* ctx, uint32_t seq, struct conn_id_s_t *conn_id_s, uint32_t len, enum step_t step, struct data_args *args, uint32_t syscall_seq, uint32_t syscall_len) {
 	report_ssl_buf(ctx, seq, conn_id_s, len, step, args->start_ts, args->end_ts - args->start_ts, args->buf, args->source_fn, syscall_seq, syscall_len);
 }
-static void __always_inline report_syscall_evt_vecs(void* ctx, uint64_t seq, struct conn_id_s_t *conn_id_s, uint32_t total_size, enum step_t step, struct data_args *args, bool prepend_length_header, uint32_t length_header) {
+static void __always_inline report_syscall_evt_vecs(void* ctx, uint32_t seq, struct conn_id_s_t *conn_id_s, uint32_t total_size, enum step_t step, struct data_args *args, bool prepend_length_header, uint32_t length_header) {
 	int bytes_sent = 0;
 #pragma unroll
 	for (int i = 0; i < LOOP_LIMIT && i < args->iovlen && bytes_sent < total_size; ++i) {
@@ -272,7 +272,7 @@ static __inline uint64_t gen_tgid_fd(uint32_t tgid, int fd) {
 static __always_inline void process_sendfile_with_conn_info(void* ctx, struct sendfile_args *args, uint64_t tgid_fd,
  enum traffic_direction_t direct,ssize_t bytes_count, struct conn_info_t* conn_info, int32_t syscall_len, bool is_ssl, bool with_data) {
 
-	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+	uint32_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 	struct conn_id_s_t conn_id_s;
 	conn_id_s.tgid_fd = tgid_fd;
 	// conn_id_s.direct = direct;
@@ -309,7 +309,7 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		}
 	}
 	// bpf_printk("start trace data!, bytes_count:%d,func:%d", bytes_count, args->source_fn);
-	uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+	uint32_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 	struct conn_id_s_t conn_id_s;
 	conn_id_s.tgid_fd = tgid_fd;
 	// conn_id_s.direct = direct;
@@ -326,7 +326,7 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		// so when conn_info.protocol is not unknown but the cause of trace state is unknown, we still trace data.
 		 (conn_info->protocol != kProtocolUnknown && conn_info->no_trace == protocol_unknown)) {
 		if (is_ssl) {
-			uint64_t syscall_seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+			uint32_t syscall_seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 			seq = (direct == kEgress ?  conn_info->ssl_write_bytes : conn_info->ssl_read_bytes) + 1;
 			report_ssl_evt(ctx, seq, &conn_id_s, bytes_count, step, args, syscall_len < 0 ? 0 : (syscall_seq - syscall_len), syscall_len < 0 ? 0 : syscall_len);
 			// bpf_printk("SSLreport ssl evt, seq: %lld len: %d, syscall_len:%d", seq, bytes_count, syscall_len);

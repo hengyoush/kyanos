@@ -6,7 +6,6 @@ import (
 	"fmt"
 	anc "kyanos/agent/analysis/common"
 	"kyanos/agent/compatible"
-	"kyanos/agent/conn"
 	"kyanos/agent/metadata"
 	"kyanos/agent/protocol"
 	"kyanos/agent/render/watch"
@@ -19,7 +18,9 @@ import (
 
 type LoadBpfProgramFunction func() *list.List
 type InitCompletedHook func()
-type ConnManagerInitHook func(*conn.ConnManager)
+type ConnManagerInitHook func(any)
+
+var Options *AgentOptions
 
 const perfEventDataBufferSize = 30 * 1024 * 1024
 const perfEventControlBufferSize = 1 * 1024 * 1024
@@ -44,10 +45,11 @@ type AgentOptions struct {
 	anc.AnalysisOptions
 	PerfEventBufferSizeForData  int
 	PerfEventBufferSizeForEvent int
-	DisableOpensslUprobe        bool
 	WatchOptions                watch.WatchOptions
 	PerformanceMode             bool
 	ConntrackCloseWaitTimeMills int
+	MaxAllowStuckTimeMills      int
+	StartGopsServer             bool
 
 	FilterComm              string
 	ProcessExecEventChannel chan *bpf.AgentProcessExecEvent

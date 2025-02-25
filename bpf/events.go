@@ -271,7 +271,7 @@ func parseSslDataEvent(record []byte) (*SslData, error) {
 		return nil, err
 	}
 	msgSize := event.SslEventHeader.BufSize
-	headerSize := uint(unsafe.Sizeof(event.SslEventHeader))
+	headerSize := uint(unsafe.Sizeof(event.SslEventHeader)) - 4
 	buf := make([]byte, msgSize)
 	err = binary.Read(bytes.NewBuffer(record[headerSize:]), binary.LittleEndian, &buf)
 	if err != nil {

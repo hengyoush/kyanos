@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"kyanos/agent/buffer"
+	ac "kyanos/agent/common"
 	"kyanos/agent/protocol"
 	_ "kyanos/agent/protocol/mysql"
 	"kyanos/bpf"
@@ -463,14 +464,14 @@ func (c *Connection4) addDataToBufferAndTryParse(data []byte, ke *bpf.AgentKernE
 	headerEvt := extractHeaderEvent(data, ke, c)
 	if isReq {
 		if headerEvt != nil {
-			c.reqStreamBuffer.Add(headerEvt.SyscallEvent.Ke.Seq, headerEvt.Buf, getEventTimestamp(ke, c, isReq))
+			c.reqStreamBuffer.Add(uint64(headerEvt.SyscallEvent.Ke.Seq), headerEvt.Buf, getEventTimestamp(ke, c, isReq))
 		}
-		addedToBuffer = c.reqStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
+		addedToBuffer = c.reqStreamBuffer.Add(uint64(ke.Seq), data, getEventTimestamp(ke, c, isReq))
 	} else {
 		if headerEvt != nil {
-			c.respStreamBuffer.Add(headerEvt.SyscallEvent.Ke.Seq, headerEvt.Buf, getEventTimestamp(ke, c, isReq))
+			c.respStreamBuffer.Add(uint64(headerEvt.SyscallEvent.Ke.Seq), headerEvt.Buf, getEventTimestamp(ke, c, isReq))
 		}
-		addedToBuffer = c.respStreamBuffer.Add(ke.Seq, data, getEventTimestamp(ke, c, isReq))
+		addedToBuffer = c.respStreamBuffer.Add(uint64(ke.Seq), data, getEventTimestamp(ke, c, isReq))
 	}
 	if !addedToBuffer {
 		return false
@@ -687,7 +688,7 @@ func (c *Connection4) parseStreamBuffer(streamBuffer *buffer.StreamBuffer, messa
 		}
 	}
 	curProgress := streamBuffer.Position0()
-	if streamBuffer.IsEmpty() || curProgress != int(originPos) {
+	if streamBuffer.IsEmpty() || curProgress != originPos {
 		c.updateProgressTime(streamBuffer)
 	}
 	// if parseState == protocol.Invalid {
@@ -710,8 +711,6 @@ func (c *Connection4) getLastProgressTime(sb *buffer.StreamBuffer) int64 {
 	}
 }
 
-const maxAllowStuckTime = 1000000
-
 func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 	if c.getLastProgressTime(sb) == 0 {
 		c.updateProgressTime(sb)
@@ -719,11 +718,11 @@ func (c *Connection4) progressIsStucked(sb *buffer.StreamBuffer) bool {
 	}
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
 	stuckDuration := time.Now().UnixMilli() - int64(common.NanoToMills(headTime))
-	if !ok || stuckDuration > maxAllowStuckTime {
+	if !ok || stuckDuration > int64(ac.Options.MaxAllowStuckTimeMills) {
 		return true
 	}
 	if common.ConntrackLog.Level >= logrus.DebugLevel {
-		common.ConntrackLog.Debugf("%s stucked for %d ms, less than %d", c.ToString(), stuckDuration, maxAllowStuckTime)
+		common.ConntrackLog.Debugf("%s stucked for %d ms, less than %d", c.ToString(), stuckDuration, ac.Options.MaxAllowStuckTimeMills)
 	}
 	return false
 }
@@ -735,7 +734,7 @@ func (c *Connection4) checkProgress(sb *buffer.StreamBuffer) bool {
 	headTime, ok := sb.FindTimestampBySeq(uint64(sb.Position0()))
 	now := time.Now().UnixMilli()
 	headTimeMills := int64(common.NanoToMills(headTime))
-	if !ok || now-headTimeMills > maxAllowStuckTime {
+	if !ok || now-headTimeMills > int64(ac.Options.MaxAllowStuckTimeMills) {
 		sb.RemoveHead()
 		return true
 	} else {

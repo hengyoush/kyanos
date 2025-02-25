@@ -25,7 +25,7 @@ function test_mysql_server() {
 
     cname='test-mysql'
     docker rm -f $cname || true
-    cid1=$(docker run --name $cname -e MYSQL_ROOT_PASSWORD=123456  -p 3306:3306 -v /opt/docker_v/mysql/conf:/etc/mysql/conf.d -d "$IMAGE_NAME")
+    cid1=$(docker run --name $cname -e MYSQL_ROOT_PASSWORD=123456 -e MYSQL_ROOT_HOST=%  -p 3306:3306 -v /opt/docker_v/mysql/conf:/etc/mysql/conf.d -d "$IMAGE_NAME")
     export cid1
     echo $cid1
 
@@ -57,7 +57,7 @@ function test_mysql_client() {
 
     cname='test-mysql'
     docker rm -f $cname || true
-    cid1=$(docker run --name $cname -e MYSQL_ROOT_PASSWORD=123456  -p 3306:3306 -v /opt/docker_v/mysql/conf:/etc/mysql/conf.d -d "$IMAGE_NAME")
+    cid1=$(docker run --name $cname -e MYSQL_ROOT_PASSWORD=123456 -e MYSQL_ROOT_HOST=%  -p 3306:3306 -v /opt/docker_v/mysql/conf:/etc/mysql/conf.d -d "$IMAGE_NAME")
     export cid1
     echo $cid1
 

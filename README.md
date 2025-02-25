@@ -26,16 +26,20 @@
 
 ## Table of Contents
 
-- [What is kyanos](#-what-is-kyanos)
-- [Examples](#-examples)
-- [Requirements](#-requirements)
-- [How to get kyanos](#-how-to-get-kyanos)
-- [Documentation](#-documentation)
-- [Usage](#-usage)
-- [How to build](#-how-to-build)
-- [Feedback and Contributions](#-feedback-and-contributions)
-- [Special Thanks](#-special-thanks)
-- [Contacts](#%EF%B8%8F-contacts)
+- [kyanos](#kyanos)
+  - [Table of Contents](#table-of-contents)
+  - [What is kyanos](#what-is-kyanos)
+  - [Examples](#examples)
+  - [❗ Requirements](#-requirements)
+  - [🎯 How to get kyanos](#-how-to-get-kyanos)
+  - [📝 Documentation](#-documentation)
+  - [⚙ Usage](#-usage)
+  - [🏠 How to build](#-how-to-build)
+  - [Roadmap](#roadmap)
+  - [🤝 Feedback and Contributions](#-feedback-and-contributions)
+  - [🙇‍ Special Thanks](#-special-thanks)
+  - [🗨️ Contacts](#️-contacts)
+  - [Star History](#star-history)
 
 ## What is kyanos
 
@@ -206,14 +210,12 @@ The Kyanos Roadmap shows the future plans for Kyanos. If you have feature
 requests or want to prioritize a specific feature, please submit an issue on
 GitHub.
 
-_1.5.0_
+_1.6.0_
 
-1. Support for openssl 3.4.0
-2. Support for parsing ipip packets
-3. Support for filtering data based on process name
-4. Support for postgresql protocol parsing
-5. Support for kafka protocol parsing
-6. Full support for ipv6
+1. Support for postgresql protocol parsing.
+2. Support for HTTP2 protocol parsing.
+3. Support for DNS protocol parsing.
+4. Support for GnuTLS.
 
 ## 🤝 Feedback and Contributions
 
@@ -235,7 +237,6 @@ projects:
 
 For more detailed inquiries, you can use the following contact methods:
 
-- **Twitter:** [https://x.com/kyanos_github](https://x.com/kyanos_github)
 - **My Email:** [hengyoush1@163.com](mailto:hengyoush1@163.com)
 - **My Blog:** [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)
 

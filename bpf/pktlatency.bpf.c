@@ -214,7 +214,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 	u32 tcpseq = 0;
 	BPF_CORE_READ_INTO(&tcpseq, tcp, seq);
 	tcpseq  = bpf_htonl(tcpseq);
-	uint64_t relative_seq = (uint64_t)(tcpseq - seq); 
+	uint32_t relative_seq = (uint32_t)(tcpseq - seq); 
 
 	
 	u32 doff = 0;
@@ -253,7 +253,7 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 		bpf_probe_read_kernel(&evt->flags, sizeof(uint8_t), &(((u8 *)tcp)[13]));
 		bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
 		bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt));
-	} else if (conn_id_s == NULL && relative_seq == 1 && len_minus_hdr > 0 && (step == DEV_IN || step == TCP_IN) && is_protocol_not_unknown) {
+	} else if (conn_id_s == NULL && relative_seq == 1 && len_minus_hdr > 0 && (step == DEV_IN || step == TCP_IN)) {
 		// fist packet
 		struct first_packet_evt* evt = bpf_map_lookup_elem(&first_packet_evt_map, &zero);
 		if(!evt) {
@@ -297,21 +297,16 @@ static bool __always_inline use_ipv6(struct sock_common * skc) {
 static bool __always_inline parse_sock_key_sk(struct sock* sk, struct sock_key* key) {
 	struct sock_common *skc = {0};
 	skc = (struct sock_common *)sk;
-	bool supportIpv6 = use_ipv6(skc);
 	switch (_C(skc, skc_family)) {
 		case AF_INET: 
 			key->dip[0] = _C(skc, skc_daddr);
 			key->sip[0] = _C(skc, skc_rcv_saddr);
 			break;
 		case AF_INET6:
-			if (supportIpv6) {
-				bpf_probe_read_kernel((void *)(key->dip), sizeof(struct in6_addr), (const void *)__builtin_preserve_access_index(&((typeof((skc)))((skc)))->skc_v6_daddr)); 
-				bpf_probe_read_kernel((void *)(key->sip), sizeof(struct in6_addr), (const void *)__builtin_preserve_access_index(&((typeof((skc)))((skc)))->skc_v6_rcv_saddr));
-			} else {
-				key->dip[0] = _C(skc, skc_daddr);
-				key->sip[0] = _C(skc, skc_rcv_saddr);
-			}
-		break;
+			bpf_probe_read_kernel((void *)(key->dip), sizeof(struct in6_addr), (const void *)__builtin_preserve_access_index(&((typeof((skc)))((skc)))->skc_v6_daddr.in6_u.u6_addr32)); 
+			bpf_probe_read_kernel((void *)(key->sip), sizeof(struct in6_addr), (const void *)__builtin_preserve_access_index(&((typeof((skc)))((skc)))->skc_v6_rcv_saddr.in6_u.u6_addr32));
+			// bpf_printk("ipv6!, sport: %d, dport: %d", _C(skc, skc_num), _C(skc, skc_dport));
+			break;
 		default:
 			return false;
 	}
@@ -472,7 +467,7 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 		l3 = (void *)eth + ETH_HLEN;
 		BPF_CORE_READ_INTO(&l3_proto, eth, h_proto);
 		l3_proto = bpf_ntohs(l3_proto);
-		// bpf_printk("%s, l3_proto: %x",func_name, l3_proto);
+		// bpf_printk("test l3_proto: %x", l3_proto);
 		if (l3_proto == ETH_P_IP || l3_proto == ETH_P_IPV6) {
 	__l3:	
 			if (!skb_l4_check(trans_header, network_header)) {
@@ -506,7 +501,8 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 				}
 			} else if (l3_proto == ETH_P_IPV6) {
 				proto_l4 = _(ipv6->nexthdr);
-				tcp_len = _C(ipv6, payload_len);
+				tcp_len = bpf_ntohs(_C(ipv6, payload_len));
+				// bpf_printk("testipv6, tcp_len: %d", tcp_len);
 				l4 = l4 ? l4 : ip + sizeof(*ipv6);
 			}else{
 				goto err;
@@ -661,6 +657,13 @@ int BPF_KPROBE(tcp_rcv_established, struct sock *sk, struct sk_buff *skb) {
   
 SEC("kprobe/tcp_v4_do_rcv")
 int BPF_KPROBE(tcp_v4_do_rcv, struct sock *sk, struct sk_buff *skb) { 
+	parse_skb(ctx, skb, 1, TCP_IN);
+	return BPF_OK;
+}
+
+  
+SEC("kprobe/tcp_v6_do_rcv")
+int BPF_KPROBE(tcp_v6_do_rcv, struct sock *sk, struct sk_buff *skb) { 
 	parse_skb(ctx, skb, 1, TCP_IN);
 	return BPF_OK;
 }
@@ -890,14 +893,14 @@ static __inline void read_sockaddr_kernel(struct conn_info_t* conn_info,
 
 	conn_info->laddr.in6.sin6_port = lport;
 	conn_info->raddr.in6.sin6_port = rport;
-  if (family == AF_INET || !use_ipv6(sk_common)) {
+  if (family == AF_INET) {
 	conn_info->laddr.in6.sin6_addr.in6_u.u6_addr32[0] = _C(sk_common, skc_rcv_saddr);
 	conn_info->raddr.in6.sin6_addr.in6_u.u6_addr32[0] = _C(sk_common, skc_daddr);
 	// BPF_CORE_READ_INTO(&conn_info->laddr.in4.sin_addr.s_addr, sk_common, skc_rcv_saddr);
 	// BPF_CORE_READ_INTO(&conn_info->raddr.in4.sin_addr.s_addr, sk_common, skc_daddr);
   } else if (family == AF_INET6) {
-	BPF_CORE_READ_INTO(&conn_info->laddr.in6.sin6_addr, sk_common, skc_v6_rcv_saddr);
-	BPF_CORE_READ_INTO(&conn_info->raddr.in6.sin6_addr, sk_common, skc_v6_daddr);
+	BPF_CORE_READ_INTO(&conn_info->laddr.in6.sin6_addr, sk_common, skc_v6_rcv_saddr.in6_u.u6_addr32);
+	BPF_CORE_READ_INTO(&conn_info->raddr.in6.sin6_addr, sk_common, skc_v6_daddr.in6_u.u6_addr32);
   } 
 }
 
@@ -1041,7 +1044,6 @@ enum endpoint_role_t role, uint64_t start_ts) {
 	
 	// print_sock_key(&key);
 	struct sock_common *sk_common = (struct sock_common *) tcp_sk; 
-	bool is_ipv6 = use_ipv6(sk_common);
 	if (socket == NULL) {
 		// conn_info.laddr.in4.sin_addr.s_addr = role == kRoleClient ? key.sip : key.dip;
 		// conn_info.laddr.in4.sin_port = role == kRoleClient ? key.sport : key.dport;
@@ -1054,7 +1056,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		uint16_t family = -1;
 		BPF_CORE_READ_INTO(&family, sk_common, skc_family);
 	// bpf_printk("AF: %d", family);
-		if (family == AF_INET || !is_ipv6) {
+		if (family == AF_INET ) {
 			// conn_info.laddr.in4.sin_addr.s_addr = (u32)key.sip[0] ;
 			// conn_info.raddr.in4.sin_addr.s_addr = (u32)key.dip[0];
 			conn_info.laddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.sip[0];
@@ -1065,10 +1067,6 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		}
 		conn_info.laddr.sa.sa_family = family;
 		conn_info.raddr.sa.sa_family = family;
-	}
-	if (!use_ipv6(sk_common)) {
-		conn_info.laddr.sa.sa_family = AF_INET;
-		conn_info.raddr.sa.sa_family = AF_INET;
 	}
 
 	// bpf_printk("submit_new_conn laddr: port:%u", conn_info.laddr.in4.sin_port);
@@ -1298,7 +1296,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		}
 
 		// bpf_printk("start trace data(vecs)!, bytes_count:%d,func:%d", bytes_count, args->source_fn);		
-		uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+		uint32_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 		struct conn_id_s_t conn_id_s;
 		conn_id_s.tgid_fd = tgid_fd;
 		// conn_id_s.direct = direct;
@@ -1313,7 +1311,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		}
 	} else {
 		// only report syscall event without data 
-		uint64_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
+		uint32_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 		struct conn_id_s_t conn_id_s;
 		conn_id_s.tgid_fd = tgid_fd;
 		enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;

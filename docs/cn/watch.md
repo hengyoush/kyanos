@@ -39,8 +39,8 @@ kyanos watch
 | TotalTime      | 这次请求响应的总耗时，单位毫秒                                                                                                           | 100                                |
 | ReqSize        | 请求大小，单位 bytes                                                                                                                     | 512                                |
 | RespSize       | 响应大小，单位 bytes                                                                                                                     | 1024                               |
-| Net/Internal   | 如果这是本地发起的请求，含义为网络耗时; 如果是作为服务端接收外部请求，含义为本地进程处理的内部耗时                                       | 50                                 |
-| ReadSocketTime | 如果这是本地发起的请求，含义为从内核 Socket 缓冲区读取响应的耗时; 如果是作为服务端接收外部请求，含义从内核 Socket 缓冲区读取请求的耗时。 | 30                                 |
+| Net/Internal   | 如果这是本地发起的请求，含义为网络耗时; 如果是作为服务端接收外部请求，含义为本地进程处理的内部耗时(指定-o wide时才会出现该列)                                       | 50                                 |
+| ReadSocketTime | 如果这是本地发起的请求，含义为从内核 Socket 缓冲区读取响应的耗时; 如果是作为服务端接收外部请求，含义从内核 Socket 缓冲区读取请求的耗时。(指定-o wide时才会出现该列)  | 30                                 |
 
 按下数字键可以排序对应的列。按 `"↑"` `"↓"` 或者 `"k"` `"j"`
 可以上下移动选择表格中的记录。按下 enter 进入这次请求响应的详细界面：
@@ -49,34 +49,22 @@ kyanos watch
 
 详情界面里第一部分是
 **耗时详情**，每一个方块代表数据包经过的节点，比如这里有进程、网卡、Socket 缓冲区等。  
-每个方块下面有一个耗时，这里的耗时指从上个节点到这个节点经过的时间。可以清楚的看到请求从进程发送到网卡，响应再从网卡复制到 Socket 缓冲区并且被进程读取的流程和每一个步骤的耗时。
+每个方块下面有一个耗时，这里的耗时指从上个节点到这个节点经过的时间。可以清楚的看到请求从进程发送到网卡，响应再从网卡复制被进程读取的流程和每一个步骤的耗时。
+
+> [!TIP]
+>
+> 如果想查看数据 **从网卡复制到TCP缓冲区** 以及 **从缓冲区读取到进程** 这两部分的耗时，可以在watch选项里加上`--trace-socket-event`:
+> ![kyanos watch result detail with socket event](/watch-result-detail-with-socket-event.jpg)
+> 可以看到耗时可视化图里增加了一个 Socket 的方块。
 
 第二部分是
+**请求响应的基本信息**，包含请求响应的开始和结束时间，请求响应的大小等。
+
+第三部分是
 **请求响应的具体内容**，分为 Request 和 Response 两部分，超过 1024 字节会截断展示（通过
 `--max-print-bytes` 选项可以调整这个限制）。
 
-## JSON 输出 <Badge type="tip" text="1.5.0" />
 
-如果你需要以编程方式处理采集到的数据，可以使用 `--json-output`
-参数将结果输出为 JSON 格式：
-
-```bash
-# 输出到终端
-kyanos watch --json-output=stdout
-
-# 输出到文件
-kyanos watch --json-output=/path/to/custom.json
-```
-
-JSON 输出中包含每个请求-响应对的详细信息，包括：
-
-- 请求和响应的时间戳
-- 连接详情（地址和端口）
-- 协议特定信息
-- 详细的耗时指标
-- 请求和响应内容
-
-完整的 JSON 输出格式规范，请参考 [JSON 输出格式](./json-output.md) 文档。
 
 ## 如何发现你感兴趣的请求响应 {#how-to-filter}
 
@@ -142,7 +130,7 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 | 请求 Key      | `keys`       | `--keys foo,bar ` 只观察请求 key 为 foo 和 bar        |
 | 请求 key 前缀 | `key-prefix` | `--method foo:bar ` 只观察请求的 key 前缀为 foo\: bar |
 
-#### RocketMQ 协议过滤 <Badge type="tip" text="1.5.0" />
+#### RocketMQ 协议过滤 <Badge type="tip" text="preview" />
 
 | 过滤条件 | 命令行 flag     | 示例                                                                    |
 | :------- | :-------------- | :---------------------------------------------------------------------- |
@@ -156,14 +144,14 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 > [这里](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/LanguageCode.java)。
 
 
-#### Kafka 协议过滤 <Badge type="tip" text="1.5.0" />
+#### Kafka 协议过滤 <Badge type="tip" text="preview" />
 
 | 过滤条件 | 命令行 flag     | 示例                                                                    |
 | :------- | :-------------- | :---------------------------------------------------------------------- |
 | 主题名称 | `topic` | `--topic quickstart-events`                  |
 | 生产者 | `producer` | `--producer` 观察 producer 的请求，指定topic时有用，默认为true                  |
 | 消费者 | `consumer` | `--consumer` 观察 consumer 的请求，指定topic时有用，默认为true                    |
-| 请求代码 | `apikeys` | `--apikeys 10,11` 只观察Kafka APIKEY为 10 和 11 的                    |
+| API Key  | `apikeys` | `--apikeys 10,11` 只观察Kafka APIKEY为 10 和 11 的                    |
 
 > 有关API Key的含义和值，请参阅
 > [这里](https://kafka.apache.org/protocol#protocol_api_keys)。
@@ -178,3 +166,27 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 > [!TIP]
 >
 > 所有上述选项均可以组合使用，比如：`./kyanos watch redis --keys foo,bar --remote-ports 6379 --pid 12345`
+
+
+## JSON 输出 <Badge type="tip" text="preview" />
+
+如果你需要以编程方式处理采集到的数据，可以使用 `--json-output`
+参数将结果输出为 JSON 格式：
+
+```bash
+# 输出到终端
+kyanos watch --json-output=stdout
+
+# 输出到文件
+kyanos watch --json-output=/path/to/custom.json
+```
+
+JSON 输出中包含每个请求-响应对的详细信息，包括：
+
+- 请求和响应的时间戳
+- 连接详情（地址和端口）
+- 协议特定信息
+- 详细的耗时指标
+- 请求和响应内容
+
+完整的 JSON 输出格式规范，请参考 [JSON 输出格式](./json-output.md) 文档。
