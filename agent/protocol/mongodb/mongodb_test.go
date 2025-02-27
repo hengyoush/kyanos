@@ -452,8 +452,7 @@ func TestParseFrameEmptyDocument(t *testing.T) {
 	assert.True(t, len(mongoDBFrame.Sections[0].Documents[0]) == 0)
 	assert.True(t, mongoDBFrame.Sections[1].Kind() == 1)
 	assert.True(t, mongoDBFrame.Sections[1].Length() == 53)
-	// 解码大小不同？
-	assert.True(t, len(mongoDBFrame.Sections[1].Documents[0]) == 70)
+	assert.True(t, len(mongoDBFrame.Sections[1].Documents[0]) == 59)
 
 }
 

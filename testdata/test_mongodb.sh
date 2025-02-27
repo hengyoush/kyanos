@@ -4,7 +4,7 @@ set -ex
 
 CMD="$1"
 DOCKER_REGISTRY="$2"
-FILE_PREFIX="./mongodbtest/kyanos"
+FILE_PREFIX="/tmp/kyanos"
 CLIENT_LNAME="${FILE_PREFIX}_mongodb_client.log"
 SERVER_LNAME="${FILE_PREFIX}_mongodb_server.log"
 
@@ -23,8 +23,8 @@ function test_mongodb_client() {
     echo $cid1
 
     sudo timeout 30 ${CMD} watch --debug-output mongodb --remote-ports 27017 2>&1 | tee "${CLIENT_LNAME}" &
-    sleep 10
-    mongo --eval "db.test.insert({name: 'test', value: 1}); db.test.find({name: 'test'})"
+    sleep 15
+    mongosh --eval "db.test.insert({name: 'test', value: 1}); db.test.find({name: 'test'})"
     wait
 
     cat "${CLIENT_LNAME}"
@@ -47,8 +47,8 @@ function test_mongodb_server() {
     echo $cid1
 
     timeout 30 ${CMD} watch --debug-output mongodb --local-ports 27017 2>&1 | tee "${SERVER_LNAME}" &
-    sleep 10
-    mongo --eval "db.test.insert({name: 'test', value: 1}); db.test.find({name: 'test'})"
+    sleep 15
+    mongosh --eval "db.test.insert({name: 'test', value: 1}); db.test.find({name: 'test'})"
     wait
 
     cat "${SERVER_LNAME}"
@@ -57,10 +57,8 @@ function test_mongodb_server() {
 }
 
 function main() {
-    mkdir mongodbtest
     test_mongodb_client
     test_mongodb_server
-    rm -rf ./mongodbtest
 }
 
 main

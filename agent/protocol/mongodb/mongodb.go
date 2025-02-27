@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"kyanos/agent/buffer"
+	"kyanos/agent/protocol"
 	. "kyanos/agent/protocol"
 	"kyanos/bpf"
 
@@ -12,6 +13,35 @@ import (
 
 var _ ProtocolStreamParser = &MongoDBStreamParser{}
 var _ ParsedMessage = &MongoDBFrame{}
+
+type MongoDBFilter struct {
+}
+
+// Filter implements protocol.ProtocolFilter.
+func (m *MongoDBFilter) Filter(req ParsedMessage, resp ParsedMessage) bool {
+	return true
+}
+
+// FilterByProtocol implements protocol.ProtocolFilter.
+func (m *MongoDBFilter) FilterByProtocol(p bpf.AgentTrafficProtocolT) bool {
+	return p == bpf.AgentTrafficProtocolTKProtocolMongo
+}
+
+// FilterByRequest implements protocol.ProtocolFilter.
+func (m *MongoDBFilter) FilterByRequest() bool {
+	return true
+}
+
+// FilterByResponse implements protocol.ProtocolFilter.
+func (m *MongoDBFilter) FilterByResponse() bool {
+	return true
+}
+
+var _ protocol.ProtocolFilter = &MongoDBFilter{}
+
+func NewMongoDBFilter() *MongoDBFilter {
+	return &MongoDBFilter{}
+}
 
 type MongoDBFrame struct {
 	FrameBase
@@ -138,14 +168,9 @@ func (m *MongoDBStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, mes
 		return result
 	}
 
-	frameBase, ok := CreateFrameBase(streamBuffer, int(length))
-	if ok {
-	}
-
 	// frameBase := FrameBase{}
 	// frameBase.SetTimeStamp(ts)
 	mongoDBFrame := &MongoDBFrame{
-		FrameBase:  frameBase,
 		Length:     length,
 		RequestId:  requestId,
 		ResponseTo: respondTo,
@@ -155,6 +180,17 @@ func (m *MongoDBStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, mes
 
 	result.ParseState = ProcessPayload(decoder, mongoDBFrame)
 	result.ReadBytes = decoder.ReadBytes()
+	frameBase, ok := CreateFrameBase(streamBuffer, result.ReadBytes)
+	if !ok {
+		return ParseResult{
+			ParseState: Invalid,
+		}
+	}
+	if frameBase.ByteSize() != int(mongoDBFrame.Length) {
+		//log.Printf("Frame length mismatch: %d != %d", frameBase.ByteSize(), mongoDBFrame.Length)
+	}
+	mongoDBFrame.FrameBase = frameBase
+
 	result.ParsedMessages = []ParsedMessage{mongoDBFrame}
 	if messageType == Request {
 		m.State.StreamOrder = append(m.State.StreamOrder, StreamOrderPair{
@@ -166,7 +202,7 @@ func (m *MongoDBStreamParser) ParseStream(streamBuffer *buffer.StreamBuffer, mes
 }
 
 func (m *MongoDBStreamParser) FindBoundary(streamBuffer *buffer.StreamBuffer, messageType MessageType, startPos int) int {
-	// 待实现
+	// TODO
 	if startPos == 0 {
 		return 0
 	} else {
@@ -343,7 +379,7 @@ func ProcessOpMsg(decoder *BinaryDecoder, mongoDBFrame *MongoDBFrame) ParseState
 			}
 			remainingSectionLength = section.length
 		} else if section.kind == kSectionKindOne {
-			section.length, err = ExtractLEInt[int32](decoder) //pixie uint32?
+			section.length, err = ExtractLEInt[int32](decoder)
 			if err != nil {
 				return Invalid
 			}

@@ -1,8 +1,8 @@
 package mongodb
 
 import (
-	"fmt"
 	. "kyanos/agent/protocol"
+	"kyanos/common"
 	"sort"
 )
 
@@ -24,7 +24,7 @@ func FindMoreToComeResponses(resps map[StreamId]*ParsedMessageQueue, errorCount 
 		// Look for the queue of the next response
 		nextRespDeque, nextRespExists := resps[StreamId(curRespFrame.RequestId)]
 		if !nextRespExists {
-			fmt.Printf("Did not find a response deque extending the prior more to come response. requestID: %d\n", curRespFrame.RequestId)
+			common.ProtocolParserLog.Infof("Did not find a response deque extending the prior more to come response. requestID: %d\n", curRespFrame.RequestId)
 			(*errorCount)++
 			return
 		}
@@ -34,7 +34,7 @@ func FindMoreToComeResponses(resps map[StreamId]*ParsedMessageQueue, errorCount 
 			return (*nextRespDeque)[i].TimestampNs() > *latestRespTs
 		})
 		if nextRespIndex == len((*nextRespDeque)) || (*nextRespDeque)[nextRespIndex].TimestampNs() < *latestRespTs {
-			fmt.Printf("Did not find a response extending the prior more to come response. requestID: %d\n", curRespFrame.RequestId)
+			common.ProtocolParserLog.Infof("Did not find a response extending the prior more to come response. requestID: %d\n", curRespFrame.RequestId)
 			(*errorCount)++
 			return
 		}
