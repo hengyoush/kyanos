@@ -162,11 +162,11 @@ jobs:
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
             
-            #install mongodb client
+            #install mongodb shell
             wget -qO- https://www.mongodb.org/static/pgp/server-8.0.asc | sudo tee /etc/apt/trusted.gpg.d/server-8.0.asc
             echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
             sudo apt-get update
-            sudo apt install mongo-clients
+            sudo apt-get install -y mongodb-mongosh
 
       - name: Test Mongo
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
