@@ -384,7 +384,7 @@ func (r *RedisStreamParser) Match(reqStreams map[StreamId]*ParsedMessageQueue, r
 	if !ok1 || !ok2 {
 		return []Record{}
 	}
-	return matchByTimestamp(reqStream, respStream)
+	return MatchByTimestamp(reqStream, respStream)
 }
 func ParseSize(decoder *BinaryDecoder) (int, error) {
 	str, err := decoder.ExtractStringUntil(kTerminalSequence)
