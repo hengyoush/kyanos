@@ -24,7 +24,7 @@ function test_filter_by_remote_port() {
     remote_port=88
     timeout 20 ${CMD} watch --debug-output http --remote-ports "$remote_port" 2>&1  | tee "${LNAME_REMOTE_PORT}" &
     sleep 10
-    curl http://baidu.com || true
+    curl http://www.baidu.com || true
     wait
 
     cat "${LNAME_REMOTE_PORT}"
@@ -35,7 +35,7 @@ function test_filter_by_remote_port() {
     remote_port=80
     timeout 20 ${CMD} watch --debug-output http --remote-ports "$remote_port" 2>&1  | tee "${LNAME_REMOTE_PORT}" &
     sleep 10
-    curl http://baidu.com || true
+    curl http://www.baidu.com || true
     wait
 
     cat "${LNAME_REMOTE_PORT}"
