@@ -18,12 +18,12 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@v4.2.2
         with:
           submodules: recursive
 
       - name: Set up Go
-        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
+        uses: actions/setup-go@v5.3.0
         with:
           go-version: '1.22.4'
 
@@ -48,7 +48,7 @@ jobs:
       #   run: make test
 
       - name: Store executable
-        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4
+        uses: actions/upload-artifact@v4.6.1
         with:
           name: kyanos
           path: kyanos
@@ -80,18 +80,18 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@v4.2.2
         with:
           submodules: recursive
 
       - name: Retrieve stored kyanos executable
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        uses: actions/download-artifact@v4.1.9
         with:
           name: kyanos
           path: kyanos
 
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           test-name: kyanos-test
           image-version: ${{ matrix.kernel }}
@@ -116,7 +116,7 @@ jobs:
 
       - name: copy btf file
         if: ${{ startsWith(matrix.kernel, '4.') }}
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -131,7 +131,7 @@ jobs:
             # sudo cp $btf_file /var/lib/ptcpdump/btf/vmlinux
 
       - name: Install dependencies
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -163,7 +163,7 @@ jobs:
             docker-compose --version
 
       - name: Test Truncated Data parsing
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         if: ${{ !contains(fromJSON('["4.19-20240912.022020", "5.4-20240912.022020"]'), matrix.kernel) }}
         with:
           provision: 'false'
@@ -180,7 +180,7 @@ jobs:
             popd
 
       - name: Test Kafka
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -196,7 +196,7 @@ jobs:
             popd
 
       - name: Test CAP_BPF privilege check
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         if: ${{ !contains(fromJSON('["4.19-20240912.022020", "5.4-20240912.022020"]'), matrix.kernel) }}
         with:
           provision: 'false'
@@ -209,7 +209,7 @@ jobs:
             popd
 
       - name: Test CAP_SYS_ADMIN privilege check
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         if: contains(fromJSON('["4.19-20240912.022020", "5.4-20240912.022020"]'), matrix.kernel)
         with:
           provision: 'false'
@@ -222,7 +222,7 @@ jobs:
             popd
       
       - name: Test RocketMQ
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -238,7 +238,7 @@ jobs:
             popd
 
       - name: Test filter by comm
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -254,7 +254,7 @@ jobs:
             popd
 
       - name: Test gotls
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -270,7 +270,7 @@ jobs:
             popd
 
       - name: Test https
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -286,7 +286,7 @@ jobs:
             popd
 
       - name: Test side
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -302,7 +302,7 @@ jobs:
             popd
 
       - name: Test mysql
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -318,7 +318,7 @@ jobs:
             popd
 
       - name: Test base
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -333,7 +333,7 @@ jobs:
 
 
       - name: Test filter by l3/l4 info
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -347,7 +347,7 @@ jobs:
             fi
 
       - name: Test kern evt
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -361,7 +361,7 @@ jobs:
             fi
 
       - name: Test test docker filter by container id
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -375,7 +375,7 @@ jobs:
             fi
 
       - name: Test test docker filter by container name
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -389,7 +389,7 @@ jobs:
             fi
 
       - name: Test filter by pid
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -403,7 +403,7 @@ jobs:
             fi
 
       - name: Test test containerd filter by container name
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -417,7 +417,7 @@ jobs:
             fi
 
       - name: Test test containerd filter by container id
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -431,7 +431,7 @@ jobs:
             fi
 
       - name: Test redis
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
@@ -446,7 +446,7 @@ jobs:
 
       - name: Test k8s
         if: ${{ startsWith(matrix.kernel, '6.') }}
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
           provision: 'false'
           cmd: |
