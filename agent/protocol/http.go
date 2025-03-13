@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"kyanos/agent/buffer"
@@ -136,6 +138,17 @@ func (h *HTTPStreamParser) ParseResponse(buf string, messageType MessageType, ti
 		return h.handleReadResponseError(err, buf, streamBuffer, messageType, timestamp, seq)
 	}
 
+	gzipFlag := false
+	contentEncodingList := resp.Header["Content-Encoding"]
+	if len(contentEncodingList) > 0 {
+		for _, v := range contentEncodingList {
+			if v == "gzip" {
+				gzipFlag = true
+				break
+			}
+		}
+	}
+
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return h.handleReadBodyError(err, buf, streamBuffer, messageType, timestamp, seq)
@@ -154,6 +167,7 @@ func (h *HTTPStreamParser) ParseResponse(buf string, messageType MessageType, ti
 		&ParsedHttpResponse{
 			FrameBase: NewFrameBase(timestamp, readIndex, seq),
 			buf:       []byte(buf[:readIndex]),
+			isGzip:    gzipFlag,
 		},
 	}
 	parseResult.ParseState = Success
@@ -260,7 +274,8 @@ func (req *ParsedHttpRequest) StreamId() StreamId {
 
 type ParsedHttpResponse struct {
 	FrameBase
-	buf []byte
+	isGzip bool
+	buf    []byte
 }
 
 func (resp *ParsedHttpResponse) FormatToSummaryString() string {
@@ -271,6 +286,26 @@ func (resp *ParsedHttpResponse) Status() ResponseStatus {
 }
 
 func (resp *ParsedHttpResponse) FormatToString() string {
+	if resp.isGzip {
+		// 创建一个bytes.Reader
+		bytesReader := bytes.NewReader(resp.buf)
+
+		// 创建gzip.Reader
+		gzipReader, err := gzip.NewReader(bytesReader)
+		if err != nil {
+			return string(resp.buf)
+		}
+		defer gzipReader.Close()
+
+		// 读取解压后的内容
+		decompressed, err := io.ReadAll(gzipReader)
+		if err != nil {
+			return string(resp.buf)
+		}
+
+		// 转换为string并返回
+		return string(decompressed)
+	}
 	return string(resp.buf)
 }
 func (resp *ParsedHttpResponse) IsReq() bool {
