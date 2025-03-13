@@ -252,6 +252,18 @@ jobs:
                 bash /host/testdata/test_filter_by_comm.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
             fi
             popd
+      
+      - name: Test http with gzip
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            pushd /host
+            bash /host/testdata/test_http_gzip.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
+            popd
 
       - name: Test gotls
         uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
