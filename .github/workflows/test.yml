@@ -237,6 +237,22 @@ jobs:
             fi
             popd
 
+      - name: Test NATS
+        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -ex
+            uname -a
+            cat /etc/issue
+            pushd /host
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
+                bash /host/testdata/test_nats.sh 'sudo /host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else  
+                bash /host/testdata/test_nats.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
+            fi
+            popd
+
       - name: Test filter by comm
         uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:

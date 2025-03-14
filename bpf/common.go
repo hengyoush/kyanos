@@ -8,6 +8,7 @@ var ProtocolNamesMap = map[AgentTrafficProtocolT]string{
 	AgentTrafficProtocolTKProtocolHTTP:     "HTTP",
 	AgentTrafficProtocolTKProtocolRedis:    "Redis",
 	AgentTrafficProtocolTKProtocolMySQL:    "MySQL",
+	AgentTrafficProtocolTKProtocolNATS:     "NATS",
 	AgentTrafficProtocolTKProtocolRocketMQ: "RocketMQ",
 	AgentTrafficProtocolTKProtocolKafka:    "Kafka",
 }

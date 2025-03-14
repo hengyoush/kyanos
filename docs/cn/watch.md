@@ -137,6 +137,13 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 | 请求代码 | `request-codes` | `--request-codes 10,11` 只观察请求代码为 10 和 11 的                    |
 | 语言     | `languages`     | `--languages Java,Go ` 只观察使用 Java 和 Go 编写的应用程序发出的请求。 |
 
+#### NATS 协议过滤 <Badge type="tip" text="1.5.0" />
+
+| 过滤条件 | 命令行 flag     | 示例                                                                    |
+| :------- | :-------------- | :---------------------------------------------------------------------- |
+| 协议类型   | `protocols`     | `--protocols PUB,PING` 只观察协议类型为 PUB 和 PING 的请求               |
+| 主题      | `subjects`      | `--subjects demo,echo` 只观察主题为 demo 和 echo 的请求               |
+
 > 有关请求代码的含义和值，请参阅
 > [这里](https://github.com/apache/rocketmq/blob/develop/remoting/src/main/java/org/apache/rocketmq/remoting/protocol/RequestCode.java)。
 
