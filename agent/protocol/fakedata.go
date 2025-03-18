@@ -13,10 +13,10 @@ func MakeNewFakeData(size uint32) ([]byte, bool) {
 		copy(buf, fakeDataMarkPrefix)
 		size -= uint32(fakeDataMarkLen)
 		lenByte := []byte{byte(size >> 24), byte(size >> 16), byte(size >> 8), byte(size)}
-		buf[fakeDataMarkLen] = lenByte[0]
-		buf[fakeDataMarkLen+1] = lenByte[1]
-		buf[fakeDataMarkLen+2] = lenByte[2]
-		buf[fakeDataMarkLen+3] = lenByte[3]
+		buf[len(fakeDataMarkPrefix)] = lenByte[0]
+		buf[len(fakeDataMarkPrefix)+1] = lenByte[1]
+		buf[len(fakeDataMarkPrefix)+2] = lenByte[2]
+		buf[len(fakeDataMarkPrefix)+3] = lenByte[3]
 		return buf, true
 	}
 }
@@ -37,6 +37,6 @@ func getFakeDataSize(buf []byte, pos int) uint32 {
 	if len(buf) < fakeDataMarkLen {
 		return 0
 	} else {
-		return uint32(buf[fakeDataMarkLen])<<24 | uint32(buf[fakeDataMarkLen+1])<<16 | uint32(buf[fakeDataMarkLen+2])<<8 | uint32(buf[fakeDataMarkLen+3])
+		return uint32(buf[len(fakeDataMarkPrefix)])<<24 | uint32(buf[len(fakeDataMarkPrefix)+1])<<16 | uint32(buf[len(fakeDataMarkPrefix)+2])<<8 | uint32(buf[len(fakeDataMarkPrefix)+3])
 	}
 }
