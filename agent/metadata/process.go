@@ -75,7 +75,7 @@ func startPID(pid int, netns int64) {
 	cacheLock.Lock()
 	defer cacheLock.Unlock()
 	common.AgentLog.Infof("Start tracking PID %d, netns: %d", pid, netns)
-	pidCache.Store(pid, PIDInfo{
+	pidCache.Store(pid, &PIDInfo{
 		PID:       pid,
 		NetNS:     netns,
 		Timestamp: time.Now(),
@@ -88,7 +88,7 @@ func stopPID(pid int) {
 	common.AgentLog.Debugf("Stop tracking PID %d, netns: %d", pid)
 	if info, exists := pidCache.Load(pid); exists {
 		pidCache.Delete(pid)
-		pidInfo := info.(PIDInfo)
+		pidInfo := info.(*PIDInfo)
 		pidInfo.Timestamp = time.Now()
 		deadPids.Store(pid, pidInfo)
 	}
@@ -99,7 +99,7 @@ func cleanupDeadPIDs() {
 	defer cacheLock.Unlock()
 	now := time.Now()
 	deadPids.Range(func(key, value interface{}) bool {
-		info := value.(PIDInfo)
+		info := value.(*PIDInfo)
 		if now.Sub(info.Timestamp) > cleanupTimeout {
 			deadPids.Delete(key)
 		}
@@ -107,14 +107,19 @@ func cleanupDeadPIDs() {
 	})
 }
 
-func GetPidInfo(pid int) PIDInfo {
+func GetPidInfo(pid int) *PIDInfo {
 	if info, exists := pidCache.Load(pid); exists {
-		return info.(PIDInfo)
+		return info.(*PIDInfo)
 	}
 	// find from deadPids
 	if info, exists := deadPids.Load(pid); exists {
-		return info.(PIDInfo)
+		return info.(*PIDInfo)
 	}
-
-	return PIDInfo{}
+	ret := &PIDInfo{
+		PID:       pid,
+		NetNS:     -1,
+		Timestamp: time.Now(),
+	}
+	pidCache.Store(pid, ret)
+	return ret
 }
