@@ -64,6 +64,10 @@ func (d *BinaryDecoder) ReadBytes() int {
 var ResourceNotAvailble = NewResourceNotAvailbleError("Insufficient number of bytes.")
 var NotFound = NewNotFoundError("Could not find sentinel character")
 
+func (d *BinaryDecoder) RemovePrefix(size int32) {
+	d.str = d.str[size:]
+}
+
 /*
 Extract until encounter the input string.
 
@@ -100,6 +104,9 @@ func (d *BinaryDecoder) ExtractByte() (byte, error) {
 	return x, nil
 }
 
+func (d *BinaryDecoder) GetSize() int {
+	return len(d.str)
+}
 func ExtractBEInt[TIntType int8 | int16 | int32 | uint32 | uint8 | int64](d *BinaryDecoder) (TIntType, error) {
 	typeSize := int(reflect.TypeOf(TIntType(0)).Size())
 	if len(d.str) < typeSize {
