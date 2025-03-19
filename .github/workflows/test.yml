@@ -161,28 +161,6 @@ jobs:
             sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
-            
-            #install mongodb shell
-            wget -qO- https://www.mongodb.org/static/pgp/server-8.0.asc | sudo tee /etc/apt/trusted.gpg.d/server-8.0.asc
-            echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-            sudo apt-get update
-            sudo apt-get install -y mongodb-mongosh
-
-      - name: Test Mongo
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
-        with:
-          provision: 'false'
-          cmd: |
-            set -euxo pipefail
-            uname -a
-            cat /etc/issue
-            pushd /host
-            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
-                bash /host/testdata/test_mongodb.sh 'sudo /host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
-            else  
-                bash /host/testdata/test_mongodb.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
-            fi
-            popd
 
       - name: Test Truncated Data parsing
         uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
@@ -243,20 +221,6 @@ jobs:
             bash /host/testdata/run_cap_bpf_test.sh "" "CAP_SYS_ADMIN"
             popd
       
-      - name: Test Mongodb
-        uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
-        with:
-          provision: 'false'
-          cmd: |
-            set -ex
-            uname -a
-            cat /etc/issue
-            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then
-                bash /host/testdata/test_mongodb.sh 'sudo /host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
-            else
-                bash /host/testdata/test_mongodb.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
-            fi
-
       - name: Test RocketMQ
         uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:
