@@ -13,6 +13,7 @@ jobs:
 
   release:
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
 
       - name: Remove large directories
