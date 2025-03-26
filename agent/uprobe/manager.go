@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cilium/ebpf"
@@ -18,6 +19,7 @@ import (
 )
 
 var attachedLibPaths map[string]bool = make(map[string]bool)
+var attachedLibPathsMutex sync.Mutex
 var uprobeLinks []link.Link = make([]link.Link, 0)
 
 func StartHandleSchedExecEvent(ch chan *bpf.AgentProcessExecEvent) {
@@ -119,10 +121,13 @@ func AttachSslUprobe(pid int) ([]link.Link, error) {
 		return nil, err
 	}
 
+	attachedLibPathsMutex.Lock()
 	if _, found := attachedLibPaths[libSslPath]; found {
+		attachedLibPathsMutex.Unlock()
 		return []link.Link{}, nil
 	} else {
 		attachedLibPaths[libSslPath] = true
+		attachedLibPathsMutex.Unlock()
 	}
 
 	sslEx, err := link.OpenExecutable(libSslPath)
