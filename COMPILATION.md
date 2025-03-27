@@ -78,7 +78,7 @@ project.
 > Check if BTF is enabled:
 >
 > ```
-> grep CONFIG_DEBUG_INFO_BTF "/boot/config-$(uname -r)"
+> ( zgrep CONFIG_DEBUG_INFO_BTF /proc/config.gz ; grep CONFIG_DEBUG_INFO_BTF "/boot/config-$(uname -r)" ) | uniq
 > ```
 >
 > If the result is `CONFIG_DEBUG_INFO_BTF=y`, it means BTF is enabled. If not,
