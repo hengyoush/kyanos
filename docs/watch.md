@@ -175,6 +175,12 @@ Here are the options available for filtering by each protocol:
 > [here](https://kafka.apache.org/protocol#protocol_api_keys).
 
 
+#### DNS Protocol Filtering <Badge type="tip" text="preview" />
+
+| Filter Condition | Command Line Flag | Example |
+| :------- | :-------------- | :---------------------------------------------------------------------- |
+| host  | `host` | `--host example.com`                  |
+
 #### MySQL Protocol Filtering
 
 > MySQL protocol capturing is supported, but filtering by conditions is still in

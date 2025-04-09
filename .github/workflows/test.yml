@@ -169,6 +169,21 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y mongodb-mongosh
 
+      - name: Test DNS
+        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        with:
+          provision: 'false'
+          cmd: |
+            set -euxo pipefail
+            uname -a
+            cat /etc/issue
+            pushd /host
+            if [ -f "/var/lib/kyanos/btf/current.btf" ]; then  
+                bash /host/testdata/test_dns.sh 'sudo /host/kyanos/kyanos $kyanos_log_option --btf /var/lib/kyanos/btf/current.btf'
+            else  
+                bash /host/testdata/test_dns.sh 'sudo /host/kyanos/kyanos $kyanos_log_option'
+            fi
+            popd
       - name: Test Mongo
         uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
         with:

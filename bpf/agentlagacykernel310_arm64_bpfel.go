@@ -81,8 +81,10 @@ type AgentLagacyKernel310ProgramSpecs struct {
 	TracepointSyscallsSysEnterRead       *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_read"`
 	TracepointSyscallsSysEnterReadv      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_readv"`
 	TracepointSyscallsSysEnterRecvfrom   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvfrom"`
+	TracepointSyscallsSysEnterRecvmmsg   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvmmsg"`
 	TracepointSyscallsSysEnterRecvmsg    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_recvmsg"`
 	TracepointSyscallsSysEnterSendfile64 *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendfile64"`
+	TracepointSyscallsSysEnterSendmmsg   *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendmmsg"`
 	TracepointSyscallsSysEnterSendmsg    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
 	TracepointSyscallsSysEnterSendto     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
 	TracepointSyscallsSysEnterWrite      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_enter_write"`
@@ -93,8 +95,10 @@ type AgentLagacyKernel310ProgramSpecs struct {
 	TracepointSyscallsSysExitRead        *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_read"`
 	TracepointSyscallsSysExitReadv       *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_readv"`
 	TracepointSyscallsSysExitRecvfrom    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvfrom"`
+	TracepointSyscallsSysExitRecvmmsg    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvmmsg"`
 	TracepointSyscallsSysExitRecvmsg     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
 	TracepointSyscallsSysExitSendfile64  *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendfile64"`
+	TracepointSyscallsSysExitSendmmsg    *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendmmsg"`
 	TracepointSyscallsSysExitSendmsg     *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
 	TracepointSyscallsSysExitSendto      *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
 	TracepointSyscallsSysExitWrite       *ebpf.ProgramSpec `ebpf:"tracepoint__syscalls__sys_exit_write"`
@@ -277,8 +281,10 @@ type AgentLagacyKernel310Programs struct {
 	TracepointSyscallsSysEnterRead       *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_read"`
 	TracepointSyscallsSysEnterReadv      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_readv"`
 	TracepointSyscallsSysEnterRecvfrom   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvfrom"`
+	TracepointSyscallsSysEnterRecvmmsg   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvmmsg"`
 	TracepointSyscallsSysEnterRecvmsg    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_recvmsg"`
 	TracepointSyscallsSysEnterSendfile64 *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendfile64"`
+	TracepointSyscallsSysEnterSendmmsg   *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendmmsg"`
 	TracepointSyscallsSysEnterSendmsg    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendmsg"`
 	TracepointSyscallsSysEnterSendto     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_sendto"`
 	TracepointSyscallsSysEnterWrite      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_enter_write"`
@@ -289,8 +295,10 @@ type AgentLagacyKernel310Programs struct {
 	TracepointSyscallsSysExitRead        *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_read"`
 	TracepointSyscallsSysExitReadv       *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_readv"`
 	TracepointSyscallsSysExitRecvfrom    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvfrom"`
+	TracepointSyscallsSysExitRecvmmsg    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvmmsg"`
 	TracepointSyscallsSysExitRecvmsg     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_recvmsg"`
 	TracepointSyscallsSysExitSendfile64  *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendfile64"`
+	TracepointSyscallsSysExitSendmmsg    *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendmmsg"`
 	TracepointSyscallsSysExitSendmsg     *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendmsg"`
 	TracepointSyscallsSysExitSendto      *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_sendto"`
 	TracepointSyscallsSysExitWrite       *ebpf.Program `ebpf:"tracepoint__syscalls__sys_exit_write"`
@@ -328,8 +336,10 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 		p.TracepointSyscallsSysEnterRead,
 		p.TracepointSyscallsSysEnterReadv,
 		p.TracepointSyscallsSysEnterRecvfrom,
+		p.TracepointSyscallsSysEnterRecvmmsg,
 		p.TracepointSyscallsSysEnterRecvmsg,
 		p.TracepointSyscallsSysEnterSendfile64,
+		p.TracepointSyscallsSysEnterSendmmsg,
 		p.TracepointSyscallsSysEnterSendmsg,
 		p.TracepointSyscallsSysEnterSendto,
 		p.TracepointSyscallsSysEnterWrite,
@@ -340,8 +350,10 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 		p.TracepointSyscallsSysExitRead,
 		p.TracepointSyscallsSysExitReadv,
 		p.TracepointSyscallsSysExitRecvfrom,
+		p.TracepointSyscallsSysExitRecvmmsg,
 		p.TracepointSyscallsSysExitRecvmsg,
 		p.TracepointSyscallsSysExitSendfile64,
+		p.TracepointSyscallsSysExitSendmmsg,
 		p.TracepointSyscallsSysExitSendmsg,
 		p.TracepointSyscallsSysExitSendto,
 		p.TracepointSyscallsSysExitWrite,

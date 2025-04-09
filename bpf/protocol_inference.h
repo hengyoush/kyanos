@@ -326,6 +326,53 @@ static __always_inline enum message_type_t is_rocketmq_protocol(
 }
 
 
+static __inline enum message_type_t is_dns_protocol(const char* buf, size_t count) {
+  const int kDNSHeaderSize = 12;
+
+  // Use the maximum *guaranteed* UDP packet size as the max DNS message size.
+  // UDP packets can be larger, but this is the typical maximum size for DNS.
+  const int kMaxDNSMessageSize = 512;
+
+  // Maximum number of resource records.
+  // https://stackoverflow.com/questions/6794926/how-many-a-records-can-fit-in-a-single-dns-response
+  const int kMaxNumRR = 25;
+
+  if (count < kDNSHeaderSize || count > kMaxDNSMessageSize) {
+    return kUnknown;
+  }
+
+  uint8_t ubuf[12] = {};
+  bpf_probe_read_user(ubuf, 12, buf);
+
+  uint16_t flags = (ubuf[2] << 8) + ubuf[3];
+  uint16_t num_questions = (ubuf[4] << 8) + ubuf[5];
+  uint16_t num_answers = (ubuf[6] << 8) + ubuf[7];
+  uint16_t num_auth = (ubuf[8] << 8) + ubuf[9];
+  uint16_t num_addl = (ubuf[10] << 8) + ubuf[11];
+
+  bool qr = (flags >> 15) & 0x1;
+  uint8_t opcode = (flags >> 11) & 0xf;
+  uint8_t zero = (flags >> 6) & 0x1;
+
+  if (zero != 0) {
+    return kUnknown;
+  }
+
+  if (opcode != 0) {
+    return kUnknown;
+  }
+
+  if (num_questions == 0 || num_questions > 10) {
+    return kUnknown;
+  }
+
+  uint32_t num_rr = num_questions + num_answers + num_auth + num_addl;
+  if (num_rr > kMaxNumRR) {
+    return kUnknown;
+  }
+  return (qr == 0) ? kRequest : kResponse;
+}
+
 static __always_inline struct protocol_message_t infer_protocol(const char *buf, size_t count, size_t total_count, struct conn_info_t *conn_info) {
   struct protocol_message_t protocol_message;
   protocol_message.protocol = kProtocolUnknown;
@@ -342,6 +389,8 @@ static __always_inline struct protocol_message_t infer_protocol(const char *buf,
     protocol_message.protocol = kProtocolRocketMQ;
   } else if ((protocol_message.type = is_kafka_protocol(buf, count, total_count, conn_info)) != kUnknown) {
     protocol_message.protocol = kProtocolKafka;
+  } else if ((protocol_message.type = is_dns_protocol(buf, count)) != kUnknown) {
+    protocol_message.protocol = kProtocolDNS;
   } else if (is_redis_protocol(buf, count)) {
     protocol_message.protocol = kProtocolRedis;
   }
