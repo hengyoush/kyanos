@@ -12,7 +12,6 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/hengyoush/kyanos)](#) 
 [![GitHub release](https://img.shields.io/github/v/release/hengyoush/kyanos)](#) 
 [![Test](https://github.com/hengyoush/kyanos/actions/workflows/test.yml/badge.svg)](https://github.com/hengyoush/kyanos/actions/workflows/test.yml) 
-[![Twitter](https://img.shields.io/twitter/url/https/x.com/kyanos.svg?style=social&label=Follow%20%40kyanos)](https://x.com/kyanos_github)
 
 <a href="https://trendshift.io/repositories/12330" target="_blank"><img src="https://trendshift.io/api/badge/repositories/12330" alt="hengyoush%2Fkyanos | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 [![Featured on Hacker News](https://hackerbadge.now.sh/api?id=42154583)](https://news.ycombinator.com/item?id=42154583)
