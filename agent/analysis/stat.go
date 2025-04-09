@@ -201,11 +201,14 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		} else if hasReadSyscallEvents {
 			annotatedRecord.StartTs = min(events.readSyscallEvents[0].GetStartTs(), annotatedRecord.StartTs)
 		}
+		annotatedRecord.EndTs = math.MaxUint64
 		if hasDevOutEvents {
-			devOutTimestamp, _, ok := events.devOutEvents[len(events.devOutEvents)-1].GetMaxIfItmestampAttr()
+			devOutTimestamp, _, ok := events.devOutEvents[len(events.devOutEvents)-1].GetMaxIfTimestampAttr()
 			if ok {
 				annotatedRecord.EndTs = uint64(devOutTimestamp)
 			}
+		} else if hasWriteSyscallEvents {
+			annotatedRecord.EndTs = events.writeSyscallEvents[len(events.writeSyscallEvents)-1].GetEndTs()
 		}
 		if connection.IsSsl() {
 			annotatedRecord.ReqPlainTextSize = events.ingressMessage.ByteSize()
@@ -215,7 +218,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		canCalculateWritePathTime := !connection.IsSsl() || isKernEvtCanMatchSslEvt(events.sslWriteSyscallEvents)
 		annotatedRecord.ReqSize = events.ingressKernLen
 		annotatedRecord.RespSize = events.egressKernLen
-		if annotatedRecord.StartTs != math.MaxUint64 && hasDevOutEvents &&
+		if annotatedRecord.StartTs != math.MaxUint64 && annotatedRecord.EndTs != math.MaxUint64 &&
 			(canCalculateReadPathTime && canCalculateWritePathTime) {
 			annotatedRecord.TotalDuration = float64(annotatedRecord.EndTs) - float64(annotatedRecord.StartTs)
 		}
@@ -278,7 +281,7 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 			if nicIngressTimestamp != 0 {
 				nicEgressTimestamp := int64(math.MaxInt64)
 				for _, devOutEvent := range events.devOutEvents {
-					_nicEgressTimestamp, _, ok := devOutEvent.GetMaxIfItmestampAttr()
+					_nicEgressTimestamp, _, ok := devOutEvent.GetMaxIfTimestampAttr()
 					if ok {
 						nicEgressTimestamp = min(nicEgressTimestamp, _nicEgressTimestamp)
 					}

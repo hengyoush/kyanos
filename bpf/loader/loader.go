@@ -73,13 +73,15 @@ func LoadBPF(options *ac.AgentOptions) (*BPF, error) {
 	collectionOptions = &ebpf.CollectionOptions{
 		Programs: ebpf.ProgramOptions{
 			KernelTypes: btfSpec,
-			LogLevel:    ebpf.LogLevelInstruction,
 		},
+	}
+	if viper.GetBool("debug") {
+		collectionOptions.Programs.LogLevel = ebpf.LogLevelInstruction
 	}
 
 	ac.CollectionOpts = collectionOptions
 	if !options.Kv.SupportCapability(compatible.SupportFilterByContainer) {
-		// if true {
+
 		lagacyobjs := &bpf.AgentLagacyKernel310Objects{}
 		spec, err = bpf.LoadAgentLagacyKernel310()
 		if err != nil {
@@ -250,7 +252,6 @@ func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelV
 	finalCProgNames = append(finalCProgNames, bpf.SyscallExtraProgNames...)
 	for name := range coll.Programs {
 		if strings.HasPrefix(name, "tracepoint__syscalls") || strings.HasPrefix(name, "tracepoint__sched") || strings.HasPrefix(name, "kprobe__nf") {
-			// if strings.HasPrefix(name, "tracepoint__syscalls") {
 			finalCProgNames = append(finalCProgNames, name)
 		}
 	}
@@ -286,10 +287,6 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 
 	controlValues.Update(bpf.AgentControlValueIndexTKSideFilter, int64(options.TraceSide), ebpf.UpdateAny)
 
-	// if targetPid := viper.GetInt64(common.FilterPidVarName); targetPid > 0 {
-	// 	common.AgentLog.Infoln("filter for pid: ", targetPid)
-	// 	controlValues.Update(bpf.AgentControlValueIndexTKTargetTGIDIndex, targetPid, ebpf.UpdateAny)
-	// }
 	targetPids := viper.GetStringSlice(common.FilterPidVarName)
 	if len(targetPids) > 0 {
 		common.AgentLog.Infoln("filter for remote pids: ", targetPids)
@@ -574,6 +571,30 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 	linkList.PushBack(l)
 
 	l, err = bpf.AttachSyscallWriteExit()
+	if err != nil {
+		return nil, err
+	}
+	linkList.PushBack(l)
+
+	l, err = bpf.AttachSyscallSendMMsgEntry()
+	if err != nil {
+		return nil, err
+	}
+	linkList.PushBack(l)
+
+	l, err = bpf.AttachSyscallSendMMsgExit()
+	if err != nil {
+		return nil, err
+	}
+	linkList.PushBack(l)
+
+	l, err = bpf.AttachSyscallRecvMMsgEntry()
+	if err != nil {
+		return nil, err
+	}
+	linkList.PushBack(l)
+
+	l, err = bpf.AttachSyscallRecvMMsgExit()
 	if err != nil {
 		return nil, err
 	}

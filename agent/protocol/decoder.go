@@ -107,7 +107,7 @@ func (d *BinaryDecoder) ExtractByte() (byte, error) {
 func (d *BinaryDecoder) GetSize() int {
 	return len(d.str)
 }
-func ExtractBEInt[TIntType int8 | int16 | int32 | uint32 | uint8 | int64](d *BinaryDecoder) (TIntType, error) {
+func ExtractBEInt[TIntType int8 | int16 | uint16 | int32 | uint32 | uint8 | int64](d *BinaryDecoder) (TIntType, error) {
 	typeSize := int(reflect.TypeOf(TIntType(0)).Size())
 	if len(d.str) < typeSize {
 		return 0, ResourceNotAvailble

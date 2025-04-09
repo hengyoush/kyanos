@@ -1022,7 +1022,21 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		// bpf_printk("read_sockaddr_kernel laddr: port:%u", conn_info.laddr.in4.sin_port);
 		// bpf_printk("read_sockaddr_kernel raddr: port:%u", conn_info.raddr.in4.sin_port);
 	} else if (addr != NULL) {
+		sa_family_t sa_family;
+		BPF_CORE_READ_USER_INTO(&sa_family, addr, sa_family);
+		if (sa_family == AF_INET) {
+			struct sockaddr_in *addr4 = (struct sockaddr_in*)addr;
+			conn_info.raddr.in6.sin6_port = _U(addr4, sin_port);
+			conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0] = _U(addr4, sin_addr.s_addr);
+		} else if (sa_family == AF_INET6) {
+			struct sockaddr_in6 *addr6 = (struct sockaddr_in6*)addr;
+			bpf_probe_read_user(&conn_info.raddr.in6, sizeof(struct sockaddr_in6), addr6);
+		}
 		// bpf_probe_read_user(&conn_info.raddr, sizeof(union sockaddr_t), addr);
+		// conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0] = addr
+		// bpf_printk("read_sockaddr_user raddr: port:%u, addr: %llx, family: %u", 
+		// 	conn_info.raddr.in4.sin_port, conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0], conn_info.raddr.sa.sa_family);
+		// bpf_printk("sa_family: %u", sa_family);
 		// struct sockaddr_in* addr4 = (struct sockaddr_in*)addr;
 		// conn_info.raddr.in6.sin6_port = bpf_ntohs(conn_info.raddr.in6.sin6_port);
 		// conn_info.raddr = *((union sockaddr_t*)addr);
@@ -1052,7 +1066,9 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		// conn_info.laddr.in4.sin_family = key.family;
 		// conn_info.raddr.in4.sin_family = key.family;
 		conn_info.laddr.in6.sin6_port =  key.sport ;
-		conn_info.raddr.in6.sin6_port = key.dport;
+		if (addr == NULL) {
+			conn_info.raddr.in6.sin6_port = key.dport;
+		}
 		uint16_t family = -1;
 		BPF_CORE_READ_INTO(&family, sk_common, skc_family);
 	// bpf_printk("AF: %d", family);
@@ -1060,10 +1076,14 @@ enum endpoint_role_t role, uint64_t start_ts) {
 			// conn_info.laddr.in4.sin_addr.s_addr = (u32)key.sip[0] ;
 			// conn_info.raddr.in4.sin_addr.s_addr = (u32)key.dip[0];
 			conn_info.laddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.sip[0];
-			conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.dip[0];
+			if (addr == NULL) {
+				conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.dip[0];
+			}
 		} else if (family == AF_INET6) {
 			bpf_probe_read_kernel(&conn_info.laddr.in6.sin6_addr, sizeof(struct in6_addr), key.sip);
-			bpf_probe_read_kernel(&conn_info.raddr.in6.sin6_addr, sizeof(struct in6_addr), key.dip);
+			if (addr == NULL) {
+				bpf_probe_read_kernel(&conn_info.raddr.in6.sin6_addr, sizeof(struct in6_addr), key.dip);
+			}
 		}
 		conn_info.laddr.sa.sa_family = family;
 		conn_info.raddr.sa.sa_family = family;
@@ -1525,6 +1545,17 @@ int tracepoint__syscalls__sys_enter_recvfrom(struct trace_event_raw_sys_enter *c
 	struct data_args args = {0};
 	TP_ARGS(&args.fd, 0, ctx)
 	TP_ARGS(&args.buf, 1, ctx)
+
+	struct sockaddr* src_addr = NULL;
+	TP_ARGS(&src_addr, 4, ctx)
+	if (src_addr != NULL) {
+		struct connect_args _connect_args = {};
+		_connect_args.fd = args.fd;
+		_connect_args.addr = src_addr;
+
+		bpf_map_update_elem(&connect_args_map, &id, &_connect_args, BPF_ANY);
+	}
+
 	args.source_fn = kSyscallRecvFrom;
 	args.start_ts = bpf_ktime_get_ns(); // Set start time
 	bpf_map_update_elem(&read_args_map, &id, &args, BPF_ANY);
@@ -1536,6 +1567,13 @@ int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx
 	uint64_t id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count ;
 	TP_RET(&bytes_count, ctx)
+
+
+	struct connect_args* connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
+	if (connect_args != NULL && bytes_count > 0) {
+		process_implicit_conn(ctx, id, connect_args, kSyscallRecvFrom, kRoleServer);
+	}
+	bpf_map_delete_elem(&connect_args_map, &id);
 
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL) {
@@ -1582,6 +1620,68 @@ struct my_user_msghdr {
 	struct iovec *msg_iov;
 	__kernel_size_t msg_iovlen;
 };
+
+// int recvmmsg(int sockfd, struct mmsghdr msgvec[.n], unsigned int n, 
+// int flags, struct timespec *timeout);
+SEC("tracepoint/syscalls/sys_enter_recvmmsg")
+int tracepoint__syscalls__sys_enter_recvmmsg(struct trace_event_raw_sys_enter *ctx) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	struct mmsghdr* msgvec;
+	TP_ARGS(&msgvec, 1, ctx)
+	unsigned int vlen;
+	TP_ARGS(&vlen, 2, ctx)
+
+	if (msgvec != NULL && vlen >= 1) {
+		struct my_user_msghdr *msghdr = (void*)msgvec + bpf_core_field_offset(msgvec->msg_hdr);
+		int sockfd ; 
+		TP_ARGS(&sockfd, 0, ctx)
+		if (msghdr != NULL) {
+			void *msg_name = _U(msghdr, msg_name);
+			if (msg_name != NULL) {
+				struct connect_args _connect_args = {};
+				_connect_args.fd = sockfd;
+				_connect_args.addr = msg_name;
+				bpf_map_update_elem(&connect_args_map, &id, &_connect_args, BPF_ANY);
+			}
+
+			// Stash arguments.
+			struct data_args read_args = {};
+			read_args.fd = sockfd;
+			read_args.iov = _U(msghdr, msg_iov);
+			read_args.iovlen = _U(msghdr, msg_iovlen);
+    		read_args.msg_len = (void*) msgvec + bpf_core_field_offset(msgvec->msg_len);
+			read_args.source_fn = kSyscallRecvMMsg;
+			read_args.start_ts = bpf_ktime_get_ns(); // Set start time
+			bpf_map_update_elem(&read_args_map, &id, &read_args, BPF_ANY);
+		}
+	}
+	return 0;
+}
+
+SEC("tracepoint/syscalls/sys_exit_recvmmsg")
+int tracepoint__syscalls__sys_exit_recvmmsg(struct trace_event_raw_sys_exit *ctx) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	int num_msgs;
+	TP_RET(&num_msgs, ctx)
+
+	const struct connect_args* _connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
+	if (_connect_args != NULL && num_msgs > 0) {
+		process_implicit_conn(ctx, id, _connect_args, kSyscallRecvMMsg, kRoleServer);
+	}
+	bpf_map_delete_elem(&connect_args_map, &id);
+
+	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
+	if (args != NULL && num_msgs > 0) {
+		unsigned int bytes_count = 0;
+		bpf_probe_read(&bytes_count, sizeof(unsigned int), args->msg_len);
+		args->end_ts = bpf_ktime_get_ns();
+		bool is_ssl = propagate_fd_to_uprobe(ctx, id, args->fd, bytes_count);
+		process_syscall_data_vecs(ctx, args, id, kIngress, bytes_count, is_ssl);
+	}
+	bpf_map_delete_elem(&read_args_map, &id);
+	return 0;
+}
+
 
 SEC("tracepoint/syscalls/sys_enter_recvmsg")
 int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ctx) {
@@ -1714,6 +1814,17 @@ int tracepoint__syscalls__sys_enter_sendto(struct trace_event_raw_sys_enter *ctx
 	TP_ARGS(&args.buf, 1, ctx)
 	args.source_fn = kSyscallSendTo;
 	args.start_ts = bpf_ktime_get_ns(); // Set start time
+	struct sockaddr* dest_addr = NULL;
+	TP_ARGS(&dest_addr, 4, ctx)
+	if (dest_addr != NULL) {
+		struct connect_args _connect_args = {};
+		_connect_args.fd = args.fd;
+		_connect_args.addr = dest_addr;
+
+
+		bpf_map_update_elem(&connect_args_map, &id, &_connect_args, BPF_ANY);
+	}
+
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
@@ -1723,6 +1834,12 @@ int tracepoint__syscalls__sys_exit_sendto(struct trace_event_raw_sys_exit *ctx) 
 	uint64_t id = bpf_get_current_pid_tgid();
 	ssize_t bytes_count;
 	TP_RET(&bytes_count, ctx)
+
+	struct connect_args* connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
+	if (connect_args != NULL && bytes_count > 0) {
+		process_implicit_conn(ctx, id, connect_args, kSyscallSendTo, kRoleClient);
+	}
+	bpf_map_delete_elem(&connect_args_map, &id);
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 	if (args != NULL ) {
@@ -1761,6 +1878,68 @@ int tracepoint__syscalls__sys_exit_write(struct trace_event_raw_sys_exit *ctx) {
 		process_syscall_data(ctx, args, id, kEgress, bytes_count, is_ssl);
 	} 
 
+	bpf_map_delete_elem(&write_args_map, &id);
+	return 0;
+}
+
+// int sendmmsg(int sockfd, struct mmsghdr msgvec[.n], unsigned int n, int flags);
+SEC("tracepoint/syscalls/sys_enter_sendmmsg")
+int tracepoint__syscalls__sys_enter_sendmmsg(struct trace_event_raw_sys_enter *ctx) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	struct mmsghdr* msgvec;
+	TP_ARGS(&msgvec, 1, ctx)
+	unsigned int vlen;
+	TP_ARGS(&vlen, 2, ctx)
+
+	if (msgvec != NULL && vlen >= 1) {
+		struct my_user_msghdr *msghdr = (void*)msgvec + bpf_core_field_offset(msgvec->msg_hdr);
+		int sockfd ; 
+		TP_ARGS(&sockfd, 0, ctx)
+		if (msghdr != NULL) {
+			void *msg_name = _U(msghdr, msg_name);
+			if (msg_name != NULL) {
+				struct connect_args _connect_args = {};
+				_connect_args.fd = sockfd;
+				_connect_args.addr = msg_name;
+				bpf_map_update_elem(&connect_args_map, &id, &_connect_args, BPF_ANY);
+			}
+
+			// Stash arguments.
+			struct data_args write_args = {};
+			write_args.fd = sockfd;
+			write_args.iov = _U(msghdr, msg_iov);
+			write_args.iovlen = _U(msghdr, msg_iovlen);
+    		write_args.msg_len = (void*) msgvec + bpf_core_field_offset(msgvec->msg_len);
+			write_args.source_fn = kSyscallSendMMsg;
+			write_args.start_ts = bpf_ktime_get_ns(); // Set start time
+			bpf_map_update_elem(&write_args_map, &id, &write_args, BPF_ANY);
+		}
+	}
+
+	return 0;
+}
+
+SEC("tracepoint/syscalls/sys_exit_sendmmsg")
+int tracepoint__syscalls__sys_exit_sendmmsg(struct trace_event_raw_sys_exit *ctx) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	int num_msgs;
+	TP_RET(&num_msgs, ctx)
+
+	const struct connect_args* _connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
+	if (_connect_args != NULL && num_msgs > 0) {
+		process_implicit_conn(ctx, id, _connect_args, kSyscallSendMMsg, kRoleClient);
+	}
+	bpf_map_delete_elem(&connect_args_map, &id);
+
+	
+	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
+	if (args != NULL && num_msgs > 0) {
+		unsigned int bytes_count = 0;
+		bpf_probe_read(&bytes_count, sizeof(unsigned int), args->msg_len);
+		args->end_ts = bpf_ktime_get_ns();
+		bool is_ssl = propagate_fd_to_uprobe(ctx, id, args->fd, bytes_count);
+		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count, is_ssl);
+	}
 	bpf_map_delete_elem(&write_args_map, &id);
 	return 0;
 }

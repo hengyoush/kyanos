@@ -97,7 +97,7 @@ func (s *KernEventStream) AddKernEvent(event *bpf.AgentKernEvt) bool {
 		}
 
 		kernEvtRingBuffer := s.kernEvents[event.Step]
-    index, found := kernEvtRingBuffer.BinarySearch(KernEvent{seq: uint64(event.Seq)}, func(i any, j any) int {
+		index, found := kernEvtRingBuffer.BinarySearch(KernEvent{seq: uint64(event.Seq)}, func(i any, j any) int {
 			return cmp.Compare(i.(KernEvent).seq, j.(KernEvent).seq)
 		})
 		isNicEvnt := event.Step == bpf.AgentStepTDEV_OUT || event.Step == bpf.AgentStepTDEV_IN
@@ -329,7 +329,7 @@ func (kernevent *KernEvent) UpdateIfTimestampAttr(ifname string, time int64) boo
 	return true
 }
 
-func (kernevent *KernEvent) GetMaxIfItmestampAttr() (int64, string, bool) {
+func (kernevent *KernEvent) GetMaxIfTimestampAttr() (int64, string, bool) {
 	maxTimestamp := int64(0)
 	var maxIfname string
 	found := false

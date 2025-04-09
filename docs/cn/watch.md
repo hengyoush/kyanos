@@ -157,6 +157,12 @@ kyanos 支持根据 IP 端口等三/四层信息过滤，可以指定以下选�
 > [这里](https://kafka.apache.org/protocol#protocol_api_keys)。
 
 
+#### DNS 协议过滤 <Badge type="tip" text="preview" />
+
+| 过滤条件 | 命令行 flag     | 示例                                                                    |
+| :------- | :-------------- | :---------------------------------------------------------------------- |
+| host名称 | `host` | `--host example.com`                  |
+
 #### MYSQL 协议过滤
 
 > 已支持 MySQL 协议抓取，根据条件过滤仍在实现中...
