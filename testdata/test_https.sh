@@ -82,6 +82,9 @@ function test_sendfile() {
 }
 
 function main() {
+    echo "========================="
+    openssl version
+    echo "========================="
     test_http_plain_client
     test_http_plain_server
     test_https_nginx_server
