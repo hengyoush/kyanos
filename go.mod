@@ -12,7 +12,7 @@ require (
 	github.com/containerd/containerd/api v1.7.19
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/typeurl/v2 v2.2.3
-	github.com/docker/docker v27.3.1+incompatible
+	github.com/docker/docker v27.5.1+incompatible
 	github.com/emirpasic/gods v1.18.1
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-github/v68 v68.0.0
