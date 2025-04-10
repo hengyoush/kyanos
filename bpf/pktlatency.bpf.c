@@ -830,23 +830,23 @@ static __always_inline void handle_nat(struct nf_conn *ct) {
 
     struct sock_key reversed_orig = {0};
     reverse_flow(&orig, &reversed_orig);
-    // debug_log("[ptcpdump] nat flow %pI4:%d %pI4:%d ->\n",
-    // 		&reply.saddr[0], reply.sport,
-    // 	       	&reply.daddr[0], reply.dport);
-    // debug_log("[ptcpdump]                               -> %pI4:%d %pI4:%d\n",
-    // 		&reversed_orig.saddr[0], reversed_orig.sport,
-    // 		&reversed_orig.saddr[0], reversed_orig.dport);
-    bpf_map_update_elem(&nat_flow_map, &reply, &reversed_orig, BPF_ANY);
+    // bpf_printk("[ptcpdump] nat flow %pI4:%d %pI4 ->\n",
+    // 		&reply.sip[0], reply.sport,
+    // 	       	&reply.dip[0]);
+    // bpf_printk("[ptcpdump]                               -> %pI4:%d %pI4\n",
+    // 		&reversed_orig.sip[0], reversed_orig.sport,
+    // 		&reversed_orig.dip[0]);
+    bpf_map_update_elem(&nat_flow_map,  &reversed_orig,&reply, BPF_ANY);
 
     struct sock_key reversed_reply = {0};
     reverse_flow(&reply, &reversed_reply);
-    // debug_log("[ptcpdump] nat flow %pI4:%d %pI4:%d ->\n",
-    // 		&reversed_reply.saddr[0], reversed_reply.sport,
-    // 	       	&reversed_reply.daddr[0], reversed_reply.dport);
-    // debug_log("[ptcpdump]                               -> %pI4:%d %pI4:%d\n",
-    // 		&orig.saddr[0], orig.sport,
-    // 		&orig.saddr[0], orig.dport);
-    bpf_map_update_elem(&nat_flow_map, &reversed_reply, &orig, BPF_ANY);
+    // bpf_printk("[ptcpdump] nat flow %pI4:%d %pI4: ->\n",
+    // 		&reversed_reply.sip[0], reversed_reply.sport,
+    // 	       	&reversed_reply.dip[0]);
+    // bpf_printk("[ptcpdump]                               -> %pI4:%d %pI4\n",
+    // 		&orig.sip[0], orig.sport,
+    // 		&orig.dip[0]);
+    bpf_map_update_elem(&nat_flow_map,  &orig,&reversed_reply, BPF_ANY);
 }
 
 SEC("kprobe/nf_nat_packet")
@@ -1178,7 +1178,7 @@ static __always_inline void process_syscall_accept(void* ctx, long int ret, stru
 
 
 static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct tcp_sock* tcp_sk,uint64_t tgid_fd, enum traffic_direction_t direct,ssize_t bytes_count,
-			struct conn_info_t* new_conn_info) {
+			struct conn_info_t* new_conn_info, uint64_t ts) {
 		init_conn_info(tgid_fd>>32, (uint32_t)tgid_fd, new_conn_info);
 		struct sock_key key = {0};
 		parse_sock_key_sk((struct sock*)tcp_sk, &key);
@@ -1214,7 +1214,7 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		// new_conn_info->laddr.in4.sin_port = key.sport;
 		// new_conn_info->raddr.in4.sin_addr.s_addr =  key.dip ;
 		// new_conn_info->raddr.in4.sin_port =  key.dport;
-		bool created = create_conn_info(ctx, new_conn_info, tgid_fd, &key, kRoleUnknown, bpf_ktime_get_ns());
+		bool created = create_conn_info(ctx, new_conn_info, tgid_fd, &key, kRoleUnknown, ts);
 		if (!created) {
 			return false;
 		}
@@ -1268,7 +1268,7 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 			// struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
-				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info);
+				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info, args->end_ts-1);
 				if (created) {
 					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 				}
@@ -1369,7 +1369,7 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 			// struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
-				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info);
+				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info,args->end_ts-1);
 				if (created) {
 					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 				}
@@ -1424,7 +1424,7 @@ static __always_inline void process_syscall_sendfile(void* ctx, uint64_t id, str
 			struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
-				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, kEgress, bytes_count, new_conn_info);
+				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, kEgress, bytes_count, new_conn_info,args->end_ts-1);
 				if (created) {
 					conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 				}
