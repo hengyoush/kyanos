@@ -77,7 +77,6 @@ MY_BPF_ARRAY_PERCPU(conn_info_t_map, struct conn_info_t)
 MY_BPF_ARRAY_PERCPU(kern_evt_t_map, struct kern_evt)
 
 
-MY_BPF_HASH(control_values, uint32_t, int64_t)
 
 enum target_tgid_match_result_t {
   TARGET_TGID_UNSPECIFIED,
@@ -1296,7 +1295,15 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 				buf_size = iov_cpy.iov_len < bytes_count ? iov_cpy.iov_len : bytes_count;
 				if (buf_size != 0) {
 					enum traffic_protocol_t before_infer = conn_info->protocol;
-					struct protocol_message_t protocol_message = infer_protocol(iov_cpy.iov_base, buf_size, bytes_count, conn_info);
+					uint32_t idx = kTraceProtocol;
+					enum traffic_protocol_t trace_protocol;
+					enum traffic_protocol_t *trace_protocol_p = bpf_map_lookup_elem(&control_values, &idx);
+					if (trace_protocol_p == NULL) {
+						trace_protocol = kProtocolUnset;
+					} else {
+						trace_protocol = *trace_protocol_p;
+					}
+					struct protocol_message_t protocol_message = infer_protocol(iov_cpy.iov_base, buf_size, bytes_count, conn_info, trace_protocol);
 					
 					if (before_infer != protocol_message.protocol) {
 						conn_info->protocol = protocol_message.protocol;

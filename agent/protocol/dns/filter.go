@@ -42,3 +42,7 @@ func (d *DnsFilter) FilterByRequest() bool {
 func (d *DnsFilter) FilterByResponse() bool {
 	return false
 }
+
+func (DnsFilter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolDNS
+}

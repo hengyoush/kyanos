@@ -436,6 +436,8 @@ func setAndValidateParameters(ctx context.Context, options *ac.AgentOptions) boo
 			}
 		}
 	}
+	traceProtocol := options.MessageFilter.Protocol()
+	controlValues.Update(bpf.AgentControlValueIndexTKTraceProtocol, int64(traceProtocol), ebpf.UpdateAny)
 
 	return true
 }

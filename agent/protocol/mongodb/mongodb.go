@@ -37,6 +37,10 @@ func (m *MongoDBFilter) FilterByResponse() bool {
 	return true
 }
 
+func (MongoDBFilter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolMongo
+}
+
 var _ protocol.ProtocolFilter = &MongoDBFilter{}
 
 func NewMongoDBFilter() *MongoDBFilter {

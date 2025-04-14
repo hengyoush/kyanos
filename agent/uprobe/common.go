@@ -23,6 +23,7 @@ func getMapReplacementsForOpenssl() map[string]*ebpf.Map {
 		"filter_netns_map":          bpf.GetMapFromObjs(bpf.Objs, "FilterNetnsMap"),
 		"filter_pid_map":            bpf.GetMapFromObjs(bpf.Objs, "FilterPidMap"),
 		"filter_pidns_map":          bpf.GetMapFromObjs(bpf.Objs, "FilterPidnsMap"),
+		"control_values":            bpf.GetMapFromObjs(bpf.Objs, "ControlValues"),
 	}
 }
 

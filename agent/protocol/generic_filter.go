@@ -53,6 +53,10 @@ func (NoopFilter) Filter(ParsedMessage, ParsedMessage) bool {
 	return true
 }
 
+func (NoopFilter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolUnset
+}
+
 var _ ProtocolFilter = BaseFilter{}
 
 type BaseFilter struct {
@@ -72,6 +76,10 @@ func (n BaseFilter) FilterByResponse() bool {
 
 func (BaseFilter) Filter(ParsedMessage, ParsedMessage) bool {
 	return true
+}
+
+func (BaseFilter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolUnset
 }
 
 func IsNoopFilter(filter ProtocolFilter) bool {

@@ -99,6 +99,7 @@ const (
 	AgentControlValueIndexTKEnableFilterByRemoteHost AgentControlValueIndexT = 6
 	AgentControlValueIndexTKSideFilter               AgentControlValueIndexT = 7
 	AgentControlValueIndexTKNumControlValues         AgentControlValueIndexT = 8
+	AgentControlValueIndexTKTraceProtocol            AgentControlValueIndexT = 9
 )
 
 type AgentEndpointRoleT uint32
