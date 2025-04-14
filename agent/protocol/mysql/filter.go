@@ -24,4 +24,8 @@ func (m MysqlFilter) FilterByResponse() bool {
 	return false
 }
 
+func (MysqlFilter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolMySQL
+}
+
 var _ protocol.ProtocolFilter = MysqlFilter{}

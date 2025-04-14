@@ -99,4 +99,8 @@ func (k *KafkaFilter) FilterByResponse() bool {
 	return (k.consumer && k.topic != "")
 }
 
+func (KafkaFilter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolKafka
+}
+
 var _ protocol.ProtocolFilter = &KafkaFilter{}

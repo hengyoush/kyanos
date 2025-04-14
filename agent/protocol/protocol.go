@@ -146,6 +146,7 @@ type ProtocolFilter interface {
 	FilterByProtocol(bpf.AgentTrafficProtocolT) bool
 	FilterByRequest() bool
 	FilterByResponse() bool
+	Protocol() bpf.AgentTrafficProtocolT
 }
 
 type StatusfulMessage interface {

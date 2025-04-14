@@ -105,6 +105,7 @@ type GoTlsLagacyKernel310MapSpecs struct {
 	ConnEvtMap            *ebpf.MapSpec `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.MapSpec `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.MapSpec `ebpf:"conn_info_map"`
+	ControlValues         *ebpf.MapSpec `ebpf:"control_values"`
 	FilterMntnsMap        *ebpf.MapSpec `ebpf:"filter_mntns_map"`
 	FilterNetnsMap        *ebpf.MapSpec `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.MapSpec `ebpf:"filter_pid_map"`
@@ -148,6 +149,7 @@ type GoTlsLagacyKernel310Maps struct {
 	ConnEvtMap            *ebpf.Map `ebpf:"conn_evt_map"`
 	ConnEvtRb             *ebpf.Map `ebpf:"conn_evt_rb"`
 	ConnInfoMap           *ebpf.Map `ebpf:"conn_info_map"`
+	ControlValues         *ebpf.Map `ebpf:"control_values"`
 	FilterMntnsMap        *ebpf.Map `ebpf:"filter_mntns_map"`
 	FilterNetnsMap        *ebpf.Map `ebpf:"filter_netns_map"`
 	FilterPidMap          *ebpf.Map `ebpf:"filter_pid_map"`
@@ -174,6 +176,7 @@ func (m *GoTlsLagacyKernel310Maps) Close() error {
 		m.ConnEvtMap,
 		m.ConnEvtRb,
 		m.ConnInfoMap,
+		m.ControlValues,
 		m.FilterMntnsMap,
 		m.FilterNetnsMap,
 		m.FilterPidMap,

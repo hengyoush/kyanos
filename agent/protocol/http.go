@@ -351,3 +351,7 @@ func (filter HttpFilter) Filter(parsedReq ParsedMessage, _ ParsedMessage) bool {
 
 	return true
 }
+
+func (HttpFilter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolHTTP
+}

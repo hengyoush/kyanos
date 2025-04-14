@@ -648,4 +648,8 @@ func (r RedisFilter) FilterByResponse() bool {
 	return false
 }
 
+func (RedisFilter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolRedis
+}
+
 var _ ProtocolFilter = RedisFilter{}

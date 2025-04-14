@@ -39,4 +39,8 @@ func (m Filter) FilterByResponse() bool {
 	return len(m.TargetRequestCodes) > 0 || len(m.TargetLanguageCodes) > 0
 }
 
+func (Filter) Protocol() bpf.AgentTrafficProtocolT {
+	return bpf.AgentTrafficProtocolTKProtocolRocketMQ
+}
+
 var _ protocol.ProtocolFilter = Filter{}

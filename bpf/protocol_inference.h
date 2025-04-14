@@ -373,25 +373,28 @@ static __inline enum message_type_t is_dns_protocol(const char* buf, size_t coun
   return (qr == 0) ? kRequest : kResponse;
 }
 
-static __always_inline struct protocol_message_t infer_protocol(const char *buf, size_t count, size_t total_count, struct conn_info_t *conn_info) {
+#define TRACE_PROTOCOL(p) (trace_protocol == kProtocolUnset || trace_protocol == p)
+
+static __always_inline struct protocol_message_t infer_protocol(const char *buf, size_t count, 
+    size_t total_count, struct conn_info_t *conn_info, enum traffic_protocol_t trace_protocol) {
   struct protocol_message_t protocol_message;
   protocol_message.protocol = kProtocolUnknown;
   protocol_message.type = kUnknown;
   conn_info->prepend_length_header = false;
 
-  if ((protocol_message.type = is_http_protocol(buf, count)) != kUnknown) {
+  if (TRACE_PROTOCOL(kProtocolHTTP) && (protocol_message.type = is_http_protocol(buf, count)) != kUnknown) {
     protocol_message.protocol = kProtocolHTTP;
-  } else if ((protocol_message.type = is_mongo_protocol(buf, count)) != kUnknown)  {
+  } else if (TRACE_PROTOCOL(kProtocolMongo) && (protocol_message.type = is_mongo_protocol(buf, count)) != kUnknown)  {
     protocol_message.protocol = kProtocolMongo;
-  } else if ((protocol_message.type = is_mysql_protocol(buf, count, conn_info)) != kUnknown)  {
+  } else if (TRACE_PROTOCOL(kProtocolMySQL) && (protocol_message.type = is_mysql_protocol(buf, count, conn_info)) != kUnknown)  {
     protocol_message.protocol = kProtocolMySQL;
-  } else if ((protocol_message.type = is_rocketmq_protocol(buf, count)) != kUnknown) {
+  } else if (TRACE_PROTOCOL(kProtocolRocketMQ) && (protocol_message.type = is_rocketmq_protocol(buf, count)) != kUnknown) {
     protocol_message.protocol = kProtocolRocketMQ;
-  } else if ((protocol_message.type = is_kafka_protocol(buf, count, total_count, conn_info)) != kUnknown) {
+  } else if (TRACE_PROTOCOL(kProtocolKafka) && (protocol_message.type = is_kafka_protocol(buf, count, total_count, conn_info)) != kUnknown) {
     protocol_message.protocol = kProtocolKafka;
-  } else if ((protocol_message.type = is_dns_protocol(buf, count)) != kUnknown) {
+  } else if (TRACE_PROTOCOL(kProtocolDNS) && (protocol_message.type = is_dns_protocol(buf, count)) != kUnknown) {
     protocol_message.protocol = kProtocolDNS;
-  } else if (is_redis_protocol(buf, count)) {
+  } else if (TRACE_PROTOCOL(kProtocolRedis) && is_redis_protocol(buf, count)) {
     protocol_message.protocol = kProtocolRedis;
   }
   conn_info->prev_count = count;

@@ -98,6 +98,7 @@ MY_BPF_ARRAY_PERCPU(syscall_data_map, struct kern_evt_data)
 MY_BPF_ARRAY_PERCPU(ssl_data_map, struct kern_evt_ssl_data)
 MY_BPF_ARRAY_PERCPU(first_packet_evt_map, struct first_packet_evt)
 MY_BPF_ARRAY_PERCPU(conn_evt_map, struct conn_evt_t)
+MY_BPF_HASH(control_values, uint32_t, int64_t)
 
 const int32_t kInvalidFD = -1;
 
@@ -294,7 +295,15 @@ static __always_inline void process_syscall_data_with_conn_info(void* ctx, struc
 		enum traffic_protocol_t before_infer = conn_info->protocol;
 		// bpf_printk("SSL[protocol infer]:start, bc:%d", bytes_count);
 		// conn_info->protocol = protocol_message.protocol;
-		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, bytes_count, conn_info);
+		uint32_t idx = kTraceProtocol;
+		enum traffic_protocol_t trace_protocol;
+		enum traffic_protocol_t *trace_protocol_p = bpf_map_lookup_elem(&control_values, &idx);
+		if (trace_protocol_p == NULL) {
+			trace_protocol = kProtocolUnset;
+		} else {
+			trace_protocol = *trace_protocol_p;
+		}
+		struct protocol_message_t protocol_message = infer_protocol(args->buf, bytes_count, bytes_count, conn_info, trace_protocol);
 		if (before_infer != protocol_message.protocol) {
 			conn_info->protocol = protocol_message.protocol;
 			// bpf_printk("SSL[protocol infer]: %d, func: %d", conn_info->protocol, args->source_fn);
