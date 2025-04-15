@@ -188,17 +188,14 @@ static void __always_inline parse_kern_evt_body(struct parse_kern_evt_body *para
 
 	bpf_core_read(&evt->conn_id_s, sizeof(struct conn_id_s_t), conn_id_s);
 	evt->seq = cur_seq; 
-	// u32 doff = BPF_CORE_READ_BITFIELD_PROBED(tcp, doff);
-	// u64 hdr_len = doff << 2;
 	evt->len = len; 
 	evt->ts = bpf_ktime_get_ns();
 	evt->ts_delta = 0;
 	evt->step = step;
 	bpf_probe_read_kernel(evt->func_name,FUNC_NAME_LIMIT, func_name);
-	// my_strcpy(evt->func_name, func_name, FUNC_NAME_LIMIT);
 	bpf_perf_event_output(ctx, &rb, BPF_F_CURRENT_CPU, evt, sizeof(struct kern_evt));
 }
-// static __always_inline void  report_kern_evt(void* ctx, u32 seq, struct sock_key* key,struct tcphdr* tcp, int len, char* func_name, enum step_t step) {
+
 static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) {
 	void* ctx = param->ctx;
 	u32 seq = param->inital_seq;
@@ -231,13 +228,6 @@ static __always_inline void  report_kern_evt(struct parse_kern_evt_body *param) 
 		struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 		has_conn_info = conn_info != NULL && (is_protocol_not_unknown = conn_info->protocol != kProtocolUnknown);
 	}
-	// if (has_conn_info) {
-	// 	uint64_t tgid_fd = conn_id_s->tgid_fd;
-	// 	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
-	// 	if (conn_info == NULL || conn_info->protocol == kProtocolUnknown) {
-	// 		return;
-	// 	}
-	// }
 	if (has_conn_info) {
 		struct kern_evt* evt = bpf_map_lookup_elem(&kern_evt_t_map, &zero);
 		if(!evt) {
@@ -288,7 +278,6 @@ static bool __always_inline use_ipv6(struct sock_common * skc) {
 		if (flag != -1) {
 			onlyIpv6 = flag & (1<<5);
 		} 
-		// onlyIpv6 = BPF_CORE_READ_BITFIELD_PROBED(skc, skc_ipv6only);
 	}
 	use = use && onlyIpv6;
 	return use;
@@ -304,7 +293,6 @@ static bool __always_inline parse_sock_key_sk(struct sock* sk, struct sock_key* 
 		case AF_INET6:
 			bpf_probe_read_kernel((void *)(key->dip), sizeof(struct in6_addr), (const void *)__builtin_preserve_access_index(&((typeof((skc)))((skc)))->skc_v6_daddr.in6_u.u6_addr32)); 
 			bpf_probe_read_kernel((void *)(key->sip), sizeof(struct in6_addr), (const void *)__builtin_preserve_access_index(&((typeof((skc)))((skc)))->skc_v6_rcv_saddr.in6_u.u6_addr32));
-			// bpf_printk("ipv6!, sport: %d, dport: %d", _C(skc, skc_num), _C(skc, skc_dport));
 			break;
 		default:
 			return false;
@@ -353,8 +341,6 @@ static void __always_inline parse_sock_key_from_ipv4_tcp_hdr(struct sock_key *ke
 
 static void __always_inline parse_sock_key_from_ipv6_tcp_hdr(struct sock_key *key, struct ipv6hdr *ipv6, 
 	struct tcphdr *tcp) {
-	// BPF_CORE_READ_INTO(key->sip, ipv6, saddr);
-	// BPF_CORE_READ_INTO(key->dip, ipv6, daddr);
 	bpf_probe_read_kernel((void *)(key->sip), 16, (const void *)__builtin_preserve_access_index(&((typeof((ipv6)))((ipv6)))->saddr)); 
 	bpf_probe_read_kernel((void *)(key->dip), 16, (const void *)__builtin_preserve_access_index(&((typeof((ipv6)))((ipv6)))->daddr)); 
 	u16 sport = 0;
@@ -409,12 +395,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 	BPF_CORE_READ_INTO(&mac_header, skb, mac_header);
 	u16 trans_header = 0;
 	BPF_CORE_READ_INTO(&trans_header, skb, transport_header);
-	
-	// pr_bpf_debug("%s, len: %u, data_len: %u",func_name, _C(skb, len), _C(skb, data_len));
-	// pr_bpf_debug("%s, mac_header: %d", func_name,mac_header);
-	// pr_bpf_debug("%s, network_header: %d", func_name,network_header);
-	// pr_bpf_debug("%s, trans_header: %d", func_name,trans_header);
-	// pr_bpf_debug("data:%d,end: %d, tail: %d",_C(skb,data) - _C(skb,head), _C(skb,end), _C(skb,tail));
 
 	bool is_l2 = !skb_l2_check(mac_header);
 	// pr_bpf_debug("%s, skb_l2_check: %d", func_name, is_l2);
@@ -425,12 +405,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 	void* l4 = NULL;
 	u16 l3_proto;
 	int ifindex = _C(skb,dev,ifindex);
-		// bpf_printk(" dev1: %s, ifindex: %d", _C(skb,dev)->name, _C(skb,dev,ifindex));//629
-		// bpf_printk("is_l2:%d, mac_header: %lld, network_header:%lld", is_l2, mac_header, network_header); 
-		// bpf_printk("len: %u, data_len: %u", _C(skb, len), _C(skb, data_len));
-	// if (ifindex == 629) {
-	// 	bpf_printk("is_l2:%d, mac_header: %lld, network_header:%lld", is_l2, mac_header, network_header); 
-	// }
 
 	if (is_l2) {
 		if (network_header && mac_header >= network_header) {
@@ -450,15 +424,11 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 		u16 _protocol = 0;
 		BPF_CORE_READ_INTO(&_protocol, skb, protocol);
 		l3_proto = bpf_ntohs(_protocol);
-		// bpf_printk("%s, l3_proto: %x", func_name, l3_proto);
-		// bpf_printk("devname2: %s", _C(skb,dev)->name);
 		if (l3_proto == ETH_P_IP || l3_proto == ETH_P_IPV6) {
-			// bpf_printk("%s, is_ip: %d", func_name, 1);
 			l3 = data + network_header;
 			goto __l3;
 		}
 				
-		// pr_bpf_debug("%s, is_ip: %d", func_name,0);
 		goto err;
 	}
 	__l2: if (mac_header != network_header) {
@@ -466,12 +436,9 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 		l3 = (void *)eth + ETH_HLEN;
 		BPF_CORE_READ_INTO(&l3_proto, eth, h_proto);
 		l3_proto = bpf_ntohs(l3_proto);
-		// bpf_printk("test l3_proto: %x", l3_proto);
 		if (l3_proto == ETH_P_IP || l3_proto == ETH_P_IPV6) {
 	__l3:	
 			if (!skb_l4_check(trans_header, network_header)) {
-				// 存在l4
-				// bpf_printk("%s, skb_l4_check: %d",func_name, 0);
 				l4 = data + trans_header;
 			}
 			// output: *ip, tcp_len, proto_l4, l4
@@ -501,16 +468,13 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 			} else if (l3_proto == ETH_P_IPV6) {
 				proto_l4 = _(ipv6->nexthdr);
 				tcp_len = bpf_ntohs(_C(ipv6, payload_len));
-				// bpf_printk("testipv6, tcp_len: %d", tcp_len);
 				l4 = l4 ? l4 : ip + sizeof(*ipv6);
 			}else{
 				goto err;
 			}
-			// bpf_printk("protocol_l4:%d,len:%lld",proto_l4,_C(skb, len));//629
 			struct tcphdr *tcp = l4;
 			if (proto_l4 == IPPROTO_TCP) {
 				if (!inital_seq) {
-					// 在这里补充sk
 					if (l3_proto == ETH_P_IP) {
 						parse_sock_key_from_ipv4_tcp_hdr(&key, ipv4, tcp);
 					}else{
@@ -522,12 +486,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 							key = *translated_flow;
 						}
 					}
-					// if (key.dport != target_port && key.sport != target_port) {
-					// 	goto err;
-					// }
-					// if (!should_trace_sock_key(&key)) {
-					// 	goto err;
-					// }
 					int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 					if (found == NULL) {
 						if (step == DEV_IN) {
@@ -542,7 +500,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 						} else {
 							goto err;
 						}
-						// goto err;
 					} else {
 						bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 					}
@@ -553,7 +510,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 				body.key = &key;
 				body.tcp = tcp;
 				body.len = tcp_len;
-				// body.func_name = func_name;
 				body.step = step;	
 
 				struct net_device *dev = _C(skb, dev);
@@ -568,7 +524,6 @@ static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not
 				report_kern_evt(&body);
 				return 1;
 			} else {
-				// bpf_printk("%s, not match: %d", func_name, _C(ipv4,saddr));
 			}
 		}
 	}
@@ -587,9 +542,6 @@ static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, 
 	if (!found) {
 		return BPF_OK;
 	}
-	// if (!should_trace_sock_key(&key)) {
-	// 	return BPF_OK;
-	// }
 	u32 inital_seq = 0;
 	bpf_probe_read_kernel(&inital_seq, sizeof(inital_seq), found);
 
@@ -605,7 +557,6 @@ static __always_inline int handle_skb_data_copy(void *ctx, struct sk_buff *skb, 
 	body.key = &key;
 	body.cur_seq = seq - inital_seq;
 	body.len = len;
-	// body.func_name = SKB_COPY_FUNC_NAME;
 	body.step = USER_COPY;
 	parse_kern_evt_body(&body);
 	return BPF_OK;
@@ -688,13 +639,9 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 #else
     skb = (struct sk_buff *) PT_REGS_PARM1_CORE(ctx);
 #endif
-	// BPF_CORE_READ_INTO(&skb, ctx, di);
-	// skb = PT_REGS_PARM1_CORE(ctx);
 #pragma unroll
 	for (int i = 0; i < 2; i++) {
 		int ret = parse_skb(ctx, skb, 0, DEV_OUT);
-		// if (ret) bpf_printk("dev_hard_start_xmit, final: %d", i);
-		// skb = _C(skb,next);
 		struct sk_buff *_skb = {0};
 		BPF_CORE_READ_INTO(&_skb, skb, next);
 		skb = _skb;
@@ -706,7 +653,6 @@ int BPF_KPROBE(dev_hard_start_xmit, struct sk_buff *first) {
 	return 0;
 }
 
-// 进入qdisc之前
 SEC("kprobe/dev_queue_xmit")
 int BPF_KPROBE(dev_queue_xmit, struct sk_buff *skb) {
 	parse_skb(ctx, skb, 0, QDISC_OUT);
@@ -716,7 +662,6 @@ static __always_inline int handle_ip_queue_xmit(void* ctx, struct sk_buff *skb)
 {
 	struct sock_key key = {0};
 	parse_sock_key(skb, &key);
-	// 如果map里有才进行后面的步骤
 	int  *found = bpf_map_lookup_elem(&sock_xmit_map, &key);
 	if (found == NULL) {
 		return 0;
@@ -736,7 +681,6 @@ static __always_inline int handle_ip_queue_xmit(void* ctx, struct sk_buff *skb)
 	body.key = &key;
 	body.tcp = tcp;
 	BPF_CORE_READ_INTO(&body.len, skb, len);
-	// body.func_name = "";
 	body.step = IP_OUT;	
 	report_kern_evt(&body);
 	return 0;
@@ -760,7 +704,6 @@ SEC("raw_tp/tcp_destroy_sock")
 int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 {
 	struct sock_key key = {0};
-	// parse_sock_key_sk(sk, &key);
 	const struct inet_sock *inet = (struct inet_sock *)(sk);
 	parse_sock_key_sk(sk,&key);
 	key.sport = bpf_ntohs(_C(inet, inet_sport));
@@ -770,7 +713,6 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 	uint64_t tgid_fd;
 	if (conn_id_s != NULL) {
 		tgid_fd = conn_id_s->tgid_fd;
-		// pr_bpf_debug("tcp_destroy_sock found, tgid:%d", tgid_fd>>32);
 		struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 		if (conn_info != NULL) {
 			report_conn_evt(ctx, conn_info, kClose, 0);
@@ -778,12 +720,8 @@ int BPF_PROG(tcp_destroy_sock, struct sock *sk)
 		bpf_map_delete_elem(&conn_info_map, &tgid_fd);
 		bpf_map_delete_elem(&sock_key_conn_id_map, &key);
 	} 
-	if (!err) {
-		// pr_bpf_debug("tcp_destroy_sock, sock destory, %d, %d", key.sport, key.dport);
-	}
 	return BPF_OK;
 }
-// #endif
 
 // nat
 
@@ -829,20 +767,20 @@ static __always_inline void handle_nat(struct nf_conn *ct) {
 
     struct sock_key reversed_orig = {0};
     reverse_flow(&orig, &reversed_orig);
-    // bpf_printk("[ptcpdump] nat flow %pI4:%d %pI4 ->\n",
+    // bpf_printk("[kyanos] nat flow %pI4:%d %pI4 ->\n",
     // 		&reply.sip[0], reply.sport,
     // 	       	&reply.dip[0]);
-    // bpf_printk("[ptcpdump]                               -> %pI4:%d %pI4\n",
+    // bpf_printk("[kyanos]                               -> %pI4:%d %pI4\n",
     // 		&reversed_orig.sip[0], reversed_orig.sport,
     // 		&reversed_orig.dip[0]);
     bpf_map_update_elem(&nat_flow_map,  &reversed_orig,&reply, BPF_ANY);
 
     struct sock_key reversed_reply = {0};
     reverse_flow(&reply, &reversed_reply);
-    // bpf_printk("[ptcpdump] nat flow %pI4:%d %pI4: ->\n",
+    // bpf_printk("[kyanos] nat flow %pI4:%d %pI4: ->\n",
     // 		&reversed_reply.sip[0], reversed_reply.sport,
     // 	       	&reversed_reply.dip[0]);
-    // bpf_printk("[ptcpdump]                               -> %pI4:%d %pI4\n",
+    // bpf_printk("[kyanos]                               -> %pI4:%d %pI4\n",
     // 		&orig.sip[0], orig.sport,
     // 		&orig.dip[0]);
     bpf_map_update_elem(&nat_flow_map,  &orig,&reversed_reply, BPF_ANY);
@@ -877,7 +815,7 @@ static __inline void read_sockaddr_kernel(struct conn_info_t* conn_info,
   // Use BPF_PROBE_READ_KERNEL_VAR since BCC cannot insert them as expected.
   struct sock* sk = _C(socket, sk);
 
-  struct sock_common *sk_common = &sk->__sk_common; // 这里不行可以直接强转
+  struct sock_common *sk_common = &sk->__sk_common;
 
   uint16_t family = -1;
   uint16_t lport = -1;
@@ -895,8 +833,6 @@ static __inline void read_sockaddr_kernel(struct conn_info_t* conn_info,
   if (family == AF_INET) {
 	conn_info->laddr.in6.sin6_addr.in6_u.u6_addr32[0] = _C(sk_common, skc_rcv_saddr);
 	conn_info->raddr.in6.sin6_addr.in6_u.u6_addr32[0] = _C(sk_common, skc_daddr);
-	// BPF_CORE_READ_INTO(&conn_info->laddr.in4.sin_addr.s_addr, sk_common, skc_rcv_saddr);
-	// BPF_CORE_READ_INTO(&conn_info->raddr.in4.sin_addr.s_addr, sk_common, skc_daddr);
   } else if (family == AF_INET6) {
 	BPF_CORE_READ_INTO(&conn_info->laddr.in6.sin6_addr, sk_common, skc_v6_rcv_saddr.in6_u.u6_addr32);
 	BPF_CORE_READ_INTO(&conn_info->raddr.in6.sin6_addr, sk_common, skc_v6_daddr.in6_u.u6_addr32);
@@ -907,7 +843,6 @@ static __inline void read_sockaddr_kernel(struct conn_info_t* conn_info,
 static __inline void init_conn_id(uint32_t tgid, int32_t fd, struct conn_id_t* conn_id) {
   conn_id->upid.tgid = tgid;
   conn_id->upid.start_time_ticks = 0;
-//   conn_id->upid.start_time_ticks = get_tgid_start_time();
   conn_id->fd = fd;
   conn_id->tsid = bpf_ktime_get_ns();
 }
@@ -1018,8 +953,6 @@ enum endpoint_role_t role, uint64_t start_ts) {
 	init_conn_info(tgid, fd, &conn_info);
 	if (socket != NULL) {
 		read_sockaddr_kernel(&conn_info, socket);
-		// bpf_printk("read_sockaddr_kernel laddr: port:%u", conn_info.laddr.in4.sin_port);
-		// bpf_printk("read_sockaddr_kernel raddr: port:%u", conn_info.raddr.in4.sin_port);
 	} else if (addr != NULL) {
 		sa_family_t sa_family;
 		BPF_CORE_READ_USER_INTO(&sa_family, addr, sa_family);
@@ -1031,49 +964,24 @@ enum endpoint_role_t role, uint64_t start_ts) {
 			struct sockaddr_in6 *addr6 = (struct sockaddr_in6*)addr;
 			bpf_probe_read_user(&conn_info.raddr.in6, sizeof(struct sockaddr_in6), addr6);
 		}
-		// bpf_probe_read_user(&conn_info.raddr, sizeof(union sockaddr_t), addr);
-		// conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0] = addr
-		// bpf_printk("read_sockaddr_user raddr: port:%u, addr: %llx, family: %u", 
-		// 	conn_info.raddr.in4.sin_port, conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0], conn_info.raddr.sa.sa_family);
-		// bpf_printk("sa_family: %u", sa_family);
-		// struct sockaddr_in* addr4 = (struct sockaddr_in*)addr;
-		// conn_info.raddr.in6.sin6_port = bpf_ntohs(conn_info.raddr.in6.sin6_port);
-		// conn_info.raddr = *((union sockaddr_t*)addr);
 	} else {
-		// pr_bpf_debug("raddr: null");
 	}
 	struct tcp_sock * tcp_sk = get_socket_from_fd(fd);
 	if (!tcp_sk) {
 		tcp_sk = (struct tcp_sock *) _C(socket, sk);
 	}
-	// s => d
 	struct sock_key key = {0};
 	parse_sock_key_sk((struct sock*)tcp_sk, &key);
-	// if (role == kRoleClient) {
-	// 	parse_sock_key_sk((struct sock*)tcp_sk, &key);
-	// } else {
-	// 	parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
-	// }
 	
-	// print_sock_key(&key);
 	struct sock_common *sk_common = (struct sock_common *) tcp_sk; 
 	if (socket == NULL) {
-		// conn_info.laddr.in4.sin_addr.s_addr = role == kRoleClient ? key.sip : key.dip;
-		// conn_info.laddr.in4.sin_port = role == kRoleClient ? key.sport : key.dport;
-		// conn_info.raddr.in4.sin_addr.s_addr = role == kRoleClient ? key.dip : key.sip;
-		// conn_info.raddr.in4.sin_port = role == kRoleClient ? key.dport : key.sport;
-		// conn_info.laddr.in4.sin_family = key.family;
-		// conn_info.raddr.in4.sin_family = key.family;
 		conn_info.laddr.in6.sin6_port =  key.sport ;
 		if (addr == NULL) {
 			conn_info.raddr.in6.sin6_port = key.dport;
 		}
 		uint16_t family = -1;
 		BPF_CORE_READ_INTO(&family, sk_common, skc_family);
-	// bpf_printk("AF: %d", family);
 		if (family == AF_INET ) {
-			// conn_info.laddr.in4.sin_addr.s_addr = (u32)key.sip[0] ;
-			// conn_info.raddr.in4.sin_addr.s_addr = (u32)key.dip[0];
 			conn_info.laddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.sip[0];
 			if (addr == NULL) {
 				conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.dip[0];
@@ -1088,14 +996,11 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		conn_info.raddr.sa.sa_family = family;
 	}
 
-	// bpf_printk("submit_new_conn laddr: port:%u", conn_info.laddr.in4.sin_port);
-	// bpf_printk("submit_new_conn raddr: port:%u", conn_info.raddr.in4.sin_port);
 
 	conn_info.role = role;
 
 	bool created = create_conn_info(ctx, &conn_info, tgid_fd, &key, role, start_ts);
 	if (created && tcp_sk) {
-		// parse_sock_key_sk((struct sock*)tcp_sk, &key);
 		u32 write_seq = _C(tcp_sk,write_seq);
 		u32 copied_seq = _C(tcp_sk, copied_seq);
 		if (write_seq != 0) {
@@ -1114,22 +1019,18 @@ enum endpoint_role_t role, uint64_t start_ts) {
 static __always_inline void process_syscall_close(void* ctx, int ret_val, struct close_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
 	if (args->fd < 0) {
-		// bpf_printk("close syscall args->fd:%d,tgid:%u", args->fd, tgid);
 		return;
 	}
 	if (ret_val < 0) {
-		// bpf_printk("close syscall ret_val:%d,tgid:%u", ret_val, tgid);
 		return;
 	}
 	uint64_t tgid_fd = gen_tgid_fd(tgid, args->fd);
 	struct conn_info_t *conn_info = bpf_map_lookup_elem(&conn_info_map, &tgid_fd);
 	if (conn_info == NULL) {
-		// bpf_printk("close syscall no conn find,tgid:%u,fd:%d",  tgid, args->fd);
 		return;
 	}
 	
 	bool reported = report_conn_evt(ctx, conn_info, kClose, 0);
-	// bpf_printk("reported  close syscall event tgid:%u , reported: %d", tgid, reported);
 
 	bpf_map_delete_elem(&conn_info_map, &tgid_fd);
 	
@@ -1157,20 +1058,17 @@ static __always_inline void process_syscall_connect(void* ctx, int  ret_val, str
 	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
 		return;
 	}
-	// bpf_printk("process_syscall_connect, tgid:%lu, fd: %d", tgid, args->fd);
 	submit_new_conn(ctx, tgid, args->fd, args->addr, NULL, kRoleClient , args->start_ts);
 }
 static __always_inline void process_syscall_accept(void* ctx, long int ret, struct accept_args *args, uint64_t id) {
 	uint32_t tgid = id >> 32;
 	if (ret < 0) {
-		// bpf_printk("process_syscall_accept, ret_fd: %d, socket:%d", -ret_fd,args->sock_alloc_socket);
 		return;
 	}
 
 	if (match_trace_tgid(tgid) == TARGET_TGID_UNMATCHED) {
 		return;
 	}
-	// bpf_printk("process_syscall_accept, tgid:%lu, ret_fd: %d, socket:%d", tgid,ret_fd,args->sock_alloc_socket);
 	submit_new_conn(ctx, tgid, ret, args->addr, args->sock_alloc_socket, kRoleServer , 0);
 }
 
@@ -1182,11 +1080,6 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		struct sock_key key = {0};
 		parse_sock_key_sk((struct sock*)tcp_sk, &key);
 		
-		// if (new_conn_info->conn_id.upid.pid==1499551) {
-		// 	bpf_printk("parse sock!");
-		// 	print_sock_key(&key);
-
-		// }
 		new_conn_info->laddr.in6.sin6_port = key.sport;
 		new_conn_info->raddr.in6.sin6_port =  key.dport;
 		uint16_t family = -1;
@@ -1200,8 +1093,6 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		if (family == AF_INET) {
 			new_conn_info->laddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.sip[0];
 			new_conn_info->raddr.in6.sin6_addr.in6_u.u6_addr32[0] = (u32)key.dip[0];
-			// new_conn_info->laddr.in4.sin_addr.s_addr = (u32)key.sip[0] ;
-			// new_conn_info->raddr.in4.sin_addr.s_addr = (u32)key.dip[0];
 		} else if (family == AF_INET6) {
 			bpf_probe_read_kernel(&new_conn_info->laddr.in6.sin6_addr, sizeof(struct in6_addr), key.sip);
 			bpf_probe_read_kernel(&new_conn_info->raddr.in6.sin6_addr, sizeof(struct in6_addr), key.dip);
@@ -1209,10 +1100,6 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		new_conn_info->laddr.sa.sa_family = family;
 		new_conn_info->raddr.sa.sa_family = family;
 
-		// new_conn_info->laddr.in4.sin_addr.s_addr =  key.sip;
-		// new_conn_info->laddr.in4.sin_port = key.sport;
-		// new_conn_info->raddr.in4.sin_addr.s_addr =  key.dip ;
-		// new_conn_info->raddr.in4.sin_port =  key.dport;
 		bool created = create_conn_info(ctx, new_conn_info, tgid_fd, &key, kRoleUnknown, ts);
 		if (!created) {
 			return false;
@@ -1225,11 +1112,9 @@ static __always_inline bool create_conn_info_in_data_syscall(void* ctx, struct t
 		if (direct == kEgress) {
 			send_initial_seq = write_seq - bytes_count - 1;
 			rcv_initial_seq = copied_seq - 1;
-			// bpf_printk("send initial_seq: %u", initial_seq); x-28 [27] x
 		} else {
 			send_initial_seq = write_seq - 1;
 			rcv_initial_seq = copied_seq - bytes_count - 1;
-			// bpf_printk("recv initial_seq: %u", initial_seq);
 		}
 		bpf_map_update_elem(&sock_xmit_map, &key, &send_initial_seq, BPF_ANY);
 		parse_sock_key_rcv_sk((struct sock*)tcp_sk, &key);
@@ -1263,8 +1148,6 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		if (tcp_sk) {
 			int zero = 0;
 			struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
-			// struct conn_info_t _new_conn_info = {};
-			// struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
 				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info, args->end_ts-1);
@@ -1280,7 +1163,6 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 		return;
 	}
 	if (is_in_nested_ssl) {
-		// bpf_printk("set ssl=true for tgid: %lld, fd: %d", tgid, args->fd);
 		conn_info->ssl = true;
 	}
 	if (!conn_info->ssl) {
@@ -1307,7 +1189,6 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 					
 					if (before_infer != protocol_message.protocol) {
 						conn_info->protocol = protocol_message.protocol;
-						// bpf_printk("[protocol infer]: %d", conn_info->protocol);
 						
 						if (conn_info->role == kRoleUnknown && protocol_message.type != kUnknown) {
 							conn_info->role = ((direct == kEgress) ^ (protocol_message.type == kResponse))
@@ -1321,12 +1202,10 @@ static __always_inline void process_syscall_data_vecs(void* ctx, struct data_arg
 			}
 		} else {
 		}
-
-		// bpf_printk("start trace data(vecs)!, bytes_count:%d,func:%d", bytes_count, args->source_fn);		
+	
 		uint32_t seq = (direct == kEgress ? conn_info->write_bytes : conn_info->read_bytes) + 1;
 		struct conn_id_s_t conn_id_s;
 		conn_id_s.tgid_fd = tgid_fd;
-		// conn_id_s.direct = direct;
 		enum step_t step = direct == kEgress ? SYSCALL_OUT : SYSCALL_IN;
 		if (should_trace_conn(conn_info)) {
 			uint32_t length_header = 0;
@@ -1372,8 +1251,6 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 		if (tcp_sk) {
 			int zero = 0;
 			struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
-			// struct conn_info_t _new_conn_info = {};
-			// struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
 				new_conn_info->protocol = kProtocolUnset;
 				bool created = create_conn_info_in_data_syscall(ctx, tcp_sk, tgid_fd, direct, bytes_count, new_conn_info,args->end_ts-1);
@@ -1399,7 +1276,6 @@ static __always_inline void process_syscall_data(void* ctx, struct data_args *ar
 	if (direct == kEgress) {
 		conn_info->write_bytes += bytes_count;
 	} else {
-		// bpf_printk("read+bytes, tgid:%u, fd: %d, bytes_count:%d", tgid, args->fd, bytes_count);
 		conn_info->read_bytes += bytes_count;
 	}
 }
@@ -1426,7 +1302,6 @@ static __always_inline void process_syscall_sendfile(void* ctx, uint64_t id, str
 		tcp_sk = get_socket_from_fd(args->out_fd);
 		if (tcp_sk) {
 			int zero = 0;
-			// struct conn_info_t *new_conn_info = bpf_map_lookup_elem(&conn_info_t_map, &zero);
 			struct conn_info_t _new_conn_info = {};
 			struct conn_info_t *new_conn_info = &_new_conn_info;
 			if (new_conn_info) {
@@ -1475,7 +1350,6 @@ static __always_inline void process_implicit_conn(void* ctx, uint64_t id,
 
 static __always_inline bool update_fd_and_syscall_len_to_uprobe(struct nested_syscall_fd_t* nested_syscall_fd_ptr, int fd, int len) {
 	
-	// bpf_printk("propagate_fd_to_uprobe, tgid: %lld, fd: %lld, len:%d",pid_tgid >> 32, fd ,len);
 	int current_fd = nested_syscall_fd_ptr->fd;
 	if (current_fd == kInvalidFD) {
 		nested_syscall_fd_ptr->fd = fd;
@@ -1485,14 +1359,12 @@ static __always_inline bool update_fd_and_syscall_len_to_uprobe(struct nested_sy
 	if (len > 0) {
 		nested_syscall_fd_ptr->syscall_len = nested_syscall_fd_ptr->syscall_len + len;
 	}
-	// uint32_t tgid = pid_tgid >> 32;
 	return true;
 }
 
 static __always_inline bool propagate_fd_to_uprobe(void* ctx, uint64_t pid_tgid, int fd, uint32_t len) {
 	struct nested_syscall_fd_t* nested_syscall_fd_ptr = bpf_map_lookup_elem(&ssl_user_space_call_map, &pid_tgid);
 	if (nested_syscall_fd_ptr) {
-		// bpf_printk("propagate_fd_to_uprobe, tgid: %lld, fd: %lld, len:%d",pid_tgid >> 32, fd ,len);
 		update_fd_and_syscall_len_to_uprobe(nested_syscall_fd_ptr, fd, len);
 	} else {
 		// return false;
@@ -1505,7 +1377,6 @@ static __always_inline bool propagate_fd_to_uprobe(void* ctx, uint64_t pid_tgid,
 		tgid_goid.goid=goid;
 		nested_syscall_fd_ptr = bpf_map_lookup_elem(&go_ssl_user_space_call_map,&tgid_goid);
 		if (nested_syscall_fd_ptr) {
-			// bpf_printk("propagate_fd_to_uprobe, tgid: %lld, fd: %lld, len:%d",pid_tgid >> 32, fd ,len);
 			update_fd_and_syscall_len_to_uprobe(nested_syscall_fd_ptr, fd, len);
 			return true;
 		} else {
@@ -2115,7 +1986,6 @@ int BPF_KRETPROBE(sock_alloc_ret)
 #else
 		sk = PT_REGS_RC_CORE(ctx);
 #endif
-		// args->sock_alloc_socket = (struct socket*) PT_REGS_RC_CORE(ctx);
 		args->sock_alloc_socket = sk;
 	}
 
