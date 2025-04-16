@@ -160,7 +160,7 @@ func init() {
 	v5d8.removeCapability(SupportFentry)
 	KernelVersionsMap.Put(v5d8.Version, v5d8)
 
-	v5d4 := copyKernelVersion(v5d15)
+	v5d4 := copyKernelVersion(v5d8)
 	v5d4.Version = "5.4.0"
 	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, MakeBackupInstrumentFunction("kprobe/ip_rcv_core.isra.0", "IpRcvCore"))
 	v5d4.addBackupInstrumentFunction(bpf.AgentStepTIP_IN, MakeBackupInstrumentFunction("kprobe/ip_rcv_core.isra.20", "IpRcvCore"))
