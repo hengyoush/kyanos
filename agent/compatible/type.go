@@ -22,6 +22,7 @@ const (
 	SupportRingBuffer
 	SupportBTF
 	SupportFilterByContainer
+	SupportFentry
 )
 
 type InstrumentFunction struct {
@@ -67,6 +68,12 @@ func (f *InstrumentFunction) IsKRetprobe() bool {
 }
 func (f *InstrumentFunction) IsTracepoint() bool {
 	return strings.HasPrefix(f.KernelFunctionName, "tracepoint")
+}
+func (f *InstrumentFunction) IsFentry() bool {
+	return strings.HasPrefix(f.KernelFunctionName, "fentry")
+}
+func (f *InstrumentFunction) IsFexit() bool {
+	return strings.HasPrefix(f.KernelFunctionName, "fexit")
 }
 func (f *InstrumentFunction) GetKprobeName() string {
 	return f.GetRealKernelFunctionName()
@@ -141,11 +148,17 @@ func init() {
 			SupportRingBuffer:        false,
 			SupportBTF:               true,
 			SupportFilterByContainer: true,
+			SupportFentry:            true,
 		},
 	}
 	baseVersion.addBackupInstrumentFunction(bpf.AgentStepTQDISC_OUT, MakeBackupInstrumentFunction("kprobe/__dev_queue_xmit", "DevQueueXmit"))
 	v5d15 := copyKernelVersion(baseVersion)
 	KernelVersionsMap.Put(v5d15.Version, v5d15)
+
+	v5d8 := copyKernelVersion(v5d15)
+	v5d8.Version = "5.8.0"
+	v5d8.removeCapability(SupportFentry)
+	KernelVersionsMap.Put(v5d8.Version, v5d8)
 
 	v5d4 := copyKernelVersion(v5d15)
 	v5d4.Version = "5.4.0"

@@ -284,6 +284,36 @@ type AgentSpecs struct {
 type AgentProgramSpecs struct {
 	DevHardStartXmit                     *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                         *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
+	FentrySchedProcessExec               *ebpf.ProgramSpec `ebpf:"fentry__sched_process_exec"`
+	FentrySchedProcessExit               *ebpf.ProgramSpec `ebpf:"fentry__sched_process_exit"`
+	FentrySysAccept4                     *ebpf.ProgramSpec `ebpf:"fentry__sys_accept4"`
+	FentrySysClose                       *ebpf.ProgramSpec `ebpf:"fentry__sys_close"`
+	FentrySysConnect                     *ebpf.ProgramSpec `ebpf:"fentry__sys_connect"`
+	FentrySysRead                        *ebpf.ProgramSpec `ebpf:"fentry__sys_read"`
+	FentrySysReadv                       *ebpf.ProgramSpec `ebpf:"fentry__sys_readv"`
+	FentrySysRecvfrom                    *ebpf.ProgramSpec `ebpf:"fentry__sys_recvfrom"`
+	FentrySysRecvmmsg                    *ebpf.ProgramSpec `ebpf:"fentry__sys_recvmmsg"`
+	FentrySysRecvmsg                     *ebpf.ProgramSpec `ebpf:"fentry__sys_recvmsg"`
+	FentrySysSendfile64                  *ebpf.ProgramSpec `ebpf:"fentry__sys_sendfile64"`
+	FentrySysSendmmsg                    *ebpf.ProgramSpec `ebpf:"fentry__sys_sendmmsg"`
+	FentrySysSendmsg                     *ebpf.ProgramSpec `ebpf:"fentry__sys_sendmsg"`
+	FentrySysSendto                      *ebpf.ProgramSpec `ebpf:"fentry__sys_sendto"`
+	FentrySysWrite                       *ebpf.ProgramSpec `ebpf:"fentry__sys_write"`
+	FentrySysWritev                      *ebpf.ProgramSpec `ebpf:"fentry__sys_writev"`
+	FexitSysAccept4                      *ebpf.ProgramSpec `ebpf:"fexit__sys_accept4"`
+	FexitSysClose                        *ebpf.ProgramSpec `ebpf:"fexit__sys_close"`
+	FexitSysConnect                      *ebpf.ProgramSpec `ebpf:"fexit__sys_connect"`
+	FexitSysRead                         *ebpf.ProgramSpec `ebpf:"fexit__sys_read"`
+	FexitSysReadv                        *ebpf.ProgramSpec `ebpf:"fexit__sys_readv"`
+	FexitSysRecvfrom                     *ebpf.ProgramSpec `ebpf:"fexit__sys_recvfrom"`
+	FexitSysRecvmmsg                     *ebpf.ProgramSpec `ebpf:"fexit__sys_recvmmsg"`
+	FexitSysRecvmsg                      *ebpf.ProgramSpec `ebpf:"fexit__sys_recvmsg"`
+	FexitSysSendfile64                   *ebpf.ProgramSpec `ebpf:"fexit__sys_sendfile64"`
+	FexitSysSendmmsg                     *ebpf.ProgramSpec `ebpf:"fexit__sys_sendmmsg"`
+	FexitSysSendmsg                      *ebpf.ProgramSpec `ebpf:"fexit__sys_sendmsg"`
+	FexitSysSendto                       *ebpf.ProgramSpec `ebpf:"fexit__sys_sendto"`
+	FexitSysWrite                        *ebpf.ProgramSpec `ebpf:"fexit__sys_write"`
+	FexitSysWritev                       *ebpf.ProgramSpec `ebpf:"fexit__sys_writev"`
 	IpQueueXmit                          *ebpf.ProgramSpec `ebpf:"ip_queue_xmit"`
 	IpQueueXmit2                         *ebpf.ProgramSpec `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                            *ebpf.ProgramSpec `ebpf:"ip_rcv_core"`
@@ -484,6 +514,36 @@ func (m *AgentMaps) Close() error {
 type AgentPrograms struct {
 	DevHardStartXmit                     *ebpf.Program `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                         *ebpf.Program `ebpf:"dev_queue_xmit"`
+	FentrySchedProcessExec               *ebpf.Program `ebpf:"fentry__sched_process_exec"`
+	FentrySchedProcessExit               *ebpf.Program `ebpf:"fentry__sched_process_exit"`
+	FentrySysAccept4                     *ebpf.Program `ebpf:"fentry__sys_accept4"`
+	FentrySysClose                       *ebpf.Program `ebpf:"fentry__sys_close"`
+	FentrySysConnect                     *ebpf.Program `ebpf:"fentry__sys_connect"`
+	FentrySysRead                        *ebpf.Program `ebpf:"fentry__sys_read"`
+	FentrySysReadv                       *ebpf.Program `ebpf:"fentry__sys_readv"`
+	FentrySysRecvfrom                    *ebpf.Program `ebpf:"fentry__sys_recvfrom"`
+	FentrySysRecvmmsg                    *ebpf.Program `ebpf:"fentry__sys_recvmmsg"`
+	FentrySysRecvmsg                     *ebpf.Program `ebpf:"fentry__sys_recvmsg"`
+	FentrySysSendfile64                  *ebpf.Program `ebpf:"fentry__sys_sendfile64"`
+	FentrySysSendmmsg                    *ebpf.Program `ebpf:"fentry__sys_sendmmsg"`
+	FentrySysSendmsg                     *ebpf.Program `ebpf:"fentry__sys_sendmsg"`
+	FentrySysSendto                      *ebpf.Program `ebpf:"fentry__sys_sendto"`
+	FentrySysWrite                       *ebpf.Program `ebpf:"fentry__sys_write"`
+	FentrySysWritev                      *ebpf.Program `ebpf:"fentry__sys_writev"`
+	FexitSysAccept4                      *ebpf.Program `ebpf:"fexit__sys_accept4"`
+	FexitSysClose                        *ebpf.Program `ebpf:"fexit__sys_close"`
+	FexitSysConnect                      *ebpf.Program `ebpf:"fexit__sys_connect"`
+	FexitSysRead                         *ebpf.Program `ebpf:"fexit__sys_read"`
+	FexitSysReadv                        *ebpf.Program `ebpf:"fexit__sys_readv"`
+	FexitSysRecvfrom                     *ebpf.Program `ebpf:"fexit__sys_recvfrom"`
+	FexitSysRecvmmsg                     *ebpf.Program `ebpf:"fexit__sys_recvmmsg"`
+	FexitSysRecvmsg                      *ebpf.Program `ebpf:"fexit__sys_recvmsg"`
+	FexitSysSendfile64                   *ebpf.Program `ebpf:"fexit__sys_sendfile64"`
+	FexitSysSendmmsg                     *ebpf.Program `ebpf:"fexit__sys_sendmmsg"`
+	FexitSysSendmsg                      *ebpf.Program `ebpf:"fexit__sys_sendmsg"`
+	FexitSysSendto                       *ebpf.Program `ebpf:"fexit__sys_sendto"`
+	FexitSysWrite                        *ebpf.Program `ebpf:"fexit__sys_write"`
+	FexitSysWritev                       *ebpf.Program `ebpf:"fexit__sys_writev"`
 	IpQueueXmit                          *ebpf.Program `ebpf:"ip_queue_xmit"`
 	IpQueueXmit2                         *ebpf.Program `ebpf:"ip_queue_xmit2"`
 	IpRcvCore                            *ebpf.Program `ebpf:"ip_rcv_core"`
@@ -539,6 +599,36 @@ func (p *AgentPrograms) Close() error {
 	return _AgentClose(
 		p.DevHardStartXmit,
 		p.DevQueueXmit,
+		p.FentrySchedProcessExec,
+		p.FentrySchedProcessExit,
+		p.FentrySysAccept4,
+		p.FentrySysClose,
+		p.FentrySysConnect,
+		p.FentrySysRead,
+		p.FentrySysReadv,
+		p.FentrySysRecvfrom,
+		p.FentrySysRecvmmsg,
+		p.FentrySysRecvmsg,
+		p.FentrySysSendfile64,
+		p.FentrySysSendmmsg,
+		p.FentrySysSendmsg,
+		p.FentrySysSendto,
+		p.FentrySysWrite,
+		p.FentrySysWritev,
+		p.FexitSysAccept4,
+		p.FexitSysClose,
+		p.FexitSysConnect,
+		p.FexitSysRead,
+		p.FexitSysReadv,
+		p.FexitSysRecvfrom,
+		p.FexitSysRecvmmsg,
+		p.FexitSysRecvmsg,
+		p.FexitSysSendfile64,
+		p.FexitSysSendmmsg,
+		p.FexitSysSendmsg,
+		p.FexitSysSendto,
+		p.FexitSysWrite,
+		p.FexitSysWritev,
 		p.IpQueueXmit,
 		p.IpQueueXmit2,
 		p.IpRcvCore,

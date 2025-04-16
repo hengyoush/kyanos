@@ -496,7 +496,7 @@ func (p *Processor) processSyscallEvent(event *bpf.SyscallEventData, recordChann
 		}
 	} else {
 		if common.BPFEventLog.Level >= logrus.DebugLevel {
-			common.BPFEventLog.Debugf("[syscall][other][ts=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
+			common.BPFEventLog.Debugf("[syscall][other][ts=%d][fn=%d][tgid=%d fd=%d][len=%d] %s", event.SyscallEvent.Ke.Ts, event.SyscallEvent.GetSourceFunction(), tgidFd>>32, uint32(tgidFd), event.SyscallEvent.BufSize, string(event.Buf))
 		}
 	}
 }

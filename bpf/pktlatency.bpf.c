@@ -1409,23 +1409,15 @@ int BPF_KPROBE(security_socket_recvmsg_enter) {
 	return 0;
 }
 
-// ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
-//                  struct sockaddr *src_addr, socklen_t *addrlen);
-SEC("tracepoint/syscalls/sys_enter_recvfrom")
-int tracepoint__syscalls__sys_enter_recvfrom(struct trace_event_raw_sys_enter *ctx) {
-	int flags = 0;
-	TP_ARGS(&flags, 3, ctx)
+static __always_inline int handle_syscall_enter_recvfrom(int fd, void* buf, struct sockaddr* src_addr, int flags) {
+	
 	if ((flags & MSG_OOB) ||(flags & MSG_PEEK)) {
 		return 0;
-	}
-	uint64_t id = bpf_get_current_pid_tgid();
-
+	}	
 	struct data_args args = {0};
-	TP_ARGS(&args.fd, 0, ctx)
-	TP_ARGS(&args.buf, 1, ctx)
-
-	struct sockaddr* src_addr = NULL;
-	TP_ARGS(&src_addr, 4, ctx)
+	args.fd = fd;
+	args.buf = buf;
+	uint64_t id = bpf_get_current_pid_tgid();
 	if (src_addr != NULL) {
 		struct connect_args _connect_args = {};
 		_connect_args.fd = args.fd;
@@ -1440,11 +1432,32 @@ int tracepoint__syscalls__sys_enter_recvfrom(struct trace_event_raw_sys_enter *c
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_recvfrom")
-int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx) {
+SEC("fentry/__x64_sys_recvfrom")
+int BPF_PROG(fentry__sys_recvfrom, struct pt_regs * regs) {
+	int fd = PT_REGS_PARM1(regs);
+	void* buf = (void*)PT_REGS_PARM2(regs);
+	struct sockaddr* src_addr = (struct sockaddr*)PT_REGS_PARM3(regs);
+	int flags = PT_REGS_PARM4(regs);
+	return handle_syscall_enter_recvfrom(fd, buf, src_addr, flags);
+}
+
+// ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+//                  struct sockaddr *src_addr, socklen_t *addrlen);
+SEC("tracepoint/syscalls/sys_enter_recvfrom")
+int tracepoint__syscalls__sys_enter_recvfrom(struct trace_event_raw_sys_enter *ctx) {
+	int flags;
+	int fd;
+	void *buf;
+	struct sockaddr* src_addr;
+	TP_ARGS(&fd, 0, ctx)
+	TP_ARGS(&buf, 1, ctx)
+	TP_ARGS(&flags, 3, ctx)
+	TP_ARGS(&src_addr, 4, ctx)
+	return handle_syscall_enter_recvfrom(fd, buf, src_addr, flags);
+}
+
+static __always_inline int handle_syscall_exit_recvfrom(void* ctx, ssize_t bytes_count) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count ;
-	TP_RET(&bytes_count, ctx)
 
 
 	struct connect_args* connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
@@ -1464,24 +1477,47 @@ int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_read")
-int tracepoint__syscalls__sys_enter_read(struct trace_event_raw_sys_enter *ctx) {
-	uint64_t id = bpf_get_current_pid_tgid();
+SEC("fexit/__x64_sys_recvfrom")
+int BPF_PROG(fexit__sys_recvfrom, struct pt_regs * regs, ssize_t ret) {
+	return handle_syscall_exit_recvfrom(ctx, ret);
+}
 
+SEC("tracepoint/syscalls/sys_exit_recvfrom")
+int tracepoint__syscalls__sys_exit_recvfrom(struct trace_event_raw_sys_exit *ctx) {
+	ssize_t bytes_count ;
+	TP_RET(&bytes_count, ctx)
+	return handle_syscall_exit_recvfrom(ctx, bytes_count);
+}
+
+static __always_inline int handle_syscall_enter_read(int fd, void* buf) {
+	uint64_t id = bpf_get_current_pid_tgid();
 	struct data_args args = {0};
-	TP_ARGS(&args.fd, 0, ctx)
-	TP_ARGS(&args.buf, 1, ctx)
+	args.fd = fd;
+	args.buf = buf;
 	args.source_fn = kSyscallRead;
 	args.start_ts = bpf_ktime_get_ns(); // Set start time
 	bpf_map_update_elem(&read_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_read")
-int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
+SEC("fentry/__x64_sys_read")
+int BPF_PROG(fentry__sys_read, struct pt_regs * regs) {
+	int fd = PT_REGS_PARM1(regs);
+	void* buf = (void*)PT_REGS_PARM2(regs);
+	return handle_syscall_enter_read(fd, buf);
+}
+
+SEC("tracepoint/syscalls/sys_enter_read")
+int tracepoint__syscalls__sys_enter_read(struct trace_event_raw_sys_enter *ctx) {
+	int fd;
+	void *buf;
+	TP_ARGS(&fd, 0, ctx)
+	TP_ARGS(&buf, 1, ctx)
+	return handle_syscall_enter_read(fd, buf);
+}
+
+static __always_inline int handle_syscall_exit_read(void* ctx, ssize_t bytes_count) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count;
-	TP_RET(&bytes_count, ctx)
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->end_ts = bpf_ktime_get_ns();
@@ -1492,6 +1528,18 @@ int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
 	bpf_map_delete_elem(&read_args_map, &id);
 	return 0;
 }
+
+SEC("fexit/__x64_sys_read")
+int BPF_PROG(fexit__sys_read, struct pt_regs * regs, long int ret) {
+	return handle_syscall_exit_read(ctx, ret);
+}
+
+SEC("tracepoint/syscalls/sys_exit_read")
+int tracepoint__syscalls__sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
+	return handle_syscall_exit_read(ctx, bytes_count);
+}
 struct my_user_msghdr {
 	void *msg_name;
 	int msg_namelen;
@@ -1499,20 +1547,10 @@ struct my_user_msghdr {
 	__kernel_size_t msg_iovlen;
 };
 
-// int recvmmsg(int sockfd, struct mmsghdr msgvec[.n], unsigned int n, 
-// int flags, struct timespec *timeout);
-SEC("tracepoint/syscalls/sys_enter_recvmmsg")
-int tracepoint__syscalls__sys_enter_recvmmsg(struct trace_event_raw_sys_enter *ctx) {
+static __always_inline int handle_syscall_enter_recvmmsg(int sockfd, struct mmsghdr* msgvec, unsigned int vlen) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	struct mmsghdr* msgvec;
-	TP_ARGS(&msgvec, 1, ctx)
-	unsigned int vlen;
-	TP_ARGS(&vlen, 2, ctx)
-
 	if (msgvec != NULL && vlen >= 1) {
 		struct my_user_msghdr *msghdr = (void*)msgvec + bpf_core_field_offset(msgvec->msg_hdr);
-		int sockfd ; 
-		TP_ARGS(&sockfd, 0, ctx)
 		if (msghdr != NULL) {
 			void *msg_name = _U(msghdr, msg_name);
 			if (msg_name != NULL) {
@@ -1536,11 +1574,30 @@ int tracepoint__syscalls__sys_enter_recvmmsg(struct trace_event_raw_sys_enter *c
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_recvmmsg")
-int tracepoint__syscalls__sys_exit_recvmmsg(struct trace_event_raw_sys_exit *ctx) {
+SEC("fentry/__x64_sys_recvmmsg")
+int BPF_PROG(fentry__sys_recvmmsg, struct pt_regs * regs) {
+	int sockfd = PT_REGS_PARM1(regs);
+	struct mmsghdr* msgvec = (struct mmsghdr*)PT_REGS_PARM2(regs);
+	unsigned int vlen = PT_REGS_PARM3(regs);
+	return handle_syscall_enter_recvmmsg(sockfd, msgvec, vlen);
+}
+
+// int recvmmsg(int sockfd, struct mmsghdr msgvec[.n], unsigned int n, 
+// int flags, struct timespec *timeout);
+SEC("tracepoint/syscalls/sys_enter_recvmmsg")
+int tracepoint__syscalls__sys_enter_recvmmsg(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	int num_msgs;
-	TP_RET(&num_msgs, ctx)
+	struct mmsghdr* msgvec;
+	TP_ARGS(&msgvec, 1, ctx)
+	unsigned int vlen;
+	TP_ARGS(&vlen, 2, ctx)
+	int sockfd ; 
+	TP_ARGS(&sockfd, 0, ctx)
+	return handle_syscall_enter_recvmmsg(sockfd, msgvec, vlen);
+}
+
+static __always_inline int handle_syscall_exit_recvmmsg(void* ctx, int num_msgs) {
+	uint64_t id = bpf_get_current_pid_tgid();
 
 	const struct connect_args* _connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
 	if (_connect_args != NULL && num_msgs > 0) {
@@ -1560,19 +1617,23 @@ int tracepoint__syscalls__sys_exit_recvmmsg(struct trace_event_raw_sys_exit *ctx
 	return 0;
 }
 
+SEC("fexit/__x64_sys_recvmmsg")
+int BPF_PROG(fexit__sys_recvmmsg, struct pt_regs * regs, long int ret) {
+	return handle_syscall_exit_recvmmsg(ctx, ret);
+}
 
-SEC("tracepoint/syscalls/sys_enter_recvmsg")
-int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ctx) {
-	int flags = 0;
-	TP_ARGS(&flags, 2, ctx)
+SEC("tracepoint/syscalls/sys_exit_recvmmsg")
+int tracepoint__syscalls__sys_exit_recvmmsg(struct trace_event_raw_sys_exit *ctx) {
+	int num_msgs;
+	TP_RET(&num_msgs, ctx)
+	return handle_syscall_exit_recvmmsg(ctx, num_msgs);
+}
+
+static __always_inline int handle_syscall_enter_recvmsg(int sockfd, struct my_user_msghdr* msghdr, int flags) {
 	if ((flags & MSG_OOB) ||(flags & MSG_PEEK)) {
 		return 0;
 	}
 	uint64_t id = bpf_get_current_pid_tgid();
-	struct my_user_msghdr* msghdr;
-	TP_ARGS(&msghdr, 1, ctx)
-	int sockfd ; 
-	TP_ARGS(&sockfd, 0, ctx)
 	if (msghdr != NULL) {
 		// Stash arguments.
 		void *msg_name = _U(msghdr, msg_name);
@@ -1595,12 +1656,27 @@ int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ct
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_recvmsg")
-int tracepoint__syscalls__sys_exit_recvmsg(struct trace_event_raw_sys_exit *ctx) {
-	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count;
-	TP_RET(&bytes_count, ctx)
+SEC("fentry/__x64_sys_recvmsg")
+int BPF_PROG(fentry__sys_recvmsg, struct pt_regs * regs) {
+	int flags = PT_REGS_PARM4(regs);
+	struct my_user_msghdr* msghdr = (struct my_user_msghdr*)PT_REGS_PARM3(regs);
+	int sockfd = PT_REGS_PARM1(regs);
+	return handle_syscall_enter_recvmsg(sockfd, msghdr, flags);
+}
 
+SEC("tracepoint/syscalls/sys_enter_recvmsg")
+int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ctx) {
+	int flags;
+	TP_ARGS(&flags, 2, ctx)
+	struct my_user_msghdr* msghdr;
+	TP_ARGS(&msghdr, 1, ctx)
+	int sockfd ; 
+	TP_ARGS(&sockfd, 0, ctx)
+	return handle_syscall_enter_recvmsg(sockfd, msghdr, flags);
+}
+
+static __always_inline int handle_syscall_exit_recvmsg(void* ctx, ssize_t bytes_count) {
+	uint64_t id = bpf_get_current_pid_tgid();
 	// Unstash arguments, and process syscall.
 	const struct connect_args* connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
 	if (connect_args != NULL && bytes_count > 0) {
@@ -1620,26 +1696,54 @@ int tracepoint__syscalls__sys_exit_recvmsg(struct trace_event_raw_sys_exit *ctx)
 	return 0;
 }
 
+SEC("fexit/__x64_sys_recvmsg")
+int BPF_PROG(fexit__sys_recvmsg, struct pt_regs * regs, long int ret) {
+	return handle_syscall_exit_recvmsg(ctx, ret);
+}
 
-SEC("tracepoint/syscalls/sys_enter_readv")
-int tracepoint__syscalls__sys_enter_readv(struct trace_event_raw_sys_enter *ctx) {
+SEC("tracepoint/syscalls/sys_exit_recvmsg")
+int tracepoint__syscalls__sys_exit_recvmsg(struct trace_event_raw_sys_exit *ctx) {
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
+	return handle_syscall_exit_recvmsg(ctx, bytes_count);
+}
+
+static __always_inline int handle_syscall_enter_readv(int fd, struct iovec* iov, int iovlen) {
 	uint64_t id = bpf_get_current_pid_tgid();
-
+	if (iov == NULL) {
+		return 0;
+	}
 	struct data_args args = {0};
-	TP_ARGS(&args.fd, 0, ctx)
-	TP_ARGS(&args.iov, 1, ctx)
-	TP_ARGS(&args.iovlen, 2, ctx)
+	args.fd = fd;
+	args.iov = iov;
+	args.iovlen = iovlen;
 	args.source_fn = kSyscallReadV;
 	args.start_ts = bpf_ktime_get_ns(); // Set start time
 	bpf_map_update_elem(&read_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_readv")
-int tracepoint__syscalls__sys_exit_readv(struct trace_event_raw_sys_exit *ctx) {
+SEC("fentry/__x64_sys_readv")
+int BPF_PROG(fentry__sys_readv, struct pt_regs * regs) {
+	int fd = PT_REGS_PARM1(regs);
+	struct iovec* iov = (struct iovec*)PT_REGS_PARM2(regs);
+	int iovlen = PT_REGS_PARM3(regs);
+	return handle_syscall_enter_readv(fd, iov, iovlen);
+}
+
+SEC("tracepoint/syscalls/sys_enter_readv")
+int tracepoint__syscalls__sys_enter_readv(struct trace_event_raw_sys_enter *ctx) {
+	int fd;
+	struct iovec* iov;
+	int iovlen;
+	TP_ARGS(&fd, 0, ctx)
+	TP_ARGS(&iov, 1, ctx)
+	TP_ARGS(&iovlen, 2, ctx)
+	return handle_syscall_enter_readv(fd, iov, iovlen);
+}
+
+static __always_inline int handle_syscall_exit_readv(void* ctx, ssize_t bytes_count) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count ;
-	TP_RET(&bytes_count, ctx)
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 	if (args != NULL && args->sock_event) {
 		args->end_ts = bpf_ktime_get_ns();
@@ -1650,26 +1754,54 @@ int tracepoint__syscalls__sys_exit_readv(struct trace_event_raw_sys_exit *ctx) {
 	return 0;
 }
 
-//ssize_t sendfile(int out_fd, int in_fd, off_t *_Nullable offset, size_t count);
-SEC("tracepoint/syscalls/sys_enter_sendfile64")
-int tracepoint__syscalls__sys_enter_sendfile64(struct trace_event_raw_sys_enter *ctx) {
-	uint64_t id = bpf_get_current_pid_tgid();
-	struct sendfile_args args = {0};
+SEC("fexit/__x64_sys_readv")
+int BPF_PROG(fexit__sys_readv, struct pt_regs * regs, long int ret) {
+	return handle_syscall_exit_readv(ctx, ret);
+}
 
-	TP_ARGS(&args.out_fd, 0, ctx)
-	TP_ARGS(&args.in_fd, 1, ctx)
-	TP_ARGS(&args.count, 3, ctx)
+SEC("tracepoint/syscalls/sys_exit_readv")
+int tracepoint__syscalls__sys_exit_readv(struct trace_event_raw_sys_exit *ctx) {
+	ssize_t bytes_count ;
+	TP_RET(&bytes_count, ctx)
+	return handle_syscall_exit_readv(ctx, bytes_count);
+}
+
+static __always_inline int handle_syscall_enter_sendfile(int out_fd, int in_fd, size_t count) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	if (out_fd < 0 || in_fd < 0) {
+		return 0;
+	}
+	struct sendfile_args args = {0};
+	args.out_fd = out_fd;
+	args.in_fd = in_fd;
+	args.count = count;
 	args.start_ts = bpf_ktime_get_ns(); // Set start time
 	bpf_map_update_elem(&active_sendfile_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
 
+SEC("fentry/__x64_sys_sendfile64")
+int BPF_PROG(fentry__sys_sendfile64, struct pt_regs * regs) {
+	int out_fd = PT_REGS_PARM1(regs);
+	int in_fd = PT_REGS_PARM2(regs);
+	size_t count = PT_REGS_PARM4(regs);
+	return handle_syscall_enter_sendfile(out_fd, in_fd, count);
+}
 
-SEC("tracepoint/syscalls/sys_exit_sendfile64")
-int tracepoint__syscalls__sys_exit_sendfile64(struct trace_event_raw_sys_exit *ctx) {
+//ssize_t sendfile(int out_fd, int in_fd, off_t *_Nullable offset, size_t count);
+SEC("tracepoint/syscalls/sys_enter_sendfile64")
+int tracepoint__syscalls__sys_enter_sendfile64(struct trace_event_raw_sys_enter *ctx) {
+	int out_fd;
+	int in_fd;
+	long int count;
+	TP_ARGS(&out_fd, 0, ctx)
+	TP_ARGS(&in_fd, 1, ctx)
+	TP_ARGS(&count, 3, ctx)
+	return handle_syscall_enter_sendfile(out_fd, in_fd, count);
+}
+
+static __always_inline int handle_syscall_exit_sendfile64(void* ctx, ssize_t bytes_count) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count;
-	TP_RET(&bytes_count, ctx)
 	struct sendfile_args *args = bpf_map_lookup_elem(&active_sendfile_args_map, &id);
 
 	if (args != NULL ) {
@@ -1681,19 +1813,30 @@ int tracepoint__syscalls__sys_exit_sendfile64(struct trace_event_raw_sys_exit *c
 	return 0;
 }
 
-// ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
-//                const struct sockaddr *dest_addr, socklen_t addrlen);
-SEC("tracepoint/syscalls/sys_enter_sendto")
-int tracepoint__syscalls__sys_enter_sendto(struct trace_event_raw_sys_enter *ctx) {
-	uint64_t id = bpf_get_current_pid_tgid();
+SEC("fexit/__x64_sys_sendfile64")
+int BPF_PROG(fexit__sys_sendfile64, struct pt_regs * regs, long int ret) {
+	return handle_syscall_exit_sendfile64(ctx, ret);
+}
 
+SEC("tracepoint/syscalls/sys_exit_sendfile64")
+int tracepoint__syscalls__sys_exit_sendfile64(struct trace_event_raw_sys_exit *ctx) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
+	return handle_syscall_exit_sendfile64(ctx, bytes_count);
+}
+
+static __always_inline int handle_syscall_enter_sendto(int fd, const void* buf, struct sockaddr* dest_addr) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	if (buf == NULL) {
+		return 0;
+	}
+	
 	struct data_args args = {0};
-	TP_ARGS(&args.fd, 0, ctx)
-	TP_ARGS(&args.buf, 1, ctx)
+	args.fd = fd;
+	args.buf = buf;
 	args.source_fn = kSyscallSendTo;
 	args.start_ts = bpf_ktime_get_ns(); // Set start time
-	struct sockaddr* dest_addr = NULL;
-	TP_ARGS(&dest_addr, 4, ctx)
 	if (dest_addr != NULL) {
 		struct connect_args _connect_args = {};
 		_connect_args.fd = args.fd;
@@ -1707,11 +1850,27 @@ int tracepoint__syscalls__sys_enter_sendto(struct trace_event_raw_sys_enter *ctx
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_sendto")
-int tracepoint__syscalls__sys_exit_sendto(struct trace_event_raw_sys_exit *ctx) {
+SEC("fentry/__sys_sendto")
+int BPF_PROG(fentry__sys_sendto, int fd, void *buff, size_t len, unsigned int flags, 
+		 struct sockaddr *dest_addr, int addrlen) {
+	return handle_syscall_enter_sendto(fd, buff, dest_addr);
+}
+
+// ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+//                const struct sockaddr *dest_addr, socklen_t addrlen);
+SEC("tracepoint/syscalls/sys_enter_sendto")
+int tracepoint__syscalls__sys_enter_sendto(struct trace_event_raw_sys_enter *ctx) {
+	int fd;
+	void *buff;
+	struct sockaddr* dest_addr;
+	TP_ARGS(&fd, 0, ctx)
+	TP_ARGS(&buff, 1, ctx)
+	TP_ARGS(&dest_addr, 4, ctx)
+	return handle_syscall_enter_sendto(fd, buff, dest_addr);
+}
+
+static __always_inline int handle_syscall_exit_sendto(void* ctx, ssize_t bytes_count) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count;
-	TP_RET(&bytes_count, ctx)
 
 	struct connect_args* connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
 	if (connect_args != NULL && bytes_count > 0) {
@@ -1730,6 +1889,39 @@ int tracepoint__syscalls__sys_exit_sendto(struct trace_event_raw_sys_exit *ctx) 
 	return 0;
 }
 
+SEC("fexit/__x64_sys_sendto")
+int BPF_PROG(fexit__sys_sendto, struct pt_regs * regs, ssize_t ret) {
+	return handle_syscall_exit_sendto(ctx, ret);
+}
+
+SEC("tracepoint/syscalls/sys_exit_sendto")
+int tracepoint__syscalls__sys_exit_sendto(struct trace_event_raw_sys_exit *ctx) {
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
+	return handle_syscall_exit_sendto(ctx, bytes_count);
+}
+
+static __always_inline int handle_syscall_enter_write(int fd, const void* buf) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	if (buf == NULL) {
+		return 0;
+	}
+	struct data_args args = {0};
+	args.fd = fd;
+	args.buf = buf;
+	args.source_fn = kSyscallWrite;
+	args.start_ts = bpf_ktime_get_ns(); // Set start time
+	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
+	return 0;
+}
+
+SEC("fentry/__x64_sys_write")
+int BPF_PROG(fentry__sys_write, struct pt_regs * regs) {
+	int fd = PT_REGS_PARM1(regs);
+	const void* buf = PT_REGS_PARM2(regs);
+	return handle_syscall_enter_write(fd, buf);
+}
+
 SEC("tracepoint/syscalls/sys_enter_write")
 int tracepoint__syscalls__sys_enter_write(struct trace_event_raw_sys_enter *ctx) {
 	uint64_t id = bpf_get_current_pid_tgid();
@@ -1741,6 +1933,25 @@ int tracepoint__syscalls__sys_enter_write(struct trace_event_raw_sys_enter *ctx)
 	args.start_ts = bpf_ktime_get_ns(); // Set start time
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
 	return 0;
+}
+
+static __always_inline int handle_syscall_exit_write(void* ctx, ssize_t bytes_count) {
+	uint64_t id = bpf_get_current_pid_tgid();
+
+	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
+	if (args != NULL && args->sock_event) {
+		args->end_ts = bpf_ktime_get_ns();
+		bool is_ssl = propagate_fd_to_uprobe(ctx, id, args->fd, bytes_count);
+		process_syscall_data(ctx, args, id, kEgress, bytes_count, is_ssl);
+	} 
+
+	bpf_map_delete_elem(&write_args_map, &id);
+	return 0;
+}
+
+SEC("fexit/__x64_sys_write")
+int BPF_PROG(fexit__sys_write, struct pt_regs * regs, long int bytes_count) {
+	return handle_syscall_exit_write(ctx, bytes_count);
 }
 
 SEC("tracepoint/syscalls/sys_exit_write")
@@ -1760,19 +1971,10 @@ int tracepoint__syscalls__sys_exit_write(struct trace_event_raw_sys_exit *ctx) {
 	return 0;
 }
 
-// int sendmmsg(int sockfd, struct mmsghdr msgvec[.n], unsigned int n, int flags);
-SEC("tracepoint/syscalls/sys_enter_sendmmsg")
-int tracepoint__syscalls__sys_enter_sendmmsg(struct trace_event_raw_sys_enter *ctx) {
+static __always_inline int handle_syscall_enter_sendmmsg(int sockfd, struct mmsghdr* msgvec, unsigned int vlen) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	struct mmsghdr* msgvec;
-	TP_ARGS(&msgvec, 1, ctx)
-	unsigned int vlen;
-	TP_ARGS(&vlen, 2, ctx)
-
 	if (msgvec != NULL && vlen >= 1) {
 		struct my_user_msghdr *msghdr = (void*)msgvec + bpf_core_field_offset(msgvec->msg_hdr);
-		int sockfd ; 
-		TP_ARGS(&sockfd, 0, ctx)
 		if (msghdr != NULL) {
 			void *msg_name = _U(msghdr, msg_name);
 			if (msg_name != NULL) {
@@ -1797,12 +1999,25 @@ int tracepoint__syscalls__sys_enter_sendmmsg(struct trace_event_raw_sys_enter *c
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_sendmmsg")
-int tracepoint__syscalls__sys_exit_sendmmsg(struct trace_event_raw_sys_exit *ctx) {
-	uint64_t id = bpf_get_current_pid_tgid();
-	int num_msgs;
-	TP_RET(&num_msgs, ctx)
+SEC("fentry/__sys_sendmmsg")
+int BPF_PROG(fentry__sys_sendmmsg, int sockfd, struct mmsghdr* msgvec, unsigned int vlen) {
+	return handle_syscall_enter_sendmmsg(sockfd, msgvec, vlen);
+}
 
+// int sendmmsg(int sockfd, struct mmsghdr msgvec[.n], unsigned int n, int flags);
+SEC("tracepoint/syscalls/sys_enter_sendmmsg")
+int tracepoint__syscalls__sys_enter_sendmmsg(struct trace_event_raw_sys_enter *ctx) {
+	int sockfd ; 
+	TP_ARGS(&sockfd, 0, ctx)
+	struct mmsghdr* msgvec;
+	TP_ARGS(&msgvec, 1, ctx)
+	unsigned int vlen;
+	TP_ARGS(&vlen, 2, ctx)
+	return handle_syscall_enter_sendmmsg(sockfd, msgvec, vlen);
+}
+
+static __always_inline int handle_syscall_exit_sendmmsg(void* ctx, int num_msgs) {
+	uint64_t id = bpf_get_current_pid_tgid();
 	const struct connect_args* _connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
 	if (_connect_args != NULL && num_msgs > 0) {
 		process_implicit_conn(ctx, id, _connect_args, kSyscallSendMMsg, kRoleClient);
@@ -1822,13 +2037,21 @@ int tracepoint__syscalls__sys_exit_sendmmsg(struct trace_event_raw_sys_exit *ctx
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_sendmsg")
-int tracepoint__syscalls__sys_enter_sendmsg(struct trace_event_raw_sys_enter *ctx) {
+SEC("fexit/__x64_sys_sendmmsg")
+int BPF_PROG(fexit__sys_sendmmsg, struct pt_regs * regs, int num_msgs) {
+	return handle_syscall_exit_sendmmsg(ctx, num_msgs);
+}
+
+SEC("tracepoint/syscalls/sys_exit_sendmmsg")
+int tracepoint__syscalls__sys_exit_sendmmsg(struct trace_event_raw_sys_exit *ctx) {
+	int num_msgs;
+	TP_RET(&num_msgs, ctx)
+	return handle_syscall_exit_sendmmsg(ctx, num_msgs);
+}
+
+static __always_inline int handle_syscall_enter_sendmsg(int sockfd, struct my_user_msghdr * msghdr) {
 	uint64_t id = bpf_get_current_pid_tgid();
-	struct my_user_msghdr* msghdr;
-	TP_ARGS(&msghdr, 1, ctx)
-	int sockfd ; 
-	TP_ARGS(&sockfd, 0, ctx)
+
 	if (msghdr != NULL) {
 		void *msg_name = _U(msghdr, msg_name);
 		if (msg_name != NULL) {
@@ -1851,12 +2074,22 @@ int tracepoint__syscalls__sys_enter_sendmsg(struct trace_event_raw_sys_enter *ct
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_sendmsg")
-int tracepoint__syscalls__sys_exit_sendmsg(struct trace_event_raw_sys_exit *ctx) {
-	uint64_t id = bpf_get_current_pid_tgid();
-	ssize_t bytes_count;
-	TP_RET(&bytes_count, ctx)
+SEC("fentry/__sys_sendmsg")
+int BPF_PROG(fentry__sys_sendmsg, int fd, struct my_user_msghdr * msg) {
+	return handle_syscall_enter_sendmsg(fd, msg);
+}
 
+SEC("tracepoint/syscalls/sys_enter_sendmsg")
+int tracepoint__syscalls__sys_enter_sendmsg(struct trace_event_raw_sys_enter *ctx) {
+	struct my_user_msghdr* msghdr;
+	TP_ARGS(&msghdr, 1, ctx)
+	int sockfd ; 
+	TP_ARGS(&sockfd, 0, ctx)
+	return handle_syscall_enter_sendmsg(sockfd, msghdr);
+}
+
+static __always_inline int handle_syscall_exit_sendmsg(void* ctx, ssize_t bytes_count) {
+	uint64_t id = bpf_get_current_pid_tgid();
 	const struct connect_args* _connect_args = bpf_map_lookup_elem(&connect_args_map, &id);
 	if (_connect_args != NULL && bytes_count > 0) {
 		process_implicit_conn(ctx, id, _connect_args, kSyscallSendMsg, kRoleClient);
@@ -1864,29 +2097,74 @@ int tracepoint__syscalls__sys_exit_sendmsg(struct trace_event_raw_sys_exit *ctx)
 	bpf_map_delete_elem(&connect_args_map, &id);
 
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
-	if (args != NULL) {
+	if (args != NULL && args->sock_event) {
 		args->end_ts = bpf_ktime_get_ns();
 		bool is_ssl = propagate_fd_to_uprobe(ctx, id, args->fd, bytes_count);
 		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count, is_ssl);
-	} 
-
+	}
 	bpf_map_delete_elem(&write_args_map, &id);
 	return 0;
 }
 
+SEC("fexit/__x64_sys_sendmsg")
+int BPF_PROG(fexit__sys_sendmsg, struct pt_regs * regs, ssize_t bytes_count) {
+	return handle_syscall_exit_sendmsg(ctx, bytes_count);
+}
 
-SEC("tracepoint/syscalls/sys_enter_writev")
-int tracepoint__syscalls__sys_enter_writev(struct trace_event_raw_sys_enter *ctx) {
+SEC("tracepoint/syscalls/sys_exit_sendmsg")
+int tracepoint__syscalls__sys_exit_sendmsg(struct trace_event_raw_sys_exit *ctx) {
+	ssize_t bytes_count;
+	TP_RET(&bytes_count, ctx)
+	return handle_syscall_exit_sendmsg(ctx, bytes_count);
+}
+
+static __always_inline int handle_syscall_enter_writev(int fd, struct iovec * iov, int iovlen) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct data_args args = {0};
-	TP_ARGS(&args.fd, 0, ctx)
-	TP_ARGS(&args.iov, 1, ctx)
-	TP_ARGS(&args.iovlen, 2, ctx)
-	args.source_fn = kSyscallWriteV;
+	args.fd = fd;
+	args.iov = iov;
+	args.iovlen = iovlen;
 	args.start_ts = bpf_ktime_get_ns(); // Set start time
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
 	return 0;
+}
+SEC("fentry/__x64_sys_writev")
+int BPF_PROG(fentry__sys_writev, struct pt_regs *regs) {
+	int fd;
+	struct iovec * iov;
+	int iovlen;
+	fd = PT_REGS_PARM1_CORE(regs);
+	iov = PT_REGS_PARM2_CORE(regs);
+	iovlen = PT_REGS_PARM3_CORE(regs);
+	return handle_syscall_enter_writev(fd, iov, iovlen);
+}
+
+SEC("tracepoint/syscalls/sys_enter_writev")
+int tracepoint__syscalls__sys_enter_writev(struct trace_event_raw_sys_enter *ctx) {
+	int fd;
+	struct iovec * iov;
+	int iovlen;
+	TP_ARGS(&fd, 0, ctx)
+	TP_ARGS(&iov, 1, ctx)
+	TP_ARGS(&iovlen, 2, ctx)
+	return handle_syscall_enter_writev(fd, iov, iovlen);
+}
+
+static __always_inline int handle_syscall_exit_writev(void* ctx, ssize_t bytes_count) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
+	if (args != NULL && args->sock_event) {
+		args->end_ts = bpf_ktime_get_ns();
+		bool is_ssl = propagate_fd_to_uprobe(ctx, id, args->fd, bytes_count);
+		process_syscall_data_vecs(ctx, args, id, kEgress, bytes_count, is_ssl);
+	}
+	bpf_map_delete_elem(&write_args_map, &id);
+	return 0;
+}
+SEC("fexit/__x64_sys_writev")
+int BPF_PROG(fexit__sys_writev, struct pt_regs * regs, ssize_t bytes_count) {
+	return handle_syscall_exit_writev(ctx, bytes_count);
 }
 
 SEC("tracepoint/syscalls/sys_exit_writev")
@@ -1906,68 +2184,121 @@ int tracepoint__syscalls__sys_exit_writev(struct trace_event_raw_sys_exit *ctx) 
 	return 0;
 }
 
-// int close(int fd);
-SEC("tracepoint/syscalls/sys_enter_close")
-// SEC("kprobe/sys_close")
-int tracepoint__syscalls__sys_enter_close(struct trace_event_raw_sys_enter *ctx) {
+static __always_inline int handle_syscall_enter_close(int fd) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct close_args args = {0};
-	TP_ARGS(&args.fd, 0, ctx)
+	args.fd =  fd;
 	bpf_map_update_elem(&close_args_map, &id, &args, BPF_ANY);
 	return 0;
+}
+
+SEC("fentry/__x64_sys_close")
+int BPF_PROG(fentry__sys_close, struct pt_regs *regs) {
+	int fd;
+	fd = PT_REGS_PARM1_CORE(regs);
+	return handle_syscall_enter_close(fd);
+}
+
+// int close(int fd);
+SEC("tracepoint/syscalls/sys_enter_close")
+int tracepoint__syscalls__sys_enter_close(struct trace_event_raw_sys_enter *ctx) {
+	uint32_t fd;
+	TP_ARGS(&fd, 0, ctx)
+	return handle_syscall_enter_close(fd);
+}
+
+static __always_inline int handle_syscall_exit_close(void* ctx, long int ret) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	struct close_args *args = bpf_map_lookup_elem(&close_args_map, &id);
+	if (args != NULL) {
+		process_syscall_close(ctx, ret, args, id);
+	}
+	bpf_map_delete_elem(&close_args_map, &id);
+	return 0;
+}
+
+SEC("fexit/__x64_sys_close")
+int BPF_PROG(fexit__sys_close, struct pt_regs * regs, long int ret) {
+	return handle_syscall_exit_close(ctx, ret);
 }
 
 SEC("tracepoint/syscalls/sys_exit_close")
 int tracepoint__syscalls__sys_exit_close(struct trace_event_raw_sys_exit *ctx)
 {
-	uint64_t id = bpf_get_current_pid_tgid();
-	struct close_args *args = bpf_map_lookup_elem(&close_args_map, &id);
-	if (args != NULL) {
-		long int ret;
-		TP_RET(&ret, ctx);
-		process_syscall_close(ctx, ret, args, id);
-	}	
-	bpf_map_delete_elem(&close_args_map, &id);
-	return 0;
+	long int ret;
+	TP_RET(&ret, ctx);
+	return handle_syscall_exit_close(ctx, ret);
 }
 
-
-//int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-SEC("tracepoint/syscalls/sys_enter_connect")
-int tracepoint__syscalls__sys_enter_connect(struct trace_event_raw_sys_enter *ctx) {
+static __always_inline int handle_syscall_enter_connect(int sockfd, struct sockaddr * addr) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct connect_args args = {0};
-	TP_ARGS(&args.fd, 0, ctx)
-	TP_ARGS(&args.addr, 1, ctx)
+	args.addr = addr;
+	args.fd = sockfd;
 	args.start_ts = bpf_ktime_get_ns();
 	bpf_map_update_elem(&connect_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_exit_connect")
-int tracepoint__syscalls__sys_exit_connect(struct trace_event_raw_sys_exit *ctx) {
+SEC("fentry/__sys_connect")
+int BPF_PROG(fentry__sys_connect, int sockfd, struct sockaddr *addr) {
+	return handle_syscall_enter_connect(sockfd, addr);
+}
+
+//int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+SEC("tracepoint/syscalls/sys_enter_connect")
+int tracepoint__syscalls__sys_enter_connect(struct trace_event_raw_sys_enter *ctx) {
+	int sockfd;
+	struct sockaddr * addr;
+	TP_ARGS(&sockfd, 0, ctx)
+	TP_ARGS(&addr, 1, ctx)
+	return handle_syscall_enter_connect(sockfd, addr);
+}
+
+static __always_inline int handle_syscall_exit_connect(void* ctx, int ret) {
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct connect_args *args = bpf_map_lookup_elem(&connect_args_map, &id);
-
 	if (args != NULL) {
-		long int ret;
-		TP_RET(&ret, ctx);
 		process_syscall_connect(ctx, ret, args, id);
-	} 
+	}
 	bpf_map_delete_elem(&connect_args_map, &id);
 	return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_accept4")
-int tracepoint__syscalls__sys_enter_accept4(struct trace_event_raw_sys_enter *ctx) {
+SEC("fexit/__sys_connect")
+int BPF_PROG(fexit__sys_connect, int fd, const struct sockaddr *addr, int addrlen, int ret) {
+	return handle_syscall_exit_connect(ctx, ret);
+}
+
+SEC("tracepoint/syscalls/sys_exit_connect")
+int tracepoint__syscalls__sys_exit_connect(struct trace_event_raw_sys_exit *ctx) {
+	long int ret;
+	TP_RET(&ret, ctx)
+	return handle_syscall_exit_connect(ctx, ret);
+}
+
+static __always_inline int handle_syscall_enter_accept4(struct sockaddr * addr) {
 	uint64_t id = bpf_get_current_pid_tgid();
 
 	struct accept_args args = {0};
-	TP_ARGS(&args.addr, 1, ctx)
+	args.addr = addr;
 	bpf_map_update_elem(&accept_args_map, &id, &args, BPF_ANY);
 	return 0;
+}
+
+
+SEC("fentry/__sys_accept4")
+int BPF_PROG(fentry__sys_accept4, int fd, struct sockaddr * addr) {
+	return handle_syscall_enter_accept4(addr);
+}
+
+SEC("tracepoint/syscalls/sys_enter_accept4")
+int tracepoint__syscalls__sys_enter_accept4(struct trace_event_raw_sys_enter *ctx) {
+	struct sockaddr * addr;
+	TP_ARGS(&addr, 1, ctx)
+	return handle_syscall_enter_accept4(addr);
 }
 
 SEC("kretprobe/sock_alloc") 
@@ -1990,6 +2321,24 @@ int BPF_KRETPROBE(sock_alloc_ret)
 	}
 
 	return 0;
+}
+
+static __always_inline int handle_syscall_exit_accept4(void* ctx, long int ret) {
+	uint64_t id = bpf_get_current_pid_tgid();
+	struct accept_args *args = bpf_map_lookup_elem(&accept_args_map, &id);
+	if (args != NULL) {
+		process_syscall_accept(ctx, ret, args, id);
+	}
+	bpf_map_delete_elem(&accept_args_map, &id);
+	return 0;
+}
+
+
+
+SEC("fexit/__sys_accept4")
+int BPF_PROG(fexit__sys_accept4, int fd,struct sockaddr * upeer_sockaddr,int * upeer_addrlen,
+	int flags,  long int ret) {
+	return handle_syscall_exit_accept4(ctx, ret);
 }
 
 SEC("tracepoint/syscalls/sys_exit_accept4")
@@ -2026,8 +2375,7 @@ struct process_exit_event {
 	int pid;
 };
 
-SEC("tracepoint/sched/sched_process_exec")
-int tracepoint__sched__sched_process_exec(struct trace_event_raw_sched_process_exec *ctx) {
+static __always_inline int handle_sched_process_exec(void *ctx) {
 	struct process_exec_event event = {0};
 	uint64_t id = bpf_get_current_pid_tgid();
 	uint32_t tgid = id >> 32;
@@ -2040,10 +2388,17 @@ int tracepoint__sched__sched_process_exec(struct trace_event_raw_sched_process_e
 	}
 	return BPF_OK;
 }
+SEC("fentry/__traceiter_sched_process_exec")
+int BPF_PROG(fentry__sched_process_exec) {
+	return handle_sched_process_exec(ctx);
+}
 
+SEC("tracepoint/sched/sched_process_exec")
+int tracepoint__sched__sched_process_exec(struct trace_event_raw_sched_process_exec *ctx) {
+	return handle_sched_process_exec(ctx);
+}
 
-SEC("tracepoint/sched/sched_process_exit")
-int tracepoint__sched__sched_process_exit(struct trace_event_raw_sched_process_exec *ctx) {
+static __always_inline int handle_sched_process_exit(void *ctx) {
 	struct process_exit_event event = {0};
 	uint64_t id = bpf_get_current_pid_tgid();
 	uint32_t tgid = id >> 32;
@@ -2055,4 +2410,14 @@ int tracepoint__sched__sched_process_exit(struct trace_event_raw_sched_process_e
 		bpf_perf_event_output(ctx, &proc_exit_events, BPF_F_CURRENT_CPU, &event, sizeof(struct process_exit_event));
 	}
 	return BPF_OK;
+}
+
+SEC("fentry/__traceiter_sched_process_exit")
+int BPF_PROG(fentry__sched_process_exit) {
+	return handle_sched_process_exit(ctx);
+}
+
+SEC("tracepoint/sched/sched_process_exit")
+int tracepoint__sched__sched_process_exit(struct trace_event_raw_sched_process_exec *ctx) {
+	return handle_sched_process_exit(ctx);
 }
