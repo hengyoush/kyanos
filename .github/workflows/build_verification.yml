@@ -26,7 +26,7 @@ jobs:
     # https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-public-repositories
     strategy:
       matrix:
-        os: [ "ubuntu-20.04","ubuntu-22.04","ubuntu-24.04" ]
+        os: ["ubuntu-22.04","ubuntu-24.04" ]
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
