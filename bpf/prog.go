@@ -348,10 +348,11 @@ func FentryOrTracepoint(func_name string, fentryProg *ebpf.Program, group string
 	}
 	if l != nil {
 		common.BPFLog.Infof("attached fentry to %s", func_name)
+		return l, nil
 	} else {
 		common.BPFLog.Errorf("failed to attach fentry to %s", func_name)
+		return nil, err
 	}
-	return l, err
 }
 
 func FentryOrKprobe(func_name string, fentryProg *ebpf.Program, kprobeProg *ebpf.Program) (link.Link, error) {
@@ -366,10 +367,11 @@ func FentryOrKprobe(func_name string, fentryProg *ebpf.Program, kprobeProg *ebpf
 	}
 	if l != nil {
 		common.BPFLog.Infof("attached fentry to %s", func_name)
+		return l, nil
 	} else {
 		common.BPFLog.Errorf("failed to attach fentry to %s", func_name)
+		return nil, err
 	}
-	return l, err
 }
 
 func FexitOrTracepoint(func_name string, fexitProg *ebpf.Program, group string, name string, tracepointProg *ebpf.Program) (link.Link, error) {
@@ -384,10 +386,11 @@ func FexitOrTracepoint(func_name string, fexitProg *ebpf.Program, group string, 
 	}
 	if l != nil {
 		common.BPFLog.Infof("attached fexit to %s", func_name)
+		return l, nil
 	} else {
 		common.BPFLog.Errorf("failed to attach fexit to %s", func_name)
+		return nil, err
 	}
-	return l, err
 }
 
 func FexitOrKretprobe(func_name string, fexitProg *ebpf.Program, kretprobeProg *ebpf.Program) (link.Link, error) {
@@ -402,8 +405,9 @@ func FexitOrKretprobe(func_name string, fexitProg *ebpf.Program, kretprobeProg *
 	}
 	if l != nil {
 		common.BPFLog.Infof("attached fexit to %s", func_name)
+		return l, nil
 	} else {
 		common.BPFLog.Errorf("failed to attach fexit to %s", func_name)
+		return nil, err
 	}
-	return l, err
 }
