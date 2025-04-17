@@ -1432,14 +1432,24 @@ static __always_inline int handle_syscall_enter_recvfrom(int fd, void* buf, stru
 	return 0;
 }
 
-SEC("fentry/__x64_sys_recvfrom")
-int BPF_PROG(fentry__sys_recvfrom, struct pt_regs * regs) {
-	int fd = PT_REGS_PARM1(regs);
-	void* buf = (void*)PT_REGS_PARM2(regs);
-	struct sockaddr* src_addr = (struct sockaddr*)PT_REGS_PARM3(regs);
-	int flags = PT_REGS_PARM4(regs);
+SEC("fentry/__sys_recvfrom")
+int BPF_PROG(fentry__sys_recvfrom, int fd, void *buf, size_t size, unsigned int flags, struct sockaddr * src_addr) {
+	// int fd = PT_REGS_PARM1_CORE(regs);
+	// void* buf = (void*)PT_REGS_PARM2_CORE(regs);
+	// int flags = PT_REGS_PARM4_CORE(regs);
+	// struct sockaddr* src_addr = (struct sockaddr*)PT_REGS_PARM5_CORE(regs);
 	return handle_syscall_enter_recvfrom(fd, buf, src_addr, flags);
 }
+
+// SEC("fentry/__x64_sys_recvfrom")
+// int BPF_PROG(fentry__sys_recvfrom, struct pt_regs * regs) {
+// 	int fd = PT_REGS_PARM1(regs);
+// 	void* buf = (void*)PT_REGS_PARM2(regs);
+// 	int flags = PT_REGS_PARM4(regs);
+// 	struct sockaddr* src_addr = (struct sockaddr*)PT_REGS_PARM5(regs);
+// 	return handle_syscall_enter_recvfrom(fd, buf, src_addr, flags);
+// }
+
 
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
 //                  struct sockaddr *src_addr, socklen_t *addrlen);
@@ -1502,8 +1512,8 @@ static __always_inline int handle_syscall_enter_read(int fd, void* buf) {
 
 SEC("fentry/__x64_sys_read")
 int BPF_PROG(fentry__sys_read, struct pt_regs * regs) {
-	int fd = PT_REGS_PARM1(regs);
-	void* buf = (void*)PT_REGS_PARM2(regs);
+	int fd = PT_REGS_PARM1_CORE(regs);
+	void* buf = (void*)PT_REGS_PARM2_CORE(regs);
 	return handle_syscall_enter_read(fd, buf);
 }
 
@@ -1576,9 +1586,9 @@ static __always_inline int handle_syscall_enter_recvmmsg(int sockfd, struct mmsg
 
 SEC("fentry/__x64_sys_recvmmsg")
 int BPF_PROG(fentry__sys_recvmmsg, struct pt_regs * regs) {
-	int sockfd = PT_REGS_PARM1(regs);
-	struct mmsghdr* msgvec = (struct mmsghdr*)PT_REGS_PARM2(regs);
-	unsigned int vlen = PT_REGS_PARM3(regs);
+	int sockfd = PT_REGS_PARM1_CORE(regs);
+	struct mmsghdr* msgvec = (struct mmsghdr*)PT_REGS_PARM2_CORE(regs);
+	unsigned int vlen = PT_REGS_PARM3_CORE(regs);
 	return handle_syscall_enter_recvmmsg(sockfd, msgvec, vlen);
 }
 
@@ -1658,20 +1668,20 @@ static __always_inline int handle_syscall_enter_recvmsg(int sockfd, struct my_us
 
 SEC("fentry/__x64_sys_recvmsg")
 int BPF_PROG(fentry__sys_recvmsg, struct pt_regs * regs) {
-	int flags = PT_REGS_PARM4(regs);
-	struct my_user_msghdr* msghdr = (struct my_user_msghdr*)PT_REGS_PARM3(regs);
-	int sockfd = PT_REGS_PARM1(regs);
+	int sockfd = PT_REGS_PARM1_CORE(regs);
+	struct my_user_msghdr* msghdr = (struct my_user_msghdr*)PT_REGS_PARM2_CORE(regs);
+	int flags = PT_REGS_PARM3_CORE(regs);
 	return handle_syscall_enter_recvmsg(sockfd, msghdr, flags);
 }
 
 SEC("tracepoint/syscalls/sys_enter_recvmsg")
 int tracepoint__syscalls__sys_enter_recvmsg(struct trace_event_raw_sys_enter *ctx) {
-	int flags;
-	TP_ARGS(&flags, 2, ctx)
-	struct my_user_msghdr* msghdr;
-	TP_ARGS(&msghdr, 1, ctx)
 	int sockfd ; 
 	TP_ARGS(&sockfd, 0, ctx)
+	struct my_user_msghdr* msghdr;
+	TP_ARGS(&msghdr, 1, ctx)
+	int flags;
+	TP_ARGS(&flags, 2, ctx)
 	return handle_syscall_enter_recvmsg(sockfd, msghdr, flags);
 }
 
@@ -1725,9 +1735,9 @@ static __always_inline int handle_syscall_enter_readv(int fd, struct iovec* iov,
 
 SEC("fentry/__x64_sys_readv")
 int BPF_PROG(fentry__sys_readv, struct pt_regs * regs) {
-	int fd = PT_REGS_PARM1(regs);
-	struct iovec* iov = (struct iovec*)PT_REGS_PARM2(regs);
-	int iovlen = PT_REGS_PARM3(regs);
+	int fd = PT_REGS_PARM1_CORE(regs);
+	struct iovec* iov = (struct iovec*)PT_REGS_PARM2_CORE(regs);
+	int iovlen = PT_REGS_PARM3_CORE(regs);
 	return handle_syscall_enter_readv(fd, iov, iovlen);
 }
 
@@ -1782,9 +1792,9 @@ static __always_inline int handle_syscall_enter_sendfile(int out_fd, int in_fd, 
 
 SEC("fentry/__x64_sys_sendfile64")
 int BPF_PROG(fentry__sys_sendfile64, struct pt_regs * regs) {
-	int out_fd = PT_REGS_PARM1(regs);
-	int in_fd = PT_REGS_PARM2(regs);
-	size_t count = PT_REGS_PARM4(regs);
+	int out_fd = PT_REGS_PARM1_CORE(regs);
+	int in_fd = PT_REGS_PARM2_CORE(regs);
+	size_t count = PT_REGS_PARM4_CORE(regs);
 	return handle_syscall_enter_sendfile(out_fd, in_fd, count);
 }
 
@@ -1917,8 +1927,8 @@ static __always_inline int handle_syscall_enter_write(int fd, const void* buf) {
 
 SEC("fentry/__x64_sys_write")
 int BPF_PROG(fentry__sys_write, struct pt_regs * regs) {
-	int fd = PT_REGS_PARM1(regs);
-	const void* buf = PT_REGS_PARM2(regs);
+	int fd = PT_REGS_PARM1_CORE(regs);
+	const void* buf = PT_REGS_PARM2_CORE(regs);
 	return handle_syscall_enter_write(fd, buf);
 }
 
