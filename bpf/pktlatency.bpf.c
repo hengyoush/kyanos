@@ -2398,10 +2398,6 @@ static __always_inline int handle_sched_process_exec(void *ctx) {
 	}
 	return BPF_OK;
 }
-SEC("fentry/__traceiter_sched_process_exec")
-int BPF_PROG(fentry__sched_process_exec) {
-	return handle_sched_process_exec(ctx);
-}
 
 SEC("tracepoint/sched/sched_process_exec")
 int tracepoint__sched__sched_process_exec(struct trace_event_raw_sched_process_exec *ctx) {
@@ -2422,10 +2418,6 @@ static __always_inline int handle_sched_process_exit(void *ctx) {
 	return BPF_OK;
 }
 
-SEC("fentry/__traceiter_sched_process_exit")
-int BPF_PROG(fentry__sched_process_exit) {
-	return handle_sched_process_exit(ctx);
-}
 
 SEC("tracepoint/sched/sched_process_exit")
 int tracepoint__sched__sched_process_exit(struct trace_event_raw_sched_process_exec *ctx) {

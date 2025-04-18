@@ -284,8 +284,6 @@ type AgentSpecs struct {
 type AgentProgramSpecs struct {
 	DevHardStartXmit                     *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                         *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
-	FentrySchedProcessExec               *ebpf.ProgramSpec `ebpf:"fentry__sched_process_exec"`
-	FentrySchedProcessExit               *ebpf.ProgramSpec `ebpf:"fentry__sched_process_exit"`
 	FentrySysAccept4                     *ebpf.ProgramSpec `ebpf:"fentry__sys_accept4"`
 	FentrySysClose                       *ebpf.ProgramSpec `ebpf:"fentry__sys_close"`
 	FentrySysConnect                     *ebpf.ProgramSpec `ebpf:"fentry__sys_connect"`
@@ -514,8 +512,6 @@ func (m *AgentMaps) Close() error {
 type AgentPrograms struct {
 	DevHardStartXmit                     *ebpf.Program `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                         *ebpf.Program `ebpf:"dev_queue_xmit"`
-	FentrySchedProcessExec               *ebpf.Program `ebpf:"fentry__sched_process_exec"`
-	FentrySchedProcessExit               *ebpf.Program `ebpf:"fentry__sched_process_exit"`
 	FentrySysAccept4                     *ebpf.Program `ebpf:"fentry__sys_accept4"`
 	FentrySysClose                       *ebpf.Program `ebpf:"fentry__sys_close"`
 	FentrySysConnect                     *ebpf.Program `ebpf:"fentry__sys_connect"`
@@ -599,8 +595,6 @@ func (p *AgentPrograms) Close() error {
 	return _AgentClose(
 		p.DevHardStartXmit,
 		p.DevQueueXmit,
-		p.FentrySchedProcessExec,
-		p.FentrySchedProcessExit,
 		p.FentrySysAccept4,
 		p.FentrySysClose,
 		p.FentrySysConnect,

@@ -44,8 +44,8 @@ func StartHandleSchedExecEvent(ch chan *bpf.AgentProcessExecEvent) {
 
 func checkFilterByPIDEnabled() (bool, error) {
 	var controlValues *ebpf.Map = bpf.GetMapFromObjs(bpf.Objs, "ControlValues")
-	var enabledValue int8
-	if err := controlValues.Lookup(bpf.AgentControlValueIndexTKEnableFilterByPid, enabledValue); err != nil {
+	var enabledValue int64
+	if err := controlValues.Lookup(bpf.AgentControlValueIndexTKEnableFilterByPid, &enabledValue); err != nil {
 		if errors.Is(err, ebpf.ErrKeyNotExist) {
 			return false, nil
 		} else {

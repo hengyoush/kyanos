@@ -220,15 +220,11 @@ func AttachSyscallRecvfromExit() (link.Link, error) {
 }
 
 func AttachSchedProcessExec() (link.Link, error) {
-	return FentryOrTracepoint("__traceiter_sched_process_exec", GetProgramFromObjs(Objs, "FentrySchedProcessExec"),
-		"sched", "sched_process_exec",
-		GetProgramFromObjs(Objs, "TracepointSchedSchedProcessExec"))
+	return Tracepoint("sched", "sched_process_exec", GetProgramFromObjs(Objs, "TracepointSchedSchedProcessExec"))
 }
 
 func AttachSchedProcessExit() (link.Link, error) {
-	return FentryOrTracepoint("__traceiter_sched_process_exit", GetProgramFromObjs(Objs, "FentrySchedProcessExit"),
-		"sched", "sched_process_exit",
-		GetProgramFromObjs(Objs, "TracepointSchedSchedProcessExit"))
+	return Tracepoint("sched", "sched_process_exit", GetProgramFromObjs(Objs, "TracepointSchedSchedProcessExit"))
 }
 
 func AttachNfNatManipPkt() (link.Link, error) {
