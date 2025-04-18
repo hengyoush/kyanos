@@ -958,7 +958,7 @@ enum endpoint_role_t role, uint64_t start_ts) {
 		BPF_CORE_READ_USER_INTO(&sa_family, addr, sa_family);
 		if (sa_family == AF_INET) {
 			struct sockaddr_in *addr4 = (struct sockaddr_in*)addr;
-			conn_info.raddr.in6.sin6_port = _U(addr4, sin_port);
+			conn_info.raddr.in6.sin6_port = bpf_ntohs(_U(addr4, sin_port));
 			conn_info.raddr.in6.sin6_addr.in6_u.u6_addr32[0] = _U(addr4, sin_addr.s_addr);
 		} else if (sa_family == AF_INET6) {
 			struct sockaddr_in6 *addr6 = (struct sockaddr_in6*)addr;
