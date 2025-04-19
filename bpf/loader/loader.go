@@ -253,6 +253,9 @@ func filterFunctions(coll *ebpf.CollectionSpec, kernelVersion compatible.KernelV
 	for name := range coll.Programs {
 		if strings.HasPrefix(name, "tracepoint__syscalls") || strings.HasPrefix(name, "tracepoint__sched") || strings.HasPrefix(name, "kprobe__nf") {
 			finalCProgNames = append(finalCProgNames, name)
+		} else if kernelVersion.SupportCapability(compatible.SupportFentry) &&
+			(strings.HasPrefix(name, "fentry__") || strings.HasPrefix(name, "fexit__")) {
+			finalCProgNames = append(finalCProgNames, name)
 		}
 	}
 
@@ -500,6 +503,10 @@ func attachBpfProgs(ifName string, kernelVersion *compatible.KernelVersion, opti
 					bpf.GetProgramFromObjs(bpf.Objs, function.BPFGoProgName))
 			} else if function.IsKRetprobe() {
 				l, err = bpf.Kretprobe(function.GetKprobeName(), bpf.GetProgramFromObjs(bpf.Objs, function.BPFGoProgName))
+			} else if function.IsFentry() {
+				l, err = bpf.Fentry(function.GetKprobeName(), bpf.GetProgramFromObjs(bpf.Objs, function.BPFGoProgName))
+			} else if function.IsFexit() {
+				l, err = bpf.Fexit(function.GetKprobeName(), bpf.GetProgramFromObjs(bpf.Objs, function.BPFGoProgName))
 			} else {
 				panic(fmt.Sprintf("invalid program type: %v", function))
 			}
@@ -757,22 +764,28 @@ func attachOpensslToSpecificProcess() bool {
 }
 
 func attachSchedProgs(links *list.List) {
-	link, err := link.Tracepoint("sched", "sched_process_exec", bpf.GetProgramFromObjs(bpf.Objs, "TracepointSchedSchedProcessExec"), nil)
+	_link, err := bpf.AttachSchedProcessExec()
 	if err != nil {
-		common.AgentLog.Warnf("Attach tracepoint/sched/sched_process_exec error: %v", err)
+		common.AgentLog.Debugf("Attach sched_process_exec failed: %v", err)
 	} else {
-		links.PushBack(link)
+		links.PushBack(_link)
+	}
+	_link, err = bpf.AttachSchedProcessExit()
+	if err != nil {
+		common.AgentLog.Debugf("Attach sched_process_exit failed: %v", err)
+	} else {
+		links.PushBack(_link)
 	}
 }
 
 func attachNfFunctions(links *list.List) {
-	l, err := link.Kprobe("nf_nat_manip_pkt", bpf.GetProgramFromObjs(bpf.Objs, "KprobeNfNatManipPkt"), nil)
+	l, err := bpf.AttachNfNatManipPkt()
 	if err != nil {
 		common.AgentLog.Debugf("Attahc kprobe/nf_nat_manip_pkt failed: %v", err)
 	} else {
 		links.PushBack(l)
 	}
-	l, err = link.Kprobe("nf_nat_packet", bpf.GetProgramFromObjs(bpf.Objs, "KprobeNfNatPacket"), nil)
+	l, err = bpf.AttachNfNatPacket()
 	if err != nil {
 		common.AgentLog.Debugf("Attahc kprobe/nf_nat_packet failed: %v", err)
 	} else {
