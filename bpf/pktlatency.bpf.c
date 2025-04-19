@@ -1487,7 +1487,11 @@ static __always_inline int handle_syscall_exit_recvfrom(void* ctx, ssize_t bytes
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fexit/__x64_sys_recvfrom")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_recvfrom")
+#endif
 int BPF_PROG(fexit__sys_recvfrom, struct pt_regs * regs, ssize_t ret) {
 	return handle_syscall_exit_recvfrom(ctx, ret);
 }
@@ -1510,7 +1514,11 @@ static __always_inline int handle_syscall_enter_read(int fd, void* buf) {
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fentry/__x64_sys_read")
+#elif defined(ARCH_arm64)
+SEC("fentry/__arm64_sys_read")
+#endif
 int BPF_PROG(fentry__sys_read, struct pt_regs * regs) {
 	int fd = PT_REGS_PARM1_CORE(regs);
 	void* buf = (void*)PT_REGS_PARM2_CORE(regs);
@@ -1539,7 +1547,11 @@ static __always_inline int handle_syscall_exit_read(void* ctx, ssize_t bytes_cou
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fexit/__x64_sys_read")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_read")
+#endif
 int BPF_PROG(fexit__sys_read, struct pt_regs * regs, long int ret) {
 	return handle_syscall_exit_read(ctx, ret);
 }
@@ -1584,7 +1596,11 @@ static __always_inline int handle_syscall_enter_recvmmsg(int sockfd, struct mmsg
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fentry/__x64_sys_recvmmsg")
+#elif defined(ARCH_arm64)
+SEC("fentry/__arm64_sys_recvmmsg")
+#endif
 int BPF_PROG(fentry__sys_recvmmsg, struct pt_regs * regs) {
 	int sockfd = PT_REGS_PARM1_CORE(regs);
 	struct mmsghdr* msgvec = (struct mmsghdr*)PT_REGS_PARM2_CORE(regs);
@@ -1627,7 +1643,11 @@ static __always_inline int handle_syscall_exit_recvmmsg(void* ctx, int num_msgs)
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fexit/__x64_sys_recvmmsg")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_recvmmsg")
+#endif
 int BPF_PROG(fexit__sys_recvmmsg, struct pt_regs * regs, long int ret) {
 	return handle_syscall_exit_recvmmsg(ctx, ret);
 }
@@ -1666,7 +1686,11 @@ static __always_inline int handle_syscall_enter_recvmsg(int sockfd, struct my_us
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fentry/__x64_sys_recvmsg")
+#elif defined(ARCH_arm64)
+SEC("fentry/__arm64_sys_recvmsg")
+#endif
 int BPF_PROG(fentry__sys_recvmsg, struct pt_regs * regs) {
 	int sockfd = PT_REGS_PARM1_CORE(regs);
 	struct my_user_msghdr* msghdr = (struct my_user_msghdr*)PT_REGS_PARM2_CORE(regs);
@@ -1706,7 +1730,11 @@ static __always_inline int handle_syscall_exit_recvmsg(void* ctx, ssize_t bytes_
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fexit/__x64_sys_recvmsg")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_recvmsg")
+#endif
 int BPF_PROG(fexit__sys_recvmsg, struct pt_regs * regs, long int ret) {
 	return handle_syscall_exit_recvmsg(ctx, ret);
 }
@@ -1733,7 +1761,11 @@ static __always_inline int handle_syscall_enter_readv(int fd, struct iovec* iov,
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fentry/__x64_sys_readv")
+#elif defined(ARCH_arm64)
+SEC("fentry/__arm64_sys_readv")
+#endif
 int BPF_PROG(fentry__sys_readv, struct pt_regs * regs) {
 	int fd = PT_REGS_PARM1_CORE(regs);
 	struct iovec* iov = (struct iovec*)PT_REGS_PARM2_CORE(regs);
@@ -1764,7 +1796,11 @@ static __always_inline int handle_syscall_exit_readv(void* ctx, ssize_t bytes_co
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fexit/__x64_sys_readv")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_readv")
+#endif
 int BPF_PROG(fexit__sys_readv, struct pt_regs * regs, long int ret) {
 	return handle_syscall_exit_readv(ctx, ret);
 }
@@ -1790,7 +1826,11 @@ static __always_inline int handle_syscall_enter_sendfile(int out_fd, int in_fd, 
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fentry/__x64_sys_sendfile64")
+#elif defined(ARCH_arm64)
+SEC("fentry/__arm64_sys_sendfile64")
+#endif
 int BPF_PROG(fentry__sys_sendfile64, struct pt_regs * regs) {
 	int out_fd = PT_REGS_PARM1_CORE(regs);
 	int in_fd = PT_REGS_PARM2_CORE(regs);
@@ -1823,7 +1863,11 @@ static __always_inline int handle_syscall_exit_sendfile64(void* ctx, ssize_t byt
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fexit/__x64_sys_sendfile64")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_sendfile64")
+#endif
 int BPF_PROG(fexit__sys_sendfile64, struct pt_regs * regs, long int ret) {
 	return handle_syscall_exit_sendfile64(ctx, ret);
 }
@@ -1899,7 +1943,11 @@ static __always_inline int handle_syscall_exit_sendto(void* ctx, ssize_t bytes_c
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fexit/__x64_sys_sendto")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_sendto")
+#endif
 int BPF_PROG(fexit__sys_sendto, struct pt_regs * regs, ssize_t ret) {
 	return handle_syscall_exit_sendto(ctx, ret);
 }
@@ -1925,7 +1973,11 @@ static __always_inline int handle_syscall_enter_write(int fd, const void* buf) {
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fentry/__x64_sys_write")
+#elif defined(ARCH_arm64)
+SEC("fentry/__arm64_sys_write")
+#endif
 int BPF_PROG(fentry__sys_write, struct pt_regs * regs) {
 	int fd = PT_REGS_PARM1_CORE(regs);
 	const void* buf = PT_REGS_PARM2_CORE(regs);
@@ -1959,7 +2011,11 @@ static __always_inline int handle_syscall_exit_write(void* ctx, ssize_t bytes_co
 	return 0;
 }
 
+#ifdef defined(ARCH_amd64)
 SEC("fexit/__x64_sys_write")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_write")
+#endif
 int BPF_PROG(fexit__sys_write, struct pt_regs * regs, long int bytes_count) {
 	return handle_syscall_exit_write(ctx, bytes_count);
 }
@@ -2047,7 +2103,11 @@ static __always_inline int handle_syscall_exit_sendmmsg(void* ctx, int num_msgs)
 	return 0;
 }
 
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_sendmmsg")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_sendmmsg")
+#endif
 int BPF_PROG(fexit__sys_sendmmsg, struct pt_regs * regs, int num_msgs) {
 	return handle_syscall_exit_sendmmsg(ctx, num_msgs);
 }
@@ -2116,7 +2176,11 @@ static __always_inline int handle_syscall_exit_sendmsg(void* ctx, ssize_t bytes_
 	return 0;
 }
 
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_sendmsg")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_sendmsg")
+#endif
 int BPF_PROG(fexit__sys_sendmsg, struct pt_regs * regs, ssize_t bytes_count) {
 	return handle_syscall_exit_sendmsg(ctx, bytes_count);
 }
@@ -2139,7 +2203,12 @@ static __always_inline int handle_syscall_enter_writev(int fd, struct iovec * io
 	bpf_map_update_elem(&write_args_map, &id, &args, BPF_ANY);
 	return 0;
 }
+
+#ifdef ARCH_amd64
 SEC("fentry/__x64_sys_writev")
+#elif defined(ARCH_arm64)
+SEC("fentry/__arm64_sys_writev")
+#endif
 int BPF_PROG(fentry__sys_writev, struct pt_regs *regs) {
 	int fd;
 	struct iovec * iov;
@@ -2172,7 +2241,12 @@ static __always_inline int handle_syscall_exit_writev(void* ctx, ssize_t bytes_c
 	bpf_map_delete_elem(&write_args_map, &id);
 	return 0;
 }
+
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_writev")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_writev")
+#endif
 int BPF_PROG(fexit__sys_writev, struct pt_regs * regs, ssize_t bytes_count) {
 	return handle_syscall_exit_writev(ctx, bytes_count);
 }
@@ -2203,7 +2277,11 @@ static __always_inline int handle_syscall_enter_close(int fd) {
 	return 0;
 }
 
+#ifdef ARCH_amd64
 SEC("fentry/__x64_sys_close")
+#elif defined(ARCH_arm64)
+SEC("fentry/__arm64_sys_close")
+#endif
 int BPF_PROG(fentry__sys_close, struct pt_regs *regs) {
 	int fd;
 	fd = PT_REGS_PARM1_CORE(regs);
@@ -2228,7 +2306,12 @@ static __always_inline int handle_syscall_exit_close(void* ctx, long int ret) {
 	return 0;
 }
 
+
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_close")
+#elif defined(ARCH_arm64)
+SEC("fexit/__arm64_sys_close")
+#endif
 int BPF_PROG(fexit__sys_close, struct pt_regs * regs, long int ret) {
 	return handle_syscall_exit_close(ctx, ret);
 }
