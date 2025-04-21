@@ -30,3 +30,7 @@ func (w *WatchOptions) Init() {
 		w.MaxRecords = 100
 	}
 }
+
+func (w *WatchOptions) UseTui() bool {
+	return !w.DebugOutput && w.JsonOutput == ""
+}

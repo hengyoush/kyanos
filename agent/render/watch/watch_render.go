@@ -570,9 +570,10 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 		var jsonFile *os.File
 		var err error
 		if options.JsonOutput != "stdout" {
+			c.AgentLog.Info("Writing JSON output to file: ", options.JsonOutput)
 			jsonFile, err = os.OpenFile(options.JsonOutput, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 			if err != nil {
-				c.BPFEventLog.Errorln("Failed to open JSON output file:", err)
+				c.AgentLog.Errorln("Failed to open JSON output file:", err)
 				return
 			}
 			defer jsonFile.Close()
@@ -584,12 +585,12 @@ func RunWatchRender(ctx context.Context, ch chan *common.AnnotatedRecord, option
 			case r := <-ch:
 				jsonData, err := json.Marshal(r)
 				if err != nil {
-					c.BPFEventLog.Errorln("Failed to marshal record to JSON:", err)
+					c.AgentLog.Errorln("Failed to marshal record to JSON:", err)
 					continue
 				}
 				if jsonFile != nil {
 					if _, err := jsonFile.Write(append(jsonData, '\n')); err != nil {
-						c.BPFEventLog.Errorln("Failed to write JSON to file:", err)
+						c.AgentLog.Errorln("Failed to write JSON to file:", err)
 					}
 				} else {
 					fmt.Println(string(jsonData))

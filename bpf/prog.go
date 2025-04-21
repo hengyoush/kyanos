@@ -340,10 +340,10 @@ func FentryOrTracepoint(func_name string, fentryProg *ebpf.Program, group string
 			common.BPFLog.Errorf("failed to attach fentry or tracepoint, group: %s name: %s, err: %v", group, name, err)
 		}
 	} else {
-		common.BPFLog.Infof("attached fentry to %s", func_name)
+		common.BPFLog.Debugf("attached fentry to %s", func_name)
 	}
 	if l != nil {
-		common.BPFLog.Infof("attached fentry to %s", func_name)
+		common.BPFLog.Debugf("attached fentry to %s", func_name)
 		return l, nil
 	} else {
 		common.BPFLog.Errorf("failed to attach fentry to %s", func_name)
@@ -359,10 +359,10 @@ func FentryOrKprobe(func_name string, fentryProg *ebpf.Program, kprobeProg *ebpf
 			common.BPFLog.Errorf("failed to attach fentry or kprobe, func_name: %s, err: %v", func_name, err)
 		}
 	} else {
-		common.BPFLog.Infof("attached fentry to %s", func_name)
+		common.BPFLog.Debugf("attached fentry to %s", func_name)
 	}
 	if l != nil {
-		common.BPFLog.Infof("attached fentry to %s", func_name)
+		common.BPFLog.Debugf("attached fentry to %s", func_name)
 		return l, nil
 	} else {
 		common.BPFLog.Errorf("failed to attach fentry to %s", func_name)
@@ -378,10 +378,10 @@ func FexitOrTracepoint(func_name string, fexitProg *ebpf.Program, group string, 
 			common.BPFLog.Errorf("failed to attach fexit or tracepoint, group: %s name: %s, err: %v", group, name, err)
 		}
 	} else {
-		common.BPFLog.Infof("attached fexit to %s", func_name)
+		common.BPFLog.Debugf("attached fexit to %s", func_name)
 	}
 	if l != nil {
-		common.BPFLog.Infof("attached fexit to %s", func_name)
+		common.BPFLog.Debugf("attached fexit to %s", func_name)
 		return l, nil
 	} else {
 		common.BPFLog.Errorf("failed to attach fexit to %s", func_name)
@@ -397,10 +397,10 @@ func FexitOrKretprobe(func_name string, fexitProg *ebpf.Program, kretprobeProg *
 			common.BPFLog.Errorf("failed to attach fexit or kretprobe, func_name: %s, err: %v", func_name, err)
 		}
 	} else {
-		common.BPFLog.Infof("attached fexit to %s", func_name)
+		common.BPFLog.Debugf("attached fexit to %s", func_name)
 	}
 	if l != nil {
-		common.BPFLog.Infof("attached fexit to %s", func_name)
+		common.BPFLog.Debugf("attached fexit to %s", func_name)
 		return l, nil
 	} else {
 		common.BPFLog.Errorf("failed to attach fexit to %s", func_name)

@@ -148,7 +148,7 @@ func SetupAgent(options ac.AgentOptions) {
 		if err != nil {
 			return
 		}
-		if !options.WatchOptions.DebugOutput {
+		if options.WatchOptions.UseTui() {
 			options.LoadPorgressChannel <- "🍹 All programs attached"
 			options.LoadPorgressChannel <- "🍭 Waiting for events.."
 			time.Sleep(500 * time.Millisecond)
@@ -158,7 +158,7 @@ func SetupAgent(options ac.AgentOptions) {
 	defer func() {
 		_bf.Close()
 	}()
-	if !options.WatchOptions.DebugOutput {
+	if options.WatchOptions.UseTui() {
 		loader_render.Start(ctx, options)
 		common.SetLogToStdout()
 	} else {
