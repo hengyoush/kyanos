@@ -1487,7 +1487,7 @@ static __always_inline int handle_syscall_exit_recvfrom(void* ctx, ssize_t bytes
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_recvfrom")
 #elif defined(ARCH_arm64)
 SEC("fexit/__arm64_sys_recvfrom")
@@ -1514,7 +1514,7 @@ static __always_inline int handle_syscall_enter_read(int fd, void* buf) {
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fentry/__x64_sys_read")
 #elif defined(ARCH_arm64)
 SEC("fentry/__arm64_sys_read")
@@ -1547,7 +1547,7 @@ static __always_inline int handle_syscall_exit_read(void* ctx, ssize_t bytes_cou
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_read")
 #elif defined(ARCH_arm64)
 SEC("fexit/__arm64_sys_read")
@@ -1596,7 +1596,7 @@ static __always_inline int handle_syscall_enter_recvmmsg(int sockfd, struct mmsg
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fentry/__x64_sys_recvmmsg")
 #elif defined(ARCH_arm64)
 SEC("fentry/__arm64_sys_recvmmsg")
@@ -1643,7 +1643,7 @@ static __always_inline int handle_syscall_exit_recvmmsg(void* ctx, int num_msgs)
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_recvmmsg")
 #elif defined(ARCH_arm64)
 SEC("fexit/__arm64_sys_recvmmsg")
@@ -1686,7 +1686,7 @@ static __always_inline int handle_syscall_enter_recvmsg(int sockfd, struct my_us
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fentry/__x64_sys_recvmsg")
 #elif defined(ARCH_arm64)
 SEC("fentry/__arm64_sys_recvmsg")
@@ -1730,7 +1730,7 @@ static __always_inline int handle_syscall_exit_recvmsg(void* ctx, ssize_t bytes_
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_recvmsg")
 #elif defined(ARCH_arm64)
 SEC("fexit/__arm64_sys_recvmsg")
@@ -1761,7 +1761,7 @@ static __always_inline int handle_syscall_enter_readv(int fd, struct iovec* iov,
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fentry/__x64_sys_readv")
 #elif defined(ARCH_arm64)
 SEC("fentry/__arm64_sys_readv")
@@ -1796,7 +1796,7 @@ static __always_inline int handle_syscall_exit_readv(void* ctx, ssize_t bytes_co
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_readv")
 #elif defined(ARCH_arm64)
 SEC("fexit/__arm64_sys_readv")
@@ -1826,7 +1826,7 @@ static __always_inline int handle_syscall_enter_sendfile(int out_fd, int in_fd, 
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fentry/__x64_sys_sendfile64")
 #elif defined(ARCH_arm64)
 SEC("fentry/__arm64_sys_sendfile64")
@@ -1863,7 +1863,7 @@ static __always_inline int handle_syscall_exit_sendfile64(void* ctx, ssize_t byt
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_sendfile64")
 #elif defined(ARCH_arm64)
 SEC("fexit/__arm64_sys_sendfile64")
@@ -1943,7 +1943,7 @@ static __always_inline int handle_syscall_exit_sendto(void* ctx, ssize_t bytes_c
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_sendto")
 #elif defined(ARCH_arm64)
 SEC("fexit/__arm64_sys_sendto")
@@ -1973,7 +1973,7 @@ static __always_inline int handle_syscall_enter_write(int fd, const void* buf) {
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fentry/__x64_sys_write")
 #elif defined(ARCH_arm64)
 SEC("fentry/__arm64_sys_write")
@@ -2011,7 +2011,7 @@ static __always_inline int handle_syscall_exit_write(void* ctx, ssize_t bytes_co
 	return 0;
 }
 
-#ifdef defined(ARCH_amd64)
+#ifdef ARCH_amd64
 SEC("fexit/__x64_sys_write")
 #elif defined(ARCH_arm64)
 SEC("fexit/__arm64_sys_write")
