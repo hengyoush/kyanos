@@ -298,6 +298,8 @@ type AgentProgramSpecs struct {
 	FentrySysSendto                      *ebpf.ProgramSpec `ebpf:"fentry__sys_sendto"`
 	FentrySysWrite                       *ebpf.ProgramSpec `ebpf:"fentry__sys_write"`
 	FentrySysWritev                      *ebpf.ProgramSpec `ebpf:"fentry__sys_writev"`
+	FentrySecuritySocketRecvmsg          *ebpf.ProgramSpec `ebpf:"fentry_security_socket_recvmsg"`
+	FentrySecuritySocketSendmsg          *ebpf.ProgramSpec `ebpf:"fentry_security_socket_sendmsg"`
 	FexitSysAccept4                      *ebpf.ProgramSpec `ebpf:"fexit__sys_accept4"`
 	FexitSysClose                        *ebpf.ProgramSpec `ebpf:"fexit__sys_close"`
 	FexitSysConnect                      *ebpf.ProgramSpec `ebpf:"fexit__sys_connect"`
@@ -526,6 +528,8 @@ type AgentPrograms struct {
 	FentrySysSendto                      *ebpf.Program `ebpf:"fentry__sys_sendto"`
 	FentrySysWrite                       *ebpf.Program `ebpf:"fentry__sys_write"`
 	FentrySysWritev                      *ebpf.Program `ebpf:"fentry__sys_writev"`
+	FentrySecuritySocketRecvmsg          *ebpf.Program `ebpf:"fentry_security_socket_recvmsg"`
+	FentrySecuritySocketSendmsg          *ebpf.Program `ebpf:"fentry_security_socket_sendmsg"`
 	FexitSysAccept4                      *ebpf.Program `ebpf:"fexit__sys_accept4"`
 	FexitSysClose                        *ebpf.Program `ebpf:"fexit__sys_close"`
 	FexitSysConnect                      *ebpf.Program `ebpf:"fexit__sys_connect"`
@@ -609,6 +613,8 @@ func (p *AgentPrograms) Close() error {
 		p.FentrySysSendto,
 		p.FentrySysWrite,
 		p.FentrySysWritev,
+		p.FentrySecuritySocketRecvmsg,
+		p.FentrySecuritySocketSendmsg,
 		p.FexitSysAccept4,
 		p.FexitSysClose,
 		p.FexitSysConnect,

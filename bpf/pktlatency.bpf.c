@@ -1387,8 +1387,7 @@ static __always_inline bool propagate_fd_to_uprobe(void* ctx, uint64_t pid_tgid,
 	}
 }
 
-SEC("kprobe/security_socket_sendmsg")
-int BPF_KPROBE(security_socket_sendmsg_enter) {
+static __always_inline int handle_security_socket_sendmsg() {
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct data_args *args = bpf_map_lookup_elem(&write_args_map, &id);
 
@@ -1398,8 +1397,17 @@ int BPF_KPROBE(security_socket_sendmsg_enter) {
 	return 0;
 }
 
-SEC("kprobe/security_socket_recvmsg")
-int BPF_KPROBE(security_socket_recvmsg_enter) {
+SEC("fentry/security_socket_sendmsg")
+int BPF_PROG(fentry_security_socket_sendmsg) {
+	return handle_security_socket_sendmsg();
+}
+
+SEC("kprobe/security_socket_sendmsg")
+int BPF_KPROBE(security_socket_sendmsg_enter) {
+	return handle_security_socket_sendmsg();
+}
+
+static __always_inline int handle_security_socket_recvmsg() {
 	uint64_t id = bpf_get_current_pid_tgid();
 	struct data_args *args = bpf_map_lookup_elem(&read_args_map, &id);
 
@@ -1407,6 +1415,16 @@ int BPF_KPROBE(security_socket_recvmsg_enter) {
 		args->sock_event = true;
 	}
 	return 0;
+}
+
+SEC("fentry/security_socket_recvmsg")
+int BPF_PROG(fentry_security_socket_recvmsg) {
+	return handle_security_socket_recvmsg();
+}
+
+SEC("kprobe/security_socket_recvmsg")
+int BPF_KPROBE(security_socket_recvmsg_enter) {
+	return handle_security_socket_recvmsg();
 }
 
 static __always_inline int handle_syscall_enter_recvfrom(int fd, void* buf, struct sockaddr* src_addr, int flags) {

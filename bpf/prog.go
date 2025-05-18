@@ -237,12 +237,16 @@ func AttachNfNatPacket() (link.Link, error) {
 
 /* security_socket_recvmsg */
 func AttachKProbeSecuritySocketRecvmsgEntry() (link.Link, error) {
-	return Kprobe("security_socket_recvmsg", GetProgramFromObjs(Objs, "SecuritySocketRecvmsgEnter"))
+	return FentryOrKprobe("security_socket_recvmsg", GetProgramFromObjs(Objs, "FentrySecuritySocketRecvmsg"),
+		GetProgramFromObjs(Objs, "SecuritySocketRecvmsgRet"))
+	// return Kprobe("security_socket_recvmsg", GetProgramFromObjs(Objs, "SecuritySocketRecvmsgEnter"))
 }
 
 /* security_socket_sendmsg */
 func AttachKProbeSecuritySocketSendmsgEntry() (link.Link, error) {
-	return Kprobe("security_socket_sendmsg", GetProgramFromObjs(Objs, "SecuritySocketSendmsgEnter"))
+	return FentryOrKprobe("security_socket_sendmsg", GetProgramFromObjs(Objs, "FentrySecuritySocketSendmsg"),
+		GetProgramFromObjs(Objs, "SecuritySocketSendmsgRet"))
+	// return Kprobe("security_socket_sendmsg", GetProgramFromObjs(Objs, "SecuritySocketSendmsgEnter"))
 }
 
 /* tcp_destroy_sock */
