@@ -152,14 +152,6 @@ func (bf *BPF) AttachProgs(options *ac.AgentOptions) error {
 	bf.attachExitEventChannels(options)
 
 	if options.WatchOptions.TraceSslEvent {
-		uprobeSchedEventChannel := make(chan *bpf.AgentProcessExecEvent, 10)
-		uprobe.StartHandleSchedExecEvent(uprobeSchedEventChannel)
-		execEventChannels := []chan *bpf.AgentProcessExecEvent{uprobeSchedEventChannel}
-		if options.ProcessExecEventChannel != nil {
-			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
-		}
-		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
-
 		attachUprobes(links, options, options.Kv, bf.Objs)
 		options.LoadPorgressChannel <- "🍕 Attached ssl eBPF programs."
 	}
@@ -182,8 +174,8 @@ func (bf *BPF) attachExecEventChannels(options *ac.AgentOptions) {
 		if options.ProcessExecEventChannel != nil {
 			execEventChannels = append(execEventChannels, options.ProcessExecEventChannel)
 		}
-		bpf.PullProcessExecEvents(options.Ctx, &execEventChannels)
 	}
+	bpf.PullProcessExecEvents(options.Ctx, execEventChannels)
 }
 
 func (bf *BPF) attachExitEventChannels(options *ac.AgentOptions) {
