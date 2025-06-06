@@ -21,6 +21,7 @@ require (
 	github.com/jefurry/logrus v2.0.6+incompatible
 	github.com/lucasb-eyer/go-colorful v1.2.0
 	github.com/mandiant/GoReSym v1.7.2-0.20240819162932-534ca84b42d5
+	github.com/miekg/dns v1.1.64
 	github.com/muesli/termenv v0.15.2
 	github.com/sevlyar/go-daemon v0.1.6
 	github.com/shirou/gopsutil v3.21.11+incompatible
@@ -29,7 +30,7 @@ require (
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
 	github.com/zcalusic/sysinfo v1.1.2
-	golang.org/x/arch v0.0.0-20201008161808-52c3e6f60cff
+	golang.org/x/arch v0.18.0
 	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
 	golang.org/x/sys v0.30.0
 	k8s.io/cri-api v0.31.0
@@ -39,7 +40,6 @@ require (
 )
 
 require (
-	github.com/miekg/dns v1.1.64 // indirect
 	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
 )
