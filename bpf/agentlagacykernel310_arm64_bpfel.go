@@ -55,6 +55,8 @@ type AgentLagacyKernel310Specs struct {
 type AgentLagacyKernel310ProgramSpecs struct {
 	DevHardStartXmit                     *ebpf.ProgramSpec `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                         *ebpf.ProgramSpec `ebpf:"dev_queue_xmit"`
+	FentrySecuritySocketRecvmsg          *ebpf.ProgramSpec `ebpf:"fentry__security_socket_recvmsg"`
+	FentrySecuritySocketSendmsg          *ebpf.ProgramSpec `ebpf:"fentry__security_socket_sendmsg"`
 	FentrySysAccept4                     *ebpf.ProgramSpec `ebpf:"fentry__sys_accept4"`
 	FentrySysClose                       *ebpf.ProgramSpec `ebpf:"fentry__sys_close"`
 	FentrySysConnect                     *ebpf.ProgramSpec `ebpf:"fentry__sys_connect"`
@@ -69,8 +71,6 @@ type AgentLagacyKernel310ProgramSpecs struct {
 	FentrySysSendto                      *ebpf.ProgramSpec `ebpf:"fentry__sys_sendto"`
 	FentrySysWrite                       *ebpf.ProgramSpec `ebpf:"fentry__sys_write"`
 	FentrySysWritev                      *ebpf.ProgramSpec `ebpf:"fentry__sys_writev"`
-	FentrySecuritySocketRecvmsg          *ebpf.ProgramSpec `ebpf:"fentry_security_socket_recvmsg"`
-	FentrySecuritySocketSendmsg          *ebpf.ProgramSpec `ebpf:"fentry_security_socket_sendmsg"`
 	FexitSysAccept4                      *ebpf.ProgramSpec `ebpf:"fexit__sys_accept4"`
 	FexitSysClose                        *ebpf.ProgramSpec `ebpf:"fexit__sys_close"`
 	FexitSysConnect                      *ebpf.ProgramSpec `ebpf:"fexit__sys_connect"`
@@ -285,6 +285,8 @@ func (m *AgentLagacyKernel310Maps) Close() error {
 type AgentLagacyKernel310Programs struct {
 	DevHardStartXmit                     *ebpf.Program `ebpf:"dev_hard_start_xmit"`
 	DevQueueXmit                         *ebpf.Program `ebpf:"dev_queue_xmit"`
+	FentrySecuritySocketRecvmsg          *ebpf.Program `ebpf:"fentry__security_socket_recvmsg"`
+	FentrySecuritySocketSendmsg          *ebpf.Program `ebpf:"fentry__security_socket_sendmsg"`
 	FentrySysAccept4                     *ebpf.Program `ebpf:"fentry__sys_accept4"`
 	FentrySysClose                       *ebpf.Program `ebpf:"fentry__sys_close"`
 	FentrySysConnect                     *ebpf.Program `ebpf:"fentry__sys_connect"`
@@ -299,8 +301,6 @@ type AgentLagacyKernel310Programs struct {
 	FentrySysSendto                      *ebpf.Program `ebpf:"fentry__sys_sendto"`
 	FentrySysWrite                       *ebpf.Program `ebpf:"fentry__sys_write"`
 	FentrySysWritev                      *ebpf.Program `ebpf:"fentry__sys_writev"`
-	FentrySecuritySocketRecvmsg          *ebpf.Program `ebpf:"fentry_security_socket_recvmsg"`
-	FentrySecuritySocketSendmsg          *ebpf.Program `ebpf:"fentry_security_socket_sendmsg"`
 	FexitSysAccept4                      *ebpf.Program `ebpf:"fexit__sys_accept4"`
 	FexitSysClose                        *ebpf.Program `ebpf:"fexit__sys_close"`
 	FexitSysConnect                      *ebpf.Program `ebpf:"fexit__sys_connect"`
@@ -370,6 +370,8 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 	return _AgentLagacyKernel310Close(
 		p.DevHardStartXmit,
 		p.DevQueueXmit,
+		p.FentrySecuritySocketRecvmsg,
+		p.FentrySecuritySocketSendmsg,
 		p.FentrySysAccept4,
 		p.FentrySysClose,
 		p.FentrySysConnect,
@@ -384,8 +386,6 @@ func (p *AgentLagacyKernel310Programs) Close() error {
 		p.FentrySysSendto,
 		p.FentrySysWrite,
 		p.FentrySysWritev,
-		p.FentrySecuritySocketRecvmsg,
-		p.FentrySecuritySocketSendmsg,
 		p.FexitSysAccept4,
 		p.FexitSysClose,
 		p.FexitSysConnect,

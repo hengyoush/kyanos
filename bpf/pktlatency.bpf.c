@@ -1398,7 +1398,7 @@ static __always_inline int handle_security_socket_sendmsg() {
 }
 
 SEC("fentry/security_socket_sendmsg")
-int BPF_PROG(fentry_security_socket_sendmsg) {
+int BPF_PROG(fentry__security_socket_sendmsg) {
 	return handle_security_socket_sendmsg();
 }
 
@@ -1418,7 +1418,7 @@ static __always_inline int handle_security_socket_recvmsg() {
 }
 
 SEC("fentry/security_socket_recvmsg")
-int BPF_PROG(fentry_security_socket_recvmsg) {
+int BPF_PROG(fentry__security_socket_recvmsg) {
 	return handle_security_socket_recvmsg();
 }
 

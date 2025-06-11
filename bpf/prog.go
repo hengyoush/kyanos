@@ -238,14 +238,14 @@ func AttachNfNatPacket() (link.Link, error) {
 /* security_socket_recvmsg */
 func AttachKProbeSecuritySocketRecvmsgEntry() (link.Link, error) {
 	return FentryOrKprobe("security_socket_recvmsg", GetProgramFromObjs(Objs, "FentrySecuritySocketRecvmsg"),
-		GetProgramFromObjs(Objs, "SecuritySocketRecvmsgRet"))
+		GetProgramFromObjs(Objs, "SecuritySocketRecvmsgEnter"))
 	// return Kprobe("security_socket_recvmsg", GetProgramFromObjs(Objs, "SecuritySocketRecvmsgEnter"))
 }
 
 /* security_socket_sendmsg */
 func AttachKProbeSecuritySocketSendmsgEntry() (link.Link, error) {
 	return FentryOrKprobe("security_socket_sendmsg", GetProgramFromObjs(Objs, "FentrySecuritySocketSendmsg"),
-		GetProgramFromObjs(Objs, "SecuritySocketSendmsgRet"))
+		GetProgramFromObjs(Objs, "SecuritySocketSendmsgEnter"))
 	// return Kprobe("security_socket_sendmsg", GetProgramFromObjs(Objs, "SecuritySocketSendmsgEnter"))
 }
 
@@ -358,6 +358,7 @@ func FentryOrTracepoint(func_name string, fentryProg *ebpf.Program, group string
 func FentryOrKprobe(func_name string, fentryProg *ebpf.Program, kprobeProg *ebpf.Program) (link.Link, error) {
 	l, err := Fentry(func_name, fentryProg)
 	if err != nil {
+		common.BPFLog.Errorf("failed to attach fentry, func_name: %s, err: %v", func_name, err)
 		l, err = Kprobe(func_name, kprobeProg)
 		if err != nil {
 			common.BPFLog.Errorf("failed to attach fentry or kprobe, func_name: %s, err: %v", func_name, err)
@@ -377,6 +378,7 @@ func FentryOrKprobe(func_name string, fentryProg *ebpf.Program, kprobeProg *ebpf
 func FexitOrTracepoint(func_name string, fexitProg *ebpf.Program, group string, name string, tracepointProg *ebpf.Program) (link.Link, error) {
 	l, err := Fexit(func_name, fexitProg)
 	if err != nil {
+		common.BPFLog.Errorf("failed to attach fexit, func_name: %s, err: %v", func_name, err)
 		l, err = Tracepoint(group, name, tracepointProg)
 		if err != nil {
 			common.BPFLog.Errorf("failed to attach fexit or tracepoint, group: %s name: %s, err: %v", group, name, err)
