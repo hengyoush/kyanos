@@ -3,6 +3,7 @@ package version
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -17,6 +18,7 @@ func UpgradeDetect() error {
 	if err != nil {
 		return fmt.Errorf("Failed to parse local version: %s err: %v", Version, err)
 	}
+	os.Setenv("GODEBUG", "netdns=go")
 
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
