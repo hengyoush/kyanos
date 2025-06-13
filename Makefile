@@ -37,6 +37,9 @@ endif
 $(call allow-override,CC,$(CROSS_COMPILE)cc)
 $(call allow-override,LD,$(CROSS_COMPILE)ld)
 
+%:
+	@:
+
 .PHONY: all
 all: $(APPS)
 
@@ -112,7 +115,7 @@ format-md:
 
 .PHONY: dlv
 dlv:
-	chmod +x kyanos && dlv --headless --listen=:2345 --api-version=2 --check-go-version=false exec ./kyanos 
+	chmod +x kyanos && dlv --headless --listen=:2345 --api-version=2 --check-go-version=false exec ./kyanos -- $(filter-out $@,$(MAKECMDGOALS))
 
 .PHONY: kyanos-debug
 kyanos-debug: $(GO_FILES)
