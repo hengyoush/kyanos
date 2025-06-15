@@ -160,7 +160,7 @@ replace (
 	k8s.io/code-generator => k8s.io/code-generator v0.24.17
 	k8s.io/component-helpers => k8s.io/component-helpers v0.24.17
 	k8s.io/controller-manager => k8s.io/controller-manager v0.24.17
-	k8s.io/cri-api => k8s.io/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20230824000246-2cb31c9333ad
+	k8s.io/cri-api => k8s.io/kubernetes/staging/src/k8s.io/cri-api bb639c3dc77e
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.24.17
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.24.17
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.24.17
