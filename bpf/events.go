@@ -80,7 +80,7 @@ func parseExitEvent(rawSample []byte) (*AgentProcessExitEvent, error) {
 	return &event, nil
 }
 
-func PullProcessExecEvents(ctx context.Context, channels *[]chan *AgentProcessExecEvent) error {
+func PullProcessExecEvents(ctx context.Context, channels []chan *AgentProcessExecEvent) error {
 	pageSize := os.Getpagesize()
 	perCPUBuffer := pageSize * 4
 	eventSize := int(unsafe.Sizeof(AgentProcessExecEvent{}))
@@ -116,7 +116,7 @@ func PullProcessExecEvents(ctx context.Context, channels *[]chan *AgentProcessEx
 					common.AgentLog.Errorf("[dataReader] handleKernEvt err: %s\n", err)
 					continue
 				} else {
-					for _, ch := range *channels {
+					for _, ch := range channels {
 						ch <- evt
 					}
 				}
