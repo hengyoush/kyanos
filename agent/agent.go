@@ -9,6 +9,7 @@ import (
 	ac "kyanos/agent/common"
 	"kyanos/agent/compatible"
 	"kyanos/agent/conn"
+	"kyanos/agent/ipvs"
 	"kyanos/agent/protocol"
 	loader_render "kyanos/agent/render/loader"
 	"kyanos/agent/render/stat"
@@ -181,6 +182,32 @@ func SetupAgent(options ac.AgentOptions) {
 
 	if options.InitCompletedHook != nil {
 		options.InitCompletedHook()
+	}
+
+	// 启动 IPVS 追踪（如果启用）
+	var ipvsAgent *ipvs.IPVSAgent
+	if options.EnableIPVS {
+		ipvsAgent = ipvs.NewIPVSAgent()
+		perfPageCount := options.IpvsPerfEventMapPageNum
+		if perfPageCount <= 0 {
+			perfPageCount = 64
+		}
+		if err := ipvsAgent.Start(perfPageCount); err != nil {
+			common.AgentLog.Warnf("Failed to start IPVS agent: %v", err)
+		} else {
+			common.AgentLog.Info("IPVS tracing enabled")
+			// 启动 IPVS 事件日志输出
+			go func() {
+				for chain := range ipvsAgent.GetChainChannel() {
+					common.AgentLog.Infof("[IPVS] %s", chain.String())
+				}
+			}()
+		}
+		defer func() {
+			if ipvsAgent != nil {
+				ipvsAgent.Stop()
+			}
+		}()
 	}
 
 	if options.AnalysisEnable {

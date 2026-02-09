@@ -72,6 +72,10 @@ type AgentOptions struct {
 	ConnPerfEventMapPageNum    int
 	KernPerfEventMapPageNum    int
 	FirstPacketEventMapPageNum int
+
+	// IPVS 追踪选项
+	EnableIPVS             bool
+	IpvsPerfEventMapPageNum int
 }
 
 func (o AgentOptions) FilterByContainer() bool {

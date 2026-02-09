@@ -12,6 +12,29 @@ import (
 	"github.com/Ha4sh-447/flowcharts/draw"
 )
 
+
+// formatIpvsInfo 格式化 IPVS 信息为字符串
+func formatIpvsInfo(r *common.AnnotatedRecord) string {
+	if !r.IpvsEnabled {
+		return ""
+	}
+	latencyMs := float64(r.IpvsLatencyNs) / 1000000.0
+	result := fmt.Sprintf("[IPVS LB] %s:%d -> %s:%d [%s] (%.2fms)", r.IpvsVIP, r.IpvsVPort, r.IpvsRealIP, r.IpvsRealPort, r.IpvsMode, latencyMs)
+
+
+	// 添加 IPVS 函数调用链详情
+	if len(r.IpvsEvents) > 0 {
+		result += "\n[IPVS Call Chain] "
+		for i, evt := range r.IpvsEvents {
+			latencyUs := float64(evt.LatencyNs) / 1000.0
+			if i > 0 {
+				result += " -> "
+			}
+			result += fmt.Sprintf("%s(%.1fus)", evt.EventType, latencyUs)
+		}
+	}
+	return result
+}
 func ViewRecordTimeDetailAsFlowChart(r *common.AnnotatedRecord) (result string) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -23,6 +46,11 @@ func ViewRecordTimeDetailAsFlowChart(r *common.AnnotatedRecord) (result string) 
 		result = ViewRecordTimeDetailAsFlowChartForServer(r)
 	} else {
 		result = ViewRecordTimeDetailAsFlowChartForClientSide(r)
+	}
+	// 添加 IPVS 信息
+	ipvsInfo := formatIpvsInfo(r)
+	if ipvsInfo != "" {
+		result = ipvsInfo + "\n" + result
 	}
 	return result
 }
@@ -226,12 +254,31 @@ func ViewRecordTimeDetailAsFlowChartForClientSide(r *common.AnnotatedRecord) str
 	appToNic0 := diagrams.Shape{
 		Content: "",
 		Type:    diagrams.RightArrow,
-		// IsJunction: true,
 	}
 	diagrams.AddToRight(&applicationStart, &appToNic0)
 	shapes = append(shapes, &applicationStart)
 
-	lastNicShape, lastNicTs := addNicEventsDiagram(r.ReqNicEventDetails, &appToNic0, int64(r.StartTs), &shapes, true)
+	// 如果有 IPVS 信息，在 Process 和 NIC 之间添加 IPVS 节点
+	var prevShape *diagrams.Shape = &appToNic0
+	if r.IpvsEnabled {
+		latencyMs := float64(r.IpvsLatencyNs) / 1000000.0
+		ipvsShape := diagrams.Shape{
+			Content:    fmt.Sprintf(" IPVS[%s](%.2fms) ", r.IpvsMode, latencyMs),
+			Type:       diagrams.Rectangle,
+			IsJunction: true,
+		}
+		diagrams.AddToRight(&appToNic0, &ipvsShape)
+		shapes = append(shapes, &appToNic0, &ipvsShape)
+
+		ipvsToNic := diagrams.Shape{
+			Content: "",
+			Type:    diagrams.RightArrow,
+		}
+		diagrams.AddToRight(&ipvsShape, &ipvsToNic)
+		prevShape = &ipvsToNic
+	}
+
+	lastNicShape, lastNicTs := addNicEventsDiagram(r.ReqNicEventDetails, prevShape, int64(r.StartTs), &shapes, true)
 	lastNicToBottomArrow := diagrams.Shape{
 		Content: "lastNicToBottomArrow",
 		Type:    diagrams.DownArrow,
