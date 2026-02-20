@@ -2,6 +2,9 @@ package protocol
 
 import (
 	"bufio"
+	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"kyanos/agent/buffer"
@@ -149,15 +152,55 @@ func (h *HTTPStreamParser) ParseResponse(buf string, messageType MessageType, ti
 			ParseState: NeedsMoreData,
 		}
 	}
+
+	displayBuf := []byte(buf[:readIndex])
+	if decompressed, ok := decompressHTTPBody(respBody, resp.Header.Get("Content-Encoding")); ok {
+		if headerEnd := strings.Index(buf[:readIndex], "\r\n\r\n"); headerEnd != -1 {
+			displayBuf = append([]byte(buf[:headerEnd+4]), decompressed...)
+		}
+	}
+
 	parseResult.ReadBytes = readIndex
 	parseResult.ParsedMessages = []ParsedMessage{
 		&ParsedHttpResponse{
 			FrameBase: NewFrameBase(timestamp, readIndex, seq),
-			buf:       []byte(buf[:readIndex]),
+			buf:       displayBuf,
 		},
 	}
 	parseResult.ParseState = Success
 	return parseResult
+}
+
+func decompressHTTPBody(body []byte, contentEncoding string) ([]byte, bool) {
+	if len(body) == 0 {
+		return nil, false
+	}
+	switch strings.ToLower(strings.TrimSpace(contentEncoding)) {
+	case "gzip", "x-gzip":
+		gr, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			common.ProtocolParserLog.Debugf("[HTTP] failed to create gzip reader: %v", err)
+			return nil, false
+		}
+		defer gr.Close()
+		decompressed, err := io.ReadAll(gr)
+		if err != nil {
+			common.ProtocolParserLog.Debugf("[HTTP] failed to decompress gzip body: %v", err)
+			return nil, false
+		}
+		return decompressed, true
+	case "deflate":
+		fr := flate.NewReader(bytes.NewReader(body))
+		defer fr.Close()
+		decompressed, err := io.ReadAll(fr)
+		if err != nil {
+			common.ProtocolParserLog.Debugf("[HTTP] failed to decompress deflate body: %v", err)
+			return nil, false
+		}
+		return decompressed, true
+	default:
+		return nil, false
+	}
 }
 
 func (h *HTTPStreamParser) handleReadResponseError(err error, buf string, streamBuffer *buffer.StreamBuffer, messageType MessageType, timestamp uint64, seq uint64) ParseResult {

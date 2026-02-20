@@ -2,6 +2,9 @@ package protocol_test
 
 import (
 	"bufio"
+	"bytes"
+	"compress/flate"
+	"compress/gzip"
 	"fmt"
 	"io"
 	"kyanos/agent/buffer"
@@ -162,6 +165,96 @@ func TestParseResponse(t *testing.T) {
 	assert.Equal(t, false, message.IsReq())
 	assert.Equal(t, uint64(10), message.TimestampNs())
 	assert.Equal(t, uint64(20), message.Seq())
+}
+
+func gzipCompress(data []byte) []byte {
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	w.Write(data)
+	w.Close()
+	return buf.Bytes()
+}
+
+func deflateCompress(data []byte) []byte {
+	var buf bytes.Buffer
+	w, _ := flate.NewWriter(&buf, flate.DefaultCompression)
+	w.Write(data)
+	w.Close()
+	return buf.Bytes()
+}
+
+func buildHTTPResponse(statusLine string, headers map[string]string, body []byte) string {
+	var b strings.Builder
+	b.WriteString(statusLine + "\r\n")
+	for k, v := range headers {
+		b.WriteString(k + ": " + v + "\r\n")
+	}
+	b.WriteString("\r\n")
+	b.Write(body)
+	return b.String()
+}
+
+func TestParseResponse_GzipBody(t *testing.T) {
+	plainBody := "hello gzip world!"
+	compressedBody := gzipCompress([]byte(plainBody))
+
+	httpMessage := buildHTTPResponse("HTTP/1.1 200 OK", map[string]string{
+		"Content-Type":     "text/plain",
+		"Content-Encoding": "gzip",
+		"Content-Length":   fmt.Sprintf("%d", len(compressedBody)),
+	}, compressedBody)
+
+	buf := buffer.New(4096)
+	buf.Add(10, []byte(httpMessage), 10000)
+
+	parser := protocol.HTTPStreamParser{}
+	result := parser.ParseResponse(httpMessage, protocol.Response, 10, 20, buf)
+
+	assert.Equal(t, protocol.Success, result.ParseState)
+	assert.Equal(t, 1, len(result.ParsedMessages))
+
+	resp := result.ParsedMessages[0]
+	formatted := resp.FormatToString()
+	assert.Contains(t, formatted, plainBody, "decompressed body should be present in output")
+	assert.Contains(t, formatted, "Content-Encoding: gzip", "original headers should be preserved")
+}
+
+func TestParseResponse_DeflateBody(t *testing.T) {
+	plainBody := "hello deflate world!"
+	compressedBody := deflateCompress([]byte(plainBody))
+
+	httpMessage := buildHTTPResponse("HTTP/1.1 200 OK", map[string]string{
+		"Content-Type":     "text/plain",
+		"Content-Encoding": "deflate",
+		"Content-Length":   fmt.Sprintf("%d", len(compressedBody)),
+	}, compressedBody)
+
+	buf := buffer.New(4096)
+	buf.Add(10, []byte(httpMessage), 10000)
+
+	parser := protocol.HTTPStreamParser{}
+	result := parser.ParseResponse(httpMessage, protocol.Response, 10, 20, buf)
+
+	assert.Equal(t, protocol.Success, result.ParseState)
+	assert.Equal(t, 1, len(result.ParsedMessages))
+
+	resp := result.ParsedMessages[0]
+	formatted := resp.FormatToString()
+	assert.Contains(t, formatted, plainBody, "decompressed body should be present in output")
+}
+
+func TestParseResponse_NoEncoding(t *testing.T) {
+	buf := buffer.New(1000)
+	httpMessage := httpRespMessage + httpRespMessage
+	buf.Add(10, []byte(httpMessage), 10000)
+
+	parser := protocol.HTTPStreamParser{}
+	result := parser.ParseResponse(httpMessage, protocol.Response, 10, 20, buf)
+
+	assert.Equal(t, protocol.Success, result.ParseState)
+	resp := result.ParsedMessages[0]
+	formatted := resp.FormatToString()
+	assert.Contains(t, formatted, "pixielabs is awesome!", "uncompressed body should remain unchanged")
 }
 
 func TestHttpFilter_Filter(t *testing.T) {
