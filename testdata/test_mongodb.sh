@@ -24,7 +24,7 @@ function test_mongodb_client() {
 
     sudo timeout 30 ${CMD} watch --debug-output mongodb --remote-ports 27017 2>&1 | tee "${CLIENT_LNAME}" &
     sleep 15
-    mongosh --eval "db.test.insert({name: 'test', value: 1}); db.test.find({name: 'test'})"
+    docker exec $cname mongo --eval "db.test.insert({name: 'test', value: 1}); db.test.find({name: 'test'})"
     wait
 
     cat "${CLIENT_LNAME}"
@@ -48,7 +48,7 @@ function test_mongodb_server() {
 
     timeout 30 ${CMD} watch --debug-output mongodb --local-ports 27017 2>&1 | tee "${SERVER_LNAME}" &
     sleep 15
-    mongosh --eval "db.test.insert({name: 'test', value: 1}); db.test.find({name: 'test'})"
+    docker exec $cname mongo --eval "db.test.insert({name: 'test', value: 1}); db.test.find({name: 'test'})"
     wait
 
     cat "${SERVER_LNAME}"
