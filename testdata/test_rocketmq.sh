@@ -60,7 +60,13 @@ function test_rocketmq() {
 
     create_docker_compose_file
 
-    docker-compose -f "$DOCKER_COMPOSE_FILE" up -d
+    # Support both "docker compose" (plugin) and "docker-compose" (standalone)
+    if docker compose version &>/dev/null; then
+      DOCKER_COMPOSE="docker compose"
+    else
+      DOCKER_COMPOSE="docker-compose"
+    fi
+    $DOCKER_COMPOSE -f "$DOCKER_COMPOSE_FILE" up -d
     sleep 20
 
     timeout 30 ${CMD} watch --debug-output rocketmq --remote-ports 9876 2>&1 | tee "${LNAME}" &
@@ -72,7 +78,7 @@ function test_rocketmq() {
     sleep 2
 
     cat "${LNAME}"
-    docker-compose -f "$DOCKER_COMPOSE_FILE" down
+    $DOCKER_COMPOSE -f "$DOCKER_COMPOSE_FILE" down
     rm -f "$DOCKER_COMPOSE_FILE"
 
     check_patterns_in_file "${LNAME}" "TestTopic"
