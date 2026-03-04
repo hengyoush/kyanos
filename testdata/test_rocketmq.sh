@@ -60,11 +60,16 @@ function test_rocketmq() {
 
     create_docker_compose_file
 
-    # Support both "docker compose" (plugin) and "docker-compose" (standalone)
+    # Support "docker compose" (plugin), "docker-compose" in PATH, or CI path
     if docker compose version &>/dev/null; then
       DOCKER_COMPOSE="docker compose"
-    else
+    elif command -v docker-compose &>/dev/null; then
       DOCKER_COMPOSE="docker-compose"
+    elif [ -x /usr/local/bin/docker-compose ]; then
+      DOCKER_COMPOSE="/usr/local/bin/docker-compose"
+    else
+      echo "ERROR: neither 'docker compose' nor 'docker-compose' found"
+      exit 1
     fi
     $DOCKER_COMPOSE -f "$DOCKER_COMPOSE_FILE" up -d
     sleep 20
