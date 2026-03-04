@@ -60,7 +60,7 @@ function test_rocketmq() {
 
     create_docker_compose_file
 
-    # Support "docker compose" (plugin), "docker-compose" in PATH, or CI path
+    # Support "docker compose" (plugin), "docker-compose" in PATH, CI path, or download
     if docker compose version &>/dev/null; then
       DOCKER_COMPOSE="docker compose"
     elif command -v docker-compose &>/dev/null; then
@@ -68,8 +68,12 @@ function test_rocketmq() {
     elif [ -x /usr/local/bin/docker-compose ]; then
       DOCKER_COMPOSE="/usr/local/bin/docker-compose"
     else
-      echo "ERROR: neither 'docker compose' nor 'docker-compose' found"
-      exit 1
+      DC_URL="https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)"
+      DOCKER_COMPOSE="/tmp/docker-compose-$$"
+      if ! curl -sSLf "$DC_URL" -o "$DOCKER_COMPOSE" || ! chmod +x "$DOCKER_COMPOSE"; then
+        echo "ERROR: no docker compose and download failed: $DC_URL"
+        exit 1
+      fi
     fi
     $DOCKER_COMPOSE -f "$DOCKER_COMPOSE_FILE" up -d
     sleep 20
@@ -85,6 +89,7 @@ function test_rocketmq() {
     cat "${LNAME}"
     $DOCKER_COMPOSE -f "$DOCKER_COMPOSE_FILE" down
     rm -f "$DOCKER_COMPOSE_FILE"
+    case "$DOCKER_COMPOSE" in /tmp/*) rm -f "$DOCKER_COMPOSE" ;; esac
 
     check_patterns_in_file "${LNAME}" "TestTopic"
 }
