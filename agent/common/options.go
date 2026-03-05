@@ -50,6 +50,8 @@ type AgentOptions struct {
 	ConntrackCloseWaitTimeMills int
 	MaxAllowStuckTimeMills      int
 	StartGopsServer             bool
+	EnablePprof                 bool
+	PprofAddr                   string
 
 	FilterComm              string
 	ProcessExecEventChannel chan *bpf.AgentProcessExecEvent
@@ -72,6 +74,13 @@ type AgentOptions struct {
 	ConnPerfEventMapPageNum    int
 	KernPerfEventMapPageNum    int
 	FirstPacketEventMapPageNum int
+}
+
+func (o AgentOptions) GetPprofAddr() string {
+	if o.PprofAddr == "" {
+		return "localhost:6060"
+	}
+	return o.PprofAddr
 }
 
 func (o AgentOptions) FilterByContainer() bool {
