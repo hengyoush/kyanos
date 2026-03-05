@@ -92,7 +92,7 @@ jobs:
           path: kyanos
 
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           test-name: kyanos-test
           image-version: ${{ matrix.kernel }}
@@ -117,7 +117,7 @@ jobs:
 
       - name: copy btf file
         if: ${{ startsWith(matrix.kernel, '4.') }}
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -132,7 +132,7 @@ jobs:
             # sudo cp $btf_file /var/lib/ptcpdump/btf/vmlinux
 
       - name: Install dependencies
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -157,20 +157,13 @@ jobs:
             #install python pip
             sudo apt install -y python3 python3-pip pipx
 
-            #install docker-compose
-            # apt-get install -y docker-compose-plugin
+            # install docker-compose (standalone binary for docker compose v2)
             sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
             docker-compose --version
 
-            #install mongodb shell
-            wget -qO- https://www.mongodb.org/static/pgp/server-8.0.asc | sudo tee /etc/apt/trusted.gpg.d/server-8.0.asc
-            echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-            sudo apt-get update
-            sudo apt-get install -y mongodb-mongosh
-
       - name: Test DNS
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -185,7 +178,7 @@ jobs:
             fi
             popd
       - name: Test Mongo
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -201,7 +194,7 @@ jobs:
             popd
 
       - name: Test Truncated Data parsing
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -217,7 +210,7 @@ jobs:
             popd
 
       - name: Test Kafka
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -233,7 +226,7 @@ jobs:
             popd
 
       - name: Test CAP_BPF privilege check
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         if: ${{ !contains(fromJSON('["4.19-20240912.022020", "5.4-20240912.022020"]'), matrix.kernel) }}
         with:
           provision: 'false'
@@ -246,7 +239,7 @@ jobs:
             popd
 
       - name: Test CAP_SYS_ADMIN privilege check
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         if: contains(fromJSON('["4.19-20240912.022020", "5.4-20240912.022020"]'), matrix.kernel)
         with:
           provision: 'false'
@@ -259,7 +252,7 @@ jobs:
             popd
       
       - name: Test RocketMQ
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -275,7 +268,7 @@ jobs:
             popd
 
       - name: Test filter by comm
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -291,7 +284,7 @@ jobs:
             popd
 
       - name: Test gotls
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -307,7 +300,7 @@ jobs:
             popd
 
       - name: Test https
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -323,7 +316,7 @@ jobs:
             popd
 
       - name: Test side
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -339,7 +332,7 @@ jobs:
             popd
 
       - name: Test mysql
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -355,7 +348,7 @@ jobs:
             popd
 
       - name: Test base
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -369,7 +362,7 @@ jobs:
             fi
 
       - name: Test filter by l3/l4 info
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -383,7 +376,7 @@ jobs:
             fi
 
       - name: Test kern evt
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -397,7 +390,7 @@ jobs:
             fi
 
       - name: Test test docker filter by container id
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -411,7 +404,7 @@ jobs:
             fi
 
       - name: Test test docker filter by container name
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -425,7 +418,7 @@ jobs:
             fi
 
       - name: Test filter by pid
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -439,7 +432,7 @@ jobs:
             fi
 
       - name: Test test containerd filter by container name
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -453,7 +446,7 @@ jobs:
             fi
 
       - name: Test test containerd filter by container id
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -467,7 +460,7 @@ jobs:
             fi
 
       - name: Test redis
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |
@@ -482,7 +475,7 @@ jobs:
 
       - name: Test k8s
         if: ${{ startsWith(matrix.kernel, '6.') }}
-        uses: cilium/little-vm-helper@c44c1221b104ee02ec0235211f7ace3c88eb11a2 # v0.0.19
+        uses: cilium/little-vm-helper@v0.0.28
         with:
           provision: 'false'
           cmd: |

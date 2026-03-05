@@ -89,7 +89,7 @@ const (
 	MaxSupportedOpenSSL32Version  = 3 // openssl 3.2.3 ~ newer
 	MaxSupportedOpenSSL33Version  = 2
 	SupportedOpenSSL34Version0    = 1 // openssl 3.4.0
-	SupportedOpenSSL35Version0    = 0 // openssl 3.5.0
+	SupportedOpenSSL35Version0    = 5 // openssl 3.5.0 ~ 3.5.5
 )
 const (
 	Linuxdefaulefilename102 = "linux_default_1_0_2"
