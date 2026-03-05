@@ -22,7 +22,7 @@ jobs:
           cd /opt/hostedtoolcache
           find . -mindepth 1 -maxdepth 1 -type d -not -name 'go' -exec rm -rf {} +
           df -h
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Go
         uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5
