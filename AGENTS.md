@@ -1,101 +1,101 @@
 # Kyanos AGENTS.md
 
-> 本文件为 AI Agent 提供项目背景、结构、编码规范和工作流程信息。
+> This file provides AI agents with project background, structure, coding conventions, and workflow information.
 
-## 项目概述
+## Project Overview
 
-**Kyanos** 是一个基于 eBPF 的网络问题分析工具，用于捕获和分析网络请求（HTTP、Redis、MySQL 等），帮助快速诊断网络相关问题，如慢查询、高流量和异常。
+**Kyanos** is an eBPF-based network troubleshooting tool for capturing and analyzing network requests (HTTP, Redis, MySQL, etc.), helping to quickly diagnose network-related issues such as slow queries, high traffic, and anomalies.
 
-### 核心特性
+### Core Features
 
-1. **流量过滤**：支持按进程/容器、L7 协议、请求/响应大小、延迟等多维度过滤
-2. **流量分析**：聚合指标，快速定位问题（如带宽占满时找出最大响应）
-3. **内核级延迟详情**：可视化展示数据包从网卡到 socket 缓冲区的各阶段耗时
-4. **SSL 自动解密**：自动解密 HTTPS 流量为明文
-5. **零依赖**：单二进制文件，命令行交互
+1. **Traffic Filtering**: Multi-dimensional filtering by process/container, L7 protocol, request/response size, latency, etc.
+2. **Traffic Analysis**: Aggregated metrics for rapid issue identification (e.g., finding largest responses when bandwidth is saturated)
+3. **Kernel-level Latency Details**: Visual representation of packet journey from NIC to socket buffer
+4. **Automatic SSL Decryption**: Automatic HTTPS traffic decryption to plaintext
+5. **Zero Dependencies**: Single binary file with command-line interface
 
-### 技术栈
+### Technology Stack
 
-- **语言**: Go 1.23+
-- **内核技术**: eBPF (使用 cilium/ebpf 库)
-- **UI**: Charmbracelet 生态 (Bubble Tea, Bubbles, Lipgloss)
+- **Language**: Go 1.23+
+- **Kernel Technology**: eBPF (using cilium/ebpf library)
+- **UI**: Charmbracelet ecosystem (Bubble Tea, Bubbles, Lipgloss)
 - **CLI**: Cobra + Viper
-- **支持协议**: HTTP, Redis, MySQL, Kafka, MongoDB, RocketMQ, DNS
+- **Supported Protocols**: HTTP, Redis, MySQL, Kafka, MongoDB, RocketMQ, DNS
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 kyanos/
-├── main.go                 # 入口文件，调用 cmd.Execute()
-├── go.mod                  # Go 依赖管理
-├── Makefile               # 构建脚本
-├── bpf/                   # eBPF C 程序和头文件
-│   ├── pktlatency.bpf.c   # 主 eBPF 程序
-│   ├── openssl_*.bpf.c    # 各版本 OpenSSL uprobe
+├── main.go                 # Entry point, calls cmd.Execute()
+├── go.mod                  # Go dependency management
+├── Makefile               # Build scripts
+├── bpf/                   # eBPF C programs and headers
+│   ├── pktlatency.bpf.c   # Main eBPF program
+│   ├── openssl_*.bpf.c    # OpenSSL uprobes for various versions
 │   ├── gotls.bpf.c        # Go TLS uprobe
-│   ├── *.h                # BPF 头文件
-│   └── loader/            # BPF 加载器 (Go)
-├── cmd/                   # CLI 命令定义
-│   ├── root.go            # 根命令和全局 flags
-│   ├── watch.go           # watch 子命令
-│   ├── stat.go            # stat 子命令
-│   └── *.go               # 其他协议命令
-├── agent/                 # 核心 Agent 逻辑
-│   ├── agent.go           # Agent 启动和主循环
-│   ├── conn/              # 连接管理、事件处理
-│   ├── protocol/          # 协议解析器
-│   ├── analysis/          # 流量分析
-│   ├── render/            # UI 渲染
-│   └── metadata/          # 容器/K8s 元数据
-├── common/                # 公共工具和类型
-│   ├── log.go             # 日志系统
-│   ├── utils.go           # 通用工具
+│   ├── *.h                # BPF header files
+│   └── loader/            # BPF loader (Go)
+├── cmd/                   # CLI command definitions
+│   ├── root.go            # Root command and global flags
+│   ├── watch.go           # watch subcommand
+│   ├── stat.go            # stat subcommand
+│   └── *.go               # Other protocol commands
+├── agent/                 # Core Agent logic
+│   ├── agent.go           # Agent startup and main loop
+│   ├── conn/              # Connection management, event handling
+│   ├── protocol/          # Protocol parsers
+│   ├── analysis/          # Traffic analysis
+│   ├── render/            # UI rendering
+│   └── metadata/          # Container/K8s metadata
+├── common/                # Shared utilities and types
+│   ├── log.go             # Logging system
+│   ├── utils.go           # General utilities
 │   └── *.go
-├── version/               # 版本信息
-├── vmlinux/               # 各架构的 vmlinux.h
-├── libbpf/                # libbpf 子模块
-└── docs/                  # 文档
+├── version/               # Version information
+├── vmlinux/               # vmlinux.h for different architectures
+├── libbpf/                # libbpf submodule
+└── docs/                  # Documentation
 ```
 
 ---
 
-## 构建系统
+## Build System
 
-### 依赖要求
+### Dependencies
 
 - **Go**: 1.23+
 - **Clang**: 10.0+
 - **LLVM**: 10.0+
-- **Linux 头文件**: linux-tools-common, linux-tools-generic
-- **其他**: pkgconf, libelf-dev
+- **Linux Headers**: linux-tools-common, linux-tools-generic
+- **Others**: pkgconf, libelf-dev
 
-### 常用构建命令
+### Common Build Commands
 
 ```bash
-# 开发构建（本地测试）
+# Development build (local testing)
 make build-bpf && make
 
-# 生成带 BTF 的完整构建（用于低版本内核）
+# Full build with BTF (for older kernels)
 make build-bpf && make btfgen BUILD_ARCH=x86_64 ARCH_BPF_NAME=x86 && make
 
-# 调试构建
+# Debug build
 make kyanos-debug
 
-# 测试
+# Run tests
 make test
 
-# 格式化代码
+# Format code
 make format
 ```
 
-### BPF 代码生成
+### BPF Code Generation
 
-项目使用 `go generate` 生成 BPF 骨架代码：
+The project uses `go generate` to generate BPF skeleton code:
 
 ```bash
-# 在 bpf/loader/loader.go 中定义
+# Defined in bpf/loader/loader.go
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go ...
 
 TARGET=amd64 go generate ./bpf/  # x86_64
@@ -104,36 +104,36 @@ TARGET=arm64 go generate ./bpf/  # arm64
 
 ---
 
-## 代码规范
+## Coding Conventions
 
-### Go 编码风格
+### Go Style Guidelines
 
-1. **包命名**: 全小写，简短有意义，避免下划线
-2. **文件命名**: 全小写，使用下划线分隔，如 `kern_event_handler.go`
-3. **接口命名**: 动词+名词，如 `ProtocolStreamParser`
-4. **错误处理**: 显式处理，使用 `common.DefaultLog` 记录
-5. **日志**: 使用 `common.AgentLog`, `common.BPFLog` 等专用 logger
+1. **Package Naming**: All lowercase, short and meaningful, avoid underscores
+2. **File Naming**: All lowercase, use underscores for separation, e.g., `kern_event_handler.go`
+3. **Interface Naming**: Verb + Noun, e.g., `ProtocolStreamParser`
+4. **Error Handling**: Explicit handling, use `common.DefaultLog` for logging
+5. **Logging**: Use dedicated loggers like `common.AgentLog`, `common.BPFLog`
 
-### 关键模式
+### Key Patterns
 
-#### Agent 启动流程
+#### Agent Startup Flow
 
 ```go
 // agent/agent.go: SetupAgent()
-1. 检查 BPF 权限 (CAP_BPF)
-2. 初始化 ConnManager
-3. 初始化 ProcessorManager
-4. 加载 BPF 程序 (loader.LoadBPF)
-5. 启动事件拉取 goroutines
-6. 启动渲染 UI
+1. Check BPF permissions (CAP_BPF)
+2. Initialize ConnManager
+3. Initialize ProcessorManager
+4. Load BPF programs (loader.LoadBPF)
+5. Start event pulling goroutines
+6. Start rendering UI
 ```
 
-#### 协议解析器
+#### Protocol Parser
 
 ```go
 // agent/protocol/protocol.go
 
-// 实现 ProtocolStreamParser 接口
+// Implement ProtocolStreamParser interface
 type ProtocolStreamParser interface {
     Match(reqStreams, respStreams) []Record
     FindBoundary(streamBuffer, messageType, startPos) int
@@ -141,7 +141,7 @@ type ProtocolStreamParser interface {
     // ...
 }
 
-// 注册解析器
+// Register parser
 func init() {
     ParsersMap[bpf.AgentTrafficProtocolTKProtocolXXX] = func() ProtocolStreamParser {
         return &XXXStreamParser{}
@@ -149,7 +149,7 @@ func init() {
 }
 ```
 
-#### eBPF Map 定义
+#### eBPF Map Definition
 
 ```c
 // bpf/pktlatency.bpf.c
@@ -163,84 +163,84 @@ struct {
 
 ---
 
-## 测试
+## Testing
 
-### 测试结构
+### Test Structure
 
 ```
 agent/
-├── agent_test.go              # Agent 测试
-├── agent_utils_test.go        # 工具测试
+├── agent_test.go              # Agent tests
+├── agent_utils_test.go        # Utility tests
 └── protocol/
-    └── http_test.go           # 协议解析测试
+    └── http_test.go           # Protocol parser tests
 ```
 
-### 运行测试
+### Running Tests
 
 ```bash
-# 所有测试
+# All tests
 go test -v ./...
 
-# 特定包测试
+# Specific package tests
 go test -v ./agent/...
 
-# 性能测试
+# Benchmark tests
 go test -bench=. ./...
 ```
 
 ---
 
-## 常见问题
+## Troubleshooting
 
-### 1. BPF 加载失败
+### 1. BPF Loading Failed
 
-- 检查内核版本（要求 3.10.0-957+ 或 4.14+）
-- 检查 BTF 是否启用: `zgrep CONFIG_DEBUG_INFO_BTF /proc/config.gz`
-- 使用 `--btf` 指定外部 BTF 文件
+- Check kernel version (requires 3.10.0-957+ or 4.14+)
+- Check if BTF is enabled: `zgrep CONFIG_DEBUG_INFO_BTF /proc/config.gz`
+- Use `--btf` flag to specify external BTF file
 
-### 2. 容器相关功能不工作
+### 2. Container-related Features Not Working
 
-- 确保有访问 Docker/Containerd/CRI 的权限
-- 使用 `--docker-address`, `--containerd-address` 指定端点
+- Ensure access to Docker/Containerd/CRI
+- Use `--docker-address`, `--containerd-address` to specify endpoints
 
-### 3. SSL 解密失败
+### 3. SSL Decryption Failed
 
-- 检查 OpenSSL 版本是否支持
-- 确保进程有 ptrace 权限
-
----
-
-## 贡献指南
-
-### 添加新协议支持
-
-1. 在 `bpf/protocol_inference.h` 添加协议检测逻辑
-2. 在 `agent/protocol/` 创建解析器，实现 `ProtocolStreamParser`
-3. 在 `cmd/` 添加对应的子命令
-4. 添加测试用例
-
-### 修改 BPF 代码
-
-1. 修改 `.c` 或 `.h` 文件
-2. 运行 `make build-bpf` 重新生成骨架代码
-3. 测试验证
+- Check if OpenSSL version is supported
+- Ensure the process has ptrace permissions
 
 ---
 
-## 参考资源
+## Contributing
 
-- **文档**: https://kyanos.io/
+### Adding New Protocol Support
+
+1. Add protocol detection logic in `bpf/protocol_inference.h`
+2. Create parser in `agent/protocol/` implementing `ProtocolStreamParser`
+3. Add corresponding subcommand in `cmd/`
+4. Add test cases
+
+### Modifying BPF Code
+
+1. Modify `.c` or `.h` files
+2. Run `make build-bpf` to regenerate skeleton code
+3. Test and verify
+
+---
+
+## Resources
+
+- **Documentation**: https://kyanos.io/
 - **GitHub**: https://github.com/hengyoush/kyanos
 - **FAQ**: https://kyanos.io/faq.html
-- **eBPF 参考**: https://ebpf.io/
+- **eBPF Reference**: https://ebpf.io/
 - **Cilium eBPF**: https://github.com/cilium/ebpf
 
 ---
 
-## 相关项目
+## Related Projects
 
-Kyanos 开发过程中参考了以下项目：
+Kyanos development was inspired by the following projects:
 
-- [eCapture](https://ecapture.cc/zh/) - SSL 捕获
-- [pixie](https://github.com/pixie-io/pixie) - K8s 可观测性
-- [ptcpdump](https://github.com/mozillazg/ptcpdump) - 进程级 tcpdump
+- [eCapture](https://ecapture.cc/zh/) - SSL capture
+- [pixie](https://github.com/pixie-io/pixie) - K8s observability
+- [ptcpdump](https://github.com/mozillazg/ptcpdump) - Process-level tcpdump
