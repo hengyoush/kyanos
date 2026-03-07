@@ -23,6 +23,7 @@
 
 - [Table of Contents](#table-of-contents)
 - [🦜 What is kyanos](#-what-is-kyanos)
+- [📦 Installation](#-installation)
 - [🌰 Examples](#-examples)
 - [❗ Requirements](#-requirements)
 - [📝 Documentation](#-documentation)
@@ -64,6 +65,16 @@ Kyanos 是一个网络流量采集和分析工具，它提供如下特性：
    命令的耗时记录，你可以发现 kyanos 记录了请求经过容器网卡、宿主机网卡，响应经过宿主机网卡、容器网卡、Socket 缓冲区每个步骤的耗时。
 4. **轻量级零依赖**：几乎 0 依赖，只需要单个二进制文件，一行命令，所有结果都展示在命令行中。
 5. **SSL 流量自动解密**：kyanos 为你抓取的请求响应结果全部都是明文。
+
+## 📦 Installation
+
+### X-CMD
+
+如果你是 [x-cmd](https://x-cmd.com/install/kyanos) 用户，可以使用以下命令安装它：
+
+```bash
+x install kyanos
+```
 
 ## 🌰 Examples
 

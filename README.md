@@ -28,6 +28,7 @@
 - [kyanos](#kyanos)
   - [Table of Contents](#table-of-contents)
   - [What is kyanos](#what-is-kyanos)
+  - [Installation](#installation)
   - [Examples](#examples)
   - [❗ Requirements](#-requirements)
   - [🎯 How to get kyanos](#-how-to-get-kyanos)
@@ -87,6 +88,16 @@ without the complex steps of packet capturing, downloading, and analysis.
 
 5. **Automatic SSL Traffic Decryption** : All captured requests and responses
    are presented in plaintext.
+
+## Installation
+
+### X-CMD
+
+If you're an [x-cmd](https://x-cmd.com/install/kyanos) user, you can install it with the following command:
+
+```bash
+x install kyanos
+```
 
 ## Examples
 
