@@ -12,6 +12,9 @@ import (
 var maxBytesGap int = 1024 * 1024 * 1
 var maxBytesGapIndicateTcpSeqOverflow uint32 = math.MaxUint32 / 2
 
+// Maximum number of timestamp entries to prevent memory leak
+const maxTimestampEntries = 100000
+
 type StreamBuffer struct {
 	buffers    []*Buffer
 	capacity   int
@@ -122,6 +125,27 @@ func (sb *StreamBuffer) cleanTimestampMapBySeqNoMoreThan(targetSeq uint64) {
 	}
 }
 
+// cleanOldTimestamps removes old timestamp entries to prevent memory leak
+// when buffers are not shrinking but timestamps keep growing
+func (sb *StreamBuffer) cleanOldTimestamps() {
+	if sb.timestamps.Size() <= maxTimestampEntries {
+		return
+	}
+
+	// Remove oldest 50% of entries
+	removeCount := sb.timestamps.Size() / 2
+	removed := 0
+	needsDelete := make([]uint64, 0)
+	it := sb.timestamps.Iterator()
+	for it.Next() && removed < removeCount {
+		needsDelete = append(needsDelete, it.Key().(uint64))
+		removed++
+	}
+	for _, seq := range needsDelete {
+		sb.timestamps.Remove(seq)
+	}
+}
+
 func (sb *StreamBuffer) FindTimestampBySeq(targetSeq uint64) (uint64, bool) {
 	key, value := sb.timestamps.Floor(targetSeq)
 	if key == nil {
@@ -196,6 +220,10 @@ func (sb *StreamBuffer) Add(seq uint64, data []byte, timestamp uint64) bool {
 	}
 	sb.updateTimestamp(seq, timestamp)
 	sb.shrinkBufferUntilSizeBelowCapacity()
+
+	// Clean old timestamps periodically to prevent memory leak
+	sb.cleanOldTimestamps()
+
 	return true
 }
 
