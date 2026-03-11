@@ -4,6 +4,7 @@ import (
 	analysisCommon "kyanos/agent/analysis/common"
 	. "kyanos/agent/common"
 	"kyanos/agent/conn"
+	"kyanos/agent/ipvs"
 	"kyanos/agent/protocol"
 	"kyanos/bpf"
 	. "kyanos/common"
@@ -175,6 +176,38 @@ func (s *StatRecorder) ReceiveRecord(r protocol.Record, connection *conn.Connect
 		Pid:        uint32(connection.TgidFd >> 32),
 		Side:       side,
 		IsSsl:      connection.IsSsl(),
+	}
+
+	// 尝试查找 IPVS 信息
+	// 尝试查找 IPVS 信息（添加空指针检查）
+	if connection.RemoteIp != nil && connection.LocalIp != nil {
+		AgentLog.Debugf("[IPVS-Stat] Looking up IPVS info for connection: remote=%s:%d, local=%s:%d", connection.RemoteIp.String(), connection.RemotePort, connection.LocalIp.String(), connection.LocalPort)
+	}
+	ipvsCache := ipvs.GetGlobalCache()
+	if ipvsCache != nil && connection.RemoteIp != nil {
+		remoteIP := connection.RemoteIp
+		var chain *ipvs.IPVSChain
+		if chain = ipvsCache.LookupByRealServer(remoteIP, uint16(connection.RemotePort)); chain == nil {
+			chain = ipvsCache.LookupByVIP(remoteIP, uint16(connection.RemotePort))
+		}
+		if chain != nil {
+			annotatedRecord.IpvsEnabled = true
+			annotatedRecord.IpvsVIP = chain.VIP.String()
+			annotatedRecord.IpvsVPort = chain.VPort
+			annotatedRecord.IpvsRealIP = chain.RealIP.String()
+			annotatedRecord.IpvsRealPort = chain.RealPort
+			annotatedRecord.IpvsMode = chain.Mode
+			annotatedRecord.IpvsLatencyNs = uint64(chain.TotalLatency())
+			// 填充 IPVS 事件列表
+			annotatedRecord.IpvsEvents = make([]analysisCommon.IpvsEventDetail, 0, len(chain.Events))
+			for _, evt := range chain.Events {
+				annotatedRecord.IpvsEvents = append(annotatedRecord.IpvsEvents, analysisCommon.IpvsEventDetail{
+					EventType:   evt.EventType.String(),
+					LatencyNs:   evt.LatencyNs,
+					TimestampNs: evt.TimestampNs,
+				})
+			}
+		}
 	}
 
 	events := prepareEvents(r, connection)
