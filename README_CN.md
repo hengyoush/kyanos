@@ -202,7 +202,7 @@ _1.6.0_
 如果你有更详细的问题需要咨询，可以用以下联系方式：
 
 - **微信交流群：**:
-  见：https://github.com/hengyoush/kyanos/issues/178。
+  见：hengyoush/kyanos#178
 - **我的邮箱：**: [hengyoush1@163.com](mailto:hengyoush1@163.com)。
 - **我的 Blog：**: [http://blog.deadlock.cloud](http://blog.deadlock.cloud/)。
 
