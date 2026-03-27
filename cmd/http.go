@@ -8,9 +8,9 @@ import (
 )
 
 var httpCmd = &cobra.Command{
-	Use:   "http [--method METHODS|--path PATH|--path-regex REGEX|--path-prefix PREFIX|--host HOSTNAME]",
+	Use:   "http [--method METHODS|--path PATH|--path-regex REGEX|--path-prefix PREFIX|--host HOSTNAME|--body REGEX]",
 	Short: "watch HTTP message",
-	Long:  `Filter HTTP messages based on method, path (strict, regex, prefix), or host. Filter flags are combined with AND(&&).`,
+	Long:  `Filter HTTP messages based on method, path (strict, regex, prefix), host, or request/response body content. Filter flags are combined with AND(&&).`,
 	Run: func(cmd *cobra.Command, args []string) {
 		methods, err := cmd.Flags().GetStringSlice("method")
 		if err != nil {
@@ -26,6 +26,7 @@ var httpCmd = &cobra.Command{
 		}
 		var (
 			pathReg *regexp.Regexp
+			bodyReg *regexp.Regexp
 		)
 		if pathRegStr, err := cmd.Flags().GetString("path-regex"); err != nil {
 			logger.Fatalf("invalid path-regex: %v\n", err)
@@ -38,6 +39,13 @@ var httpCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatalf("invalid path-prefix: %v\n", err)
 		}
+		if bodyRegStr, err := cmd.Flags().GetString("body"); err != nil {
+			logger.Fatalf("invalid body: %v\n", err)
+		} else if len(bodyRegStr) > 0 {
+			if bodyReg, err = regexp.Compile(bodyRegStr); err != nil {
+				logger.Fatalf("invalid body: %v\n", err)
+			}
+		}
 
 		options.MessageFilter = protocol.HttpFilter{
 			TargetPath:       path,
@@ -45,6 +53,7 @@ var httpCmd = &cobra.Command{
 			TargetPathPrefix: pathPrefix,
 			TargetHostName:   host,
 			TargetMethods:    methods,
+			TargetBodyReg:    bodyReg,
 		}
 		options.LatencyFilter = initLatencyFilter(cmd)
 		options.SizeFilter = initSizeFilter(cmd)
@@ -58,6 +67,7 @@ func init() {
 	httpCmd.Flags().String("path", "", "Specify the HTTP path to monitor, like: '/foo/bar'")
 	httpCmd.Flags().String("path-regex", "", "Specify the regex for HTTP path to monitor, like: '\\/foo\\/bar\\/\\d+'")
 	httpCmd.Flags().String("path-prefix", "", "Specify the prefix of HTTP path to monitor, like: '/foo'")
+	httpCmd.Flags().String("body", "", "Specify a regex to match against HTTP request or response bodies, like: 'reqId=123'")
 
 	httpCmd.Flags().SortFlags = false
 	httpCmd.PersistentFlags().SortFlags = false
