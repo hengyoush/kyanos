@@ -606,9 +606,19 @@ func init() {
 }
 
 type RedisFilter struct {
-	TargetCommands []string
-	TargetKeys     []string
-	KeyPrefix      string
+	TargetCommands   []string
+	ExcludedCommands []string
+	TargetKeys       []string
+	KeyPrefix        string
+}
+
+func commandInList(command string, commands []string) bool {
+	for _, candidate := range commands {
+		if strings.EqualFold(candidate, command) {
+			return true
+		}
+	}
+	return false
 }
 
 func extractKeyFromPayLoad(redisMessage *RedisMessage) string {
@@ -628,7 +638,8 @@ func (r RedisFilter) Filter(req ParsedMessage, resp ParsedMessage) bool {
 		return false
 	}
 	pass := true
-	pass = pass && (len(r.TargetCommands) == 0 || slices.Index(r.TargetCommands, redisReq.Command()) != -1)
+	pass = pass && (len(r.TargetCommands) == 0 || commandInList(redisReq.Command(), r.TargetCommands))
+	pass = pass && (len(r.ExcludedCommands) == 0 || !commandInList(redisReq.Command(), r.ExcludedCommands))
 	firstKey := extractKeyFromPayLoad(redisReq)
 	pass = pass && (len(r.TargetKeys) == 0 || slices.Index(r.TargetKeys, firstKey) != -1)
 	pass = pass && (r.KeyPrefix == "" || strings.HasPrefix(firstKey, r.KeyPrefix))
@@ -641,7 +652,7 @@ func (r RedisFilter) FilterByProtocol(p bpf.AgentTrafficProtocolT) bool {
 }
 
 func (r RedisFilter) FilterByRequest() bool {
-	return len(r.TargetCommands) > 0 || len(r.TargetKeys) > 0 || r.KeyPrefix != ""
+	return len(r.TargetCommands) > 0 || len(r.ExcludedCommands) > 0 || len(r.TargetKeys) > 0 || r.KeyPrefix != ""
 }
 
 func (r RedisFilter) FilterByResponse() bool {
