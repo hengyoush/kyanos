@@ -94,6 +94,50 @@ Make sure to add the `--debug-output` parameter.
 Protocol inference code can be debugged by printing logs using `bpf_printk`,
 refer to: https://nakryiko.com/posts/bpf-tips-printk/.
 
+## Profiling
+
+Kyanos provides pprof endpoints for runtime profiling and debugging. You can enable the pprof HTTP server using the `--pprof` flag:
+
+```bash
+./kyanos watch --pprof
+```
+
+By default, the pprof server listens on `localhost:6060`. You can customize the address using the `--pprof-addr` flag:
+
+```bash
+./kyanos watch --pprof --pprof-addr="0.0.0.0:9090"
+```
+
+Available pprof endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `/debug/pprof/` | Index page with all available profiles |
+| `/debug/pprof/heap` | Memory heap profile |
+| `/debug/pprof/profile` | CPU profile (30 seconds by default) |
+| `/debug/pprof/goroutine` | Goroutine dump |
+| `/debug/pprof/allocs` | Allocation profile |
+| `/debug/pprof/block` | Block profile |
+| `/debug/pprof/mutex` | Mutex contention profile |
+
+Example usage:
+
+```bash
+# Capture CPU profile
+curl -o cpu.pprof http://localhost:6060/debug/pprof/profile?seconds=30
+go tool pprof cpu.pprof
+
+# View heap profile
+go tool pprof http://localhost:6060/debug/pprof/heap
+
+# View goroutine dump
+curl http://localhost:6060/debug/pprof/goroutine?debug=1
+```
+
+> [!TIP]
+>
+> The pprof endpoint is useful for diagnosing performance issues, memory leaks, or goroutine leaks in Kyanos itself.
+
 ## Source Code Structure
 
 ```

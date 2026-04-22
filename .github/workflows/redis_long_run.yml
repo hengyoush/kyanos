@@ -1,0 +1,80 @@
+name: Redis Long Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: "Number of Redis traffic rounds after warmup"
+        required: false
+        default: "8"
+      batch_size:
+        description: "Redis commands per round"
+        required: false
+        default: "2000"
+      growth_limit_mb:
+        description: "Allowed heap growth after warmup in MB"
+        required: false
+        default: "64"
+
+permissions:
+  contents: read
+
+jobs:
+  redis-long-run:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          submodules: recursive
+
+      - name: Set up Go
+        uses: actions/setup-go@v5.3.0
+        with:
+          go-version: '1.23.3'
+
+      - name: Build
+        run: |
+          /bin/bash init_env.sh
+          make clean && make build-bpf && make
+
+      - name: Provision LVH VM
+        uses: cilium/little-vm-helper@v0.0.28
+        with:
+          test-name: redis-long-run
+          image-version: '5.15-20240912.022020'
+          cpu: 2
+          mem: '4G'
+          host-mount: ./
+          install-dependencies: 'true'
+          cmd: |
+            chmod +x /host/kyanos
+
+      - name: Install VM dependencies
+        uses: cilium/little-vm-helper@v0.0.28
+        with:
+          provision: 'false'
+          cmd: |
+            apt-get update
+            apt-get install -y redis-tools python3 curl
+
+      - name: Run Redis long-run test
+        uses: cilium/little-vm-helper@v0.0.28
+        env:
+          REDIS_LONG_RUN_ROUNDS: ${{ github.event.inputs.rounds || '8' }}
+          REDIS_LONG_RUN_BATCH_SIZE: ${{ github.event.inputs.batch_size || '2000' }}
+          REDIS_LONG_RUN_GROWTH_LIMIT_MB: ${{ github.event.inputs.growth_limit_mb || '64' }}
+          REDIS_LONG_RUN_OUTPUT_DIR: /host/testdata/output/redis-long-run
+        with:
+          provision: 'false'
+          cmd: |
+            set -euxo pipefail
+            mkdir -p /host/testdata/output/redis-long-run
+            bash /host/testdata/test_redis_long_run.sh 'sudo /host/kyanos'
+
+      - name: Upload long-run artifacts
+        if: always()
+        uses: actions/upload-artifact@v4.6.1
+        with:
+          name: redis-long-run-artifacts
+          path: testdata/output/redis-long-run
