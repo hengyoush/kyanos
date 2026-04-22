@@ -17,9 +17,9 @@ import (
 	"kyanos/bpf/loader"
 	"kyanos/common"
 	"kyanos/version"
+	"net/http"
 	"os"
 	"os/exec"
-	"net/http"
 	"os/signal"
 	"runtime"
 	"strings"
@@ -35,7 +35,6 @@ import (
 
 func SetupAgent(options ac.AgentOptions) {
 	startGopsServer(options)
-	startPprofServer(options)
 
 	if err := version.UpgradeDetect(); err != nil {
 		if errors.Is(err, version.ErrBehindLatest) {
@@ -72,6 +71,7 @@ func SetupAgent(options ac.AgentOptions) {
 		context.Background(), syscall.SIGINT, syscall.SIGTERM,
 	)
 	options.Ctx = ctx
+	startPprofServer(options)
 
 	defer stopFunc()
 
