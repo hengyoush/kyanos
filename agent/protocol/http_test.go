@@ -164,6 +164,31 @@ func TestParseResponse(t *testing.T) {
 	assert.Equal(t, uint64(20), message.Seq())
 }
 
+func parseHTTPReqMessage(t *testing.T, raw string) protocol.ParsedMessage {
+	t.Helper()
+
+	parser := protocol.HTTPStreamParser{}
+	result := parser.ParseRequest(raw, protocol.Request, 10, 20)
+	assert.Equal(t, protocol.Success, result.ParseState)
+	assert.Len(t, result.ParsedMessages, 1)
+
+	return result.ParsedMessages[0]
+}
+
+func parseHTTPRespMessage(t *testing.T, raw string) protocol.ParsedMessage {
+	t.Helper()
+
+	streamBuffer := buffer.New(1000)
+	streamBuffer.Add(10, []byte(raw), 10000)
+
+	parser := protocol.HTTPStreamParser{}
+	result := parser.ParseResponse(raw, protocol.Response, 10, 20, streamBuffer)
+	assert.Equal(t, protocol.Success, result.ParseState)
+	assert.Len(t, result.ParsedMessages, 1)
+
+	return result.ParsedMessages[0]
+}
+
 func TestHttpFilter_Filter(t *testing.T) {
 	type fields struct {
 		TargetPath       string
@@ -171,9 +196,11 @@ func TestHttpFilter_Filter(t *testing.T) {
 		TargetPathPrefix string
 		TargetHostName   string
 		TargetMethods    []string
+		TargetBodyReg    *regexp.Regexp
 	}
 	type args struct {
-		parsedReq protocol.ParsedMessage
+		parsedReq  protocol.ParsedMessage
+		parsedResp protocol.ParsedMessage
 	}
 	tests := []struct {
 		name   string
@@ -197,6 +224,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Path: "/foo/bar",
 				},
+				parsedResp: nil,
 			},
 			want: true,
 		},
@@ -209,6 +237,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Path: "/foo/bar/baz",
 				},
+				parsedResp: nil,
 			},
 			want: false,
 		},
@@ -221,6 +250,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Path: "/foo/bar/baz",
 				},
+				parsedResp: nil,
 			},
 			want: true,
 		},
@@ -233,6 +263,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Path: "/test",
 				},
+				parsedResp: nil,
 			},
 			want: false,
 		},
@@ -245,6 +276,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Path: "/foo/bar/100/baz",
 				},
+				parsedResp: nil,
 			},
 			want: true,
 		},
@@ -257,6 +289,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Path: "/test",
 				},
+				parsedResp: nil,
 			},
 			want: false,
 		},
@@ -269,6 +302,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 					Host:   "test.com",
 					Method: "POST",
 				},
+				parsedResp: nil,
 			},
 			want: true,
 		},
@@ -281,6 +315,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Method: "GET",
 				},
+				parsedResp: nil,
 			},
 			want: true,
 		},
@@ -293,6 +328,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Method: "POST",
 				},
+				parsedResp: nil,
 			},
 			want: false,
 		},
@@ -305,6 +341,7 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Host: "foo.bar",
 				},
+				parsedResp: nil,
 			},
 			want: true,
 		},
@@ -317,6 +354,52 @@ func TestHttpFilter_Filter(t *testing.T) {
 				parsedReq: &protocol.ParsedHttpRequest{
 					Host: "foo.baz",
 				},
+				parsedResp: nil,
+			},
+			want: false,
+		},
+		{
+			name: "filter_by_request_body_regex",
+			fields: fields{
+				TargetBodyReg: regexp.MustCompile(`reqId=123`),
+			},
+			args: args{
+				parsedReq: parseHTTPReqMessage(t,
+					"POST /foo HTTP/1.1\r\nHost: foo.bar\r\nContent-Length: 21\r\n\r\npayload=reqId=123&x=1",
+				),
+				parsedResp: parseHTTPRespMessage(t,
+					"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok",
+				),
+			},
+			want: true,
+		},
+		{
+			name: "filter_by_response_body_regex",
+			fields: fields{
+				TargetBodyReg: regexp.MustCompile(`status=ok`),
+			},
+			args: args{
+				parsedReq: parseHTTPReqMessage(t,
+					"POST /foo HTTP/1.1\r\nHost: foo.bar\r\nContent-Length: 6\r\n\r\nhello!",
+				),
+				parsedResp: parseHTTPRespMessage(t,
+					"HTTP/1.1 200 OK\r\nContent-Length: 17\r\n\r\nresult=status=ok!",
+				),
+			},
+			want: true,
+		},
+		{
+			name: "not_filter_by_body_regex",
+			fields: fields{
+				TargetBodyReg: regexp.MustCompile(`reqId=123`),
+			},
+			args: args{
+				parsedReq: parseHTTPReqMessage(t,
+					"POST /foo HTTP/1.1\r\nHost: foo.bar\r\nContent-Length: 7\r\n\r\nnope123",
+				),
+				parsedResp: parseHTTPRespMessage(t,
+					"HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\nstillno",
+				),
 			},
 			want: false,
 		},
@@ -329,8 +412,18 @@ func TestHttpFilter_Filter(t *testing.T) {
 				TargetPathPrefix: tt.fields.TargetPathPrefix,
 				TargetHostName:   tt.fields.TargetHostName,
 				TargetMethods:    tt.fields.TargetMethods,
+				TargetBodyReg:    tt.fields.TargetBodyReg,
 			}
-			assert.Equalf(t, tt.want, filter.Filter(tt.args.parsedReq, nil), "Filter(%v, %v)", tt.args.parsedReq, nil)
+			assert.Equalf(t, tt.want, filter.Filter(tt.args.parsedReq, tt.args.parsedResp), "Filter(%v, %v)", tt.args.parsedReq, tt.args.parsedResp)
 		})
 	}
+}
+
+func TestHttpFilter_BodyRegexRequiresResponseFiltering(t *testing.T) {
+	filter := protocol.HttpFilter{
+		TargetBodyReg: regexp.MustCompile(`reqId=123`),
+	}
+
+	assert.True(t, filter.FilterByRequest())
+	assert.True(t, filter.FilterByResponse())
 }
