@@ -60,11 +60,11 @@ var ContainerName string
 var PodName string
 
 func init() {
-	rootCmd.PersistentFlags().StringSliceVarP(&FilterPids, "pids", "p", []string{}, "Filter by pids, seperate by ','")
+	rootCmd.PersistentFlags().StringSliceVarP(&FilterPids, "pids", "p", []string{}, "Filter by pids, separate by ','")
 	rootCmd.PersistentFlags().StringVar(&options.FilterComm, "comm", "", "Filter by process name")
-	rootCmd.PersistentFlags().StringSliceVarP(&RemotePorts, common.RemotePortsVarName, "", []string{}, "Filter by remote ports, seperate by ','")
-	rootCmd.PersistentFlags().StringSliceVarP(&LocalPorts, common.LocalPortsVarName, "", []string{}, "Filter by local ports, seperate by ','")
-	rootCmd.PersistentFlags().StringSliceVarP(&RemoteIps, common.RemoteIpsVarName, "", []string{}, "Filter by remote ips, seperate by ','")
+	rootCmd.PersistentFlags().StringSliceVarP(&RemotePorts, common.RemotePortsVarName, "", []string{}, "Filter by remote ports, separate by ','")
+	rootCmd.PersistentFlags().StringSliceVarP(&LocalPorts, common.LocalPortsVarName, "", []string{}, "Filter by local ports, separate by ','")
+	rootCmd.PersistentFlags().StringSliceVarP(&RemoteIps, common.RemoteIpsVarName, "", []string{}, "Filter by remote ips, separate by ','")
 	// rootCmd.PersistentFlags().StringVar(&IfName, "ifname", "eth0", "--ifname eth0")
 	rootCmd.PersistentFlags().StringVar(&BTFFilePath, "btf", "", "specify kernel BTF file")
 
