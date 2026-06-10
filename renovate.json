@@ -2,5 +2,13 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "k8s.io/kubernetes/staging/src/k8s.io/cri-api"
+      ],
+      "enabled": false
+    }
   ]
 }
