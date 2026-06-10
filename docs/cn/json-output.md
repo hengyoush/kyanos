@@ -33,7 +33,7 @@ kyanos watch --json-output=/path/to/custom.json
 
 | 字段          | 类型    | 描述                                    |
 | ------------- | ------- | --------------------------------------- |
-| `protocol`    | string  | 协议名称（如 "HTTP"、"Redis"、"MySQL"） |
+| `protocol`    | string  | 协议名称（如 "HTTP"、"Redis"、"MySQL"、"RocketMQ"、"Kafka"、"MongoDB"、"DNS"） |
 | `side`        | string  | 连接的角色（客户端或服务端）            |
 | `local_addr`  | string  | 本地 IP 地址                            |
 | `local_port`  | number  | 本地端口号                              |

@@ -89,6 +89,8 @@ Kyanos provides the **watch** command, allowing you to filter and capture
 various traffic types. It supports filtering based on process ID, container ID,
 container name, pod name, as well as IP and port. Additionally, you can filter
 based on protocol-specific fields, such as HTTP paths, Redis commands, and keys.
+Supported protocol parsers include HTTP, Redis, MySQL, RocketMQ, Kafka, MongoDB,
+and DNS.
 The captured traffic includes not only the request and response content but also
 detailed timing information, such as the time taken for requests to go from
 system calls to the network card and for responses to travel from the network

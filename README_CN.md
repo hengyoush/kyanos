@@ -29,7 +29,6 @@
 - [🎯 How to get kyanos](#-how-to-get-kyanos)
 - [⚙ Usage](#-usage)
 - [🏠 How to Build](#-how-to-build)
-- [Roadmap](#roadmap)
 - [🤝 Feedback and Contributions](#-feedback-and-contributions)
 - [🙇‍ Special Thanks](#-special-thanks)
 - [🗨️ Contacts](#️-contacts)
@@ -171,17 +170,6 @@ sudo ./kyanos watch
 ## 🏠 How to Build
 
 👉 [COMPILATION_CN.md](./COMPILATION_CN.md)
-
-## Roadmap
-
-Kyanos 的 Roadmap 展示了 Kyanos 未来的计划，如果你有功能需求，或者想提高某个特性的优先级，请在 GitHub 上提交 issue。
-
-_1.6.0_
-
-1. 支持 postgresql 协议解析。
-2. 支持 HTTP2 协议。
-3. 支持 DNS 协议。
-4. 支持 GnuTLS 库解析加密流量。
 
 ## 🤝 Feedback and Contributions
 

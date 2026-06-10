@@ -26,8 +26,8 @@ features:
   - icon: 🚀
     title: Easy-to-use
     details:
-      Focusing on the Layer 7 protocol, capture and analyze application layer
-      network performance with a single command.
+      Focusing on Layer 7 protocols, capture and analyze HTTP, Redis, MySQL,
+      Kafka, MongoDB, RocketMQ, and DNS performance with a single command.
     link: ./how-to
     linkText: Learn how to use kyanos
   - icon: 🎯️

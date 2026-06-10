@@ -25,8 +25,8 @@ kyanos watch
 ```
 
 Since no filter is specified, `kyanos` will attempt to capture all traffic it
-can analyze. Currently, `kyanos` supports parsing three application-layer
-protocols: `HTTP`, `Redis`, and `MySQL`.
+can analyze. Currently, `kyanos` supports parsing `HTTP`, `Redis`, `MySQL`,
+`RocketMQ`, `Kafka`, `MongoDB`, and `DNS`.
 
 When you execute this command, you’ll see a table like this:
 ![kyanos watch result](/watch-result.jpg)
@@ -120,6 +120,10 @@ adding the protocol name as subcommand. The currently supported protocols are:
 - `http`
 - `redis`
 - `mysql`
+- `rocketmq`
+- `kafka`
+- `mongodb`
+- `dns`
 
 For example, to capture only HTTP requests to the path `/foo/bar`, you would
 run:
@@ -180,6 +184,11 @@ Here are the options available for filtering by each protocol:
 | Filter Condition | Command Line Flag | Example |
 | :------- | :-------------- | :---------------------------------------------------------------------- |
 | host  | `host` | `--host example.com`                  |
+
+#### MongoDB Protocol Filtering
+
+> MongoDB protocol capturing is supported, but filtering by conditions is still
+> in development...
 
 #### MySQL Protocol Filtering
 
