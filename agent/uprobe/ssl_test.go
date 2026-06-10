@@ -7,6 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestOpenSSL36VersionsAreMapped(t *testing.T) {
+	for _, versionKey := range []string{
+		"openssl 3.6.0",
+		"openssl 3.6.1",
+		"openssl 3.6.2",
+	} {
+		assert.NotNil(t, sslVersionBpfMap[versionKey], versionKey)
+	}
+}
+
 func TestDetectOpenSsl(t *testing.T) {
 	key, err := detectOpenSsl(2276284)
 	assert.Nil(t, err)
