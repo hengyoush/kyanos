@@ -1,6 +1,6 @@
 module kyanos
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/Ha4sh-447/flowcharts v0.0.0-20240802124452-44516e0e7dc8
@@ -31,8 +31,8 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/zcalusic/sysinfo v1.1.2
 	golang.org/x/arch v0.24.0
-	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
-	golang.org/x/sys v0.30.0
+	golang.org/x/exp v0.0.0-20260611194520-c48552f49976
+	golang.org/x/sys v0.46.0
 	k8s.io/cri-api v0.31.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.24.17
@@ -40,8 +40,8 @@ require (
 )
 
 require (
-	golang.org/x/mod v0.23.0 // indirect
-	golang.org/x/tools v0.30.0 // indirect
+	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/tools v0.46.0 // indirect
 )
 
 require (
@@ -132,11 +132,11 @@ require (
 	go.opentelemetry.io/otel/sdk v1.30.0 // indirect
 	go.opentelemetry.io/otel/trace v1.30.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
-	golang.org/x/net v0.35.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
-	golang.org/x/term v0.29.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/term v0.44.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.1 // indirect
