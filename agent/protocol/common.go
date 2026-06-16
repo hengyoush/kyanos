@@ -4,6 +4,11 @@ import (
 	"kyanos/agent/buffer"
 )
 
+const (
+	maxPendingParsedMessages      = 1024
+	maxPendingParsedMessagesBytes = 16 * 1024 * 1024
+)
+
 func matchByTimestamp(reqStream *ParsedMessageQueue, respStream *ParsedMessageQueue) []Record {
 	if len(*reqStream) == 0 || len(*respStream) == 0 {
 		return nil
@@ -34,6 +39,41 @@ func matchByTimestamp(reqStream *ParsedMessageQueue, respStream *ParsedMessageQu
 		}
 	}
 	return records
+}
+
+func trimPendingParsedMessages(queue *ParsedMessageQueue, maxCount int, maxBytes int) {
+	if queue == nil || len(*queue) == 0 {
+		return
+	}
+
+	start := len(*queue)
+	keptCount := 0
+	keptBytes := 0
+	for i := len(*queue) - 1; i >= 0; i-- {
+		msgBytes := max(1, (*queue)[i].ByteSize())
+		if keptCount > 0 && (keptCount+1 > maxCount || keptBytes+msgBytes > maxBytes) {
+			break
+		}
+		start = i
+		keptCount++
+		keptBytes += msgBytes
+	}
+
+	if start > 0 {
+		*queue = (*queue)[start:]
+	}
+}
+
+func trimPendingParsedMessagesForStream(streams map[StreamId]*ParsedMessageQueue, streamID StreamId) {
+	queue, ok := streams[streamID]
+	if !ok || queue == nil {
+		return
+	}
+
+	trimPendingParsedMessages(queue, maxPendingParsedMessages, maxPendingParsedMessagesBytes)
+	if len(*queue) == 0 {
+		delete(streams, streamID)
+	}
 }
 
 func CreateFrameBase(streamBuffer *buffer.StreamBuffer, readBytes int) (FrameBase, bool) {

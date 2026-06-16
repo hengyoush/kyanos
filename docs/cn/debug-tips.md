@@ -85,6 +85,50 @@ VSCODE 直接打开项目即可，.vscode/launch.json 添加配置如下：
 
 注意添加 `--debug-output` 参数。
 
+## 性能分析（Profiling）
+
+Kyanos 提供了 pprof 端点用于运行时性能分析和调试。你可以使用 `--pprof` 标志启用 pprof HTTP 服务器：
+
+```bash
+./kyanos watch --pprof
+```
+
+默认情况下，pprof 服务器监听 `localhost:6060`。你可以使用 `--pprof-addr` 标志自定义监听地址：
+
+```bash
+./kyanos watch --pprof --pprof-addr="0.0.0.0:9090"
+```
+
+可用的 pprof 端点：
+
+| 端点 | 说明 |
+|------|------|
+| `/debug/pprof/` | 索引页面，显示所有可用的 profile |
+| `/debug/pprof/heap` | 内存堆 profile |
+| `/debug/pprof/profile` | CPU profile（默认 30 秒） |
+| `/debug/pprof/goroutine` | Goroutine 堆栈信息 |
+| `/debug/pprof/allocs` | 内存分配 profile |
+| `/debug/pprof/block` | 阻塞 profile |
+| `/debug/pprof/mutex` | 锁竞争 profile |
+
+使用示例：
+
+```bash
+# 采集 CPU profile
+curl -o cpu.pprof http://localhost:6060/debug/pprof/profile?seconds=30
+go tool pprof cpu.pprof
+
+# 查看堆内存 profile
+go tool pprof http://localhost:6060/debug/pprof/heap
+
+# 查看 goroutine 堆栈
+curl http://localhost:6060/debug/pprof/goroutine?debug=1
+```
+
+> [!TIP]
+>
+> pprof 端点对于诊断 Kyanos 自身的性能问题、内存泄漏或 goroutine 泄漏非常有用。
+
 ## 源码结构
 
 ```

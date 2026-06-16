@@ -17,6 +17,7 @@ import (
 	"kyanos/bpf/loader"
 	"kyanos/common"
 	"kyanos/version"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -26,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	_ "net/http/pprof"
+	"net/http/pprof"
 
 	"github.com/cilium/ebpf/rlimit"
 	gops "github.com/google/gops/agent"
@@ -70,6 +71,7 @@ func SetupAgent(options ac.AgentOptions) {
 		context.Background(), syscall.SIGINT, syscall.SIGTERM,
 	)
 	options.Ctx = ctx
+	startPprofServer(options)
 
 	defer stopFunc()
 
@@ -251,4 +253,50 @@ func startGopsServer(opts ac.AgentOptions) {
 			common.AgentLog.Info("gops server started")
 		}
 	}
+}
+
+func startPprofServer(opts ac.AgentOptions) {
+	if !opts.EnablePprof {
+		return
+	}
+
+	addr := opts.GetPprofAddr()
+	displayAddr := addr
+	if strings.HasPrefix(addr, ":") {
+		displayAddr = "localhost" + addr
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.HandleFunc("/debug/pprof/{name}", pprof.Index)
+
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	go func() {
+		common.AgentLog.Infof("Starting pprof server on http://%s/debug/pprof/", displayAddr)
+		common.AgentLog.Info("pprof endpoints: /debug/pprof/heap, /debug/pprof/profile, /debug/pprof/goroutine")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			common.AgentLog.Errorf("Failed to start pprof server: %v", err)
+		}
+	}()
+
+	go func() {
+		<-opts.Ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			common.AgentLog.Errorf("Failed to shutdown pprof server: %v", err)
+		} else {
+			common.AgentLog.Info("pprof server shutdown gracefully")
+		}
+	}()
 }

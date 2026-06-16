@@ -105,6 +105,8 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&options.MaxAllowStuckTimeMills, "max-allow-stuck-time-mills", 1000, "--max-allow-stuck-time-mills 100")
 
 	rootCmd.PersistentFlags().BoolVar(&options.StartGopsServer, "gops", false, "start gops server")
+	rootCmd.PersistentFlags().BoolVar(&options.EnablePprof, "pprof", false, "enable pprof HTTP endpoint for profiling (WARNING: exposes sensitive profiling data; do not use on untrusted networks)")
+	rootCmd.PersistentFlags().StringVar(&options.PprofAddr, "pprof-addr", "127.0.0.1:6060", "pprof HTTP server address (WARNING: binding to non-loopback addresses, e.g. \":6060\" or \"0.0.0.0:6060\", will expose profiling data to the network)")
 
 	rootCmd.PersistentFlags().MarkHidden("default-log-level")
 	rootCmd.PersistentFlags().MarkHidden("agent-log-level")
