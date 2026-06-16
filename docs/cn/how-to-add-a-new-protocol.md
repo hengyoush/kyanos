@@ -2,7 +2,7 @@
 
 ## 背景
 
-kyanos 需要捕获协议消息组成请求响应对以供终端展示，因此 kyanos 需要每个协议的协议解析代码，目前支持 HTTP、MySQL 和 Redis，将来会支持更多。本文将阐述 kyanos 协议解析的整体架构，以协助开发新的协议。
+kyanos 需要捕获协议消息组成请求响应对以供终端展示，因此 kyanos 需要每个协议的协议解析代码，目前支持 HTTP、Redis、MySQL、RocketMQ、Kafka、MongoDB 和 DNS，将来会支持更多。本文将阐述 kyanos 协议解析的整体架构，以协助开发新的协议。
 
 ## 协议解析流程总览
 

@@ -4,9 +4,10 @@
 
 Kyanos needs to capture protocol messages to form request-response pairs for
 terminal display. Therefore, Kyanos requires protocol parsing code for each
-protocol. Currently, it supports HTTP, MySQL, and Redis, and will support more
-in the future. This document will explain the overall architecture of Kyanos
-protocol parsing to assist in developing new protocols.
+protocol. It currently includes parsers for HTTP, Redis, MySQL, RocketMQ,
+Kafka, MongoDB, and DNS, and will support more in the future. This document
+will explain the overall architecture of Kyanos protocol parsing to assist in
+developing new protocols.
 
 ## Overview of Protocol Parsing Process
 

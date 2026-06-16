@@ -36,7 +36,7 @@ fields:
 
 | Field         | Type    | Description                                        |
 | ------------- | ------- | -------------------------------------------------- |
-| `protocol`    | string  | Protocol name (e.g., "HTTP", "Redis", "MySQL")     |
+| `protocol`    | string  | Protocol name (e.g., "HTTP", "Redis", "MySQL", "RocketMQ", "Kafka", "MongoDB", "DNS") |
 | `side`        | string  | Whether this is a client or server side connection |
 | `local_addr`  | string  | Local IP address                                   |
 | `local_port`  | number  | Local port number                                  |

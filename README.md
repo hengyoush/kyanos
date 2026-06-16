@@ -34,7 +34,6 @@
   - [📝 Documentation](#-documentation)
   - [⚙ Usage](#-usage)
   - [🏠 How to build](#-how-to-build)
-  - [Roadmap](#roadmap)
   - [🤝 Feedback and Contributions](#-feedback-and-contributions)
   - [🙇‍ Special Thanks](#-special-thanks)
   - [🗨️ Contacts](#️-contacts)
@@ -43,8 +42,9 @@
 ## What is kyanos
 
 Kyanos is an **eBPF-based** network issue analysis tool that enables you to
-capture network requests, such as HTTP, Redis, and MySQL requests.  
-It also helps you analyze abnormal network issues and quickly troubleshooting
+capture network requests, such as HTTP, Redis, MySQL, Kafka, MongoDB,
+RocketMQ, and DNS requests. It also helps you analyze abnormal network issues
+and quickly troubleshooting
 without the complex steps of packet capturing, downloading, and analysis.
 
 1. **Powerful Traffic Filtering**: Not only can filter based on traditional
@@ -202,19 +202,6 @@ Learn more: [Kyanos Docs](https://kyanos.io/)
 ## 🏠 How to build
 
 👉 [COMPILATION.md](./COMPILATION.md)
-
-## Roadmap
-
-The Kyanos Roadmap shows the future plans for Kyanos. If you have feature
-requests or want to prioritize a specific feature, please submit an issue on
-GitHub.
-
-_1.6.0_
-
-1. Support for postgresql protocol parsing.
-2. Support for HTTP2 protocol parsing.
-3. Support for DNS protocol parsing.
-4. Support for GnuTLS.
 
 ## 🤝 Feedback and Contributions
 
