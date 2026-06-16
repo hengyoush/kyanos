@@ -16,6 +16,7 @@ permissions:
 jobs:
 
   build:
+    if: ${{ github.actor != 'renovate[bot]' && !startsWith(github.head_ref, 'renovate/') && !startsWith(github.ref_name, 'renovate/') }}
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
@@ -57,6 +58,7 @@ jobs:
 
   e2e-test:
     name: e2e-test
+    if: ${{ github.actor != 'renovate[bot]' && !startsWith(github.head_ref, 'renovate/') && !startsWith(github.ref_name, 'renovate/') }}
     needs: build
     strategy:
       fail-fast: false
