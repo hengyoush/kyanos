@@ -52,6 +52,7 @@ func init() {
 	watchCmd.PersistentFlags().BoolVar(&options.WatchOptions.TraceDevEvent, "trace-dev-event", true, "Collect dev layer events to measure network interface time spent.")
 	watchCmd.PersistentFlags().BoolVar(&options.WatchOptions.TraceSocketEvent, "trace-socket-event", false, "Collect socket layer events to measure the time spent on socket data copying.")
 	watchCmd.PersistentFlags().BoolVar(&options.WatchOptions.TraceSslEvent, "trace-ssl-event", true, "Collect SSL events to trace SSL connection data.")
+	watchCmd.PersistentFlags().BoolVar(&options.EnableIPVS, "enable-ipvs", false, "Enable IPVS load balancer tracing to show VIP to RealServer mapping.")
 	watchCmd.Flags().SortFlags = false
 	watchCmd.PersistentFlags().SortFlags = false
 	rootCmd.AddCommand(watchCmd)

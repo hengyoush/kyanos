@@ -186,6 +186,22 @@ type AnnotatedRecord struct {
 	RespSyscallEventDetails      []SyscallEventDetail
 	ReqNicEventDetails           []NicEventDetail
 	RespNicEventDetails          []NicEventDetail
+	// IPVS 相关字段
+	IpvsEnabled   bool
+	IpvsVIP       string
+	IpvsVPort     uint16
+	IpvsRealIP    string
+	IpvsRealPort  uint16
+	IpvsMode      string
+	IpvsLatencyNs uint64
+	IpvsEvents    []IpvsEventDetail // IPVS 函数调用事件列表
+}
+
+// IpvsEventDetail 存储单个 IPVS 事件的详情
+type IpvsEventDetail struct {
+	EventType   string // 事件类型名称，如 CONN_NEW, SCHEDULE, NAT_XMIT 等
+	LatencyNs   uint64 // 该事件的延迟（纳秒）
+	TimestampNs uint64 // 事件时间戳
 }
 
 func (a *AnnotatedRecord) GetTotalDurationMills() float64 {
