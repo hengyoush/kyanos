@@ -7,12 +7,16 @@ import (
 )
 
 var redisCmd *cobra.Command = &cobra.Command{
-	Use:   "redis [--command COMMANDS]",
+	Use:   "redis [--command COMMANDS] [--exclude-commands COMMANDS]",
 	Short: "watch Redis message",
 	Run: func(cmd *cobra.Command, args []string) {
 		commands, err := cmd.Flags().GetStringSlice("command")
 		if err != nil {
 			logger.Fatalf("invalid method: %v\n", err)
+		}
+		excludedCommands, err := cmd.Flags().GetStringSlice("exclude-commands")
+		if err != nil {
+			logger.Fatalf("invalid exclude-commands: %v\n", err)
 		}
 		keys, err := cmd.Flags().GetStringSlice("keys")
 		if err != nil {
@@ -24,9 +28,10 @@ var redisCmd *cobra.Command = &cobra.Command{
 		}
 
 		options.MessageFilter = protocol.RedisFilter{
-			TargetCommands: commands,
-			TargetKeys:     keys,
-			KeyPrefix:      prefix,
+			TargetCommands:   commands,
+			ExcludedCommands: excludedCommands,
+			TargetKeys:       keys,
+			KeyPrefix:        prefix,
 		}
 		options.LatencyFilter = initLatencyFilter(cmd)
 		options.SizeFilter = initSizeFilter(cmd)
@@ -36,6 +41,7 @@ var redisCmd *cobra.Command = &cobra.Command{
 
 func init() {
 	redisCmd.Flags().StringSlice("command", []string{}, "Specify the redis command to monitor(GET, SET), seperate by ','")
+	redisCmd.Flags().StringSlice("exclude-commands", []string{}, "Specify redis commands to exclude(INFO, CLUSTER), seperate by ','")
 	redisCmd.Flags().StringSlice("keys", []string{}, "Specify the redis keys to monitor, seperate by ','")
 	redisCmd.Flags().String("key-prefix", "", "Specify the redis key prefix to monitor")
 	redisCmd.Flags().SortFlags = false
