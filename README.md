@@ -228,6 +228,6 @@ For more detailed inquiries, you can use the following contact methods:
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=hengyoush/kyanos&type=Date)](https://star-history.com/#hengyoush/kyanos&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=hengyoush/kyanos&type=Date)](https://star-history.dera.page/#hengyoush/kyanos&Date)
 
 [Back to top](#top)
