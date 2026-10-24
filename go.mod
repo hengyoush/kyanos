@@ -1,6 +1,6 @@
 module kyanos
 
-go 1.24.0
+go 1.27
 
 require (
 	github.com/Ha4sh-447/flowcharts v0.0.0-20240802124452-44516e0e7dc8
@@ -29,7 +29,8 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
-	github.com/zcalusic/sysinfo v1.1.2
+	github.com/zcalusic/sysinfo v1.2.0
+	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/arch v0.24.0
 	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
 	golang.org/x/sys v0.30.0
@@ -37,11 +38,6 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubernetes v1.24.17
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
-)
-
-require (
-	golang.org/x/mod v0.23.0 // indirect
-	golang.org/x/tools v0.30.0 // indirect
 )
 
 require (
@@ -123,7 +119,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.14 // indirect
 	github.com/tklauser/numcpus v0.9.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.mongodb.org/mongo-driver v1.17.1
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.55.0 // indirect
 	go.opentelemetry.io/otel v1.30.0 // indirect
@@ -133,10 +128,12 @@ require (
 	go.opentelemetry.io/otel/trace v1.30.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/mod v0.23.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/tools v0.30.0 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.1 // indirect
